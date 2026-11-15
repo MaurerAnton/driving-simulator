@@ -7,6 +7,10 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 
 *English summary [below](#english).*
 
+| | |
+| --- | --- |
+| ![Blick über Baunatal mit den Gebäuden aus dem amtlichen 3D-Modell](docs/img/baunatal.jpg) | ![Cockpit mit Instrumenten, Innenspiegel, Regel-Hilfe und Karte](docs/img/cockpit.jpg) |
+
 > Der Simulator ersetzt keine Fahrstunde und keine amtliche Prüfung. Er hilft, Regeln und Abläufe zu
 > verstehen und zu üben – Verkehrsbeobachtung und Verantwortung lernt man nur im echten Verkehr mit
 > einer Fahrlehrerin oder einem Fahrlehrer.

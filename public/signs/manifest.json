@@ -1106,6 +1106,15 @@
     "height": 330,
     "shape": "rect"
   },
+  "1000-11": {
+    "title": "Vorankündigung, linksweisend",
+    "commonsFile": "File:Zusatzzeichen 1000-11 - Richtung der Gefahrstelle, linksweisend, StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1000-11_-_Richtung_der_Gefahrstelle,_linksweisend,_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 600,
+    "height": 330,
+    "shape": "rect"
+  },
   "1000-20": {
     "title": "Richtung, rechtsweisend",
     "commonsFile": "File:Zusatzzeichen 1000-20 - Richtungsangaben durch Pfeile, rechtsweisend, StVO 1992.svg",
@@ -1115,10 +1124,28 @@
     "height": 330,
     "shape": "rect"
   },
+  "1000-21": {
+    "title": "Vorankündigung, rechtsweisend",
+    "commonsFile": "File:Zusatzzeichen 1000-21 - Richtung der Gefahrstelle, rechtsweisend, StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1000-21_-_Richtung_der_Gefahrstelle,_rechtsweisend,_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 600,
+    "height": 330,
+    "shape": "rect"
+  },
   "1000-30": {
     "title": "Beide Richtungen, zwei gegengerichtete waagerechte Pfeile",
     "commonsFile": "File:Zusatzzeichen 1000-30 - beide Richtungen, zwei gegengerichtete waagerechte Pfeile, StVO 1992.svg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1000-30_-_beide_Richtungen,_zwei_gegengerichtete_waagerechte_Pfeile,_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 600,
+    "height": 330,
+    "shape": "rect"
+  },
+  "1001-30": {
+    "title": "Auf ... m",
+    "commonsFile": "File:Zusatzzeichen 1001-30 - auf ... m, StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1001-30_-_auf_..._m,_StVO_1992.svg",
     "license": "Public domain",
     "width": 600,
     "height": 330,
@@ -1284,6 +1311,24 @@
     "license": "Public domain",
     "width": 600,
     "height": 450,
+    "shape": "rect"
+  },
+  "1026-35": {
+    "title": "Lieferverkehr frei",
+    "commonsFile": "File:Zusatzzeichen 1026-35 - Lieferverkehr frei, StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1026-35_-_Lieferverkehr_frei,_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 601,
+    "height": 451,
+    "shape": "rect"
+  },
+  "1026-36": {
+    "title": "Landwirtschaftlicher Verkehr frei",
+    "commonsFile": "File:Zusatzzeichen 1026-36 - Landwirtschaftlicher Verkehr frei (450x600), StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1026-36_-_Landwirtschaftlicher_Verkehr_frei_(450x600),_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 601,
+    "height": 451,
     "shape": "rect"
   },
   "1026-38": {
