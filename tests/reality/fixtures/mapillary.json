@@ -1,0 +1,33 @@
+{
+ "data": [
+  {
+   "id": "1000000000000001",
+   "geometry": { "type": "Point", "coordinates": [9.41105, 51.25531] },
+   "computed_geometry": { "type": "Point", "coordinates": [9.411061, 51.255302] },
+   "compass_angle": 271.3,
+   "computed_compass_angle": 268.9,
+   "captured_at": 1690000000000,
+   "is_pano": false,
+   "camera_type": "perspective",
+   "thumb_256_url": "https://example.invalid/mly/1000000000000001/256.jpg",
+   "thumb_1024_url": "https://example.invalid/mly/1000000000000001/1024.jpg",
+   "thumb_2048_url": "https://example.invalid/mly/1000000000000001/2048.jpg",
+   "creator": { "username": "example-contributor", "id": "42" },
+   "sequence": "seq-a"
+  },
+  {
+   "id": "1000000000000002",
+   "geometry": { "type": "Point", "coordinates": [9.4114, 51.2556] },
+   "compass_angle": 15,
+   "captured_at": 1720000000000,
+   "is_pano": true,
+   "camera_type": "spherical",
+   "thumb_256_url": "https://example.invalid/mly/1000000000000002/256.jpg",
+   "thumb_1024_url": "https://example.invalid/mly/1000000000000002/1024.jpg",
+   "thumb_2048_url": "https://example.invalid/mly/1000000000000002/2048.jpg",
+   "creator": { "username": "another-example", "id": "43" },
+   "sequence": "seq-b"
+  },
+  { "id": "1000000000000003", "captured_at": 1720000000000 }
+ ]
+}

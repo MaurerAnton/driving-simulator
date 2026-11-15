@@ -37,6 +37,9 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 - **Fahrstunden und Prüfungsfahrt:** Grundlagen (Anfahren, Schalten, Anhalten), rechts vor links,
   Vorfahrtschilder, Ampeln, Kreisverkehr, Überland, Autobahn – und eine Prüfungsfahrt mit Auswertung.
 - **Verkehr:** Fahrzeuge, die Ampeln, Vorfahrt und Abstand beachten, sowie Fußgänger an Überwegen.
+- **Realansicht:** „Wie sieht es hier in echt aus?“ – Taste `F` zeigt echte Straßenfotos der Stelle, an der
+  das Auto steht: aus den freien Bilddiensten Panoramax, KartaView und Mapillary oder aus eigenen Bildern
+  (auch 360°-Panoramen, wie sie Street-View-Downloader speichern). Mehr dazu [unten](#realansicht).
 - Tastatur, Gamepad, **Lenkrad mit Pedalen und H-Schaltung** (Gamepad-API), Touch. Deutsch und Englisch.
 
 ## Steuerung (Tastatur)
@@ -54,6 +57,37 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 | `J` `K` oder Maus ziehen | Schulterblick links / rechts (beide Tasten: nach hinten) |
 | `B` · `L` `O` · `H` | Gurt · Abblend-/Fernlicht · Hupe |
 | `V` · `T` · `Esc` | Kamera · Auto zurück auf die Straße · Pause |
+| `F` | Realansicht: echte Fotos dieser Stelle |
+
+## Realansicht
+
+Mit `F` (oder im Pausenmenü) öffnet sich die Realansicht für die Stelle, an der das Auto gerade steht – zum
+Vergleichen: Welche Schilder stehen dort wirklich, wie sieht die Kreuzung aus?
+
+![Realansicht mit einem gezeichneten 360°-Testbild – echte Fotos werden nicht mit dem Projekt verteilt](docs/img/realansicht.jpg)
+
+- **Freie Bilddienste:** [Panoramax](https://panoramax.fr) und [KartaView](https://kartaview.org) ohne
+  Anmeldung, [Mapillary](https://www.mapillary.com) (Meta) mit einem kostenlosen Zugangsschlüssel, den man
+  im Fenster einträgt. Die Fotos stehen unter CC BY-SA 4.0 und werden mit Urheber, Datum und Link zum
+  Original angezeigt. Panoramax und KartaView haben Bilder aus Baunatal, wenn auch lückenhaft; Mapillary
+  ist in deutschen Städten meist am dichtesten abgedeckt.
+- **Eigene Bilder:** Fotos und 360°-Panoramen vom eigenen Gerät (JPEG, PNG, WebP) per Dateiauswahl, Ordner
+  oder Ziehen ins Fenster – etwa mit *streetview-dl*, *streetviewdownloader* oder einer Browser-Erweiterung
+  gespeicherte Panoramen. Position und Blickrichtung werden aus EXIF/XMP, einer beiliegenden Liste (JSON,
+  GeoJSON, CSV) oder dem Dateinamen gelesen; Panoramen lassen sich mit der Maus drehen und zeigen zuerst in
+  Fahrtrichtung. Die Bilder bleiben auf dem eigenen Gerät. Einzelheiten:
+  [public/panos/README.md](public/panos/README.md).
+- **Im Browser öffnen:** Links öffnen dieselbe Stelle bei Panoramax, Mapillary, KartaView, Google Street
+  View und OpenStreetMap in einem neuen Tab.
+
+**Datenschutz:** Der Simulator selbst ruft nichts ab. Erst wenn man in der Realansicht einen Dienst anhakt,
+fragt der Browser diesen direkt – der Dienst erfährt dabei die IP-Adresse und die Stelle auf der Karte.
+**Lizenz:** Es werden keine fremden Bilder mit dem Projekt ausgeliefert; Bilder von Google Street View und
+anderen nicht frei lizenzierten Quellen kann man für sich selbst laden, aber nicht weitergeben.
+
+Wer eine eigene Kopie betreibt, kann einen Mapillary-Schlüssel als Repository-Variable `MAPILLARY_TOKEN`
+hinterlegen (er wird beim Bauen als `VITE_MAPILLARY_TOKEN` eingesetzt) und eigene, frei lizenzierte Bilder
+über `public/panos/` und `npm run panos:index` für alle Besucher bereitstellen.
 
 ## Lokal starten
 
@@ -73,7 +107,7 @@ geladen werden.
 ### Tests
 
 ```bash
-npm test             # Fahrdynamik: 21 Abnahmetests (0–100, Bremsweg, Abwürgen, Berganfahren …)
+npm test             # 21 Abnahmetests der Fahrdynamik, 15 Tests der Realansicht (Metadaten, Bilddienste)
 npm run test:traffic # Verkehrssimulation im Dauerlauf auf der echten Karte
 npm run test:drive   # „virtueller Fahrschüler“ fährt alle Fahrstunden regelkonform ab
 ```
@@ -99,8 +133,10 @@ src/world              Straßennetz-Modell: Knoten, Kanten, Kreuzungsgeometrie, 
 src/sim/vehicle        Fahrdynamik (ohne Abhängigkeiten, deterministisch)
 src/sim                Verkehr, Ampeln, Regelwächter, Kollisionen
 src/render             three.js: Kacheln, Gebäude, Schilder, Fahrzeug, Cockpit, Spiegel
+src/reality            Realansicht: Bild-Metadaten (EXIF/XMP), eigene Bilder, freie Bilddienste
 src/game, src/ui       Spielablauf, Fahrstunden, Navigation, HUD, Menüs, Texte (de/en)
-tools/                 Kartenpipeline (OSM-PBF-Leser, Höhenmodell, LoD2, Straßennetz, 3D-Netze, Kacheln)
+tools/                 Kartenpipeline (OSM-PBF-Leser, Höhenmodell, LoD2, Straßennetz, 3D-Netze, Kacheln),
+                       Verzeichnis eigener Straßenbilder (tools/panos)
 tests/                 Fahrdynamik-Tests, Verkehrs-Dauerlauf, virtueller Fahrschüler
 ```
 
@@ -131,6 +167,8 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   der Hessischen Verwaltung für Bodenmanagement und Geoinformation.
 - **Verkehrszeichen** (`public/signs`): amtliche Werke, gemeinfrei (§ 5 Abs. 1 UrhG), Grafiken von
   Wikimedia Commons.
+- **Straßenfotos der Realansicht:** nicht Teil des Projekts – sie werden auf Wunsch live von Panoramax,
+  KartaView oder Mapillary geladen (CC BY-SA 4.0, Urheber wird angezeigt) oder stammen vom eigenen Gerät.
 - **Abhängigkeiten:** three.js (MIT). Es werden keine Schriften, Texturen, Modelle oder Tondateien
   mitgeliefert – alles wird zur Laufzeit erzeugt.
 
@@ -155,6 +193,10 @@ traffic rules (StVO).
 - A rule monitor that explains every mistake with its legal basis: speeding, red lights, stop signs, right
   of way (signs, *right before left*, roundabouts), indicating, pedestrian crossings, wrong-way driving …
 - Lessons, a simulated driving test, ambient traffic and pedestrians, keyboard / gamepad / wheel / touch.
+- A **reality view** (key `F`): real street-level photographs of the place the car is at – from the free
+  imagery services Panoramax, KartaView and Mapillary (CC BY-SA 4.0, only requested when you switch a
+  service on) or from your own files, including 360° panoramas saved with street-view download tools
+  (they stay on your device); plus links that open the place at those services and in Google Street View.
 
 Verified automatically by 21 vehicle-dynamics acceptance tests, a traffic soak run and a "virtual learner
 driver" that completes every lesson and the driving test (about 48 km in total) without a single fault being

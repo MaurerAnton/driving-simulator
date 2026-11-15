@@ -1,0 +1,419 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "id": "f984d5b8-790d-442a-a859-1567b953a0cf",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     9.4106562,
+     51.2589382
+    ]
+   },
+   "bbox": [
+    9.4106562,
+    51.2589382,
+    9.4106562,
+    51.2589382
+   ],
+   "collection": "c508d522-9924-4139-b032-3d0a36def5d9",
+   "properties": {
+    "created": "2025-04-03T09:52:24.334671+00:00",
+    "license": "CC-BY-SA-4.0",
+    "updated": "2025-06-03T03:02:44.485815+00:00",
+    "datetime": "2023-09-29T15:22:02.645062+00:00",
+    "semantics": [],
+    "collection": {
+     "semantics": []
+    },
+    "datetimetz": "2023-09-29T17:22:02.645062+02:00",
+    "annotations": [],
+    "view:azimuth": 90,
+    "geovisio:image": "https://panoramax.openstreetmap.fr/images/f9/84/d5/b8/790d-442a-a859-1567b953a0cf.jpg",
+    "geovisio:status": "ready",
+    "geovisio:producer": "example-contributor",
+    "geovisio:thumbnail": "https://panoramax.openstreetmap.fr/derivates/f9/84/d5/b8/790d-442a-a859-1567b953a0cf/thumb.jpg",
+    "original_file:name": "2023_09_29_17_22_02_461_+0200.jpg",
+    "original_file:size": 1294631,
+    "geovisio:visibility": "anyone",
+    "pers:interior_orientation": {
+     "camera_model": "moto g(9) plus",
+     "focal_length": 5.53,
+     "camera_manufacturer": "motorola",
+     "sensor_array_dimensions": [
+      4640,
+      3472
+     ]
+    },
+    "geovisio:rank_in_collection": 265,
+    "quality:horizontal_accuracy": 5.0
+   },
+   "assets": {
+    "hd": {
+     "href": "https://panoramax.openstreetmap.fr/images/f9/84/d5/b8/790d-442a-a859-1567b953a0cf.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "data"
+     ],
+     "title": "HD picture",
+     "description": "Highest resolution available of this picture"
+    },
+    "sd": {
+     "href": "https://panoramax.openstreetmap.fr/derivates/f9/84/d5/b8/790d-442a-a859-1567b953a0cf/sd.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "visual"
+     ],
+     "title": "SD picture",
+     "description": "Picture in standard definition (fixed width of 2048px)"
+    },
+    "thumb": {
+     "href": "https://panoramax.openstreetmap.fr/derivates/f9/84/d5/b8/790d-442a-a859-1567b953a0cf/thumb.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "thumbnail"
+     ],
+     "title": "Thumbnail",
+     "description": "Picture in low definition (fixed width of 500px)"
+    }
+   },
+   "providers": [
+    {
+     "name": "example-contributor",
+     "roles": [
+      "producer"
+     ]
+    }
+   ],
+   "links": [
+    {
+     "rel": "license",
+     "href": "https://creativecommons.org/licenses/by-sa/4.0/",
+     "title": "License for this object (CC-BY-SA-4.0)"
+    },
+    {
+     "rel": "self",
+     "href": "https://api.panoramax.xyz/api/collections/c508d522-9924-4139-b032-3d0a36def5d9/items/f984d5b8-790d-442a-a859-1567b953a0cf",
+     "type": "application/geo+json"
+    },
+    {
+     "rel": "via",
+     "href": "https://panoramax.openstreetmap.fr",
+     "type": "application/json",
+     "title": "Link to the original instance",
+     "instance_name": "osm-fr"
+    }
+   ]
+  },
+  {
+   "id": "8e6a3797-aa4b-4cff-9ebb-bb4ab0da7621",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     9.3951749,
+     51.259497
+    ]
+   },
+   "bbox": [
+    9.3951749,
+    51.259497,
+    9.3951749,
+    51.259497
+   ],
+   "collection": "989125eb-6221-4aaa-bc7e-1ee909713bb5",
+   "properties": {
+    "created": "2025-09-16T08:43:57.914451+00:00",
+    "license": "CC-BY-SA-4.0",
+    "updated": "2026-08-21T16:05:31.838812+00:00",
+    "datetime": "2025-08-01T14:28:36.104054+00:00",
+    "semantics": [],
+    "collection": {
+     "semantics": [
+      {
+       "key": "transport",
+       "value": "car"
+      }
+     ]
+    },
+    "datetimetz": "2025-08-01T16:28:36.104054+02:00",
+    "annotations": [
+     {
+      "id": "e54a7065-ddcd-47df-b4bc-838feb2a386d",
+      "shape": {
+       "type": "Polygon",
+       "coordinates": [
+        [
+         [
+          1233,
+          2374
+         ],
+         [
+          1276,
+          2374
+         ],
+         [
+          1276,
+          2414
+         ],
+         [
+          1233,
+          2414
+         ],
+         [
+          1233,
+          2374
+         ]
+        ]
+       ]
+      },
+      "semantics": [
+       {
+        "key": "classification_confidence[osm|traffic_sign=FR:B21a1]",
+        "value": "1.0"
+       },
+       {
+        "key": "classification_model[osm|traffic_sign=FR:B21a1]",
+        "value": "classify_fr_road_signs/26.08.11"
+       },
+       {
+        "key": "detection_confidence[osm|traffic_sign=FR:B21a1]",
+        "value": "0.703"
+       },
+       {
+        "key": "detection_model[osm|traffic_sign=FR:B21a1]",
+        "value": "SGBlur-yolo11s/0.1.0"
+       },
+       {
+        "key": "osm|traffic_sign",
+        "value": "FR:B21a1"
+       }
+      ]
+     },
+     {
+      "id": "7cee5473-03ef-4811-a99d-adbb30a37d4c",
+      "shape": {
+       "type": "Polygon",
+       "coordinates": [
+        [
+         [
+          1690,
+          2227
+         ],
+         [
+          1776,
+          2227
+         ],
+         [
+          1776,
+          2291
+         ],
+         [
+          1690,
+          2291
+         ],
+         [
+          1690,
+          2227
+         ]
+        ]
+       ]
+      },
+      "semantics": [
+       {
+        "key": "detection_confidence[osm|traffic_sign=yes]",
+        "value": "0.743"
+       },
+       {
+        "key": "detection_model[osm|traffic_sign=yes]",
+        "value": "SGBlur-yolo11s/0.1.0"
+       },
+       {
+        "key": "osm|traffic_sign",
+        "value": "yes"
+       }
+      ]
+     }
+    ],
+    "view:azimuth": 221,
+    "geovisio:image": "https://panoramax.openstreetmap.fr/images/8e/6a/37/97/aa4b-4cff-9ebb-bb4ab0da7621.jpg",
+    "geovisio:status": "ready",
+    "geovisio:producer": "example-contributor",
+    "geovisio:thumbnail": "https://panoramax.openstreetmap.fr/derivates/8e/6a/37/97/aa4b-4cff-9ebb-bb4ab0da7621/thumb.jpg",
+    "original_file:name": "2025_08_01_16_28_35_290_+0200.jpg",
+    "original_file:size": 610712,
+    "geovisio:visibility": "anyone",
+    "pers:interior_orientation": {
+     "camera_model": "moto g84 5G",
+     "focal_length": 5.56,
+     "field_of_view": 74,
+     "camera_manufacturer": "motorola",
+     "sensor_array_dimensions": [
+      4080,
+      3072
+     ]
+    },
+    "geovisio:rank_in_collection": 61,
+    "quality:horizontal_accuracy": 5.0,
+    "panoramax:horizontal_pixel_density": 55
+   },
+   "assets": {
+    "hd": {
+     "href": "https://panoramax.openstreetmap.fr/images/8e/6a/37/97/aa4b-4cff-9ebb-bb4ab0da7621.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "data"
+     ],
+     "title": "HD picture",
+     "description": "Highest resolution available of this picture"
+    },
+    "sd": {
+     "href": "https://panoramax.openstreetmap.fr/derivates/8e/6a/37/97/aa4b-4cff-9ebb-bb4ab0da7621/sd.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "visual"
+     ],
+     "title": "SD picture",
+     "description": "Picture in standard definition (fixed width of 2048px)"
+    },
+    "thumb": {
+     "href": "https://panoramax.openstreetmap.fr/derivates/8e/6a/37/97/aa4b-4cff-9ebb-bb4ab0da7621/thumb.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "thumbnail"
+     ],
+     "title": "Thumbnail",
+     "description": "Picture in low definition (fixed width of 500px)"
+    }
+   },
+   "providers": [
+    {
+     "name": "example-contributor",
+     "roles": [
+      "producer"
+     ]
+    }
+   ],
+   "links": [
+    {
+     "rel": "license",
+     "href": "https://creativecommons.org/licenses/by-sa/4.0/",
+     "title": "License for this object (CC-BY-SA-4.0)"
+    },
+    {
+     "rel": "self",
+     "href": "https://api.panoramax.xyz/api/collections/989125eb-6221-4aaa-bc7e-1ee909713bb5/items/8e6a3797-aa4b-4cff-9ebb-bb4ab0da7621",
+     "type": "application/geo+json"
+    },
+    {
+     "rel": "via",
+     "href": "https://panoramax.openstreetmap.fr",
+     "type": "application/json",
+     "title": "Link to the original instance",
+     "instance_name": "osm-fr"
+    }
+   ]
+  },
+  {
+   "id": "00000000-0000-4000-8000-000000000360",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     9.4112,
+     51.2556
+    ]
+   },
+   "bbox": [
+    9.4106562,
+    51.2589382,
+    9.4106562,
+    51.2589382
+   ],
+   "collection": "c508d522-9924-4139-b032-3d0a36def5d9",
+   "properties": {
+    "created": "2025-04-03T09:52:24.334671+00:00",
+    "license": "CC-BY-SA-4.0",
+    "updated": "2025-06-03T03:02:44.485815+00:00",
+    "datetime": "2023-09-29T15:22:02.645062+00:00",
+    "semantics": [],
+    "collection": {
+     "semantics": []
+    },
+    "datetimetz": "2023-09-29T17:22:02.645062+02:00",
+    "annotations": [],
+    "view:azimuth": 200,
+    "geovisio:image": "https://panoramax.openstreetmap.fr/images/f9/84/d5/b8/790d-442a-a859-1567b953a0cf.jpg",
+    "geovisio:status": "ready",
+    "geovisio:producer": "example-contributor",
+    "geovisio:thumbnail": "https://panoramax.openstreetmap.fr/derivates/f9/84/d5/b8/790d-442a-a859-1567b953a0cf/thumb.jpg",
+    "original_file:name": "2023_09_29_17_22_02_461_+0200.jpg",
+    "original_file:size": 1294631,
+    "geovisio:visibility": "anyone",
+    "pers:interior_orientation": {
+     "field_of_view": 360
+    },
+    "geovisio:rank_in_collection": 265,
+    "quality:horizontal_accuracy": 5.0
+   },
+   "assets": {
+    "hd": {
+     "href": "https://panoramax.openstreetmap.fr/images/f9/84/d5/b8/790d-442a-a859-1567b953a0cf.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "data"
+     ],
+     "title": "HD picture",
+     "description": "Highest resolution available of this picture"
+    },
+    "sd": {
+     "href": "https://panoramax.openstreetmap.fr/derivates/f9/84/d5/b8/790d-442a-a859-1567b953a0cf/sd.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "visual"
+     ],
+     "title": "SD picture",
+     "description": "Picture in standard definition (fixed width of 2048px)"
+    },
+    "thumb": {
+     "href": "https://panoramax.openstreetmap.fr/derivates/f9/84/d5/b8/790d-442a-a859-1567b953a0cf/thumb.jpg",
+     "type": "image/jpeg",
+     "roles": [
+      "thumbnail"
+     ],
+     "title": "Thumbnail",
+     "description": "Picture in low definition (fixed width of 500px)"
+    }
+   },
+   "providers": [
+    {
+     "name": "example-contributor",
+     "roles": [
+      "producer"
+     ]
+    }
+   ],
+   "links": [
+    {
+     "rel": "license",
+     "href": "https://creativecommons.org/licenses/by-sa/4.0/",
+     "title": "License for this object (CC-BY-SA-4.0)"
+    },
+    {
+     "rel": "self",
+     "href": "https://api.panoramax.xyz/api/collections/c508d522-9924-4139-b032-3d0a36def5d9/items/f984d5b8-790d-442a-a859-1567b953a0cf",
+     "type": "application/geo+json"
+    },
+    {
+     "rel": "via",
+     "href": "https://panoramax.openstreetmap.fr",
+     "type": "application/json",
+     "title": "Link to the original instance",
+     "instance_name": "osm-fr"
+    }
+   ]
+  }
+ ],
+ "links": []
+}

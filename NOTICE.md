@@ -29,6 +29,20 @@ Die Verkehrszeichen der StVO sind amtliche Werke und nach § 5 Abs. 1 UrhG gemei
 stammen von Wikimedia Commons; Datei, Quelle und Lizenzangabe jedes Zeichens stehen in
 `public/signs/manifest.json`.
 
+## Straßenfotos in der Realansicht
+
+Das Projekt enthält und verteilt keine Straßenfotos. Die Realansicht lädt sie auf Wunsch der Spielerin oder
+des Spielers direkt im Browser von
+
+- [Panoramax](https://panoramax.fr) (föderiert, u. a. OpenStreetMap France und IGN) – CC BY-SA 4.0 bzw.
+  Licence Ouverte 2.0, je nach Instanz;
+- [KartaView](https://kartaview.org) – CC BY-SA 4.0;
+- [Mapillary](https://www.mapillary.com) (Meta) – CC BY-SA 4.0, Abruf mit eigenem Zugangsschlüssel
+
+und zeigt sie mit Urheber, Lizenz und Link zum Original an. Eigene Bilder der Nutzer (etwa selbst
+gespeicherte Street-View-Panoramen) werden nur lokal im Browser gelesen; für deren Rechte sind die Nutzer
+selbst verantwortlich. Der Ordner `public/panos/` ist deshalb von der Versionsverwaltung ausgenommen.
+
 ## Fremde Software
 
 | Paket | Verwendung | Lizenz |

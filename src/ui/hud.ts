@@ -96,6 +96,7 @@ export class Hud {
   onStart: (req: StartRequest) => void = () => {};
   onResume: () => void = () => {};
   onQuit: () => void = () => {};
+  onReality: () => void = () => {};
   onSettingsChanged: () => void = () => {};
   routeLanes: Lane[] = [];
 
@@ -296,6 +297,7 @@ export class Hud {
       ['<kbd>H</kbd>', de ? 'Hupe' : 'Horn'],
       ['<kbd>V</kbd>', de ? 'Kamera wechseln' : 'Change camera'],
       ['<kbd>T</kbd>', de ? 'Auto zurück auf die Straße setzen' : 'Put the car back on the road'],
+      ['<kbd>F</kbd>', de ? 'Realansicht: echte Fotos dieser Stelle' : 'Reality view: real photos of this place'],
       ['<kbd>Esc</kbd>', de ? 'Pause' : 'Pause'],
     ];
     const o = el('div', 'overlay');
@@ -385,7 +387,9 @@ export class Hud {
     c.onclick = () => this.showControls(() => this.showPause());
     const q = el('button', 'btn ghost', this.t('menu'));
     q.onclick = () => this.onQuit();
-    b.append(r, s, c, q);
+    const f = el('button', 'btn ghost', this.t('realityButton'));
+    f.onclick = () => this.onReality();
+    b.append(r, f, s, c, q);
     p.append(b);
     o.append(p);
     this.setOverlay(o);

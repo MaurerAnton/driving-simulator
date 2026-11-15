@@ -35,6 +35,12 @@ export interface Settings {
   drawDistance: number;
   wheel: WheelMapping;
   invertLookY: boolean;
+  /**
+   * Reality view: which street-level imagery services may be asked for
+   * pictures of the place the car is at.  All off until the player says so –
+   * a request tells the service the player's IP address and the place.
+   */
+  reality: { panoramax: boolean; kartaview: boolean; mapillary: boolean; mapillaryToken: string };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -50,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   drawDistance: 1300,
   wheel: { steerAxis: 0, throttleAxis: 2, brakeAxis: 5, clutchAxis: 1, pedalsInverted: true, wheelRange: 900, shifter: [12, 13, 14, 15, 16, 17, 18] },
   invertLookY: false,
+  reality: { panoramax: false, kartaview: false, mapillary: false, mapillaryToken: '' },
 };
 
 const KEY = 'fahrsim-baunatal.settings.v1';
@@ -59,12 +66,12 @@ export function loadSettings(): Settings {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Settings>;
-      return { ...DEFAULT_SETTINGS, ...parsed, wheel: { ...DEFAULT_SETTINGS.wheel, ...(parsed.wheel ?? {}) } };
+      return { ...DEFAULT_SETTINGS, ...parsed, wheel: { ...DEFAULT_SETTINGS.wheel, ...(parsed.wheel ?? {}) }, reality: { ...DEFAULT_SETTINGS.reality, ...(parsed.reality ?? {}) } };
     }
   } catch {
     /* private mode or corrupted entry: fall back to defaults */
   }
-  return { ...DEFAULT_SETTINGS, wheel: { ...DEFAULT_SETTINGS.wheel } };
+  return { ...DEFAULT_SETTINGS, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality } };
 }
 
 export function saveSettings(s: Settings): void {

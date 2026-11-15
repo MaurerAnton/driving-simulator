@@ -30,7 +30,7 @@ export interface Controls {
   device: 'keyboard' | 'gamepad' | 'wheel' | 'touch';
 }
 
-export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help';
+export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality';
 
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
 const approach = (cur: number, target: number, maxStep: number): number =>
@@ -122,6 +122,8 @@ export class Input {
         e.preventDefault();
         this.fire('help');
       }
+      // "Foto": what does this place really look like? (also from the pause menu)
+      if (code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) this.fire('reality');
       if (!this.enabled) return;
       const c = this.c;
       switch (code) {

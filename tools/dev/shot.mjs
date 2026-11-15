@@ -3,9 +3,10 @@
 //   node tools/dev/shot.mjs "<query string>" out.png [width] [height] [extraWaitMs]
 // Needs a running dev/preview server (default http://127.0.0.1:5173) and a
 // Chromium binary (CHROME_BIN, or the one Playwright cached).
+// Environment: FS_URL, FS_TIMEOUT (ms), FS_FILES (pictures for the reality view, separated like PATH).
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { chromium } from 'playwright-core';
 
 function findChrome() {
@@ -44,6 +45,16 @@ try {
   await page.waitForFunction(() => window.__fs && window.__fs.ready === true, null, { timeout: Number(process.env.FS_TIMEOUT ?? 180000) });
 } catch (e) {
   logs.push(`[shot] not ready: ${e.message.split('\n')[0]}`);
+}
+// FS_FILES=a.jpg:b.jpg – hand these files to the reality view (as if chosen with "Choose pictures …")
+if (process.env.FS_FILES) {
+  await page.setInputFiles('.reality input[type=file]', process.env.FS_FILES.split(delimiter));
+  await page
+    .waitForFunction(() => {
+      const r = window.__fs.info().reality;
+      return r && r.own > 0 && r.current && (r.current.pano ? r.panoActive : true);
+    }, null, { timeout: 240000 })
+    .catch((e) => logs.push(`[shot] the files did not show: ${e.message.split('\n')[0]}`));
 }
 await page.waitForTimeout(Number(extra));
 await page.screenshot({ path: out, timeout: 240000 });

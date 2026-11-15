@@ -19,9 +19,11 @@ import type { CarVisualState } from '../render/car.ts';
 import { PropRenderer } from '../render/props.ts';
 import { SignRenderer } from '../render/signs.ts';
 import type { LoadedTile } from '../render/tiles.ts';
+import { latLonToWorld, worldToLatLon } from '../geo/utm.ts';
 import { Hud } from '../ui/hud.ts';
 import type { HudState } from '../ui/hud.ts';
 import { tr } from '../ui/i18n.ts';
+import { RealityPanel } from '../ui/reality.ts';
 import { LaneGraph } from '../world/lanes.ts';
 import type { Lane } from '../world/lanes.ts';
 import { CTRL, SURF_ROLLING } from '../world/types.ts';
@@ -31,10 +33,10 @@ import type { Edge } from '../world/world.ts';
 import { App } from './app.ts';
 import { LESSONS, Navigator, findTarget } from './nav.ts';
 import type { LessonDef } from './nav.ts';
-import { loadSettings } from './settings.ts';
+import { loadSettings, saveSettings } from './settings.ts';
 import type { Settings } from './settings.ts';
 
-type State = 'loading' | 'menu' | 'intro' | 'placing' | 'drive' | 'pause' | 'result';
+type State = 'loading' | 'menu' | 'intro' | 'placing' | 'drive' | 'pause' | 'reality' | 'result';
 type CameraMode = 'cockpit' | 'chase' | 'free';
 
 const PHYS_DT = 1 / 240;
@@ -131,6 +133,18 @@ export class Game {
     this.input.onAction((a) => this.onAction(a));
     this.hud.onStart = (req) => this.begin(req.mode, req.spawn);
     this.hud.onResume = () => this.resume();
+    this.hud.onReality = () => this.openReality();
+    this.reality = new RealityPanel(this.ui, {
+      settings: this.settings,
+      saveSettings: () => saveSettings(this.settings),
+      close: () => this.closeReality(),
+      plausible: (lat, lon) => {
+        const [x, z] = latLonToWorld(lat, lon);
+        const m = world.json.meta;
+        return x > m.minX - 500 && x < m.maxX + 500 && z > m.minZ - 500 && z < m.maxZ + 500;
+      },
+      maxTexture: app.renderer.capabilities.maxTextureSize,
+    });
     this.hud.onQuit = () => this.toMenu();
     this.hud.onSettingsChanged = () => this.applySettings();
     this.rules.onViolation = (v) => {
@@ -159,6 +173,12 @@ export class Game {
       this.free.pitch = ((c[4] ?? -15) * Math.PI) / 180;
     }
     this.autoDrive = Number(q.get('auto') ?? 0);
+    // ?reality=1|test opens the reality view once the drive has started ("test": with a drawn panorama),
+    // ?rv=panoramax,kartaview switches services on for this visit
+    this.autoReality = q.get('reality') ?? '';
+    for (const s of (q.get('rv') ?? '').split(',')) {
+      if (s === 'panoramax' || s === 'kartaview' || s === 'mapillary') this.settings.reality[s] = true;
+    }
     const look = q.get('look');
     if (look) {
       const l = look.split(',').map(Number);
@@ -178,6 +198,9 @@ export class Game {
   }
 
   private debugLook: [number, number] | null = null;
+  private autoReality = '';
+  private realityFrames = 0;
+  private reality!: RealityPanel;
 
   private onTile(tile: LoadedTile, loaded: boolean): void {
     if (loaded) {
@@ -331,10 +354,38 @@ export class Game {
     });
   }
 
+  // ---------------------------------------------------------- reality view
+  /** Real photographs of where the car is (own files and free imagery services). */
+  private openReality(): void {
+    if (this.state !== 'drive' && this.state !== 'pause') return;
+    this.state = 'reality';
+    this.input.enabled = false;
+    this.audio.suspend();
+    this.hud.hideOverlay();
+    this.hud.setHudVisible(false);
+    this.vehicle.getModelPosition(this.mpos);
+    const [lat, lon] = worldToLatLon(this.mpos[0], this.mpos[2]);
+    // yaw: 0 = north, positive = to the left; a compass counts clockwise
+    const heading = (((-this.vehicle.yaw * 180) / Math.PI) % 360 + 360) % 360;
+    this.reality.open({ lat, lon, heading, name: this.rules.context.roadName });
+  }
+
+  private closeReality(): void {
+    if (this.state !== 'reality') return;
+    this.reality.close();
+    this.state = 'pause';
+    this.hud.setHudVisible(true);
+    this.hud.showPause();
+  }
+
   private onAction(a: Action): void {
-    if (a === 'pause') {
+    if (a === 'reality') {
+      if (this.state === 'reality') this.closeReality();
+      else this.openReality();
+    } else if (a === 'pause') {
       if (this.state === 'drive') this.pause();
       else if (this.state === 'pause') this.resume();
+      else if (this.state === 'reality') this.closeReality();
     } else if (a === 'view' && this.state === 'drive') {
       this.cameraMode = this.cameraMode === 'cockpit' ? 'chase' : 'cockpit';
     } else if (a === 'reset' && this.state === 'drive') {
@@ -559,6 +610,18 @@ export class Game {
       this.tryPlace();
     } else if (this.state === 'drive') {
       this.stepDrive(dt);
+      if (this.autoReality && this.time - this.startTime > 0.3) {
+        const mode = this.autoReality;
+        this.autoReality = '';
+        this.openReality();
+        if (mode === 'test') {
+          void import('../reality/testpano.ts').then(async (m) => {
+            const [lat, lon] = worldToLatLon(this.mpos[0], this.mpos[2]);
+            // drawn as if taken looking north-east, a few metres from the car
+            await this.reality.importFiles([await m.makeTestPanorama(lat + 0.00004, lon, 45)]);
+          });
+        }
+      }
     }
 
     const haveCar = this.vehicle && this.car.root.visible;
@@ -591,7 +654,10 @@ export class Game {
     this.signalHeads.update(this.signals);
     this.actors.update(this.traffic.cars, this.traffic.peds, this.time);
 
-    if (haveCar) {
+    if (this.state === 'reality') {
+      // the panel covers the window: only a 360° panorama is drawn, not the world behind it
+      this.reality.render(app.renderer, app.canvas);
+    } else if (haveCar) {
       this.updateCamera(dt);
       const mode = this.settings.mirrors;
       if (this.cameraMode === 'cockpit' && mode !== 'off') {
@@ -604,8 +670,18 @@ export class Game {
     } else {
       app.render(this.menuFocus);
     }
+    if (this.state === 'reality') {
+      // for the automated check: the page counts as ready once a picture shows (or nothing will come)
+      this.realityFrames++;
+      if (window.__fs && !window.__fs.ready) {
+        const info = this.reality.debugInfo();
+        if (info.panoActive === true || (info.current !== null && this.realityFrames > 6) || this.realityFrames > 60) window.__fs.ready = true;
+      }
+    } else this.realityFrames = 0;
     if (window.__fs && !window.__fs.ready && tiles.settled && this.frames > 6 && (this.state === 'drive' || this.state === 'menu' || this.state === 'intro')) {
-      if (this.state !== 'drive' || this.time - this.startTime > Number(new URLSearchParams(location.search).get('wait') ?? 0)) window.__fs.ready = true;
+      if (this.autoReality) {
+        /* the reality view is about to open */
+      } else if (this.state !== 'drive' || this.time - this.startTime > Number(new URLSearchParams(location.search).get('wait') ?? 0)) window.__fs.ready = true;
     }
     requestAnimationFrame((t) => this.frame(t));
   }
@@ -748,7 +824,7 @@ export class Game {
     };
     if (!navText && !this.lesson) {
       hs.navText = ctx.roadName || (lang === 'de' ? 'Freie Fahrt' : 'Free drive');
-      hs.navSub = lang === 'de' ? 'M beendet die Fahrt und zeigt die Auswertung' : 'M ends the drive and shows the result';
+      hs.navSub = lang === 'de' ? 'M: Fahrt beenden und auswerten · F: echte Fotos dieser Stelle' : 'M: end the drive, show the result · F: real photos of this place';
       hs.navArrow = 0;
     }
     this.hud.update(hs, this.time);
@@ -825,6 +901,7 @@ export class Game {
       missingSigns: this.signs ? [...this.signs.missing] : [],
       calls: this.app.renderer.info.render.calls,
       tris: this.app.renderer.info.render.triangles,
+      reality: this.reality?.debugInfo() ?? null,
     };
   }
 }

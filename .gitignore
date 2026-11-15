@@ -7,3 +7,9 @@ data/work/
 .vite/
 test-results/
 shots/
+
+# Your own street-level pictures for the reality view stay on your machine
+# (see public/panos/README.md) – only the empty index and the notes are tracked.
+public/panos/*
+!public/panos/README.md
+!public/panos/index.json

@@ -21,9 +21,16 @@ deshalb nichts verloren. *CoMaps* dagegen zeigt OpenStreetMap-Daten: Das ist gen
 verwendet wird. Dazu kommen die amtlichen, frei nutzbaren Geodaten des Landes Hessen, die genauer sind als
 jedes Straßenfoto (Höhen auf Dezimeter, echte Dachformen).
 
-Für die Zukunft bieten sich offene Straßenfotos an ([Panoramax](https://panoramax.fr),
-[Mapillary](https://www.mapillary.com), jeweils frei lizenziert), um Schilderstandorte zu prüfen und
-fehlende Schilder in OpenStreetMap nachzutragen.
+**Ansehen ist etwas anderes als Ableiten und Weitergeben.** Deshalb gibt es im Spiel die *Realansicht*
+(Taste `F`): Sie zeigt echte Straßenfotos der aktuellen Stelle – live aus den frei lizenzierten Diensten
+[Panoramax](https://panoramax.fr), [KartaView](https://kartaview.org) und
+[Mapillary](https://www.mapillary.com) (CC BY-SA 4.0) oder aus eigenen Dateien, auch aus Panoramen, die man
+sich mit einem Street-View-Downloader gespeichert hat. Solche Bilder bleiben auf dem eigenen Gerät und
+werden vom Projekt weder gespeichert noch weitergegeben; siehe [public/panos/README.md](../public/panos/README.md).
+
+Die freien Straßenfotos eignen sich außerdem, um Schilderstandorte zu prüfen und fehlende Schilder in
+OpenStreetMap nachzutragen – Mapillary und Panoramax erlauben das ausdrücklich. Nach dem nächsten Kartenlauf
+stehen sie dann auch im Simulator.
 
 ## Was aus den Daten abgeleitet wird
 

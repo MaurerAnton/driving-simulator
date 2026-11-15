@@ -26,9 +26,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Vehicle dynamics tests
+      - name: Tests (vehicle dynamics, reality view)
         run: npm test
       - run: npm run build
+        env:
+          # optional: a Mapillary client token for the reality view (repository variable MAPILLARY_TOKEN)
+          VITE_MAPILLARY_TOKEN: ${{ vars.MAPILLARY_TOKEN }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
