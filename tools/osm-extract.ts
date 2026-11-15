@@ -129,7 +129,11 @@ readPbf(input, {
 console.log(`\n[extract] scanned ${nodeCount} nodes, ${wayCount} ways in ${elapsed()}`);
 console.log(`[extract] kept ${ways.size} ways, ${relations.length} relations; completing ${wantWays.size} outlying member ways`);
 
+// Ways that begin inside the rectangle may end far outside it (a river bank, a forest edge, a
+// long road).  Their outer nodes are needed too: an area whose outline has gaps cannot be drawn –
+// the remaining corners would be joined across the map.
 const wantNodes = new Set<number>();
+for (const w of ways.values()) for (const r of w.refs) if (!nodes.has(r)) wantNodes.add(r);
 if (wantWays.size > 0) {
   console.log('[extract] pass 2/3: outlying multipolygon ways …');
   readPbf(input, {

@@ -345,7 +345,10 @@ export class Vehicle {
     }
 
     // ---- gearbox / clutch engagement ----------------------------------------
-    const driveOmega = (w[0].omega + w[1].omega) / 2;
+    // the driven axle: wheels 0 and 1 (front) or 2 and 3 (rear)
+    const d0 = s.rearDrive ? 2 : 0;
+    const d1 = d0 + 1;
+    const driveOmega = (w[d0].omega + w[d1].omega) / 2;
     let engagement: number;
     let gear = this.gear;
     let parkLock = false;
@@ -364,14 +367,15 @@ export class Vehicle {
           // shift schedule on engine speed, later with more throttle
           let g = this.autoGear;
           if (this.shiftTimer <= 0) {
-            const up = 1900 + 4300 * inp.throttle;
-            const down = 1050 + 1700 * inp.throttle;
+            const auto = s.auto;
+            const up = auto ? auto.up[0] + (auto.up[1] - auto.up[0]) * inp.throttle : 1900 + 4300 * inp.throttle;
+            const down = auto ? auto.down[0] + (auto.down[1] - auto.down[0]) * inp.throttle : 1050 + 1700 * inp.throttle;
             const rpmNow = this.engineOmega * RPM;
             const syncRpm = driveOmega * this.ratio(g) * RPM;
             if (g < s.gearRatios.length && syncRpm > up && rpmNow > up * 0.9) {
               g++;
               this.shiftTimer = 0.38;
-            } else if (g > 1 && (syncRpm < down || (inp.throttle > 0.92 && driveOmega * this.ratio(g - 1) * RPM < 5900))) {
+            } else if (g > 1 && (syncRpm < down || (inp.throttle > 0.92 && driveOmega * this.ratio(g - 1) * RPM < (auto ? auto.kickdownRpm : 5900)))) {
               g--;
               this.shiftTimer = 0.38;
             }
@@ -620,7 +624,9 @@ export class Vehicle {
     this.bodyContact = false;
     if (upY < 0.9) {
       const mo = this.modelOrigin;
-      for (const b of BODY_POINTS) {
+      // (a heavier vehicle needs a harder shell to be carried by it)
+      const shell = s.mass / 1375;
+      for (const b of s.bodyPoints ?? BODY_POINTS) {
         const bx = b[0] + mo[0];
         const by = b[1] + mo[1];
         const bz = b[2] + mo[2];
@@ -634,7 +640,7 @@ export class Vehicle {
         const vpy = vy + wz * rx - wx * rz;
         const vpz = vz + wx * ry - wy * rx;
         const vn = vpx * smp.nx + vpy * smp.ny + vpz * smp.nz;
-        const N = clamp(BODY_STIFFNESS * Math.min(depth, 0.4) - BODY_DAMPING * vn, 0, 90000);
+        const N = clamp((BODY_STIFFNESS * Math.min(depth, 0.4) - BODY_DAMPING * vn) * shell, 0, 90000 * shell);
         if (N <= 0) continue;
         // sheet metal sliding on the ground
         const tx = vpx - vn * smp.nx;
@@ -699,9 +705,9 @@ export class Vehicle {
 
     // ---- clutch as a friction constraint ---------------------------------------
     // inverse inertia of the two driven wheels (implicit against the tyre damping, see above)
-    const inv0 = 1 / (s.wheelInertia * this.wheelImp[0]);
-    const inv1 = 1 / (s.wheelInertia * this.wheelImp[1]);
-    const S = rollTorque(this.fxTyre[0], s.wheelRadius) * inv0 + rollTorque(this.fxTyre[1], s.wheelRadius) * inv1;
+    const inv0 = 1 / (s.wheelInertia * this.wheelImp[d0]);
+    const inv1 = 1 / (s.wheelInertia * this.wheelImp[d1]);
+    const S = rollTorque(this.fxTyre[d0], s.wheelRadius) * inv0 + rollTorque(this.fxTyre[d1], s.wheelRadius) * inv1;
     // Gearbox and differential losses: less torque arrives when the engine
     // drives, more is taken when the wheels drive the engine.
     const driving = this.lastTc * ratio * driveOmega >= 0;
@@ -712,8 +718,8 @@ export class Vehicle {
       if (converter) {
         // fluid coupling: capacity grows with engine speed squared, locked up when cruising
         const sync = Math.abs(driveOmega * ratio);
-        capacity = 0.00356 * we * we;
-        if (gear >= 2 && sync > 135 && this.shiftTimer <= 0) capacity = Math.max(capacity, s.clutchTorque);
+        capacity = (s.auto?.converter ?? 0.00356) * we * we;
+        if (gear >= 2 && sync > (s.auto?.lockOmega ?? 135) && this.shiftTimer <= 0) capacity = Math.max(capacity, s.clutchTorque);
         if (this.shiftTimer > 0) capacity *= 0.35;
         capacity = Math.min(capacity, s.clutchTorque * 1.1);
       } else capacity = engagement * s.clutchTorque;
@@ -748,11 +754,11 @@ export class Vehicle {
       const front = i < 2;
       const Ii = Iw * this.wheelImp[i];
       let T = -this.fxTyre[i] * s.wheelRadius;
-      if (front) T += (Tc * wheelRatio) / 2;
+      if (i === d0 || i === d1) T += (Tc * wheelRatio) / 2;
       wh.omega += (T / Ii) * h;
       let brake = inp.brake * s.brakeTorque * (front ? s.brakeBiasFront / 2 : (1 - s.brakeBiasFront) / 2) * this.absMul[i];
       if (!front) brake += inp.handbrake * (s.handbrakeTorque / 2);
-      if (front && parkLock) brake += 6000;
+      if ((i === d0 || i === d1) && parkLock) brake += 6000 * Math.max(1, s.mass / 1375);
       if (brake > 0) {
         const need = (Math.abs(wh.omega) * Ii) / h;
         if (brake >= need) wh.omega = 0;

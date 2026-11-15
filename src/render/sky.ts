@@ -7,6 +7,8 @@ export class Sky {
   readonly sun = new THREE.DirectionalLight(0xfff4e0, 3.0);
   readonly hemi = new THREE.HemisphereLight(0xbfd6ff, 0x6b6a55, 1.1);
   readonly fog = new THREE.Fog(0xc4d4e4, 300, 2400);
+  private readonly lightRight = new THREE.Vector3();
+  private readonly lightUp = new THREE.Vector3();
   private readonly uniforms = {
     uSunDir: { value: new THREE.Vector3(0.4, 0.7, 0.3).normalize() },
     uZenith: { value: new THREE.Color(0x3f78c8) },
@@ -83,8 +85,25 @@ export class Sky {
     this.dome.position.copy(camera.position);
     this.dome.scale.setScalar(1);
     const dir = this.uniforms.uSunDir.value;
-    this.sun.position.set(focus.x + dir.x * 300, focus.y + dir.y * 300, focus.z + dir.z * 300);
-    this.sun.target.position.copy(focus);
+    let fx = focus.x;
+    let fy = focus.y;
+    let fz = focus.z;
+    if (this.sun.castShadow) {
+      // The shadow box moves with the car.  Moved in whole texels of the shadow map (along the
+      // light's own axes) the edges of the shadows stay still instead of crawling.
+      const cam = this.sun.shadow.camera;
+      const texel = (cam.right - cam.left) / this.sun.shadow.mapSize.x;
+      const r = this.lightRight.set(dir.z, 0, -dir.x).normalize(); // up × dir
+      const u = this.lightUp.crossVectors(dir, r);
+      const a = Math.round((fx * r.x + fz * r.z) / texel) * texel;
+      const b = Math.round((fx * u.x + fy * u.y + fz * u.z) / texel) * texel;
+      const c = fx * dir.x + fy * dir.y + fz * dir.z;
+      fx = r.x * a + u.x * b + dir.x * c;
+      fy = u.y * b + dir.y * c;
+      fz = r.z * a + u.z * b + dir.z * c;
+    }
+    this.sun.position.set(fx + dir.x * 300, fy + dir.y * 300, fz + dir.z * 300);
+    this.sun.target.position.set(fx, fy, fz);
     this.sun.target.updateMatrixWorld();
   }
 }

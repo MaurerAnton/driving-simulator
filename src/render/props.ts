@@ -79,6 +79,14 @@ export class PropRenderer {
   private readonly perTile = new Map<string, TileProps>();
   /** global multiplier for how many trees are drawn (quality setting) */
   density = 1;
+  private shadows = false;
+
+  /** Trees throw shadows (the highest quality only: there are many of them). */
+  setShadows(on: boolean): void {
+    if (this.shadows === on) return;
+    this.shadows = on;
+    for (const p of this.perTile.values()) for (const t of p.trees) t.mesh.castShadow = on;
+  }
 
   add(tile: LoadedTile): void {
     const group = new THREE.Group();
@@ -122,7 +130,7 @@ export class PropRenderer {
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         mesh.computeBoundingSphere();
-        mesh.castShadow = false;
+        mesh.castShadow = this.shadows;
         mesh.name = `trees${kind}`;
         group.add(mesh);
         props.trees.push({ mesh, kind, total: counts[kind] });

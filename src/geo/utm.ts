@@ -80,12 +80,13 @@ export const WORLD_ORIGIN_N = 5678000;
 
 /**
  * Extent of the simulated world in UTM32 kilometre squares.  It is the
- * bounding rectangle of the official 1 km DGM1 tiles published for Baunatal.
+ * bounding rectangle of the official 1 km DGM1 tiles published for Baunatal
+ * and for the neighbouring city of Kassel (18 km × 18 km).
  */
 export const WORLD_MIN_E = 522000;
-export const WORLD_MAX_E = 534000;
+export const WORLD_MAX_E = 540000;
 export const WORLD_MIN_N = 5674000;
-export const WORLD_MAX_N = 5682000;
+export const WORLD_MAX_N = 5692000;
 
 export function utmToWorld(easting: number, northing: number): [number, number] {
   return [easting - WORLD_ORIGIN_E, -(northing - WORLD_ORIGIN_N)];

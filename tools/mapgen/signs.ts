@@ -29,6 +29,9 @@ export class SignPlacer {
   private readonly posts: SignPost[] = [];
   readonly stats: SignStats = { posts: 0, byCode: new Map() };
 
+  /** which town a place belongs to and what stands under its name on the town sign (set by the caller) */
+  municipalityAt: (x: number, z: number) => { name: string; sign: string } | null = () => ({ name: 'Baunatal', sign: 'Kreis Kassel' });
+
   constructor(world: World, ts: TileSet, places: PlaceJson[]) {
     this.world = world;
     this.ts = ts;
@@ -238,8 +241,10 @@ export class SignPlacer {
       samplePolyline(edge.pl, s, tmp);
       for (const d of done) if (Math.hypot(d[0] - tmp.x, d[1] - tmp.z) < 120) return;
       done.push([tmp.x, tmp.z]);
-      const label = name || this.nearestPlace(tmp.x, tmp.z) || 'Baunatal';
-      const town = label === 'Baunatal' ? 'Baunatal|Kreis Kassel' : `${label}|Stadt Baunatal`;
+      // second line of the sign: the district's town, or for the town itself its county / title
+      const m = this.municipalityAt(tmp.x, tmp.z);
+      const label = name || this.nearestPlace(tmp.x, tmp.z) || m?.name || 'Baunatal';
+      const town = !m ? `${label}|Kreis Kassel` : label === m.name ? `${m.name}|${m.sign}` : `${label}|Stadt ${m.name}`;
       this.post(edge, s, enterDir, [`310:${town}`]);
       if (edge.lanesF > 0 && edge.lanesB > 0) this.post(edge, s, -enterDir, [`311:${label}`]);
     };

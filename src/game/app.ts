@@ -16,6 +16,8 @@ export class App {
   tiles!: TileManager;
   readonly baseUrl: string;
   pixelRatioCap = 1.5;
+  /** fraction of the screen's pixels that is drawn (below 1: a softer picture that costs less) */
+  renderScale = 1;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -24,6 +26,9 @@ export class App {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.85;
+    // shadows are switched by the light (see setShadows): the renderer is always ready for them
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene.fog = this.sky.fog;
     this.scene.add(this.sky.dome, this.sky.sun, this.sky.sun.target, this.sky.hemi);
     this.resize();
@@ -35,6 +40,8 @@ export class App {
     const res = await fetch(`${this.baseUrl}world.json`);
     if (!res.ok) throw new Error(`world.json: HTTP ${res.status}`);
     const json = (await res.json()) as WorldJson;
+    // (a breath for the page between the big steps, so that the loading screen is drawn)
+    await new Promise((r) => setTimeout(r));
     this.world = new World(json);
     this.tiles = new TileManager(json, this.baseUrl);
     this.scene.add(this.tiles.group);
@@ -43,10 +50,38 @@ export class App {
   resize(): void {
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.pixelRatioCap));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.pixelRatioCap) * this.renderScale);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * Shadows of the sun around the car: `mapSize` pixels square (0 = none)
+   * for a box reaching `reach` metres from the car to every side.
+   */
+  setShadows(mapSize: number, reach: number): void {
+    const sun = this.sky.sun;
+    sun.castShadow = mapSize > 0;
+    if (mapSize === 0) return;
+    const cam = sun.shadow.camera;
+    cam.left = -reach;
+    cam.right = reach;
+    cam.top = reach;
+    cam.bottom = -reach;
+    cam.near = 60;
+    cam.far = 640;
+    cam.updateProjectionMatrix();
+    if (sun.shadow.mapSize.x !== mapSize) {
+      sun.shadow.mapSize.set(mapSize, mapSize);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+    }
+    // enough to keep surfaces from shadowing themselves, little enough to keep shadows attached to what casts them
+    const texel = (2 * reach) / mapSize;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = Math.max(0.05, texel * 1.6);
+    sun.shadow.radius = 1.6;
   }
 
   render(focus: THREE.Vector3): void {

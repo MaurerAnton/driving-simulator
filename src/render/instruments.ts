@@ -42,6 +42,8 @@ export class InstrumentPanel {
     this.face.height = H;
     this.ctx = this.canvas.getContext('2d')!;
     this.drawFace();
+    // never a blank cluster: until the first update it shows the dials, unlit
+    this.ctx.drawImage(this.face, 0, 0);
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.anisotropy = 4;
@@ -91,7 +93,10 @@ export class InstrumentPanel {
 
   /** Redraw at most ~20 times a second. */
   update(s: DashState, now: number): void {
-    if (now - this.last < 0.045) return;
+    // (a clock that starts below zero or jumps back must not stop the instruments:
+    // only a short step forward counts as "drawn a moment ago")
+    const since = now - this.last;
+    if (since >= 0 && since < 0.045) return;
     this.last = now;
     const c = this.ctx;
     c.drawImage(this.face, 0, 0);

@@ -51,6 +51,12 @@ export interface Conflict {
   yield: boolean;
 }
 
+export interface Sibling {
+  other: Connector;
+  until: number;
+  untilOther: number;
+}
+
 export interface Connector {
   id: number;
   node: Node;
@@ -59,9 +65,51 @@ export interface Connector {
   turn: number;
   pl: Polyline3;
   len: number;
-  conflicts: Conflict[];
+  /** the paths through the junction this one crosses or merges with (worked out when first asked for) */
+  readonly conflicts: Conflict[];
   /** connectors leaving the same lane, with the stations up to which the two paths overlap */
-  siblings: Array<{ other: Connector; until: number; untilOther: number }>;
+  readonly siblings: Sibling[];
+}
+
+/**
+ * A path through a junction.  Which other paths it conflicts with is costly
+ * to find (every pair of paths of the junction is compared) and only matters
+ * where traffic actually is – so it is worked out for a junction when one of
+ * its paths is first asked, not for the whole map at the start.
+ */
+class JunctionPath implements Connector {
+  readonly id: number;
+  readonly node: Node;
+  readonly from: Lane;
+  readonly to: Lane;
+  readonly turn: number;
+  readonly pl: Polyline3;
+  readonly len: number;
+  /** filled by LaneGraph.resolveNode */
+  readonly foundConflicts: Conflict[] = [];
+  readonly foundSiblings: Sibling[] = [];
+  private readonly graph: LaneGraph;
+
+  constructor(graph: LaneGraph, id: number, node: Node, from: Lane, to: Lane, turn: number, pl: Polyline3) {
+    this.graph = graph;
+    this.id = id;
+    this.node = node;
+    this.from = from;
+    this.to = to;
+    this.turn = turn;
+    this.pl = pl;
+    this.len = pl.len;
+  }
+
+  get conflicts(): Conflict[] {
+    this.graph.resolveNode(this.node.id);
+    return this.foundConflicts;
+  }
+
+  get siblings(): Sibling[] {
+    this.graph.resolveNode(this.node.id);
+    return this.foundSiblings;
+  }
 }
 
 const tmpA = newPolySample();
@@ -125,11 +173,14 @@ export class LaneGraph {
   /** lanes of each edge: [forward lanes right→left, backward lanes right→left] */
   readonly edgeLanes: Array<{ fwd: Lane[]; back: Lane[] }> = [];
 
+  /** the paths through each junction, and which junctions have their conflicts worked out */
+  private readonly pathsAt = new Map<number, JunctionPath[]>();
+  private readonly resolved = new Set<number>();
+
   constructor(world: World) {
     this.world = world;
     this.buildLanes();
     this.buildConnectors();
-    this.buildConflicts();
   }
 
   private buildLanes(): void {
@@ -304,8 +355,11 @@ export class LaneGraph {
       }
     }
     const pl = makePolyline(Float64Array.from(pts));
-    const c: Connector = { id: this.connectors.length, node, from, to, turn, pl, len: pl.len, conflicts: [], siblings: [] };
+    const c = new JunctionPath(this, this.connectors.length, node, from, to, turn, pl);
     this.connectors.push(c);
+    const at = this.pathsAt.get(node.id);
+    if (at) at.push(c);
+    else this.pathsAt.set(node.id, [c]);
     from.out.push(c);
     to.in.push(c);
   }
@@ -347,14 +401,18 @@ export class LaneGraph {
     return turning1 && !turning2;
   }
 
-  private buildConflicts(): void {
-    const byNode = new Map<number, Connector[]>();
-    for (const c of this.connectors) {
-      let list = byNode.get(c.node.id);
-      if (!list) byNode.set(c.node.id, (list = []));
-      list.push(c);
-    }
-    for (const list of byNode.values()) {
+  /** Work out the conflicts of every junction now (tools and tests; the game leaves it to resolveNode). */
+  resolveAll(): void {
+    for (const id of this.pathsAt.keys()) this.resolveNode(id);
+  }
+
+  /** Compare the paths through a junction with each other: where do they cross, merge or share their way, and who yields? */
+  resolveNode(nodeId: number): void {
+    if (this.resolved.has(nodeId)) return;
+    this.resolved.add(nodeId);
+    const list = this.pathsAt.get(nodeId);
+    if (!list) return;
+    {
       for (let i = 0; i < list.length; i++) {
         for (let j = i + 1; j < list.length; j++) {
           const c1 = list[i];
@@ -363,8 +421,8 @@ export class LaneGraph {
             // diverging from one lane: no right-of-way question, but the paths share their first metres
             const u1 = divergence(c1.pl, c2.pl);
             const u2 = divergence(c2.pl, c1.pl);
-            c1.siblings.push({ other: c2, until: u1, untilOther: u2 });
-            c2.siblings.push({ other: c1, until: u2, untilOther: u1 });
+            c1.foundSiblings.push({ other: c2, until: u1, untilOther: u2 });
+            c2.foundSiblings.push({ other: c1, until: u2, untilOther: u1 });
             continue;
           }
           const sameArm = c1.from.armTo === c2.from.armTo;
@@ -394,8 +452,8 @@ export class LaneGraph {
           if (s1 < 0) continue;
           const y12 = this.yields(c1, c2, merge);
           const y21 = !y12 && this.yields(c2, c1, merge);
-          c1.conflicts.push({ other: c2, sSelf: s1, sOther: s2, merge, yield: y12 });
-          c2.conflicts.push({ other: c1, sSelf: s2, sOther: s1, merge, yield: y21 });
+          c1.foundConflicts.push({ other: c2, sSelf: s1, sOther: s2, merge, yield: y12 });
+          c2.foundConflicts.push({ other: c1, sSelf: s2, sOther: s1, merge, yield: y21 });
         }
       }
     }

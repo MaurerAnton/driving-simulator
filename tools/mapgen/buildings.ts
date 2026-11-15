@@ -7,7 +7,7 @@
  * shape.  The margin of the map outside the municipality has no LoD2 data;
  * there OSM footprints are extruded with typical heights and simple roofs.
  */
-import { readFileSync } from 'node:fs';
+import { closeSync, openSync, readSync } from 'node:fs';
 import earcut from 'earcut';
 import { hash01, pointInRing, ringArea } from '../../src/core/geom.ts';
 import { BS } from '../../src/world/tilefmt.ts';
@@ -115,11 +115,37 @@ function styleFor(fn: string, area: number, height: number): number {
   return BS.WALL_HOUSE;
 }
 
+/**
+ * The buildings of data/work/lod2-buildings.json one after the other: the
+ * file has one building per line and is too big (a city: several hundred MB)
+ * to be parsed in one piece.
+ */
+function* lod2Units(path: string): Generator<Lod2Unit> {
+  const fd = openSync(path, 'r');
+  const buf = Buffer.alloc(1 << 22);
+  let rest = '';
+  const decoder = new TextDecoder();
+  try {
+    for (;;) {
+      const n = readSync(fd, buf, 0, buf.length, null);
+      if (n === 0) break;
+      const lines = (rest + decoder.decode(buf.subarray(0, n), { stream: true })).split('\n');
+      rest = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('{"id"')) continue;
+        yield JSON.parse(line.endsWith(',') ? line.slice(0, -1) : line) as Lod2Unit;
+      }
+    }
+    if (rest.startsWith('{"id"')) yield JSON.parse(rest.endsWith(',') ? rest.slice(0, -1) : rest) as Lod2Unit;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export function addLod2Buildings(path: string, ts: TileSet, stats: BuildingStats): Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> {
-  const raw = JSON.parse(readFileSync(path, 'utf8')) as { units: Lod2Unit[] };
   const boxes: Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> = [];
   let seed = 1;
-  for (const u of raw.units) {
+  for (const u of lod2Units(path)) {
     if (u.fn.startsWith('53001')) continue; // bridges: generated from the road network instead
     let minX = Infinity;
     let maxX = -Infinity;

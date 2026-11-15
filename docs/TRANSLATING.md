@@ -86,6 +86,11 @@ translation. What the German terms mean:
 | Fahrstunde, Fahrlehrer, Prüfungsfahrt, Prüfer | driving lesson; instructor; driving test; examiner |
 | leichter Fehler, schwerer Fehler, Gefährdung | minor fault; serious fault; a fault that endangers others and fails the test |
 | Fehlerpunkte | fault points (penalty points counted in the test) |
+| Lkw mit Anhänger, Zug, Klasse CE | a truck with a trailer; the combination of the two; the licence class for it (“CE” stays as it is) |
+| Verbinden und Trennen | coupling and uncoupling truck and trailer, a part of the practical test |
+| Grundfahraufgabe, Korrekturzug | basic manoeuvre of the test (reversing round a corner, reversing to a ramp); pulling forward once to correct while reversing |
+| Zugöse, Kupplung, Stützfuß, Unterlegkeile | the trailer's drawbar eye; the truck's trailer coupling; the trailer's support leg; wheel chocks |
+| Vorratsleitung (rot), Bremsleitung (gelb) | the two air lines to the trailer: supply (red coupling head) and brake/control (yellow) |
 | Realansicht | “reality view”: real street-level photographs of the place where the car is |
 | Regel-Hilfe | on-screen hints showing the current speed limit and who has right of way |
 
@@ -100,6 +105,19 @@ The checker reports missing or extra keys, changed placeholders or key tokens, n
 stay, texts that are too long for their place, digits other than 0–9, and (for languages with their own
 script) texts that were left in Latin letters. Warnings – a sentence without its full stop, a label with one,
 a capital letter where a text continues a sentence – are hints: look at them, they need not be wrong.
+
+## Adding texts later
+
+When the program gets new texts, they are added to `en.ts` and `de.ts` first. For every other language:
+
+```bash
+node tools/i18n-merge.ts --missing fr                 # the texts still missing, as JSON for a translator
+node tools/i18n-merge.ts fr translations.json         # take over { "key": "text" } and bring the file into the shape of en.ts
+node tools/i18n-check.ts fr
+```
+
+The merge keeps the order and the section comments of `en.ts`, takes the texts of the JSON file where it has
+one and the existing text otherwise, and drops keys that `en.ts` no longer has.
 
 Quantities the program writes itself (“5.1 km”, “12 min”, the month of a photograph) follow the language
 through the browser's own formatting (`formatUnit`, `formatMonth` in `src/i18n/index.ts`).

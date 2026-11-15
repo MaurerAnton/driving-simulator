@@ -408,7 +408,8 @@ export class World {
   readonly meta: WorldJson['meta'];
   readonly nodes: Node[] = [];
   readonly edges: Edge[] = [];
-  readonly banned = new Set<string>();
+  /** forbidden turns: from edge → [via node, to edge, …] (few edges have any) */
+  private readonly banned = new Map<number, number[]>();
   readonly signals: SignalControllerJson[];
   readonly crossings: CrossingJson[];
   readonly json: WorldJson;
@@ -523,7 +524,11 @@ export class World {
         this.nodeGrid.insertBox(node.shape.minX, node.shape.minZ, node.shape.maxX, node.shape.maxZ, node);
       }
     }
-    for (const b of json.banned) this.banned.add(`${b[0]}:${b[1]}:${b[2]}`);
+    for (const b of json.banned) {
+      const list = this.banned.get(b[0]);
+      if (list) list.push(b[1], b[2]);
+      else this.banned.set(b[0], [b[1], b[2]]);
+    }
   }
 
   /** (Re)compute cached geometry of an edge and index its segments. */
@@ -564,7 +569,10 @@ export class World {
   }
 
   isBanned(from: Edge, via: Node, to: Edge): boolean {
-    return this.banned.has(`${from.id}:${via.id}:${to.id}`);
+    const list = this.banned.get(from.id);
+    if (!list) return false;
+    for (let i = 0; i < list.length; i += 2) if (list[i] === via.id && list[i + 1] === to.id) return true;
+    return false;
   }
 
   /** Height of the junction plane of `node` at (x,z). */

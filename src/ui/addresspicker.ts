@@ -24,11 +24,42 @@ export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; inp
   list.className = 'addr-list';
   node.append(input, list);
 
+  // a combo box: the field keeps the focus, the arrow keys move a mark through the list below it
+  const listId = `addr-list-${++pickers}`;
+  list.id = listId;
+  list.setAttribute('role', 'listbox');
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-controls', listId);
+  input.setAttribute('aria-expanded', 'false');
+
   let index: AddressIndex | null = null;
   let asked = false;
   let hits: AddressHit[] = [];
-  const say = (text: string): void => {
+  let buttons: HTMLButtonElement[] = [];
+  /** the entry the arrow keys have reached, -1: none yet */
+  let active = -1;
+  const mark = (i: number): void => {
+    active = hits.length === 0 ? -1 : ((i % hits.length) + hits.length) % hits.length;
+    buttons.forEach((b, k) => {
+      b.classList.toggle('on', k === active);
+      b.setAttribute('aria-selected', k === active ? 'true' : 'false');
+    });
+    if (active >= 0) {
+      input.setAttribute('aria-activedescendant', buttons[active].id);
+      buttons[active].scrollIntoView?.({ block: 'nearest' });
+    } else input.removeAttribute('aria-activedescendant');
+  };
+  const clear = (): void => {
     list.replaceChildren();
+    hits = [];
+    buttons = [];
+    active = -1;
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+  };
+  const say = (text: string): void => {
+    clear();
     if (!text) return;
     const p = document.createElement('small');
     p.textContent = text;
@@ -36,14 +67,12 @@ export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; inp
   };
   const choose = (h: AddressHit): void => {
     input.value = h.label;
-    list.replaceChildren();
-    hits = [];
+    clear();
     o.pick(h);
   };
   const show = (): void => {
     const q = input.value.trim();
     if (q.length < 2) {
-      hits = [];
       say('');
       return;
     }
@@ -51,19 +80,28 @@ export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; inp
       say(o.loading);
       return;
     }
-    hits = index.search(q, 8);
-    if (hits.length === 0) {
+    const found = index.search(q, 8);
+    if (found.length === 0) {
       say(o.none);
       return;
     }
-    list.replaceChildren();
-    for (const h of hits) {
+    clear();
+    hits = found;
+    input.setAttribute('aria-expanded', 'true');
+    hits.forEach((h, k) => {
       const b = document.createElement('button');
       b.type = 'button';
+      b.id = `${listId}-${k}`;
+      b.setAttribute('role', 'option');
+      // the field keeps the focus (Tab goes on to the next control, the arrow keys walk the list)
+      b.tabIndex = -1;
       b.textContent = h.label;
       b.onclick = () => choose(h);
+      b.onpointerenter = () => mark(k);
+      buttons.push(b);
       list.append(b);
-    }
+    });
+    mark(-1);
   };
   const ensure = (): void => {
     if (asked) return;
@@ -80,12 +118,28 @@ export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; inp
     show();
   });
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && hits.length > 0) {
+    // by key *and* by code: some browsers and input methods report one of them only
+    const k = e.key || e.code;
+    const down = k === 'ArrowDown' || k === 'Down' || e.code === 'ArrowDown';
+    const up = k === 'ArrowUp' || k === 'Up' || e.code === 'ArrowUp';
+    if ((down || up) && !e.isComposing) {
+      // (also keeps the browser from moving the caret or opening its own list of earlier entries)
       e.preventDefault();
-      choose(hits[0]);
-    }
+      if (hits.length === 0) show();
+      else mark(active < 0 ? (down ? 0 : hits.length - 1) : active + (down ? 1 : -1));
+    } else if ((k === 'Enter' || e.code === 'NumpadEnter') && !e.isComposing && hits.length > 0) {
+      e.preventDefault();
+      choose(hits[Math.max(0, active)]);
+    } else if ((k === 'Escape' || k === 'Esc') && hits.length > 0) {
+      // close the list first; a second Escape reaches the menu
+      e.preventDefault();
+      clear();
+    } else if (k === 'Tab' && active >= 0) choose(hits[active]);
     // typing must not drive the car or close the menu
     e.stopPropagation();
   });
+  input.addEventListener('keyup', (e) => e.stopPropagation());
   return { node, input };
 }
+
+let pickers = 0;

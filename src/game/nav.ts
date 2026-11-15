@@ -173,19 +173,29 @@ export type TargetType = 'rbl' | 'signals' | 'roundabout' | 'rural' | 'motorway'
 export interface LessonDef {
   /** title and introduction are texts: "lesson.<id>.title", "lesson.<id>.intro" */
   id: string;
-  kind: 'free' | 'basics' | 'route' | 'exam';
+  /** 'yard': tasks on the practice yard only (class CE) */
+  kind: 'free' | 'basics' | 'route' | 'exam' | 'yard';
   targets: TargetType[];
+  /** only for this vehicle (default: both) */
+  vehicle?: 'car' | 'truck';
+  /** tasks on the practice yard, done one after the other before the drive (see game/ce.ts) */
+  tasks?: Array<'couple' | 'corner' | 'ramp'>;
 }
 
 export const LESSONS: LessonDef[] = [
-  { id: 'basics', kind: 'basics', targets: [] },
+  { id: 'basics', kind: 'basics', targets: [], vehicle: 'car' },
   { id: 'rbl', kind: 'route', targets: ['rbl', 'rbl', 'home'] },
   { id: 'priority', kind: 'route', targets: ['priority', 'priority', 'home'] },
   { id: 'signals', kind: 'route', targets: ['signals', 'signals', 'home'] },
   { id: 'roundabout', kind: 'route', targets: ['roundabout', 'roundabout', 'home'] },
   { id: 'rural', kind: 'route', targets: ['rural', 'home'] },
   { id: 'motorway', kind: 'route', targets: ['motorway', 'home'] },
-  { id: 'exam', kind: 'exam', targets: ['rbl', 'signals', 'roundabout', 'priority', 'rural', 'home'] },
+  { id: 'exam', kind: 'exam', targets: ['rbl', 'signals', 'roundabout', 'priority', 'rural', 'home'], vehicle: 'car' },
+  // class CE: truck with trailer (Anlage 7 FeV: coupling, two basic manoeuvres, the drive)
+  { id: 'ceCouple', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['couple'] },
+  { id: 'ceCorner', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['corner'] },
+  { id: 'ceRamp', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['ramp'] },
+  { id: 'ceExam', kind: 'exam', targets: ['signals', 'roundabout', 'priority', 'rural', 'home'], vehicle: 'truck', tasks: ['couple', 'corner', 'ramp'] },
 ];
 
 /** Pick a destination edge of the wanted kind at a sensible distance from (x, z). */

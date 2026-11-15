@@ -25,7 +25,7 @@ export interface Report {
 const KEEP = [
   'StVO', '§', 'Baunatal', 'Fahrsim', 'Panoramax', 'KartaView', 'Mapillary', 'OpenStreetMap', 'ODbL', 'AGPL-3.0-only', 'three.js', 'MIT', 'Wikimedia Commons', 'CC BY-SA 4.0',
   'EXIF', 'XMP', 'GeoJSON', 'JSON', 'CSV', 'JPEG', 'PNG', 'WebP', 'WebGL 2', '▲', '▼', '⋯', 'DGM1', 'LoD2', 'UrhG', 'Marktplatz 5', 'A 49', 'Logitech', 'Thrustmaster', 'Fanatec',
-  'RT', 'LT', 'RB/LB', 'X/B', 'Anlieger frei', 'P·R·N·D', '360°', 'IP',
+  'RT', 'LT', 'RB/LB', 'X/B', 'Anlieger frei', 'P·R·N·D', '360°', 'IP', 'Kassel', 'CE',
 ];
 
 /** Longest text (in characters) that still fits where these keys are shown. */
@@ -37,8 +37,22 @@ const MAX: Array<[RegExp, number]> = [
   [/^kr\./, 26],
   [/^tb/, 34],
   [/^(start|free|exam|settings|controls|about|resume|menu|paused|back|result|passed|failed|faults|points|distance|duration|hint|minor|major|fail|reality|realityClose)$/, 34],
+  [/^(realityCopy|realityCopied)$/, 16],
+  [/^mapTitle$/, 22],
+  [/^(viewChase|viewCockpit|enginePower|startView|mapPath|mapClearPath|logClear|logTitle|realityPlace|mapTeleport|endDrive|mapCentre|mapPlace)$/, 36],
+  [/^realityAerial$/, 44],
   [/^nav(Left|Right|Uturn|Follow|Motorway)$|^lane(Left|Right)$|^routeDone$/, 60],
   [/^lesson\.\w+\.title$/, 60],
+  [/^(demo|demoStart|demoClear|demoArrived|demoStop|demoTaken)$/, 34],
+  [/^demoAdd$/, 40],
+  [/^demoRunning$/, 120],
+  [/^demo\.\w+$/, 96],
+  [/^vehicle$/, 30],
+  [/^veh(Car|Truck)$/, 46],
+  [/^ce\.(corrections|gap)$/, 46],
+  [/^ce\.onFoot$/, 64],
+  [/^ce\.step\./, 84],
+  [/^ce\.(do\.\w+|again)$/, 200],
   [/^v\.\w+\.title$/, 80],
 ];
 

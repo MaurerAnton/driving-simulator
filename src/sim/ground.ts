@@ -21,6 +21,8 @@ export class WorldGround implements Ground {
   private lastY = 0;
   /** global grip multiplier (rain, ice) */
   weatherGrip = 1;
+  /** places that are paved for the time being, whatever the map says (the practice yard laid over a field) */
+  paved: ((x: number, z: number) => boolean) | null = null;
 
   constructor(world: World, terrain: TerrainSource) {
     this.world = world;
@@ -86,7 +88,7 @@ export class WorldGround implements Ground {
     out.ny = 1 / l;
     out.nz = nz / l;
     const c = t.coverAt(x, z);
-    if (c === COVER.ASPHALT || c === COVER.PAVED) {
+    if (c === COVER.ASPHALT || c === COVER.PAVED || this.paved?.(x, z)) {
       out.grip = 0.95 * this.weatherGrip;
       out.rolling = 1.1;
     } else if (c === COVER.WATER) {

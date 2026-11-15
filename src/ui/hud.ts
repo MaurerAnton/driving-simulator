@@ -3,7 +3,7 @@
 import type { AddressHit, AddressIndex } from '../game/address.ts';
 import { LESSONS } from '../game/nav.ts';
 import type { Settings } from '../game/settings.ts';
-import { saveSettings } from '../game/settings.ts';
+import { ENGINE_POWERS, saveSettings } from '../game/settings.ts';
 import type { Input } from '../input/input.ts';
 import type { Violation } from '../sim/rules.ts';
 import { SIG } from '../sim/signals.ts';
@@ -13,12 +13,16 @@ import type { SpawnJson } from '../world/types.ts';
 import type { World } from '../world/world.ts';
 import { addressPicker } from './addresspicker.ts';
 import { NoticeBoard, noticeColour } from './notices.ts';
-import { LANGS, formatUnit, keyName, lessonIntro, lessonTitle, loadLang, tr, violationRef, violationTitle, violationWhy } from '../i18n/index.ts';
+import { LANGS, formatUnit, keyName, lessonIntro, lessonTitle, loadLang, localeOf, tr, violationRef, violationTitle, violationWhy } from '../i18n/index.ts';
+import { VIOLATION_REFS, citationParts } from '../i18n/violations.ts';
+import type { FaultLog } from '../game/faultlog.ts';
 import type { Lang } from '../i18n/index.ts';
 
 export interface HudState {
   speedKmh: number;
   rpm: number;
+  /** engine speed at which the bar is full (a truck's diesel turns a third as fast as a car's engine) */
+  rpmMax?: number;
   gear: string;
   /** km/h; 0 = no limit; -1 = unknown */
   limit: number;
@@ -37,6 +41,8 @@ export interface HudState {
   hazard: boolean;
   blinkOn: boolean;
   handbrake: boolean;
+  /** the car is being driven against the handbrake */
+  handbrakeWarn: boolean;
   seatbelt: boolean;
   engineOn: boolean;
   lights: boolean;
@@ -90,6 +96,10 @@ export class Hud {
   private navText!: HTMLElement;
   private navSub!: HTMLElement;
   private navBox!: HTMLElement;
+  private choiceBox!: HTMLElement;
+  private navLong = false;
+  private choiceKey = '';
+  private choicePick: (id: string) => void = () => {};
   private roundel!: HTMLElement;
   private roundelText = '';
   private ruler: CanvasRenderingContext2D | null = null;
@@ -105,6 +115,8 @@ export class Hud {
   private noticeShown: object | null = null;
   private dash!: HTMLElement;
   private dashV!: HTMLElement;
+  private lampBrake!: HTMLElement;
+  private lampBelt!: HTMLElement;
   private dashG!: HTMLElement;
   private dashRpm!: HTMLElement;
   private indL!: HTMLElement;
@@ -131,6 +143,22 @@ export class Hud {
   onResume: () => void = () => {};
   onQuit: () => void = () => {};
   onReality: () => void = () => {};
+  /** the faults of this and of earlier drives (set by the game) */
+  faultLog: FaultLog | null = null;
+  /** open the full-screen map */
+  /**
+   * The gearbox of the vehicle that is being driven, where it is not the one
+   * of the settings: the truck's is automatic, and so is the car's on a
+   * demonstration drive.  (The key reminder goes by it.)
+   */
+  gearbox: Settings['transmission'] | null = null;
+  onMap: () => void = () => {};
+  /** plan a demonstration drive (opens the map with its panel for that) */
+  onDemo: () => void = () => {};
+  /** end a free drive and show its result */
+  onFinish: () => void = () => {};
+  /** a free drive is running (it has no destination that would end it) */
+  canFinish = false;
   onPause: () => void = () => {};
   onTeleport: (a: AddressHit) => void = () => {};
   onSettingsChanged: () => void = () => {};
@@ -212,13 +240,20 @@ export class Hud {
     this.setOverlay(o);
   }
 
-  showMenu(spawns: SpawnJson[], lastSpawn = 0): void {
+  showMenu(spawns: SpawnJson[]): void {
     const o = el('div', 'overlay');
     const p = el('div', 'panel');
     // the language first: whoever cannot read the page must be able to find it
-    p.append(this.languagePicker(() => this.showMenu(spawns, spawn)));
+    p.append(this.languagePicker(() => this.showMenu(spawns)));
     p.append(el('h1', '', 'Fahrsim <span>Baunatal</span>'), el('p', '', this.t('subtitle')));
-    let spawn = Math.min(lastSpawn, Math.max(0, spawns.length - 1));
+    // where the last drive began – also after the page was closed
+    const last = this.settings.lastStart;
+    let spawn = Math.min(last.spawn, Math.max(0, spawns.length - 1));
+    const remember = (): void => {
+      last.spawn = spawn;
+      last.address = address ?? null;
+      saveSettings(this.settings);
+    };
 
     const opts = el('div');
     const rowSpawn = el('div', 'row');
@@ -230,13 +265,19 @@ export class Hud {
       selSpawn.append(op);
     });
     selSpawn.value = String(spawn);
-    let address: AddressHit | undefined;
+    let address: AddressHit | undefined = last.address ?? undefined;
     const atAddress = el('option');
     atAddress.value = 'address';
+    if (address) {
+      atAddress.textContent = address.label;
+      selSpawn.append(atAddress);
+      selSpawn.value = 'address';
+    }
     selSpawn.onchange = () => {
       if (selSpawn.value === 'address') return;
       spawn = Number(selSpawn.value);
       address = undefined;
+      remember();
     };
     rowSpawn.append(el('label', '', this.t('startPoint')), selSpawn);
     // … or anywhere: street and house number
@@ -251,6 +292,7 @@ export class Hud {
         atAddress.textContent = hit.label;
         if (!atAddress.parentNode) selSpawn.append(atAddress);
         selSpawn.value = 'address';
+        remember();
       },
     });
     rowAddr.append(el('label', '', this.t('startAddress')), picker.node);
@@ -268,7 +310,26 @@ export class Hud {
       saveSettings(this.settings);
     };
     rowTr.append(el('label', '', this.t('transmission')), selTr);
-    opts.append(rowSpawn, rowAddr, rowTr);
+    // a car, or the truck with its trailer (class CE) – each with lessons of its own
+    const truck = this.settings.vehicle === 'truck';
+    const rowVeh = el('div', 'row');
+    const selVeh = el('select');
+    for (const [v, k] of [['car', 'vehCar'], ['truck', 'vehTruck']]) {
+      const op = el('option');
+      op.value = v;
+      op.textContent = this.t(k);
+      selVeh.append(op);
+    }
+    selVeh.value = this.settings.vehicle;
+    selVeh.onchange = () => {
+      this.settings.vehicle = selVeh.value as Settings['vehicle'];
+      saveSettings(this.settings);
+      this.showMenu(spawns);
+    };
+    rowVeh.append(el('label', '', this.t('vehicle')), selVeh);
+    // (the truck has an automated gearbox, as nearly all of them today)
+    opts.append(rowSpawn, rowAddr, rowVeh);
+    if (!truck) opts.append(rowTr);
     p.append(opts);
 
     p.append(el('h2', '', this.t('start')));
@@ -284,17 +345,25 @@ export class Hud {
       cards.append(c);
     };
     card(this.t('free'), this.t('freeDesc'), 'free');
-    for (const l of LESSONS) card(lessonTitle(l.id, this.lang), l.kind === 'exam' ? this.t('examDesc') : lessonIntro(l.id, this.lang), l.id);
+    card(this.t('demo'), this.t('demoDesc'), 'demo');
+    // the lessons of the chosen vehicle: the practice yard first, the test last
+    const rank = (kind: string): number => (kind === 'yard' ? 0 : kind === 'exam' ? 2 : 1);
+    const lessons = LESSONS.filter((l) => (l.vehicle ?? this.settings.vehicle) === this.settings.vehicle && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
+    // (the lessons on the road were written for the car: what is different with the truck is said first)
+    const note = this.settings.vehicle === 'truck' ? `${this.t('lesson.truckNote')} ` : '';
+    for (const l of lessons) card(lessonTitle(l.id, this.lang), l.id === 'exam' ? this.t('examDesc') : `${l.kind === 'route' ? note : ''}${lessonIntro(l.id, this.lang)}`, l.id);
     p.append(cards);
 
     const b = el('div', 'buttons');
     const bs = el('button', 'btn ghost', this.t('settings'));
-    bs.onclick = () => this.showSettings(() => this.showMenu(spawns, spawn));
+    bs.onclick = () => this.showSettings(() => this.showMenu(spawns));
     const bc = el('button', 'btn ghost', this.t('controls'));
-    bc.onclick = () => this.showControls(() => this.showMenu(spawns, spawn));
+    bc.onclick = () => this.showControls(() => this.showMenu(spawns));
     const ba = el('button', 'btn ghost', this.t('about'));
-    ba.onclick = () => this.showAbout(() => this.showMenu(spawns, spawn));
-    b.append(bs, bc, ba);
+    ba.onclick = () => this.showAbout(() => this.showMenu(spawns));
+    const bl = el('button', 'btn ghost', this.t('logTitle'));
+    bl.onclick = () => this.showLog(() => this.showMenu(spawns));
+    b.append(bs, bc, bl, ba);
     p.append(b);
     o.append(p);
     this.setOverlay(o);
@@ -399,6 +468,18 @@ export class Hud {
       p.append(row);
     }
     select(this.t('transmission'), s.transmission, [['assist', this.t('trAssist')], ['manual', this.t('trManual')], ['automatic', this.t('trAutomatic')]], (v) => (s.transmission = v as Settings['transmission']));
+    // the car
+    select(
+      this.t('enginePower'),
+      String(s.power),
+      ENGINE_POWERS.map((ps): [string, string] => [String(ps), `${ps} PS (${Math.round(ps * 0.7355)} kW)`]),
+      (v) => (s.power = Number(v)),
+    );
+    p.append(el('p', 'note', this.t('settingsNextDrive')));
+    check(this.t('limiter'), s.limiter, (v) => (s.limiter = v));
+    // the picture
+    select(this.t('startView'), s.view, [['chase', this.t('viewChase')], ['cockpit', this.t('viewCockpit')]], (v) => (s.view = v as Settings['view']));
+    range(this.t('cabinOpacity'), (s.cabinOpacity - 0.2) / 0.8, (v) => (s.cabinOpacity = 0.2 + 0.8 * v));
     select(this.t('quality'), s.quality, [['low', this.t('qLow')], ['medium', this.t('qMedium')], ['high', this.t('qHigh')]], (v) => (s.quality = v as Settings['quality']));
     select(this.t('mirrors'), s.mirrors, [['off', this.t('mOff')], ['alternate', this.t('mAlt')], ['full', this.t('mFull')]], (v) => (s.mirrors = v as Settings['mirrors']));
     range(this.t('traffic'), s.traffic, (v) => (s.traffic = v));
@@ -409,6 +490,8 @@ export class Hud {
     check(this.t('hudRules'), s.hudRules, (v) => (s.hudRules = v));
     check(this.t('hudGear'), s.hudGear, (v) => (s.hudGear = v));
     check(this.t('voice'), s.voice, (v) => (s.voice = v));
+    // settings live in the browser's storage; say so if this browser keeps none
+    if (!saveSettings(s)) p.append(el('p', 'note warn', this.t('settingsNotSaved')));
     const b = el('div', 'buttons');
     const bb = el('button', 'btn', this.t('back'));
     bb.onclick = back;
@@ -431,13 +514,14 @@ export class Hud {
       [[...k('Enter'), ' / ', ...k('KeyI')], 'ctl.engine'],
       [[...k('KeyZ', 'KeyC'), ' / ', ...k('KeyX')], 'ctl.indicators'],
       [k('KeyJ', 'KeyK'), 'ctl.look'],
+      [k('KeyU'), 'ctl.lookBack'],
       [k('KeyB'), 'ctl.belt'],
       [[...k('KeyL'), ' / ', ...k('KeyO')], 'ctl.lights'],
       [k('KeyH'), 'ctl.horn'],
       [k('KeyV'), 'ctl.camera'],
       [k('KeyT'), 'ctl.reset'],
       [k('KeyF'), 'ctl.reality'],
-      [k('KeyM'), 'ctl.endDrive'],
+      [k('KeyM'), 'ctl.map'],
       [k('Escape'), 'ctl.pause'],
       [k('F1'), 'ctl.help'],
     ];
@@ -533,13 +617,27 @@ export class Hud {
     q.onclick = () => this.onQuit();
     const f = el('button', 'btn ghost', this.t('realityButton'));
     f.onclick = () => this.onReality();
-    b.append(r, f);
+    const m = el('button', 'btn ghost', this.t('mapTitle'));
+    m.onclick = () => this.onMap();
+    b.append(r, m, f);
     if (this.canTeleport) {
       const a = el('button', 'btn ghost', this.t('teleport'));
       a.onclick = () => this.showTeleport();
-      b.append(a);
+      // … or have the car drive somewhere by itself and watch how it is done
+      const demo = el('button', 'btn ghost', this.t('demo'));
+      demo.onclick = () => this.onDemo();
+      b.append(a, demo);
     }
-    b.append(s, c, q);
+    const log = el('button', 'btn ghost', this.t('logTitle'));
+    log.onclick = () => this.showLog(() => this.showPause());
+    b.append(log, s, c);
+    if (this.canFinish) {
+      // a free drive ends when the driver says so: the result, then the main menu
+      const e = el('button', 'btn ghost', this.t('endDrive'));
+      e.onclick = () => this.onFinish();
+      b.append(e);
+    }
+    b.append(q);
     p.append(b);
     o.append(p);
     this.setOverlay(o);
@@ -588,16 +686,90 @@ export class Hud {
     const order: Record<string, number> = { fail: 0, major: 1, minor: 2, hint: 3 };
     for (const g of [...groups.values()].sort((a, b) => order[a.v.severity] - order[b.v.severity])) {
       const f = el('div', `fault ${g.v.severity}`);
-      f.append(el('b', '', `${violationTitle(g.v.id, this.lang, g.v.data)}${g.n > 1 ? ` (${g.n}×)` : ''}`), el('small', '', violationWhy(g.v.id, this.lang)), el('em', '', `${this.t(g.v.severity)} · ${violationRef(g.v.id, this.lang)}`));
+      const em = el('em', '', `${this.t(g.v.severity)} · `);
+      em.append(this.ruleNode(g.v.id));
+      f.append(el('b', '', `${violationTitle(g.v.id, this.lang, g.v.data)}${g.n > 1 ? ` (${g.n}×)` : ''}`), el('small', '', violationWhy(g.v.id, this.lang)), em);
       p.append(f);
     }
     const b = el('div', 'buttons');
     const q = el('button', 'btn', this.t('menu'));
     q.onclick = () => this.onQuit();
-    b.append(q);
+    const log = el('button', 'btn ghost', this.t('logTitle'));
+    log.onclick = () => this.showLog(() => this.showResult(r));
+    b.append(q, log);
     p.append(b);
     o.append(p);
     this.setOverlay(o);
+  }
+
+  /**
+   * The rule a fault refers to.  A citation of the StVO is written as it is
+   * in German law (left to right in every language), and each paragraph
+   * opens its official text in a new tab.
+   */
+  private ruleNode(id: string): HTMLElement {
+    const ref = VIOLATION_REFS[id] ?? '';
+    const node = el('span', 'rule');
+    if (ref.startsWith('@') || !ref) {
+      node.textContent = violationRef(id, this.lang);
+      return node;
+    }
+    node.dir = 'ltr';
+    for (const part of citationParts(ref)) {
+      if (!part.url) {
+        node.append(part.text);
+        continue;
+      }
+      const a = el('a');
+      a.href = part.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = part.text;
+      a.title = this.t('logRule');
+      node.append(a);
+    }
+    return node;
+  }
+
+  /**
+   * The log of faults: every fault of this and of earlier drives, newest
+   * first, each with its explanation and the rule to read up.
+   */
+  showLog(back: () => void): void {
+    const o = el('div', 'overlay');
+    const p = el('div', 'panel');
+    p.append(el('h1', '', this.t('logTitle')));
+    const entries = this.faultLog?.entries ?? [];
+    if (entries.length === 0) p.append(el('p', '', this.t('logEmpty')));
+    else p.append(el('p', '', this.t('logText')));
+    const when = new Intl.DateTimeFormat(localeOf(this.lang), { dateStyle: 'medium', timeStyle: 'short', numberingSystem: 'latn', calendar: 'gregory' });
+    const list = el('div', 'log');
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const e = entries[i];
+      const f = el('div', `fault ${e.severity}`);
+      const where = [when.format(new Date(e.t)), e.street, e.mode === 'free' ? this.t('free') : e.mode === 'exam' ? this.t('exam') : lessonTitle(e.mode, this.lang)].filter(Boolean).join(' · ');
+      const em = el('em', '', `${this.t(e.severity)} · `);
+      em.append(this.ruleNode(e.id));
+      f.append(el('small', 'when', where), el('b', '', violationTitle(e.id, this.lang, e.data)), el('small', '', violationWhy(e.id, this.lang)), em);
+      list.append(f);
+    }
+    p.append(list);
+    const b = el('div', 'buttons');
+    const bb = el('button', 'btn', this.t('back'));
+    bb.onclick = back;
+    b.append(bb);
+    if (entries.length > 0) {
+      const clear = el('button', 'btn ghost', this.t('logClear'));
+      clear.onclick = () => {
+        this.faultLog?.clear();
+        this.showLog(back);
+      };
+      b.append(clear);
+    }
+    p.append(b);
+    o.append(p);
+    this.setOverlay(o);
+    bb.focus();
   }
 
   hideOverlay(): void {
@@ -633,7 +805,18 @@ export class Hud {
     this.dashRpm = el('i');
     rpm.append(this.dashRpm);
     this.indR = el('span', 'ind', '▶');
-    this.dash.append(this.indL, this.dashV, el('span', 'u', 'km/h'), this.dashG, rpm, this.indR);
+    // warning lamps as in an instrument cluster: parking brake and seat belt
+    this.lampBrake = el(
+      'span',
+      'lamp',
+      '<svg viewBox="0 0 34 24" aria-hidden="true"><circle cx="17" cy="12" r="7.6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M6 4.2a11.5 11.5 0 0 0 0 15.6M28 4.2a11.5 11.5 0 0 1 0 15.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><text x="17" y="16" text-anchor="middle" font-size="10.5" font-weight="800" font-family="sans-serif" fill="currentColor">P</text></svg>',
+    );
+    this.lampBelt = el(
+      'span',
+      'lamp',
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="3.2" fill="currentColor"/><path d="M6 22v-6.5a6 6 0 0 1 12 0V22" fill="none" stroke="currentColor" stroke-width="2.3"/><path d="M7.2 11.2 17 21" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg>',
+    );
+    this.dash.append(this.indL, this.lampBrake, this.dashV, el('span', 'u', 'km/h'), this.dashG, rpm, this.lampBelt, this.indR);
     this.tip = el('div', 'tip');
     const map = el('div', 'map');
     this.mapCanvas = el('canvas');
@@ -643,10 +826,50 @@ export class Hud {
     map.append(this.mapCanvas, el('span', 'cam', '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 4 7.5 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.5L15 4H9zm3 4.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>'));
     map.title = this.t('realityButton');
     map.onclick = () => this.onReality();
+    // … and a corner of it opens the whole map
+    const expand = el('button', 'expand', '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>');
+    expand.type = 'button';
+    expand.title = this.t('mapTitle');
+    expand.setAttribute('aria-label', this.t('mapTitle'));
+    expand.onclick = (e) => {
+      e.stopPropagation();
+      this.onMap();
+    };
+    map.append(expand);
     this.score = el('div', 'score');
     this.keysBox = el('div', 'keyhelp');
-    h.append(this.navBox, assist, this.dash, this.tip, map, this.score, this.keysBox);
+    // the upper left corner: the street-name block and, under it, things to choose from while standing
+    const side = el('div', 'side');
+    this.choiceBox = el('div', 'choices');
+    this.choiceBox.hidden = true;
+    side.append(this.navBox, this.choiceBox);
+    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox);
     return h;
+  }
+
+  /**
+   * Things to choose from while the vehicle stands (class CE: what is done on
+   * foot around truck and trailer; the street-name block above says what is
+   * asked).  An empty list takes the panel away.
+   * May be called every frame: the panel is rebuilt only when the list changes.
+   */
+  setChoices(items: ReadonlyArray<{ id: string; label: string }>, pick: (id: string) => void): void {
+    this.choicePick = pick;
+    const key = items.length ? `${this.lang}|${items.map((i) => i.id).join(',')}` : '';
+    if (key === this.choiceKey) return;
+    this.choiceKey = key;
+    this.choiceBox.replaceChildren();
+    this.choiceBox.hidden = items.length === 0;
+    for (const it of items) {
+      const b = el('button');
+      b.type = 'button';
+      b.textContent = it.label;
+      b.onclick = (e) => {
+        e.stopPropagation();
+        this.choicePick(it.id);
+      };
+      this.choiceBox.append(b);
+    }
   }
 
   setHudVisible(v: boolean): void {
@@ -673,6 +896,12 @@ export class Hud {
       // navigation box
       const arrow = s.navArrow < 0 ? '↰' : s.navArrow > 0 ? '↱' : '↑';
       const note = this.notices.current(performance.now());
+      // an instruction of several lines is set smaller than a street name
+      const long = !note && s.navText.length > 64;
+      if (long !== this.navLong) {
+        this.navLong = long;
+        this.navText.classList.toggle('long', long);
+      }
       if (note) {
         // a fault or hint takes the place of the street name (red: serious, yellow: minor)
         if (note !== this.noticeShown) {
@@ -738,12 +967,18 @@ export class Hud {
       // phone, where the instruments are too small to read
       const showDash = s.showDash || this.mode === 'touch';
       this.dash.style.display = showDash ? '' : 'none';
+      // (the key reminder keeps clear of the strip)
+      this.hud.classList.toggle('dashon', showDash);
       if (showDash) {
         this.dashV.textContent = String(Math.round(Math.abs(s.speedKmh)));
         this.dashG.textContent = s.gear;
-        this.dashRpm.style.width = `${Math.min(100, (s.rpm / 7000) * 100).toFixed(0)}%`;
+        this.dashRpm.style.width = `${Math.min(100, (s.rpm / (s.rpmMax || 7000)) * 100).toFixed(0)}%`;
         this.indL.className = `ind${s.blinkOn && (s.hazard || s.indicator < 0) ? ' on' : ''}`;
         this.indR.className = `ind${s.blinkOn && (s.hazard || s.indicator > 0) ? ' on' : ''}`;
+        // lit while the handbrake is on; large and flashing when the car is driven against it
+        this.lampBrake.className = `lamp${s.handbrake ? ' on' : ''}${s.handbrakeWarn ? ' warn' : ''}`;
+        this.lampBrake.title = s.handbrake ? this.t('tbHandbrake') : '';
+        this.lampBelt.className = `lamp${s.seatbelt ? '' : ' on'}`;
       }
       this.tip.style.display = s.tip ? '' : 'none';
       this.tip.textContent = s.tip;
@@ -765,7 +1000,7 @@ export class Hud {
         // key reminder: while standing or crawling, out of the way once the car is rolling
         const want = this.settings.keyHints && Math.abs(s.speedKmh) < 12;
         this.keysBox.classList.toggle('show', want);
-        const key = `${this.lang}:${this.settings.transmission}`;
+        const key = `${this.lang}:${this.gearbox ?? this.settings.transmission}`;
         if (want && key !== this.keysFor) {
           this.keysFor = key;
           this.keysBox.replaceChildren(...this.keyReminder());
@@ -935,6 +1170,8 @@ export class Hud {
     item(this.t('tbLookLeft'), 'KeyJ');
     item(this.t('tbLookRight'), 'KeyK');
     item(this.t('tbCamera'), 'KeyV');
+    item(this.t('tbLookBack'), 'KeyU');
+    item(this.t('mapTitle'), 'KeyM');
     item(this.t('tbReset'), 'KeyT');
     const menu = el('button', 'mb', this.t('tbMenu'));
     menu.onclick = () => {
@@ -988,7 +1225,7 @@ export class Hud {
 
   /** The short reminder of the keys, depending on the gearbox chosen. */
   private keyReminder(): HTMLElement[] {
-    const tr = this.settings.transmission;
+    const tr = this.gearbox ?? this.settings.transmission;
     const item = (text: string, ...keys: Array<HTMLElement | string>): HTMLElement => {
       const e = el('span');
       e.append(...keys, ` ${this.t(text)}`);
@@ -1002,7 +1239,7 @@ export class Hud {
       if (tr === 'manual') out.push(item('kr.clutch', ...k('ShiftLeft')));
       out.push(item('kr.gear', ...k('Digit1'), '–', ...k('Digit6')), item('kr.reverse', ...k('KeyR')), item('kr.neutral', ...k('KeyN')), item('kr.upDown', ...k('KeyE', 'KeyQ')));
     }
-    out.push(item('kr.handbrake', ...k('Space')), item('kr.startEngine', ...k('Enter')), item('kr.indicators', ...k('KeyZ', 'KeyC')), item('kr.shoulder', ...k('KeyJ', 'KeyK')), item('kr.allKeys', ...k('F1')));
+    out.push(item('kr.handbrake', ...k('Space')), item('kr.startEngine', ...k('Enter')), item('kr.indicators', ...k('KeyZ', 'KeyC')), item('kr.shoulder', ...k('KeyJ', 'KeyK')), item('kr.camera', ...k('KeyV')), item('kr.map', ...k('KeyM')), item('kr.allKeys', ...k('F1')));
     return out;
   }
 }

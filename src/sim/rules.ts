@@ -43,6 +43,12 @@ export interface PlayerSnapshot {
   /** impact speed of a collision with scenery in this step (0 = none) */
   hitScenery: number;
   length: number;
+  /**
+   * From the point given by x, z to the front bumper (m).  Half the length
+   * unless said otherwise – a truck is measured from the middle of its
+   * wheelbase, which is not the middle of its length.
+   */
+  front?: number;
 }
 
 /** What the driver should know right now – shown by the optional HUD assistance. */
@@ -88,7 +94,17 @@ export class RuleMonitor {
   private laneS = 0;
   private prevLaneS = 0;
   private stoppedNearLine = false;
-  private entry: { node: Node; arm: Arm; lane: Lane; time: number; indicatorL: number; indicatorR: number; lookedL: boolean; lookedR: boolean; yaw: number; signalRed: boolean; nowL: boolean; nowR: boolean } | null = null;
+  private entry: { node: Node; arm: Arm; lane: Lane; time: number; indicatorL: number; indicatorR: number; lookedL: boolean; lookedR: boolean; yaw: number; signalRed: boolean; nowL: boolean; nowR: boolean; vMax: number } | null = null;
+  /**
+   * The vehicle is a truck with a trailer: 60 km/h outside built-up areas
+   * and 80 km/h on motorways (§ 3 Abs. 3 StVO), walking pace when turning
+   * right in town (§ 9 Abs. 6 StVO).
+   */
+  truck = false;
+  /** On the practice yard there are no roads and no traffic: nothing here is judged. */
+  yard = false;
+  private lastX = 0;
+  private lastZ = 0;
   private indL = 0;
   private indR = 0;
   private lookL = 0;
@@ -108,6 +124,8 @@ export class RuleMonitor {
    */
   private redLine: { lane: Lane; x: number; z: number; tol: number; severity: Severity; lineReported: boolean } | null = null;
   private indicatorOnT = 0;
+  /** an oncoming car braked hard for us at this junction (judged once it is known which way we went) */
+  private oncoming: { node: Node; time: number } | null = null;
   private lastEdge: Edge | null = null;
   private readonly crossingState = new Map<object, number>();
 
@@ -124,9 +142,20 @@ export class RuleMonitor {
     this.lane = null;
     this.entry = null;
     this.redLine = null;
+    this.oncoming = null;
     this.lastEdge = null;
     this.time = 0;
     this.speedOver = this.wrongSide = this.wrongWayT = this.sidewalkT = this.offRoadT = this.tailgateT = 0;
+  }
+
+  /** The lane the monitor has the car on (kept while it crosses a junction), or null off the road. */
+  get laneNow(): Lane | null {
+    return this.lane;
+  }
+
+  /** How far the front bumper is along that lane (m). */
+  get laneFront(): number {
+    return this.laneS;
   }
 
   get points(): number {
@@ -135,6 +164,16 @@ export class RuleMonitor {
 
   get failed(): boolean {
     return this.log.some((v) => v.severity === 'fail');
+  }
+
+  /** A fault found by somebody else (the judge of a manoeuvre): into the log like the others. */
+  note(id: string, severity: Severity, data: Record<string, number | string> = {}, cooldown = 3): void {
+    const until = this.cooldown.get(id) ?? -1;
+    if (this.time < until) return;
+    this.cooldown.set(id, this.time + cooldown);
+    const v: Violation = { id, severity, time: this.time, x: this.lastX, z: this.lastZ, data };
+    this.log.push(v);
+    this.onViolation?.(v);
   }
 
   private report(id: string, severity: Severity, p: PlayerSnapshot, data: Record<string, number | string> = {}, cooldown = 12): void {
@@ -167,8 +206,20 @@ export class RuleMonitor {
 
   update(dt: number, p: PlayerSnapshot, events: TrafficEvent[]): void {
     this.time += dt;
+    this.lastX = p.x;
+    this.lastZ = p.z;
     const world = this.world;
     const ctx = this.context;
+    if (this.yard) {
+      ctx.limit = -1;
+      ctx.zone = 0;
+      ctx.urban = false;
+      ctx.roadName = '';
+      ctx.junction = null;
+      ctx.onRoad = true;
+      ctx.wrongWay = false;
+      return;
+    }
     const fx = -Math.sin(p.yaw);
     const fz = -Math.cos(p.yaw);
     const kmh = Math.abs(p.speed) * 3.6;
@@ -220,6 +271,15 @@ export class RuleMonitor {
       // car parks, driveways and tracks have no signed limit: nothing to show
       const unsigned = edge.cls >= CLS.SERVICE && edge.zone === 0;
       ctx.limit = edge.zone === 7 ? 7 : unsigned ? -1 : limit;
+      // what the signs allow, but never more than a truck with trailer may drive there
+      let capped = false;
+      if (this.truck && edge.zone !== 7 && !unsigned) {
+        const cap = edge.cls <= CLS.MOTORWAY_LINK ? 80 : (edge.flags & EF.URBAN) !== 0 ? 0 : 60;
+        if (cap > 0 && (ctx.limit === 0 || ctx.limit > cap)) {
+          ctx.limit = cap;
+          capped = true;
+        }
+      }
       ctx.zone = edge.zone;
       ctx.urban = (edge.flags & EF.URBAN) !== 0;
       ctx.roadName = edge.name || edge.ref;
@@ -255,7 +315,7 @@ export class RuleMonitor {
           this.speedOver += dt;
           if (this.speedOver > 1.6) {
             const sev: Severity = over > 25 ? 'fail' : over > 14 ? 'major' : 'minor';
-            this.report(edge.zone === 7 ? 'speedWalk' : 'speed', sev, p, { limit: lim, speed: Math.round(kmh) }, sev === 'minor' ? 18 : 10);
+            this.report(edge.zone === 7 ? 'speedWalk' : capped ? 'truckSpeed' : 'speed', sev, p, { limit: lim, speed: Math.round(kmh) }, sev === 'minor' ? 18 : 10);
           }
         } else this.speedOver = Math.max(0, this.speedOver - dt * 2);
       }
@@ -295,6 +355,7 @@ export class RuleMonitor {
 
     this.judgeRedLine(p);
 
+    if (this.entry) this.entry.vMax = Math.max(this.entry.vMax, Math.abs(p.speed));
     // --- leaving the junction: was the turn signalled? ---
     if (this.entry && edge && (hit.zone === 0 || near)) {
       const e = this.entry;
@@ -311,7 +372,7 @@ export class RuleMonitor {
     for (const ev of events) {
       if (ev.type === 'collision') this.report('crash', 'fail', p, { speed: Math.round(ev.speed * 3.6) }, 6);
       else if (ev.type === 'pedestrianEndangered') this.report('pedestrian', 'fail', p, {}, 8);
-      else if (ev.type === 'forcedBrake') this.judgePriority(ev.car, p);
+      else if (ev.type === 'forcedBrake') this.judgePriority(ev.car, p, ev.cutIn);
     }
     if (p.hitScenery > 1.2) this.report('crashObject', p.hitScenery > 4 ? 'fail' : 'major', p, { speed: Math.round(p.hitScenery * 3.6) }, 5);
 
@@ -364,7 +425,7 @@ export class RuleMonitor {
     const ctx = this.context;
     // position of the front bumper along the lane
     const centre = lane.dir > 0 ? s - lane.s0 : lane.s0 - s;
-    const front = centre + p.length / 2;
+    const front = centre + (p.front ?? p.length / 2);
     if (lane !== this.lane) {
       this.lane = lane;
       this.prevLaneS = front;
@@ -427,6 +488,7 @@ export class RuleMonitor {
         lookedR: this.lookR > 0.2,
         yaw: p.yaw,
         signalRed: false,
+        vMax: Math.abs(p.speed),
       };
       // roundabout: no indicator when entering (§ 8 (1a) StVO)
       if (node.ctrl === CTRL.ROUNDABOUT && !(lane.edge.flags & EF.ROUNDABOUT) && p.indicator !== 0 && !p.hazard) {
@@ -485,6 +547,11 @@ export class RuleMonitor {
     // same classification as the lane graph (and therefore as the navigation hints)
     const conn = e.lane.out.find((c) => c.to.edge === exitEdge);
     if (conn) turn = conn.turn === TURN.UTURN ? TURN.LEFT : conn.turn;
+    // an oncoming car had to brake while we crossed: that is on us if we were the one turning left
+    if (this.oncoming) {
+      if (this.oncoming.node === node && this.time - this.oncoming.time < 25 && turn === TURN.LEFT) this.report('leftTurnOncoming', 'major', p, {}, 10);
+      this.oncoming = null;
+    }
     this.indL = 0;
     this.indR = 0;
     const ringIn = (e.arm.edge.flags & EF.ROUNDABOUT) !== 0;
@@ -501,6 +568,8 @@ export class RuleMonitor {
     } else if (turn === TURN.RIGHT) {
       if (e.indicatorR < 0.8) this.report(e.indicatorL > 0.8 ? 'wrongIndicator' : 'noIndicator', 'minor', p, { dir: 'right' }, 6);
       if (!e.lookedR) this.report('noShoulderCheck', 'hint', p, { dir: 'right' }, 6);
+      // a truck turns right at walking pace in town: cyclists and pedestrians beside it are hard to see
+      if (this.truck && this.context.urban && e.vMax * 3.6 > 12) this.report('truckRightTurn', 'minor', p, { speed: Math.round(e.vMax * 3.6) }, 6);
     } else if ((e.nowL && e.indicatorL > 2.5) || (e.nowR && e.indicatorR > 2.5)) {
       this.report('wrongIndicator', 'hint', p, { dir: 'none' }, 10);
     }
@@ -509,21 +578,32 @@ export class RuleMonitor {
   }
 
   /** An AI car had to brake hard because of us: were we the one who had to wait? */
-  private judgePriority(car: TrafficCar, p: PlayerSnapshot): void {
+  private judgePriority(car: TrafficCar, p: PlayerSnapshot, cutIn = true): void {
     const lane = this.lane;
     const entry = this.entry;
     const node = entry ? entry.node : lane && lane.stopAt - this.laneS < 12 ? lane.to : null;
     const myArm = entry ? entry.arm : lane ? lane.armTo : null;
     const carArm = car.conn ? car.conn.from.armTo : car.lane ? car.lane.armTo : null;
     if (!node || !myArm || !carArm || carArm.node !== node || carArm === myArm) {
-      // not a junction matter: pulled out or cut in right in front of someone
-      if (Math.abs(p.speed) > 1) this.report('cutOff', 'minor', p, {}, 15);
+      // Not a matter of this junction: pulled out or cut in right in front of someone who travels
+      // the same way.  (A car coming from the side at a junction made of several nodes – a dual
+      // carriageway, a roundabout – brakes for whoever is in its way, whoever has the right of
+      // way there: that cannot be judged from here, and is not held against the driver.)
+      // (And a car that saw the driver ahead from far away was not cut up: its distance is its own business.)
+      const along = Math.sin(car.yaw) * Math.sin(p.yaw) + Math.cos(car.yaw) * Math.cos(p.yaw);
+      if (cutIn && Math.abs(p.speed) > 1 && along > 0.6) this.report('cutOff', 'minor', p, {}, 15);
       return;
     }
     if (entry?.signalRed) return; // already recorded as a red-light offence
     const rank = (a: Arm): number => (a.role === ROLE.PRIORITY ? 3 : a.role === ROLE.RBL ? 2 : a.role === ROLE.YIELD || a.role === ROLE.STOP ? 1 : 0);
+    // § 9 (3), (4): whoever turns left lets oncoming traffic through – also those turning right.
+    // A car that turns left across our way and has to brake for us was the one to wait.
+    const theirTurn = (car.conn ?? car.next)?.turn;
+    const theyTurnLeft = theirTurn === TURN.LEFT || theirTurn === TURN.UTURN;
+    // Whether the driver is the one turning left is known when the car leaves the junction
+    // (judgeTurn): going straight on or turning right, it had the right of way over that car.
     if (node.ctrl === CTRL.SIGNALS && myArm.sg >= 0 && carArm.sg >= 0) {
-      if (myArm.sg === carArm.sg) this.report('leftTurnOncoming', 'major', p, {}, 10);
+      if (myArm.sg === carArm.sg && !theyTurnLeft) this.oncoming = { node, time: this.time };
       return;
     }
     const mine = rank(myArm);
@@ -534,7 +614,7 @@ export class RuleMonitor {
     } else if (mine === theirs) {
       const opposite = myArm.dx * carArm.dx + myArm.dz * carArm.dz < -0.64;
       if (opposite || myArm.role === ROLE.PRIORITY) {
-        this.report('leftTurnOncoming', 'major', p, {}, 10);
+        if (!theyTurnLeft) this.oncoming = { node, time: this.time };
       } else {
         // is the other one coming from our right?
         const rx = myArm.dz;
@@ -549,7 +629,7 @@ export class RuleMonitor {
       if (c.e !== edge.id) continue;
       if (c.k !== XING.ZEBRA && c.k !== XING.SIGNAL) continue;
       // signed distance of the front bumper to the near edge of the crossing
-      const d = (c.s - s) * dir - c.w / 2 - p.length / 2;
+      const d = (c.s - s) * dir - c.w / 2 - (p.front ?? p.length / 2);
       const prev = this.crossingState.get(c);
       this.crossingState.set(c, d);
       if (prev === undefined) continue;

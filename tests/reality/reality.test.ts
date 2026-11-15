@@ -319,9 +319,11 @@ test('services: requests stay small, anonymous and inside the limits', async () 
 
 test('links to the same place on the web', () => {
   const links = placeLinks(51.25529, 9.4111, -90);
-  assert.deepEqual(links.map((l) => l.id), ['panoramax', 'mapillary', 'kartaview', 'google', 'osm']);
+  assert.deepEqual(links.map((l) => l.id), ['kartaview', 'mapillary', 'panoramax', 'google', 'googlemaps', 'googleearth', 'osm']);
   for (const l of links) assert.ok(l.url.startsWith('https://') && l.url.includes('51.255290') && l.url.includes('9.411100'), l.url);
+  assert.equal(links[0].url, 'https://kartaview.org/map/@51.255290,9.411100,18z', 'straight to the place on the KartaView map');
   assert.ok(links[3].url.endsWith('&heading=270'), 'the viewing direction is handed over');
+  assert.ok(links[4].url.includes('basemap=satellite') && links[5].url.includes(',270h,'), 'satellite picture, and the globe turned the way the car faces');
 });
 
 test('ranking: near, looking the same way, panoramas first', () => {

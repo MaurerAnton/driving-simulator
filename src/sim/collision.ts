@@ -36,9 +36,15 @@ export class SceneryCollider {
   private readonly grid = new Map<number, Prim[]>();
   private readonly byTile = new Map<string, Array<[number, Prim]>>();
   /** circle centres along the car axis (model frame, metres from the wheelbase centre; - = front) */
-  private readonly offsets = [-1.28, -0.05, 1.18];
-  private readonly radius = 0.93;
+  private offsets: readonly number[] = [-1.28, -0.05, 1.18];
+  private radius = 0.93;
   private readonly tmp = new Float64Array(3);
+
+  /** Another vehicle: circle centres along its axis (metres from the model origin; - = front) and their radius. */
+  setShape(offsets: readonly number[], radius: number): void {
+    this.offsets = offsets;
+    this.radius = radius;
+  }
 
   private static key(ix: number, iz: number): number {
     return (ix + 2048) * 4096 + (iz + 2048);
@@ -107,7 +113,7 @@ export class SceneryCollider {
     let impact = 0;
     const mo = v.modelOrigin;
     const R = this.radius;
-    for (let c = 0; c < 3; c++) {
+    for (let c = 0; c < this.offsets.length; c++) {
       // circle centre in the world, at centre-of-mass height
       v.toWorld(mo[0], 0, mo[2] + this.offsets[c], this.tmp);
       const cx = this.tmp[0];

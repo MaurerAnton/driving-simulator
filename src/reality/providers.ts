@@ -230,10 +230,14 @@ export function placeLinks(lat: number, lon: number, heading: number): PlaceLink
   const lo = lon.toFixed(6);
   const h = Number.isFinite(heading) ? Math.round(((heading % 360) + 360) % 360) : 0;
   return [
-    { id: 'panoramax', label: 'Panoramax', url: `https://api.panoramax.xyz/#focus=map&map=18/${la}/${lo}` },
-    { id: 'mapillary', label: 'Mapillary', url: `https://www.mapillary.com/app/?lat=${la}&lng=${lo}&z=18` },
+    // street-level photographs
     { id: 'kartaview', label: 'KartaView', url: `https://kartaview.org/map/@${la},${lo},18z` },
+    { id: 'mapillary', label: 'Mapillary', url: `https://www.mapillary.com/app/?lat=${la}&lng=${lo}&z=18` },
+    { id: 'panoramax', label: 'Panoramax', url: `https://api.panoramax.xyz/#focus=map&map=18/${la}/${lo}` },
     { id: 'google', label: 'Google Street View', url: `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${la},${lo}&heading=${h}` },
+    // from above
+    { id: 'googlemaps', label: 'Google Maps', url: `https://www.google.com/maps/@?api=1&map_action=map&center=${la},${lo}&zoom=19&basemap=satellite` },
+    { id: 'googleearth', label: 'Google Earth', url: `https://earth.google.com/web/@${la},${lo},0a,450d,35y,${h}h,45t,0r` },
     { id: 'osm', label: 'OpenStreetMap', url: `https://www.openstreetmap.org/?mlat=${la}&mlon=${lo}#map=19/${la}/${lo}` },
   ];
 }

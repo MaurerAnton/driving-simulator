@@ -31,7 +31,7 @@ import { deriveControl } from './mapgen/control.ts';
 import { World, computeAllCuts } from '../src/world/world.ts';
 import { CTRL, ROLE, XING } from '../src/world/types.ts';
 import type { WorldJson } from '../src/world/types.ts';
-import { newPolySample, samplePolyline, offsetPolyline, slicePolyline } from '../src/core/geom.ts';
+import { newPolySample, pointInRing, samplePolyline, offsetPolyline, slicePolyline } from '../src/core/geom.ts';
 import { packTile, tileKey } from '../src/world/tilefmt.ts';
 import type { SectionArray } from '../src/world/tilefmt.ts';
 import { TileSet, meshSections } from './mapgen/meshacc.ts';
@@ -41,6 +41,8 @@ import { addLod2Buildings, addOsmBuildings } from './mapgen/buildings.ts';
 import type { BuildingStats } from './mapgen/buildings.ts';
 import { SignPlacer } from './mapgen/signs.ts';
 import { addBarriersAndRails, addLamps, addVegetation, buildingMask, collectPlaces, collectSpawns } from './mapgen/objects.ts';
+import { collectRails } from './mapgen/rails.ts';
+import { findYard } from './mapgen/yard.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
@@ -75,10 +77,32 @@ lap(
 const control = deriveControl(graph, osm);
 lap(`right-of-way: ${Object.entries(control.report).map(([k, v]) => `${v} ${k}`).join(', ')}`);
 
+/**
+ * The municipalities the official terrain and building models were loaded
+ * for (see docs/MAP_DATA.md), with their boundaries from OpenStreetMap.
+ */
+const MUNICIPALITIES = [
+  { name: 'Baunatal', level: '8', sign: 'Kreis Kassel' },
+  { name: 'Kassel', level: '6', sign: 'documenta-Stadt' },
+].map((m) => {
+  const rel = osm.relations.find((r) => r.tags.boundary === 'administrative' && r.tags.name === m.name && r.tags.admin_level === m.level);
+  if (!rel) console.warn(`[map] no boundary of ${m.name} in the OSM extract`);
+  return { ...m, rings: rel ? osm.multipolygonRings(rel).outer : [] };
+});
+/** The municipality a place belongs to ('' outside of them). */
+const municipalityAt = (x: number, z: number): { name: string; sign: string } | null => {
+  for (const m of MUNICIPALITIES) {
+    let inside = false;
+    for (const ring of m.rings) if (pointInRing(x, z, ring)) inside = !inside;
+    if (inside) return m;
+  }
+  return null;
+};
+
 const worldJson: WorldJson = {
   version: 1,
   meta: {
-    name: 'Baunatal',
+    name: 'Baunatal · Kassel',
     generated: new Date().toISOString(),
     ...bounds,
     tileSize: 500,
@@ -131,14 +155,15 @@ const bstats: BuildingStats = { lod2Units: 0, osmFallback: 0, triangles: 0, foot
 const lod2Path = resolve(root, 'data/work/lod2-buildings.json');
 if (existsSync(lod2Path)) addLod2Buildings(lod2Path, tiles, bstats);
 else console.warn('[buildings] data/work/lod2-buildings.json missing – run `node tools/lod2-extract.ts` (falling back to OSM footprints only)');
-const boundary = osm.relations.find((r) => r.tags.boundary === 'administrative' && r.tags.name === 'Baunatal' && r.tags.admin_level === '8');
-const municipality = boundary && existsSync(lod2Path) ? osm.multipolygonRings(boundary).outer : [];
+// inside the municipalities whose LoD2 models are there, only those are used
+const municipality = existsSync(lod2Path) ? MUNICIPALITIES.flatMap((m) => m.rings) : [];
 addOsmBuildings(osm, tiles, terrain, inWorld, municipality, bstats);
 lap(`buildings: ${bstats.lod2Units} LoD2 units, ${bstats.osmFallback} from OSM footprints, ${Math.round(bstats.triangles / 1000)}k triangles, ${bstats.footprints} collision footprints`);
 
 // ---- signs, vegetation, street furniture ---------------------------------------
 worldJson.places = collectPlaces(osm, inRect);
 const signs = new SignPlacer(world, tiles, worldJson.places);
+signs.municipalityAt = municipalityAt;
 signs.build(graph, cover);
 lap(`signs: ${signs.stats.posts} posts — ${[...signs.stats.byCode.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(' ')}`);
 const bmask = buildingMask(tiles, cover);
@@ -147,9 +172,16 @@ const veg = addVegetation(osm, world, cover, terrain, tiles, bmask, bounds);
 const lamps = addLamps(osm, world, terrain, tiles);
 lap(`vegetation: ${veg.mapped} mapped trees, ${veg.rows} in rows, ${veg.forest} woodland, ${veg.garden} garden; ${lamps} street lamps; ${extra.barriers} walls/hedges, ${extra.railKm.toFixed(1)} km rail, ${extra.guardKm.toFixed(1)} km guard rail`);
 worldJson.spawns = collectSpawns(osm, world, terrain, worldJson.places, inWorld);
+const yard = findYard(cover, terrain, world, osm, bmask, inWorld, worldJson.spawns[0] ?? { x: 0, z: 0 });
+if (yard) worldJson.yard = yard;
+lap(yard ? `practice yard for the truck lessons: a field at ${yard.x}, ${yard.z} (${yard.len} m × ${yard.wid} m, ${yard.rot ? 'north–south' : 'east–west'})` : 'no field for a practice yard found');
+const railNet = collectRails(osm, world, terrain, inWorld);
+worldJson.rails = railNet.rails;
+lap(`tracks for trams and trains: ${railNet.rails.length} pieces – ${railNet.km[0].toFixed(1)} km tram, ${railNet.km[1].toFixed(1)} km light rail, ${railNet.km[2].toFixed(1)} km railway, ${railNet.stops} stops`);
 lap(`start points: ${worldJson.spawns.map((s) => s.name).join('; ')}`);
 
-const outDir = resolve(root, 'public/map');
+// (MAP_OUT: build into another folder and swap it in when it is complete)
+const outDir = resolve(root, process.env.MAP_OUT ?? 'public/map');
 rmSync(resolve(outDir, 'tiles'), { recursive: true, force: true });
 mkdirSync(resolve(outDir, 'tiles'), { recursive: true });
 const perTile = TILE / TERRAIN_CELL;

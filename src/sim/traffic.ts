@@ -49,6 +49,13 @@ export interface TrafficCar {
   stuck: number;
   /** set while the player's car is the reason for braking */
   blockedByPlayer: number;
+  /**
+   * How the player's car came to be in this one's way: the time gap (s) at
+   * which it was first seen there (Infinity while it is not), and for how
+   * long that is remembered once it is out of the way again.
+   */
+  playerFirstGap: number;
+  playerSeen: number;
   crashed: number;
   wheelSpin: number;
 }
@@ -72,6 +79,26 @@ export interface Pedestrian {
   colour: number;
 }
 
+/** A vehicle that drives itself: where it is on its path, for asking the traffic what is around it. */
+export interface SelfDriving {
+  /** the lane it is on, and the connector it is on while crossing a junction (or null) */
+  lane: Lane | null;
+  conn: Connector | null;
+  /** distance of its middle along that lane or connector */
+  s: number;
+  v: number;
+  /** the connector it will take at the end of its lane */
+  next: Connector | null;
+  /** the connectors of its way beyond that, if it knows where it is going */
+  route?: readonly Connector[];
+  length: number;
+  width: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+}
+
 /** What the traffic needs to know about the player's car. */
 export interface PlayerState {
   x: number;
@@ -84,7 +111,12 @@ export interface PlayerState {
 }
 
 export type TrafficEvent =
-  | { type: 'forcedBrake'; car: TrafficCar; decel: number }
+  /**
+   * `cutIn`: the player's car appeared in this car's way at short notice –
+   * moved over or pulled out in front of it – rather than having been seen
+   * ahead from far away (whoever comes up from behind keeps his own distance, § 4 StVO)
+   */
+  | { type: 'forcedBrake'; car: TrafficCar; decel: number; cutIn: boolean }
   | { type: 'collision'; car: TrafficCar; speed: number }
   | { type: 'pedestrianEndangered'; ped: Pedestrian };
 
@@ -188,6 +220,12 @@ export class Traffic {
     return (Math.floor(x / 120) + 512) * 1024 + Math.floor(z / 120) + 512;
   }
 
+  /**
+   * Other things on the road the cars must not run into, described like the
+   * player's car (set by the game every frame: the cars of trams and trains).
+   */
+  obstacles: readonly PlayerState[] = [];
+
   private spawn(player: PlayerState): void {
     for (let attempt = 0; attempt < 10; attempt++) {
       // a random spot in the ring around the player
@@ -235,6 +273,8 @@ export class Traffic {
         stoppedAtLine: false,
         stuck: 0,
         blockedByPlayer: 0,
+        playerFirstGap: Infinity,
+        playerSeen: 0,
         crashed: 0,
         wheelSpin: 0,
       };
@@ -255,6 +295,207 @@ export class Traffic {
     this.peds.length = 0;
     this.onLane.clear();
     this.onConn.clear();
+  }
+
+  // --- for a vehicle that drives itself without being one of the traffic's cars ------
+  // (the player's car on a demonstration drive: it sees what the others see)
+  private readonly probe: TrafficCar = {
+    id: Number.MAX_SAFE_INTEGER, lane: null, conn: null, s: 0, v: 0, a: 0, next: null, length: 4.3, width: 1.8, color: 0, style: 0, temper: 1,
+    x: 0, y: 0, z: 0, yaw: 0, pitch: 0, blinker: 0, braking: false, waited: 0, yieldWait: 0, stoppedAtLine: false, stuck: 0, blockedByPlayer: 0, playerFirstGap: Infinity, playerSeen: 0, crashed: 0, wheelSpin: 0,
+  };
+  private static readonly NOBODY: PlayerState = { x: 1e9, y: 1e9, z: 1e9, yaw: 0, speed: 0, length: 0, width: 0 };
+
+  private aim(me: SelfDriving): TrafficCar {
+    const p = this.probe;
+    p.lane = me.conn ? null : me.lane;
+    p.conn = me.conn;
+    p.s = me.s;
+    p.v = me.v;
+    p.next = me.next;
+    p.length = me.length;
+    p.width = me.width;
+    p.x = me.x;
+    p.y = me.y;
+    p.z = me.z;
+    p.yaw = me.yaw;
+    return p;
+  }
+
+  /**
+   * The nearest vehicle ahead on the path of `me` – a car of the traffic, or
+   * a tram or train in its way: the gap to it (m) and its speed along the
+   * path; gap = Infinity if there is none within `horizon`.
+   */
+  aheadOf(me: SelfDriving, horizon: number): { gap: number; v: number; loose: boolean } {
+    const p = this.aim(me);
+    const lead = this.leader(p, horizon) as { gap: number; v: number; loose: boolean };
+    lead.loose = false;
+    for (const o of this.obstacles) {
+      if (Math.abs(o.x - p.x) > horizon + 30 || Math.abs(o.z - p.z) > horizon + 30) continue;
+      const gap = this.playerAhead(p, o, horizon);
+      if (gap >= lead.gap) continue;
+      const along = -Math.sin(o.yaw) * -Math.sin(p.yaw) + -Math.cos(o.yaw) * -Math.cos(p.yaw);
+      lead.gap = gap;
+      lead.v = Math.max(0, o.speed * along);
+    }
+    // Whoever stands or drives in the way without being "ahead on the lane": a car coming the
+    // other way on the wrong side of a narrow street, one crossing, one standing half in the road.
+    // (`loose`: found by where it is, not by the order of the cars on the lanes.)
+    const near = Math.min(horizon, 8 + p.v * 2.2);
+    const box = this.box;
+    const route = me.route;
+    const onward = route ? (l: Lane): Connector | undefined => route.find((c) => c.from === l) : undefined;
+    for (const o of this.cars) {
+      if (Math.abs(o.x - p.x) > near + 8 || Math.abs(o.z - p.z) > near + 8) continue;
+      box.x = o.x;
+      box.y = o.y;
+      box.z = o.z;
+      box.yaw = o.yaw;
+      box.speed = o.v;
+      box.length = o.length;
+      box.width = o.width;
+      const gap = this.playerAhead(p, box, near, onward);
+      if (gap >= lead.gap - 0.5) continue;
+      const along = -Math.sin(o.yaw) * -Math.sin(p.yaw) + -Math.cos(o.yaw) * -Math.cos(p.yaw);
+      lead.gap = gap;
+      lead.v = Math.max(0, o.v * along);
+      lead.loose = true;
+    }
+    return lead;
+  }
+
+  private readonly box: PlayerState = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, length: 4.3, width: 1.8 };
+
+  /**
+   * Walk along the way of a vehicle – its lane or connector, then the next
+   * connector, then on (as `onward` says, or straight) – and call `visit`
+   * every `step` metres with the point, the direction of travel there and
+   * the distance from the start.  Ends after `reach` metres, at the end of
+   * the way, or when `visit` returns true.
+   */
+  private walk(
+    lane0: Lane | null,
+    conn0: Connector | null,
+    s0: number,
+    next0: Connector | null,
+    onward: ((lane: Lane) => Connector | undefined) | undefined,
+    step: number,
+    reach: number,
+    visit: (x: number, z: number, tx: number, tz: number, dist: number) => boolean,
+  ): void {
+    let lane = lane0;
+    let conn = conn0;
+    let next = next0;
+    let at = s0;
+    for (let dist = step; dist <= reach; dist += step) {
+      at += step;
+      if (conn) {
+        if (at > conn.len) {
+          at -= conn.len;
+          lane = conn.to;
+          conn = null;
+          next = null;
+        }
+      } else if (lane && at > lane.len) {
+        const nx: Connector | undefined = next ?? onward?.(lane) ?? lane.out.find((q) => q.turn === TURN.STRAIGHT) ?? lane.out[0];
+        if (!nx) return;
+        at -= lane.len;
+        conn = nx;
+        lane = null;
+      }
+      if (conn) samplePolyline(conn.pl, at, tmp2);
+      else if (lane) lanePoint(lane, at, tmp2);
+      else return;
+      if (visit(tmp2.x, tmp2.z, tmp2.tx, tmp2.tz, dist)) return;
+    }
+  }
+
+  private readonly way: number[] = [];
+
+  /**
+   * For a vehicle that is about to cross the way of others – turning left, or
+   * on its way through a junction made of several: how far along its way (m,
+   * from its middle) the nearest place lies where a car that is under way now
+   * will cross at about the time it gets there itself, or Infinity.
+   * Cars that stand, crawl or are braking to a stop do not count: those are
+   * waiting for their turn.
+   */
+  crossingAhead(me: SelfDriving, reach: number): number {
+    const p = this.aim(me);
+    const route = me.route;
+    const onward = route ? (l: Lane): Connector | undefined => route.find((c) => c.from === l) : undefined;
+    const way = this.way;
+    way.length = 0;
+    this.walk(p.lane, p.conn, p.s, p.next, onward, 1.5, reach, (x, z, tx, tz, dist) => {
+      way.push(x, z, tx, tz, dist);
+      return false;
+    });
+    if (way.length === 0) return Infinity;
+    const vMe = Math.max(p.v, 2.5);
+    let best = Infinity;
+    for (const o of this.cars) {
+      if (o.v < 2.5 || o.a < -0.8) continue;
+      const dx = o.x - p.x;
+      const dz = o.z - p.z;
+      if (dx * dx + dz * dz > 85 * 85) continue;
+      this.walk(o.lane, o.conn, o.s, o.next, undefined, 2, Math.min(75, o.v * 4.5), (qx, qz, qtx, qtz, qd) => {
+        const tq = qd / o.v;
+        for (let i = 0; i < way.length; i += 5) {
+          const d = way[i + 4];
+          if (d >= best) break;
+          const ex = way[i] - qx;
+          const ez = way[i + 1] - qz;
+          if (ex * ex + ez * ez > 2.3 * 2.3) continue;
+          // going the same way (ahead of us, or beside us on its own lane) is no crossing
+          if (way[i + 2] * qtx + way[i + 3] * qtz > 0.8) continue;
+          if (Math.abs(tq - d / vMe) > 2.8) continue;
+          best = d;
+          return true;
+        }
+        return false;
+      });
+    }
+    return best;
+  }
+
+  /**
+   * May `me` drive into the junction through `c` – is the way free of
+   * traffic it has to give way to, and of cars standing or crossing in it?
+   * `impatient`: after a long wait a tighter (still safe) gap is taken.
+   */
+  mayPass(me: SelfDriving, c: Connector, distToLine: number, impatient = false): boolean {
+    const p = this.aim(me);
+    if (this.boxBlocked(c)) return false;
+    // a learner's gap: two seconds more than the traffic's own cars take
+    return this.mayEnter(p, c, distToLine, Traffic.NOBODY, impatient, 2);
+  }
+
+  /**
+   * Is there room on `lane` beside and behind a vehicle whose middle is `s`
+   * metres along it (the lanes of a carriageway are measured alike) and that
+   * drives at `v` – may it move over without making anybody brake?
+   */
+  roomOn(lane: Lane, s: number, v: number, length: number): boolean {
+    const list = this.onLane.get(lane.id);
+    if (!list) return true;
+    for (const o of list) {
+      const d = o.s - s; // + = ahead of us
+      if (d >= 0) {
+        if (d < length + 4 + Math.max(0, v - o.v) * 1.5) return false;
+      } else if (-d < length + 6 + Math.max(0, o.v - v) * 3.5) return false;
+    }
+    return true;
+  }
+
+  /** Is nobody inside the junction on a path that meets `c`? */
+  clearOf(c: Connector): boolean {
+    return this.junctionEmpty(c);
+  }
+
+  /** A pedestrian who is crossing at `c` or stands there waiting to. */
+  crossingAt(c: CrossingJson): Pedestrian | null {
+    for (const p of this.peds) if (p.crossing === c && p.state !== 'gone' && (p.state === 'cross' || p.waited > 0.3)) return p;
+    return null;
   }
 
   // --- perception ----------------------------------------------------------------
@@ -357,7 +598,7 @@ export class Traffic {
   }
 
   /** Distance along the car's path until it would touch the player's car, or Infinity. */
-  private playerAhead(car: TrafficCar, player: PlayerState, horizon: number): number {
+  private playerAhead(car: TrafficCar, player: PlayerState, horizon: number, onward?: (lane: Lane) => Connector | undefined): number {
     const dx = player.x - car.x;
     const dz = player.z - car.z;
     if (dx * dx + dz * dz > (horizon + 8) * (horizon + 8)) return Infinity;
@@ -383,8 +624,8 @@ export class Traffic {
           next = null;
         }
       } else if (lane && at > lane.len) {
-        // undecided beyond this lane: assume straight on
-        const nx = next ?? lane.out.find((q) => q.turn === TURN.STRAIGHT) ?? lane.out[0];
+        // undecided beyond this lane: assume straight on (unless the way is known: `onward`)
+        const nx = next ?? onward?.(lane) ?? lane.out.find((q) => q.turn === TURN.STRAIGHT) ?? lane.out[0];
         if (!nx) return Infinity;
         at -= lane.len;
         conn = nx;
@@ -398,13 +639,17 @@ export class Traffic {
       const pz = tmp2.z - player.z;
       const lf = -px * s - pz * c;
       const lr = px * c - pz * s;
-      if (Math.abs(lf) < hl && Math.abs(lr) < hw) return Math.max(0, dist - car.length / 2);
+      // Passing the other's nose or tail crosswise takes half this car's width more than following
+      // it does: `across` is how much the way runs across the other (0 = along it, 1 = at right angles).
+      const along = -s * tmp2.tx - c * tmp2.tz;
+      const across = Math.sqrt(Math.max(0, 1 - along * along));
+      if (Math.abs(lf) < hl + across * (car.width / 2 + 0.2) && Math.abs(lr) < hw) return Math.max(0, dist - car.length / 2);
     }
     return Infinity;
   }
 
   /** Is the way through connector `c` free of traffic it has to give way to? */
-  private mayEnter(car: TrafficCar, c: Connector, distToLine: number, player: PlayerState, impatient = false): boolean {
+  private mayEnter(car: TrafficCar, c: Connector, distToLine: number, player: PlayerState, impatient = false, caution = 0): boolean {
     // room behind the junction, so we never stop inside it
     const exit = this.onLane.get(c.to.id);
     if (exit) for (const o of exit) if (o.s < car.length + 3 && o.v < 1.5) return false;
@@ -418,7 +663,8 @@ export class Traffic {
         }
       }
       if (!k.yield) continue;
-      const myTime = tEnter + (k.sSelf + car.length) / Math.max(car.v, 3.5) + 1.2;
+      // (`caution`: seconds of gap on top – for a driver who is to make nobody brake)
+      const myTime = tEnter + (k.sSelf + car.length) / Math.max(car.v, 3.5) + 1.2 + caution;
       // traffic approaching the conflicting movement – also from further upstream,
       // because the lane feeding it can be just a few metres long (roundabouts)
       const from = k.other.from;
@@ -428,7 +674,7 @@ export class Traffic {
         if (zipper) return d - k.sOther < distToLine + car.length + 1.5;
         const t = d / Math.max(o.v, 2.5);
         // after a long wait accept a tighter (but still safe) gap
-        return impatient ? t < 2.6 && d < 60 : t < myTime + 1.5 && d < 110;
+        return impatient ? t < 2.6 + caution && d < 60 + caution * 12 : t < myTime + 1.5 && d < 110 + caution * 20;
       };
       const approaching = this.onLane.get(from.id);
       if (approaching) {
@@ -550,12 +796,30 @@ export class Traffic {
     // --- the player's car ---
     const pGap = this.playerAhead(car, player, clamp(car.v * 3.5 + 12, 14, 80));
     let playerBrake = false;
+    /** how hard the player's car alone makes this one brake (a light or a car ahead may ask for more) */
+    let playerAcc = 0;
     if (pGap < Infinity) {
       const before = acc;
       // the component of the player's speed along our direction
       const along = -Math.sin(player.yaw) * -Math.sin(car.yaw) + -Math.cos(player.yaw) * -Math.cos(car.yaw);
       brakeFor(pGap, Math.max(0, player.speed * along), 2.6);
       playerBrake = acc < before - 0.3;
+      playerAcc = acc;
+      // how far away was it when it first got in the way?
+      if (car.playerSeen <= 0) car.playerFirstGap = pGap / Math.max(car.v, 1);
+      car.playerSeen = 1.5;
+    } else if (car.playerSeen > 0) {
+      car.playerSeen -= dt;
+      if (car.playerSeen <= 0) car.playerFirstGap = Infinity;
+    }
+
+    // --- whatever else is on the road: trams and trains crossing or running in the street ---
+    for (const o of this.obstacles) {
+      if (Math.abs(o.x - car.x) > 110 || Math.abs(o.z - car.z) > 110) continue;
+      const gap = this.playerAhead(car, o, clamp(car.v * 3.5 + 12, 14, 80));
+      if (gap === Infinity) continue;
+      const along = -Math.sin(o.yaw) * -Math.sin(car.yaw) + -Math.cos(o.yaw) * -Math.cos(car.yaw);
+      brakeFor(gap, Math.max(0, o.speed * along), 2.6);
     }
 
     // --- junction ahead ---
@@ -671,11 +935,12 @@ export class Traffic {
 
     if (car.crashed > 0) acc = -6;
     acc = clamp(acc, -7.5, A);
-    // report hard braking caused by the player (the rule monitor decides who was at fault)
-    if (playerBrake && acc < -2.6 && car.v > 2) {
+    // report hard braking caused by the player (the rule monitor decides who was at fault) –
+    // not the braking for a red light of a car that happens to follow the player
+    if (playerBrake && playerAcc < -2.6 && car.v > 2) {
       car.blockedByPlayer += dt;
       if (car.blockedByPlayer > 0.12) {
-        this.events.push({ type: 'forcedBrake', car, decel: -acc });
+        this.events.push({ type: 'forcedBrake', car, decel: -acc, cutIn: car.playerFirstGap < 2.2 });
         car.blockedByPlayer = -3; // one report per incident
       }
     } else if (car.blockedByPlayer > 0) car.blockedByPlayer = 0;

@@ -4,6 +4,11 @@ import { LANGS, pickLang } from '../i18n/index.ts';
 
 export type Transmission = 'assist' | 'manual' | 'automatic';
 export type Quality = 'low' | 'medium' | 'high';
+/** the camera a drive starts with: behind the car, or at the driver's eyes */
+export type View = 'chase' | 'cockpit';
+
+/** Engine powers that can be chosen, in PS (metric horsepower) as printed in German vehicle papers. */
+export const ENGINE_POWERS = [60, 75, 95, 115, 150, 200] as const;
 
 export interface WheelMapping {
   steerAxis: number;
@@ -21,7 +26,18 @@ export interface WheelMapping {
 export interface Settings {
   /** language code, one of LANGS in src/i18n */
   lang: string;
+  /** a car (class B) or the truck with trailer (class CE) */
+  vehicle: 'car' | 'truck';
   transmission: Transmission;
+  /** engine power in PS, one of ENGINE_POWERS */
+  power: number;
+  /** with keys or pedals on the screen the throttle eases off at the current speed limit */
+  limiter: boolean;
+  view: View;
+  /** how solid the interior is drawn in the cockpit view, 0.2 (see-through) … 1 */
+  cabinOpacity: number;
+  /** where the last drive began: a start point of the map, or an address */
+  lastStart: { spawn: number; address: { label: string; street: string; x: number; z: number; exact: boolean } | null };
   quality: Quality;
   /** off | one mirror per frame | all mirrors every frame */
   mirrors: 'off' | 'alternate' | 'full';
@@ -42,7 +58,7 @@ export interface Settings {
    * pictures of the place the car is at.  All off until the player says so –
    * a request tells the service the player's IP address and the place.
    */
-  reality: { panoramax: boolean; kartaview: boolean; mapillary: boolean; mapillaryToken: string };
+  reality: { panoramax: boolean; kartaview: boolean; mapillary: boolean; mapillaryToken: string; /** aerial photographs of the land survey under the map */ aerial: boolean };
   /**
    * Driving controls on the screen (steering bar, pedals, buttons):
    * 'auto' shows them while the screen is being touched and hides them as soon
@@ -58,7 +74,14 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   // the first of the browser's languages that the simulator speaks
   lang: typeof navigator !== 'undefined' ? pickLang(navigator.languages?.length ? navigator.languages : [navigator.language]) : 'en',
-  transmission: 'assist',
+  // what the playtesters asked for: an automatic, seen from behind, with an engine that is easy to dose
+  vehicle: 'car',
+  transmission: 'automatic',
+  power: 75,
+  limiter: true,
+  view: 'chase',
+  cabinOpacity: 1,
+  lastStart: { spawn: 0, address: null },
   quality: 'medium',
   mirrors: 'alternate',
   hudRules: true,
@@ -69,33 +92,63 @@ export const DEFAULT_SETTINGS: Settings = {
   drawDistance: 1300,
   wheel: { steerAxis: 0, throttleAxis: 2, brakeAxis: 5, clutchAxis: 1, pedalsInverted: true, wheelRange: 900, shifter: [12, 13, 14, 15, 16, 17, 18] },
   invertLookY: false,
-  reality: { panoramax: false, kartaview: false, mapillary: false, mapillaryToken: '' },
+  reality: { panoramax: false, kartaview: false, mapillary: false, mapillaryToken: '', aerial: false },
   touchControls: 'auto',
   touchOpacity: 0.55,
   keyHints: true,
 };
 
-const KEY = 'fahrsim-baunatal.settings.v1';
+const KEY = 'fahrsim-baunatal.settings.v2';
+/** settings of the versions before the playtest (other defaults) */
+const OLD_KEY = 'fahrsim-baunatal.settings.v1';
+
+function fresh(): Settings {
+  return { ...DEFAULT_SETTINGS, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality }, lastStart: { ...DEFAULT_SETTINGS.lastStart } };
+}
+
+/** Defaults, overlaid with what was stored – whatever is missing or implausible keeps its default. */
+function merge(parsed: Partial<Settings>): Settings {
+  const d = fresh();
+  const s: Settings = { ...d, ...parsed, wheel: { ...d.wheel, ...(parsed.wheel ?? {}) }, reality: { ...d.reality, ...(parsed.reality ?? {}) }, lastStart: { ...d.lastStart, ...(parsed.lastStart ?? {}) } };
+  if (!LANGS.some((l) => l.code === s.lang)) s.lang = d.lang;
+  if (!(ENGINE_POWERS as readonly number[]).includes(s.power)) s.power = d.power;
+  if (s.view !== 'chase' && s.view !== 'cockpit') s.view = d.view;
+  if (s.vehicle !== 'car' && s.vehicle !== 'truck') s.vehicle = d.vehicle;
+  if (!['assist', 'manual', 'automatic'].includes(s.transmission)) s.transmission = d.transmission;
+  if (!['low', 'medium', 'high'].includes(s.quality)) s.quality = d.quality;
+  if (!(s.cabinOpacity >= 0.2 && s.cabinOpacity <= 1)) s.cabinOpacity = d.cabinOpacity;
+  if (!Number.isInteger(s.lastStart.spawn) || s.lastStart.spawn < 0) s.lastStart.spawn = 0;
+  const a = s.lastStart.address;
+  if (a && !(typeof a.label === 'string' && Number.isFinite(a.x) && Number.isFinite(a.z))) s.lastStart.address = null;
+  return s;
+}
 
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<Settings>;
-      const s = { ...DEFAULT_SETTINGS, ...parsed, wheel: { ...DEFAULT_SETTINGS.wheel, ...(parsed.wheel ?? {}) }, reality: { ...DEFAULT_SETTINGS.reality, ...(parsed.reality ?? {}) } };
-      if (!LANGS.some((l) => l.code === s.lang)) s.lang = DEFAULT_SETTINGS.lang;
+    if (raw) return merge(JSON.parse(raw) as Partial<Settings>);
+    const old = localStorage.getItem(OLD_KEY);
+    if (old) {
+      // Older versions stored every setting, also those nobody had touched.  What was a default
+      // then and is another one now (gearbox with clutch help) follows the new default.
+      const parsed = JSON.parse(old) as Partial<Settings>;
+      if (parsed.transmission === 'assist') delete parsed.transmission;
+      const s = merge(parsed);
+      saveSettings(s);
       return s;
     }
   } catch {
     /* private mode or corrupted entry: fall back to defaults */
   }
-  return { ...DEFAULT_SETTINGS, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality } };
+  return fresh();
 }
 
-export function saveSettings(s: Settings): void {
+/** false: this browser keeps nothing (private window, storage switched off) */
+export function saveSettings(s: Settings): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }

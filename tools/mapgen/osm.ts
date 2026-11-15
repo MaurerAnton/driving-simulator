@@ -104,11 +104,14 @@ export class OsmData {
         }
         if (chain.length >= 4 && chain[0] === chain[chain.length - 1]) {
           const flat: number[] = [];
+          let complete = true;
           for (let i = 0; i < chain.length - 1; i++) {
             const n = this.nodes.get(chain[i]);
             if (n) flat.push(n.x, n.z);
+            else complete = false;
           }
-          if (flat.length >= 6) rings.push(flat);
+          // an outline with corners missing would be closed across the map: better no area than a wrong one
+          if (complete && flat.length >= 6) rings.push(flat);
         }
       }
       return rings;

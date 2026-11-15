@@ -43,6 +43,20 @@ und zeigt sie mit Urheber, Lizenz und Link zum Original an. Eigene Bilder der Nu
 gespeicherte Street-View-Panoramen) werden nur lokal im Browser gelesen; für deren Rechte sind die Nutzer
 selbst verantwortlich. Der Ordner `public/panos/` ist deshalb von der Versionsverwaltung ausgenommen.
 
+## Luftbilder auf der großen Karte
+
+Das Projekt enthält und verteilt keine Luftbilder. Wer auf der großen Karte „Luftbilder“ anhakt, lässt sie
+direkt im eigenen Browser vom WMS-Dienst der Hessischen Verwaltung für Bodenmanagement und Geoinformation
+laden (Digitale Orthophotos DOP20, <https://hvbg.hessen.de>): offene Geobasisdaten, „jede Nutzung … ohne
+Einschränkung oder Bedingung erlaubt“ (§ 24 HVGG). Die Karte nennt die Herkunft der Bilder.
+
+## Verweise auf Rechtsvorschriften
+
+Das Fehlerprotokoll verlinkt die zitierten Paragrafen der Straßenverkehrs-Ordnung auf
+<https://www.gesetze-im-internet.de/stvo_2013/> und – bei den Aufgaben der Klasse CE – die Anlage 7 der
+Fahrerlaubnis-Verordnung auf <https://www.gesetze-im-internet.de/fev_2010/> (Bundesministerium der Justiz,
+Bundesamt für Justiz). Der Text der Vorschriften ist nicht Teil des Projekts.
+
 ## Fremde Software
 
 | Paket | Verwendung | Lizenz |

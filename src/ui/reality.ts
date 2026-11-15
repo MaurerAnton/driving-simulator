@@ -34,6 +34,8 @@ export interface RealityHost {
   plausible(lat: number, lon: number): boolean;
   /** widest texture the graphics chip takes */
   maxTexture: number;
+  /** the map with aerial photographs, close up on where the car is */
+  openAerial(): void;
 }
 
 type Remote = Exclude<ImageSource, 'local'>;
@@ -50,6 +52,15 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
   if (cls) e.className = cls;
   if (text) e.textContent = text;
   return e;
+}
+
+/** Mark a piece of text, ready for Ctrl+C. */
+function selectText(node: HTMLElement): void {
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
 }
 
 function link(href: string, text: string): HTMLAnchorElement {
@@ -167,6 +178,32 @@ export class RealityPanel {
     this.bindView();
 
     const side = el('aside', 'rv-side');
+    // this place: its coordinates, the same spot at the imagery services and from above
+    side.append(el('h2', '', this.t('realityPlace')));
+    const coords = `${this.place.lat.toFixed(6)}, ${this.place.lon.toFixed(6)}`;
+    const coordRow = el('div', 'rv-coords');
+    const code = el('code', '', coords);
+    const copy = el('button', 'btn ghost', this.t('realityCopy'));
+    copy.onclick = () => {
+      const done = (): void => {
+        copy.textContent = this.t('realityCopied');
+        setTimeout(() => (copy.textContent = this.t('realityCopy')), 1600);
+      };
+      // (the clipboard needs a secure page and the player's click; otherwise the text is selected for copying by hand)
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(coords).then(done, () => selectText(code));
+      else selectText(code);
+    };
+    coordRow.append(code, copy);
+    side.append(coordRow);
+    const links = el('div', 'rv-links');
+    for (const l of placeLinks(this.place.lat, this.place.lon, this.place.heading)) links.append(link(l.url, `${l.label} ↗`));
+    side.append(links);
+    const aerial = el('button', 'btn ghost', this.t('realityAerial'));
+    aerial.onclick = () => this.host.openAerial();
+    const aerialRow = el('div', 'buttons');
+    aerialRow.append(aerial);
+    side.append(aerialRow);
+
     side.append(el('h2', '', this.t('realitySources')));
     for (const s of REMOTE) side.append(this.sourceRow(s));
     side.append(el('p', 'rv-note', this.t('realityPrivacy')));
@@ -198,10 +235,6 @@ export class RealityPanel {
     this.thumbs = el('div', 'rv-thumbs');
     side.append(this.thumbs);
 
-    side.append(el('h2', '', this.t('realityOpenWeb')));
-    const links = el('div', 'rv-links');
-    for (const l of placeLinks(this.place.lat, this.place.lon, this.place.heading)) links.append(link(l.url, `${l.label} ↗`));
-    side.append(links);
 
     const main = el('div', 'rv-main');
     main.append(this.view, side);

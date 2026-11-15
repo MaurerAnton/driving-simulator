@@ -223,13 +223,13 @@ export function mainNetwork(world: World, graph: LaneGraph): Set<number> {
  * drive on – preferably the street of that name –, in the right-hand lane,
  * with the house on the right, clear of the junctions.
  */
-export function findRoadSpot(world: World, graph: LaneGraph, x: number, z: number, street = '', maxDist = 220, main?: Set<number>): SpawnJson | null {
+export function findRoadSpot(world: World, graph: LaneGraph, x: number, z: number, street = '', maxDist = 220, main?: Set<number>, accept?: (e: Edge) => boolean, room = 2): SpawnJson | null {
   const want = normaliseAddress(street);
   let best: { edge: Edge; s: number; off: number; score: number } | null = null;
   const usable = (l: Lane): boolean => !main || main.has(l.id);
   for (const roomy of [true, false]) {
     world.edgesInBox(x - maxDist, z - maxDist, x + maxDist, z + maxDist, (e) => {
-      if (!LaneGraph.drivable(e, false)) return;
+      if (!LaneGraph.drivable(e, false) || (accept && !accept(e))) return;
       const lanes = graph.edgeLanes[e.id];
       if (!lanes.fwd.some(usable) && !lanes.back.some(usable)) return;
       // keep out of the junction areas at both ends
@@ -260,6 +260,8 @@ export function findRoadSpot(world: World, graph: LaneGraph, x: number, z: numbe
   const dir = side[0].length > 0 ? side[0] : side[1];
   const lane: Lane = dir.find((l) => l.idx === 0) ?? dir[0];
   const d = lane.dir > 0 ? b.s - lane.s0 : lane.s0 - b.s;
-  lanePoint(lane, Math.max(Math.min(2, lane.len / 2), Math.min(lane.len - Math.min(2, lane.len / 2), d)), smp);
-  return { name: '', x: smp.x, z: smp.z, yaw: Math.atan2(-smp.tx, -smp.tz), kind: 'street' };
+  // (`room`: metres of lane wanted behind the spot – a trailer must not hang back into the junction)
+  lanePoint(lane, Math.max(Math.min(room, lane.len / 2), Math.min(lane.len - Math.min(2, lane.len / 2), d)), smp);
+  // (named after its street, for whoever shows the spot on a map)
+  return { name: b.edge.name || b.edge.ref || '', x: smp.x, z: smp.z, yaw: Math.atan2(-smp.tx, -smp.tz), kind: 'street' };
 }

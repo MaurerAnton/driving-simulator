@@ -28,7 +28,9 @@ interface Extract {
 }
 
 const root = new URL('../', import.meta.url);
-const json = JSON.parse(readFileSync(new URL('public/map/world.json', root), 'utf8')) as WorldJson;
+// (MAP_OUT: the folder the map was built into, see tools/build-map.ts)
+const mapDir = `${(process.env.MAP_OUT ?? 'public/map').replace(/\/$/, '')}/`;
+const json = JSON.parse(readFileSync(new URL(`${mapDir}world.json`, root), 'utf8')) as WorldJson;
 const world = new World(json);
 const graph = new LaneGraph(world);
 // only where the road is part of the connected network (not a fragment at the rim of the map)
@@ -152,7 +154,7 @@ for (const r of roads.values()) out.streets.push({ n: r.name, c: r.town, x: r.x,
 
 out.streets.sort((a, b) => a.n.localeCompare(b.n, 'de') || a.c.localeCompare(b.c, 'de'));
 const text = `{"version":1,"streets":[\n${out.streets.map((s) => JSON.stringify(s)).join(',\n')}\n]}\n`;
-const target = new URL('public/map/addresses.json', root);
+const target = new URL(`${mapDir}addresses.json`, root);
 writeFileSync(target, text);
 const houses = out.streets.reduce((n, s) => n + s.h.length / 3, 0);
 console.log(`connected road network: ${main.size} of ${graph.lanes.length} lanes`);

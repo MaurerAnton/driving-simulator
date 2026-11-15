@@ -26,11 +26,21 @@ export interface Controls {
   /** head turn target in radians (+ = left) and pitch */
   lookYaw: number;
   lookPitch: number;
+  /** distance of the camera behind the car in metres (mouse wheel) */
+  lookZoom: number;
   /** which device is steering: decides how much assistance the input layer adds */
   device: 'keyboard' | 'gamepad' | 'wheel' | 'touch';
 }
 
 export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality';
+
+/** Lateral acceleration (m/s²) the steering keys may ask for: brisk in town, gentle on the motorway. */
+const keyLateral = (v: number): number => 2.4 + 3.4 / (1 + (v / 15) * (v / 15));
+/** … and what full deflection of a stick or of the steering bar asks for: close to what the tyres hold. */
+const ANALOG_LATERAL = 7;
+const TAU = Math.PI * 2;
+/** an angle brought into -π … π */
+const wrap = (a: number): number => a - TAU * Math.round(a / TAU);
 
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
 const approach = (cur: number, target: number, maxStep: number): number =>
@@ -54,6 +64,7 @@ export class Input {
     seatbelt: false,
     lookYaw: 0,
     lookPitch: 0,
+    lookZoom: 7,
     device: 'keyboard',
   };
   private readonly keys = new Set<string>();
@@ -78,6 +89,15 @@ export class Input {
   private lookId = -1;
   private lookX = 0;
   private lookY = 0;
+  /**
+   * The camera circles the car (view from behind): looking around has no stops,
+   * and the view swings back behind the car by itself once the car is driving.
+   * False: the driver's head (stops at the shoulders).
+   */
+  orbit = false;
+  private lookIdle = 0;
+  private wheelbase = 2.63;
+  private maxWheelAngle = 0.576;
   /** suspend driving input (menus) */
   enabled = true;
   lastGamepadId = '';
@@ -113,22 +133,71 @@ export class Input {
     canvas.addEventListener('pointermove', (e) => {
       if (!this.dragging) return;
       const inv = settings.invertLookY ? -1 : 1;
+      this.lookIdle = 0;
       if (e.pointerType === 'mouse') {
-        this.mouseLookYaw = clamp(this.mouseLookYaw - e.movementX * 0.005, -2.6, 2.6);
-        this.mouseLookPitch = clamp(this.mouseLookPitch - e.movementY * 0.004 * inv, -0.8, 0.6);
+        this.turnLook(-e.movementX * 0.005, -e.movementY * 0.004 * inv);
       } else if (e.pointerId === this.lookId) {
         // a thumb travels less than a mouse: a third of the screen is a full shoulder check
         const k = 5.4 / Math.max(320, window.innerWidth);
-        this.mouseLookYaw = clamp(this.mouseLookYaw + (e.clientX - this.lookX) * k, -2.6, 2.6);
-        this.mouseLookPitch = clamp(this.mouseLookPitch + (e.clientY - this.lookY) * k * 0.5 * inv, -0.8, 0.6);
+        this.turnLook((e.clientX - this.lookX) * k, (e.clientY - this.lookY) * k * 0.5 * inv);
         this.lookX = e.clientX;
         this.lookY = e.clientY;
       }
     });
+    // the wheel of the mouse moves the camera closer to the car or further away
+    canvas.addEventListener(
+      'wheel',
+      (e) => {
+        if (!this.orbit || !this.enabled) return;
+        e.preventDefault();
+        this.c.lookZoom = clamp(this.c.lookZoom * Math.exp(clamp(e.deltaY, -120, 120) * 0.0016), 3.5, this.zoomMax);
+      },
+      { passive: false },
+    );
     canvas.addEventListener('dblclick', () => {
       this.mouseLookYaw = 0;
       this.mouseLookPitch = 0;
     });
+  }
+
+  /** Looking around with the mouse or a finger; the stops depend on what is turning: a head or a camera. */
+  private turnLook(dYaw: number, dPitch: number): void {
+    if (this.orbit) {
+      this.mouseLookYaw = wrap(this.mouseLookYaw + dYaw);
+      // from just above the road to almost straight down onto the roof
+      this.mouseLookPitch = clamp(this.mouseLookPitch + dPitch, -1.15, 0.28);
+    } else {
+      this.mouseLookYaw = clamp(this.mouseLookYaw + dYaw, -2.6, 2.6);
+      this.mouseLookPitch = clamp(this.mouseLookPitch + dPitch, -0.8, 0.6);
+    }
+  }
+
+  /** The camera was changed: look straight ahead again. */
+  resetLook(orbit: boolean): void {
+    this.orbit = orbit;
+    this.mouseLookYaw = 0;
+    this.mouseLookPitch = 0;
+    this.c.lookYaw = 0;
+    this.c.lookPitch = 0;
+    this.glance = false;
+  }
+
+  /** The car that is being steered (for how much lock the keys may ask for at speed). */
+/** how far the outside camera can be moved away (m) – more for a truck with a trailer */
+  zoomMax = 18;
+
+  setSteering(wheelbase: number, maxWheelAngle: number): void {
+    this.wheelbase = wheelbase;
+    this.maxWheelAngle = maxWheelAngle;
+  }
+
+  /**
+   * How much of the steering lock an input may ask for at this speed so that
+   * the car turns with at most `lateral` m/s² (v²/r, r = wheelbase / angle).
+   * Full lock up to walking pace.
+   */
+  private lockFor(lateral: number, speed: number): number {
+    return clamp((lateral * this.wheelbase) / (Math.max(speed * speed, 1) * this.maxWheelAngle), 0.003, 1);
   }
 
   onAction(fn: (a: Action) => void): void {
@@ -273,16 +342,16 @@ export class Input {
     } else if (pad && (Math.abs(pad.steer) > 0.02 || pad.throttle > 0.02 || pad.brake > 0.02 || c.device === 'gamepad') && !this.anyDrivingKey()) {
       c.device = 'gamepad';
       // gentle non-linearity and less lock at speed make a thumb stick usable
-      const limit = 1 / (1 + (absSpeed / 22) * (absSpeed / 22));
+      const limit = this.lockFor(ANALOG_LATERAL, absSpeed);
       const shaped = Math.sign(pad.steer) * Math.abs(pad.steer) ** 1.6;
-      c.steer = approach(c.steer, shaped * (0.3 + 0.7 * limit), dt * 3.5);
+      c.steer = approach(c.steer, shaped * limit, dt * Math.max(3.5 * limit, 0.05));
       c.throttle = pad.throttle;
       c.brake = pad.brake;
       c.clutch = pad.clutch;
     } else if (this.touch.active) {
       c.device = 'touch';
-      const limit = 1 / (1 + (absSpeed / 20) * (absSpeed / 20));
-      c.steer = approach(c.steer, this.touch.steer * (0.25 + 0.75 * limit), dt * 4);
+      const limit = this.lockFor(ANALOG_LATERAL, absSpeed);
+      c.steer = approach(c.steer, this.touch.steer * limit, dt * Math.max(4 * limit, 0.05));
       c.throttle = this.touch.throttle;
       c.brake = this.touch.brake;
       c.clutch = 0;
@@ -290,24 +359,26 @@ export class Input {
       c.device = 'keyboard';
       const left = this.key('KeyA', 'ArrowLeft');
       const right = this.key('KeyD', 'ArrowRight');
-      // full lock is only available at walking pace; at speed the keys ask for less
-      const limit = clamp(1 / (1 + (absSpeed / 9) * (absSpeed / 9)), 0.06, 1);
+      // A key is all or nothing, a steering wheel is not: the keys ask for the lock that turns the car
+      // with a comfortable lateral acceleration at this speed – full lock at walking pace, a fraction
+      // of a degree on the motorway – and wind it on within about half a second.
+      const limit = this.lockFor(keyLateral(absSpeed), absSpeed);
       const target = (right ? 1 : 0) - (left ? 1 : 0);
       if (target !== 0) {
-        const rate = 0.55 + 0.9 * limit;
-        c.steer = approach(c.steer, target * limit, dt * rate);
+        const rate = limit * (1.2 + 1.3 * (1 - limit));
         // counter-steering is quicker than winding on more lock
-        if (Math.sign(c.steer) !== target) c.steer = approach(c.steer, 0, dt * 1.6);
+        if (Math.sign(c.steer) === -target) c.steer = approach(c.steer, 0, dt * Math.max(1.6 * limit, Math.abs(c.steer) * 4));
+        c.steer = approach(c.steer, target * limit, dt * rate);
       } else {
         // hands off: the wheel centres itself when the car rolls, and stays put when it stands
-        const centring = clamp(absSpeed / 6, 0, 1) * (1.4 + Math.abs(selfAlign) * 2.5);
+        const centring = clamp(absSpeed / 6, 0, 1) * Math.max((1.4 + Math.abs(selfAlign) * 2.5) * Math.max(limit, 0.15), Math.abs(c.steer) * 3);
         c.steer = approach(c.steer, 0, dt * centring);
       }
       const gas = this.key('KeyW', 'ArrowUp');
       const brake = this.key('KeyS', 'ArrowDown');
       // quick to half travel, slower to the floor: easier to dose with a key
       const gasTarget = gas ? 1 : 0;
-      c.throttle = gas ? approach(c.throttle, gasTarget, dt * (c.throttle < 0.5 ? 2.4 : 0.9)) : approach(c.throttle, 0, dt * 5);
+      c.throttle = gas ? approach(c.throttle, gasTarget, dt * (c.throttle < 0.35 ? 2.4 : 0.6)) : approach(c.throttle, 0, dt * 5);
       c.brake = brake ? approach(c.brake, 1, dt * (c.brake < 0.45 ? 2.6 : 1.3)) : approach(c.brake, 0, dt * 6);
       const clutch = this.key('ShiftLeft', 'ShiftRight');
       // press quickly, release smoothly (like lifting the foot with feeling)
@@ -334,10 +405,22 @@ export class Input {
     let yaw = this.mouseLookYaw;
     const lookL = this.key('KeyJ');
     const lookR = this.key('KeyK');
-    if (lookL && lookR) yaw = 2.6;
+    const back = this.key('KeyU') || (lookL && lookR);
+    // looking back: over the left shoulder through the rear window – or, seen from outside, the camera in front of the car
+    if (back) yaw = this.orbit ? Math.PI : 2.6;
     else if (lookL) yaw = 1.75;
     else if (lookR) yaw = -1.75;
-    c.lookYaw = approach(c.lookYaw, yaw, dt * 7);
+    if (this.orbit) {
+      // once the car is driving and nobody is looking around, the camera swings back behind it
+      if (this.dragging || back || lookL || lookR) this.lookIdle = 0;
+      else this.lookIdle += dt;
+      if (this.lookIdle > 2.2 && absSpeed > 2.5 && !this.glance) {
+        this.mouseLookYaw = approach(this.mouseLookYaw, 0, dt * 1.6);
+        this.mouseLookPitch = approach(this.mouseLookPitch, 0, dt * 0.6);
+      }
+      // the short way round
+      c.lookYaw = wrap(c.lookYaw + clamp(wrap(yaw - c.lookYaw), -dt * 7, dt * 7));
+    } else c.lookYaw = approach(c.lookYaw, yaw, dt * 7);
     c.lookPitch = approach(c.lookPitch, this.mouseLookPitch, dt * 6);
 
     // indicator self-cancel: arms once the wheel is turned into the bend, cancels when it comes back

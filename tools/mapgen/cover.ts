@@ -118,6 +118,9 @@ export class CoverMap {
         const c1 = Math.min(this.w - 1, Math.floor((x + r - this.minX) / this.cell));
         const r0 = Math.max(0, Math.floor((z - r - this.minZ) / this.cell));
         const r1 = Math.min(this.h - 1, Math.floor((z + r - this.minZ) / this.cell));
+        // (a point beside the raster has no columns: without this check a negative end index would count
+        // from the end of the array and flood the map)
+        if (c1 < c0) continue;
         for (let row = r0; row <= r1; row++) this.data.fill(value, row * this.w + c0, row * this.w + c1 + 1);
       }
     }

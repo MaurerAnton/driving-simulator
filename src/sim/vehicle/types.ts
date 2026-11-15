@@ -136,4 +136,24 @@ export interface VehicleSpec {
 
   // aerodynamics: drag area Cd·A (m²)
   dragArea: number;
+
+  // ---- what differs for a truck (a car leaves these out) ----
+  /** the rear wheels are driven (default: the front wheels) */
+  rearDrive?: boolean;
+  /** outer length and width of the vehicle (m); default: a compact car */
+  length?: number;
+  width?: number;
+  /**
+   * Corners of the body shell relative to the point on the ground below the
+   * middle of the wheelbase (x right, y up, z back) – what touches the ground
+   * when the vehicle lies on its side or roof.  Default: a compact car.
+   */
+  bodyPoints?: ReadonlyArray<readonly [number, number, number]>;
+  /**
+   * The automatic gearbox: shift points as engine speed (rpm) at no and at
+   * full throttle, up to which speed a kick-down shifts back, from which
+   * speed of the gearbox input (rad/s) the converter locks up, and the
+   * converter's capacity (N·m per (rad/s)²).  Default: a petrol car.
+   */
+  auto?: { up: [number, number]; down: [number, number]; kickdownRpm: number; lockOmega: number; converter: number };
 }
