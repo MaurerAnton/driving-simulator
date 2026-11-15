@@ -1,0 +1,53 @@
+{
+  "name": "fahrsim-baunatal",
+  "version": "0.1.0",
+  "description": "Freier 3D-Fahrschulsimulator für Baunatal – deutsche Verkehrsregeln lernen (AGPL-3.0-only).",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/vehicle/*.test.ts\"",
+    "map:extract": "node tools/osm-extract.ts",
+    "map:build": "node --max-old-space-size=3072 tools/build-map.ts",
+    "map:all": "npm run map:extract && npm run map:lod2 && npm run map:build",
+    "test:traffic": "node tests/traffic.sim.ts 5",
+    "test:drive": "node tests/drive.sim.ts",
+    "map:lod2": "node --max-old-space-size=2048 tools/lod2-extract.ts"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/earcut": "^3.2.4",
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
+    "earcut": "^3.2.4",
+    "geotiff": "^3.0.5",
+    "playwright-core": "^1.65.1",
+    "saxes": "^6.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MaurerAnton/driving-simulator.git"
+  },
+  "homepage": "https://maureranton.github.io/driving-simulator/",
+  "keywords": [
+    "fahrschule",
+    "fahrsimulator",
+    "driving-simulator",
+    "stvo",
+    "baunatal",
+    "openstreetmap",
+    "threejs",
+    "agpl"
+  ]
+}
