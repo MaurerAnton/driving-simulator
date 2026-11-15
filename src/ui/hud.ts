@@ -13,8 +13,8 @@ import type { SpawnJson } from '../world/types.ts';
 import type { World } from '../world/world.ts';
 import { addressPicker } from './addresspicker.ts';
 import { NoticeBoard, noticeColour } from './notices.ts';
-import { VIOLATIONS, tr, violationTitle, violationWhy } from './i18n.ts';
-import type { Lang } from './i18n.ts';
+import { LANGS, formatUnit, keyName, lessonIntro, lessonTitle, loadLang, tr, violationRef, violationTitle, violationWhy } from '../i18n/index.ts';
+import type { Lang } from '../i18n/index.ts';
 
 export interface HudState {
   speedKmh: number;
@@ -91,6 +91,8 @@ export class Hud {
   private navSub!: HTMLElement;
   private navBox!: HTMLElement;
   private roundel!: HTMLElement;
+  private roundelText = '';
+  private ruler: CanvasRenderingContext2D | null = null;
   private zone!: HTMLElement;
   private prio!: HTMLElement;
   /**
@@ -151,6 +153,38 @@ export class Hud {
     return tr(key, this.lang, p);
   }
 
+  /**
+   * Font size at which a word ("walk", "none" – in any language and script)
+   * fits into the speed-limit roundel: it may wrap at spaces, the widest word
+   * must fit the width and the lines the height.
+   */
+  private fitRoundel(text: string): number {
+    const WIDTH = 43;
+    const HEIGHT = 38;
+    this.ruler ??= document.createElement('canvas').getContext('2d');
+    const c = this.ruler;
+    if (!c) return 11;
+    const family = getComputedStyle(this.roundel).fontFamily || 'sans-serif';
+    const words = text.split(/\s+/).filter(Boolean);
+    for (let px = 13; px > 7; px--) {
+      c.font = `800 ${px}px ${family}`;
+      const space = c.measureText(' ').width;
+      let lines = 1;
+      let line = 0;
+      let widest = 0;
+      for (const w of words) {
+        const width = c.measureText(w).width;
+        widest = Math.max(widest, width);
+        if (line > 0 && line + space + width > WIDTH) {
+          lines++;
+          line = width;
+        } else line += (line > 0 ? space : 0) + width;
+      }
+      if (widest <= WIDTH && lines * px * 1.1 <= HEIGHT) return px;
+    }
+    return 7;
+  }
+
   // ---------------------------------------------------------------- overlays
   private setOverlay(node: HTMLElement | null): void {
     this.overlay?.remove();
@@ -181,6 +215,8 @@ export class Hud {
   showMenu(spawns: SpawnJson[], lastSpawn = 0): void {
     const o = el('div', 'overlay');
     const p = el('div', 'panel');
+    // the language first: whoever cannot read the page must be able to find it
+    p.append(this.languagePicker(() => this.showMenu(spawns, spawn)));
     p.append(el('h1', '', 'Fahrsim <span>Baunatal</span>'), el('p', '', this.t('subtitle')));
     let spawn = Math.min(lastSpawn, Math.max(0, spawns.length - 1));
 
@@ -238,13 +274,17 @@ export class Hud {
     p.append(el('h2', '', this.t('start')));
     const cards = el('div', 'cards');
     const card = (title: string, desc: string, mode: string): void => {
-      const c = el('button', 'card', `<b>${title}</b><small>${desc}</small>`);
+      const c = el('button', 'card');
+      const b = el('b');
+      b.textContent = title;
+      const d = el('small');
+      d.textContent = desc;
+      c.append(b, d);
       c.onclick = () => this.onStart({ mode, spawn, address });
       cards.append(c);
     };
     card(this.t('free'), this.t('freeDesc'), 'free');
-    const li = this.lang === 'de' ? 0 : 1;
-    for (const l of LESSONS) card(l.title[li], l.kind === 'exam' ? this.t('examDesc') : `${l.intro[li].slice(0, 118)}…`, l.id);
+    for (const l of LESSONS) card(lessonTitle(l.id, this.lang), l.kind === 'exam' ? this.t('examDesc') : lessonIntro(l.id, this.lang), l.id);
     p.append(cards);
 
     const b = el('div', 'buttons');
@@ -258,6 +298,44 @@ export class Hud {
     p.append(b);
     o.append(p);
     this.setOverlay(o);
+  }
+
+  /**
+   * The list of languages, each under its own name.  Choosing one fetches its
+   * texts and draws the current page again.
+   */
+  private languagePicker(redraw: () => void, inRow = false): HTMLElement {
+    const sel = el('select', inRow ? '' : 'lang');
+    sel.setAttribute('aria-label', 'Language · Sprache');
+    for (const l of LANGS) {
+      const op = el('option');
+      op.value = l.code;
+      op.textContent = l.name;
+      op.lang = l.code;
+      sel.append(op);
+    }
+    sel.value = this.settings.lang;
+    sel.onchange = () => {
+      const code = sel.value;
+      void loadLang(code).then((ok) => {
+        if (ok) {
+          this.settings.lang = code;
+          saveSettings(this.settings);
+          this.onSettingsChanged();
+        }
+        redraw();
+      });
+    };
+    return sel;
+  }
+
+  /** Key caps for the keys with these codes, as printed on the player's keyboard. */
+  private keycaps(...codes: string[]): HTMLElement[] {
+    return codes.map((c) => {
+      const k = el('kbd');
+      k.textContent = keyName(c, this.lang);
+      return k;
+    });
   }
 
   showSettings(back: () => void): void {
@@ -315,10 +393,11 @@ export class Hud {
       row.append(el('label', '', label), r);
       p.append(row);
     };
-    select(this.t('language'), s.lang, [['de', 'Deutsch'], ['en', 'English']], (v) => {
-      s.lang = v as Lang;
-      this.showSettings(back);
-    });
+    {
+      const row = el('div', 'row');
+      row.append(el('label', '', this.t('language')), this.languagePicker(() => this.showSettings(back), true));
+      p.append(row);
+    }
     select(this.t('transmission'), s.transmission, [['assist', this.t('trAssist')], ['manual', this.t('trManual')], ['automatic', this.t('trAutomatic')]], (v) => (s.transmission = v as Settings['transmission']));
     select(this.t('quality'), s.quality, [['low', this.t('qLow')], ['medium', this.t('qMedium')], ['high', this.t('qHigh')]], (v) => (s.quality = v as Settings['quality']));
     select(this.t('mirrors'), s.mirrors, [['off', this.t('mOff')], ['alternate', this.t('mAlt')], ['full', this.t('mFull')]], (v) => (s.mirrors = v as Settings['mirrors']));
@@ -340,49 +419,55 @@ export class Hud {
   }
 
   showControls(back: () => void): void {
-    const de = this.lang === 'de';
-    const rows: Array<[string, string]> = [
-      ['<kbd>W</kbd> <kbd>S</kbd> / <kbd>↑</kbd> <kbd>↓</kbd>', de ? 'Gas / Bremse' : 'Throttle / brake'],
-      ['<kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd>', de ? 'Lenken' : 'Steer'],
-      ['<kbd>Umschalt</kbd>', de ? 'Kupplung (bei „Kupplung selbst“)' : 'Clutch (Shift, with own-clutch mode)'],
-      ['<kbd>E</kbd> <kbd>Q</kbd>', de ? 'Gang hoch / runter (Automatik: Wählhebel)' : 'Gear up / down (automatic: selector)'],
-      ['<kbd>1</kbd>–<kbd>6</kbd>, <kbd>R</kbd>, <kbd>N</kbd>', de ? 'Gang direkt, Rückwärts, Leerlauf' : 'Direct gear, reverse, neutral'],
-      ['<kbd>Leertaste</kbd>', de ? 'Handbremse' : 'Handbrake (Space)'],
-      ['<kbd>Enter</kbd> / <kbd>I</kbd>', de ? 'Motor starten (halten) / Zündung aus' : 'Start engine (hold) / ignition off'],
-      ['<kbd>Y</kbd> <kbd>C</kbd> / <kbd>X</kbd>', de ? 'Blinker links / rechts, Warnblinker (unterste Tastenreihe)' : 'Indicator left / right, hazards (Z C X on QWERTY)'],
-      ['<kbd>J</kbd> <kbd>K</kbd>', de ? 'Schulterblick links / rechts (beide: nach hinten), oder Maus ziehen' : 'Shoulder check left / right (both: look back), or drag the mouse'],
-      ['<kbd>B</kbd>', de ? 'Gurt anlegen' : 'Seat belt'],
-      ['<kbd>L</kbd> / <kbd>O</kbd>', de ? 'Abblendlicht / Fernlicht' : 'Dipped / main beam'],
-      ['<kbd>H</kbd>', de ? 'Hupe' : 'Horn'],
-      ['<kbd>V</kbd>', de ? 'Kamera wechseln' : 'Change camera'],
-      ['<kbd>T</kbd>', de ? 'Auto zurück auf die Straße setzen' : 'Put the car back on the road'],
-      ['<kbd>F</kbd>', de ? 'Realansicht: echte Fotos dieser Stelle (oder die Karte anklicken)' : 'Reality view: real photos of this place (or click the map)'],
-      ['<kbd>Esc</kbd>', de ? 'Pause' : 'Pause'],
+    const k = (...codes: string[]): HTMLElement[] => this.keycaps(...codes);
+    const rows: Array<[Array<HTMLElement | string>, string]> = [
+      [[...k('KeyW', 'KeyS'), ' / ', ...k('ArrowUp', 'ArrowDown')], 'ctl.throttleBrake'],
+      [[...k('KeyA', 'KeyD'), ' / ', ...k('ArrowLeft', 'ArrowRight')], 'ctl.steer'],
+      [k('ShiftLeft'), 'ctl.clutch'],
+      [k('KeyE', 'KeyQ'), 'ctl.gearUpDown'],
+      [[...k('Digit1'), '–', ...k('Digit6'), ' ', ...k('KeyR'), ' ', ...k('KeyN')], 'ctl.gearDirect'],
+      [k('KeyP'), 'ctl.park'],
+      [k('Space'), 'ctl.handbrake'],
+      [[...k('Enter'), ' / ', ...k('KeyI')], 'ctl.engine'],
+      [[...k('KeyZ', 'KeyC'), ' / ', ...k('KeyX')], 'ctl.indicators'],
+      [k('KeyJ', 'KeyK'), 'ctl.look'],
+      [k('KeyB'), 'ctl.belt'],
+      [[...k('KeyL'), ' / ', ...k('KeyO')], 'ctl.lights'],
+      [k('KeyH'), 'ctl.horn'],
+      [k('KeyV'), 'ctl.camera'],
+      [k('KeyT'), 'ctl.reset'],
+      [k('KeyF'), 'ctl.reality'],
+      [k('KeyM'), 'ctl.endDrive'],
+      [k('Escape'), 'ctl.pause'],
+      [k('F1'), 'ctl.help'],
     ];
     const o = el('div', 'overlay');
     const p = el('div', 'panel');
     p.append(el('h1', '', this.t('controls')));
     const table = el('table', 'keys');
-    for (const [k, d] of rows) table.append(el('tr', '', `<td>${k}</td><td>${d}</td>`));
+    for (const [keys, text] of rows) {
+      const row = el('tr');
+      const left = el('td');
+      left.append(...keys);
+      const right = el('td');
+      right.textContent = this.t(text);
+      row.append(left, right);
+      table.append(row);
+    }
     p.append(table);
-    p.append(
-      el(
-        'p',
-        '',
-        de
-          ? '<b>Maus und Touchscreen:</b> Straßenname oben links antippen = Menü und Einstellungen, Karte antippen = Realansicht. Auf dem Touchscreen: links die Lenkleiste und die Blinker, rechts Gas, Bremse, Gänge (▲ ▼) und Handbremse (P); „⋯“ oben öffnet Gurt, Anlasser, Licht, Hupe, Kamera und mehr. Über das Bild wischen = umsehen (Schulterblick), loslassen = wieder geradeaus. Gelbe Hinweise unten lassen sich antippen. Deckkraft und Anzeige der Bedienelemente stehen in den Einstellungen.'
-          : '<b>Mouse and touch screen:</b> tap the street name at the top left for the menu and settings, tap the map for the reality view. On a touch screen: steering bar and indicators on the left; throttle, brake, gears (▲ ▼) and handbrake (P) on the right; "⋯" at the top opens seat belt, starter, lights, horn, camera and more. Swipe across the picture to look around (shoulder check), let go to look ahead again. Yellow tips at the bottom can be tapped. Opacity and visibility of the controls are in the settings.',
-      ),
-    );
-    p.append(
-      el(
-        'p',
-        '',
-        de
-          ? 'Gamepad: linker Stick lenken, RT Gas, LT Bremse, RB/LB schalten, A Handbremse, X/B Blinker, Y Warnblinker. Lenkräder (Logitech, Thrustmaster, Fanatec …) werden über die Gamepad-Schnittstelle des Browsers erkannt, inklusive Kupplungspedal und H-Schaltung.'
-          : 'Gamepad: left stick steers, RT throttle, LT brake, RB/LB shift, A handbrake, X/B indicators, Y hazards. Steering wheels (Logitech, Thrustmaster, Fanatec …) are detected through the browser gamepad API, including clutch pedal and H-shifter.',
-      ),
-    );
+    const para = (title: string, text: string): void => {
+      const e = el('p');
+      if (title) {
+        const b = el('b');
+        b.textContent = `${this.t(title)}: `;
+        e.append(b);
+      }
+      e.append(this.t(text));
+      p.append(e);
+    };
+    para('', 'ctl.layoutNote');
+    para('ctl.touchTitle', 'ctl.touchText');
+    para('ctl.padTitle', 'ctl.padText');
     const b = el('div', 'buttons');
     const bb = el('button', 'btn', this.t('back'));
     bb.onclick = back;
@@ -393,30 +478,20 @@ export class Hud {
   }
 
   showAbout(back: () => void): void {
-    const de = this.lang === 'de';
     const o = el('div', 'overlay');
     const p = el('div', 'panel');
+    const text = (key: string): void => {
+      const e = el('p');
+      e.textContent = this.t(key);
+      p.append(e);
+    };
     p.append(el('h1', '', this.t('about')));
-    p.append(
-      el(
-        'p',
-        '',
-        de
-          ? 'Fahrsim Baunatal ist freie Software unter der GNU Affero General Public License, Version 3 (AGPL-3.0-only). Du darfst sie nutzen, untersuchen, verändern und weitergeben. Der Simulator ersetzt keine Fahrstunde und keine amtliche Prüfung.'
-          : 'Fahrsim Baunatal is free software under the GNU Affero General Public License, version 3 (AGPL-3.0-only). You may use, study, change and share it. The simulator does not replace driving lessons or the official test.',
-      ),
-    );
+    text('about.text');
     p.append(el('h2', '', this.t('credits')));
-    for (const a of this.world.meta.attribution) p.append(el('p', '', a));
-    p.append(
-      el(
-        'p',
-        '',
-        de
-          ? 'Verkehrszeichen: amtliche Werke (§ 5 Abs. 1 UrhG), Vektorgrafiken von Wikimedia Commons (gemeinfrei). 3D-Darstellung: three.js (MIT).'
-          : 'Traffic signs: official works (§ 5 (1) UrhG), vector graphics from Wikimedia Commons (public domain). 3D rendering: three.js (MIT).',
-      ),
-    );
+    text('about.dataOsm');
+    text('about.dataHessen');
+    text('about.signs');
+    text('about.photos');
     p.append(el('h2', '', this.t('source')));
     p.append(el('p', '', '<a href="https://github.com/MaurerAnton/driving-simulator" target="_blank" rel="noopener">github.com/MaurerAnton/driving-simulator</a>'));
     const b = el('div', 'buttons');
@@ -499,7 +574,9 @@ export class Hud {
     const p = el('div', 'panel');
     p.append(el('h1', '', `${this.t('result')}: ${r.title}`));
     if (r.exam) p.append(el('div', `verdict ${r.passed ? 'ok' : 'bad'}`, this.t(r.passed ? 'passed' : 'failed')));
-    p.append(el('p', '', `${this.t('distance')}: ${r.distanceKm.toFixed(1)} km · ${this.t('duration')}: ${Math.round(r.minutes)} min · ${this.t('points')}: ${r.points}`));
+    const km = formatUnit(r.distanceKm, 'kilometer', this.lang, 1);
+    const min = formatUnit(Math.round(r.minutes), 'minute', this.lang);
+    p.append(el('p', '', `${this.t('distance')}: ${km} · ${this.t('duration')}: ${min} · ${this.t('points')}: ${r.points}`));
     if (r.log.length === 0) p.append(el('p', '', this.t('noFaults')));
     // group identical faults
     const groups = new Map<string, { v: Violation; n: number }>();
@@ -511,7 +588,7 @@ export class Hud {
     const order: Record<string, number> = { fail: 0, major: 1, minor: 2, hint: 3 };
     for (const g of [...groups.values()].sort((a, b) => order[a.v.severity] - order[b.v.severity])) {
       const f = el('div', `fault ${g.v.severity}`);
-      f.append(el('b', '', `${violationTitle(g.v.id, this.lang, g.v.data)}${g.n > 1 ? ` (${g.n}×)` : ''}`), el('small', '', violationWhy(g.v.id, this.lang)), el('em', '', `${this.t(g.v.severity)} · ${VIOLATIONS[g.v.id]?.ref ?? ''}`));
+      f.append(el('b', '', `${violationTitle(g.v.id, this.lang, g.v.data)}${g.n > 1 ? ` (${g.n}×)` : ''}`), el('small', '', violationWhy(g.v.id, this.lang)), el('em', '', `${this.t(g.v.severity)} · ${violationRef(g.v.id, this.lang)}`));
       p.append(f);
     }
     const b = el('div', 'buttons');
@@ -578,7 +655,7 @@ export class Hud {
 
   /** A fault or hint of the rule monitor: shown in the block of the street name. */
   toast(v: Violation, seconds = v.severity === 'hint' ? 5.5 : 8): void {
-    this.notices.add(violationTitle(v.id, this.lang, v.data), violationWhy(v.id, this.lang), `${this.t(v.severity)} · ${VIOLATIONS[v.id]?.ref ?? ''}`, v.severity, seconds, performance.now());
+    this.notices.add(violationTitle(v.id, this.lang, v.data), violationWhy(v.id, this.lang), `${this.t(v.severity)} · ${violationRef(v.id, this.lang)}`, v.severity, seconds, performance.now());
   }
 
   message(title: string, sub = ''): void {
@@ -624,9 +701,13 @@ export class Hud {
         this.roundel.style.display = '';
         const none = s.limit === 0;
         this.roundel.className = `roundel${none ? ' none' : ''}${!none && s.speedKmh > s.limit + 6 ? ' over' : ''}`;
-        this.roundel.textContent = none ? this.t('limitNone') : s.zone === 7 ? this.t('walk') : String(s.limit);
-        if (s.zone === 7) this.roundel.style.fontSize = '12px';
-        else this.roundel.style.fontSize = '';
+        const word = none ? this.t('limitNone') : s.zone === 7 ? this.t('walk') : '';
+        const shown = word || String(s.limit);
+        if (shown !== this.roundelText) {
+          this.roundelText = shown;
+          this.roundel.textContent = shown;
+          this.roundel.style.fontSize = word ? `${this.fitRoundel(word)}px` : '';
+        }
         this.zone.style.display = s.zone === 30 || s.zone === 20 ? '' : 'none';
         this.zone.textContent = 'ZONE';
       } else {
@@ -687,7 +768,7 @@ export class Hud {
         const key = `${this.lang}:${this.settings.transmission}`;
         if (want && key !== this.keysFor) {
           this.keysFor = key;
-          this.keysBox.innerHTML = this.keyReminder();
+          this.keysBox.replaceChildren(...this.keyReminder());
         }
       }
     }
@@ -906,24 +987,22 @@ export class Hud {
   }
 
   /** The short reminder of the keys, depending on the gearbox chosen. */
-  private keyReminder(): string {
-    const de = this.lang === 'de';
-    const k = (...keys: string[]): string => keys.map((x) => `<kbd>${x}</kbd>`).join('');
+  private keyReminder(): HTMLElement[] {
     const tr = this.settings.transmission;
-    const parts: string[] = [];
+    const item = (text: string, ...keys: Array<HTMLElement | string>): HTMLElement => {
+      const e = el('span');
+      e.append(...keys, ` ${this.t(text)}`);
+      return e;
+    };
+    const k = (...codes: string[]): HTMLElement[] => this.keycaps(...codes);
+    const out: HTMLElement[] = [];
     if (tr === 'automatic') {
-      parts.push(`${k('E', 'Q')} ${de ? 'Wählhebel P·R·N·D' : 'selector P·R·N·D'}`, `${k('P')} ${de ? 'Parken' : 'park'}`, `${k('R')} ${de ? 'rückwärts' : 'reverse'}`, `${k('N')} ${de ? 'Leerlauf' : 'neutral'}`);
+      out.push(item('kr.selector', ...k('KeyE', 'KeyQ')), item('kr.park', ...k('KeyP')), item('kr.reverse', ...k('KeyR')), item('kr.neutral', ...k('KeyN')));
     } else {
-      if (tr === 'manual') parts.push(`${k(de ? 'Umschalt' : 'Shift')} ${de ? 'Kupplung' : 'clutch'}`);
-      parts.push(`${k('1')}–${k('6')} ${de ? 'Gang' : 'gear'}`, `${k('R')} ${de ? 'rückwärts' : 'reverse'}`, `${k('N')} ${de ? 'Leerlauf' : 'neutral'}`, `${k('E', 'Q')} ${de ? 'hoch / runter' : 'up / down'}`);
+      if (tr === 'manual') out.push(item('kr.clutch', ...k('ShiftLeft')));
+      out.push(item('kr.gear', ...k('Digit1'), '–', ...k('Digit6')), item('kr.reverse', ...k('KeyR')), item('kr.neutral', ...k('KeyN')), item('kr.upDown', ...k('KeyE', 'KeyQ')));
     }
-    parts.push(
-      `${k(de ? 'Leertaste' : 'Space')} ${de ? 'Handbremse' : 'handbrake'}`,
-      `${k('Enter')} ${de ? 'Motor starten' : 'start engine'}`,
-      `${k('Y', 'C')} ${de ? 'Blinker' : 'indicators'}`,
-      `${k('J', 'K')} ${de ? 'Schulterblick' : 'shoulder check'}`,
-      `${k('F1')} ${de ? 'alle Tasten' : 'all keys'}`,
-    );
-    return parts.map((x) => `<span>${x}</span>`).join('');
+    out.push(item('kr.handbrake', ...k('Space')), item('kr.startEngine', ...k('Enter')), item('kr.indicators', ...k('KeyZ', 'KeyC')), item('kr.shoulder', ...k('KeyJ', 'KeyK')), item('kr.allKeys', ...k('F1')));
+    return out;
   }
 }

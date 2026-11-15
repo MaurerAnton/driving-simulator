@@ -44,7 +44,9 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   OpenStreetMap) – das Auto steht am Straßenrand vor dem Haus. In der freien Fahrt auch als Sprung aus dem
   Pausenmenü.
 - Tastatur, Gamepad, **Lenkrad mit Pedalen und H-Schaltung** (Gamepad-API) und **Touchscreen** – auf dem
-  Smartphone ist alles ohne Tastatur erreichbar. Deutsch und Englisch.
+  Smartphone ist alles ohne Tastatur erreichbar.
+- **28 Sprachen**, vollständig übersetzt – darunter alle Sprachen, in denen man in Deutschland die
+  Theorieprüfung ablegen kann. Siehe [Sprachen](#sprachen).
 
 ## Steuerung (Tastatur)
 
@@ -88,6 +90,32 @@ angekündigte Abbiegung bleibt darunter lesbar.
 | | |
 | --- | --- |
 | ![Smartphone: Lenkleiste und Blinker links, Pedale, Gänge und Handbremse rechts, Hinweis im Straßennamen-Feld](docs/img/smartphone.jpg) | ![PC: Fehlerhinweis im Straßennamen-Feld mit Abbiegeansage, Tastenhilfe unten links, Start an einer Adresse](docs/img/hinweis.jpg) |
+
+## Sprachen
+
+Deutsch · English · Bahasa Indonesia · Čeština · Español · Français · Hrvatski · Italiano · Magyar ·
+Nederlands · Polski · Português · Română · Shqip · Tiếng Việt · Türkçe · Ελληνικά · Български · Русский ·
+Українська · العربية · فارسی · اردو · हिन्दी · বাংলা · 简体中文 · 日本語 · 한국어
+
+Die Sprache richtet sich beim ersten Start nach dem Browser (wer Serbisch, Bosnisch, Slowakisch oder
+Malaiisch eingestellt hat, bekommt die nächstverwandte Sprache) und lässt sich oben im Hauptmenü und in den
+Einstellungen umstellen; `?lang=fr` in der Adresse wählt sie für einen Besuch. Übersetzt ist alles: Menüs,
+Fahrstunden, die Hinweise des Fahrlehrers mit ihren Erklärungen, die Steuerungsübersicht und die
+Realansicht; Strecken, Zeiten und Datumsangaben schreibt der Browser in der Form der jeweiligen Sprache.
+Die Fundstellen bleiben in jeder Sprache die deutschen (z. B. „§ 37 Abs. 2 StVO“), ebenso die Nummern der
+Verkehrszeichen und natürlich die Straßennamen. Arabisch, Persisch und Urdu werden von rechts nach links
+gesetzt; die Bedienelemente behalten dabei ihren Platz. Tasten werden so benannt, wie sie auf der eigenen
+Tastatur stehen – gesteuert wird nach der Lage der Taste, auf einer französischen Tastatur also mit Z Q S D
+statt W A S D.
+
+| | |
+| --- | --- |
+| ![Hauptmenü auf Persisch, von rechts nach links gesetzt](docs/img/sprachen-menue.jpg) | ![Smartphone auf Arabisch: roter Hinweis mit deutscher Fundstelle, Bedienelemente an ihrem Platz](docs/img/sprachen-smartphone.jpg) |
+
+Die Übersetzungen wurden maschinell (mit einem KI-Sprachmodell) nach einem Glossar der Fachbegriffe erstellt
+und automatisch auf Vollständigkeit, Platzhalter und Länge geprüft, aber **nicht von Muttersprachlern
+gegengelesen**. Verbesserungen sind willkommen: eine Sprache ist eine Datei in `src/i18n/`, die Regeln
+stehen in [docs/TRANSLATING.md](docs/TRANSLATING.md), `npm run i18n:check` prüft sie.
 
 ## Realansicht
 
@@ -137,7 +165,8 @@ geladen werden.
 ### Tests
 
 ```bash
-npm test             # 45 Tests: Fahrdynamik (21), Realansicht (15), Adresssuche und Hinweise (9)
+npm test             # 55 Tests: Fahrdynamik (21), Realansicht (15), Adresssuche und Hinweise (9), Sprachen (10)
+npm run i18n:check   # Übersetzungen prüfen (Vollständigkeit, Platzhalter, Längen)
 npm run test:traffic # Verkehrssimulation im Dauerlauf auf der echten Karte
 npm run test:drive   # „virtueller Fahrschüler“ fährt alle Fahrstunden regelkonform ab
 ```
@@ -163,6 +192,7 @@ src/world              Straßennetz-Modell: Knoten, Kanten, Kreuzungsgeometrie, 
 src/sim/vehicle        Fahrdynamik (ohne Abhängigkeiten, deterministisch)
 src/sim                Verkehr, Ampeln, Regelwächter, Kollisionen
 src/render             three.js: Kacheln, Gebäude, Schilder, Fahrzeug, Cockpit, Spiegel
+src/i18n               Texte: eine Datei je Sprache, Tastenbeschriftung nach Tastaturbelegung
 src/reality            Realansicht: Bild-Metadaten (EXIF/XMP), eigene Bilder, freie Bilddienste
 src/game, src/ui       Spielablauf, Fahrstunden, Navigation, HUD, Menüs, Texte (de/en)
 tools/                 Kartenpipeline (OSM-PBF-Leser, Höhenmodell, LoD2, Straßennetz, 3D-Netze, Kacheln),
@@ -229,6 +259,10 @@ traffic rules (StVO).
 - Start at any address: type a street and house number (about 8,500 house numbers from OpenStreetMap).
 - The instructor's notices (red for serious faults, yellow for minor ones) appear in the street-name block;
   if several coincide, the gravest is shown.
+- **28 languages**, fully translated (all the languages of the German theory test among them, and
+  right-to-left layout for Arabic, Persian and Urdu); the translations are machine-made from a glossary and
+  checked automatically, not proof-read by native speakers – see
+  [docs/TRANSLATING.md](docs/TRANSLATING.md) to improve one or add another.
 - A **reality view** (key `F`): real street-level photographs of the place the car is at – from the free
   imagery services Panoramax, KartaView and Mapillary (CC BY-SA 4.0, only requested when you switch a
   service on) or from your own files, including 360° panoramas saved with street-view download tools

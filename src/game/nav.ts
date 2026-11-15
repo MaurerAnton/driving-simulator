@@ -171,94 +171,21 @@ export class Navigator {
 export type TargetType = 'rbl' | 'signals' | 'roundabout' | 'rural' | 'motorway' | 'priority' | 'home';
 
 export interface LessonDef {
+  /** title and introduction are texts: "lesson.<id>.title", "lesson.<id>.intro" */
   id: string;
-  title: [string, string];
-  intro: [string, string];
   kind: 'free' | 'basics' | 'route' | 'exam';
   targets: TargetType[];
 }
 
 export const LESSONS: LessonDef[] = [
-  {
-    id: 'basics',
-    kind: 'basics',
-    title: ['1 · Anfahren, Schalten, Anhalten', '1 · Pulling away, changing gear, stopping'],
-    intro: [
-      'Sitz und Spiegel passen, also: anschnallen (B), Kupplung treten und Motor starten (Enter halten), 1. Gang, Handbremse lösen (Leertaste). Kupplung langsam kommen lassen und etwas Gas geben. Geschaltet wird bei etwa 2000–2500 Umdrehungen.',
-      'Seat and mirrors are set: fasten your belt (B), press the clutch and start the engine (hold Enter), select 1st, release the handbrake (Space). Let the clutch up slowly and add a little throttle. Change up at about 2000–2500 rpm.',
-    ],
-    targets: [],
-  },
-  {
-    id: 'rbl',
-    kind: 'route',
-    title: ['2 · Rechts vor links (Tempo-30-Zone)', '2 · Right before left (30 km/h zone)'],
-    intro: [
-      'In Wohngebieten ohne Vorfahrtschilder gilt: Wer von rechts kommt, fährt zuerst (§ 8 StVO). Fahre so an jede Einmündung heran, dass du anhalten kannst, und schau zuerst nach rechts. In der Zone gilt 30 km/h, bis das Zonen-Ende-Schild kommt.',
-      'In residential areas without priority signs, whoever comes from the right goes first (§ 8 StVO). Approach every junction ready to stop and look right first. The 30 km/h zone lasts until the end-of-zone sign.',
-    ],
-    targets: ['rbl', 'rbl', 'home'],
-  },
-  {
-    id: 'priority',
-    kind: 'route',
-    title: ['3 · Vorfahrt gewähren und Stopp', '3 · Give way and stop'],
-    intro: [
-      'Das auf der Spitze stehende Dreieck (Zeichen 205) heißt: Vorfahrt gewähren. Das Achteck (Zeichen 206): an der Haltlinie anhalten – immer. Die gelbe Raute (Zeichen 306) zeigt: du bist auf der Vorfahrtstraße.',
-      'The inverted triangle (sign 205) means give way. The octagon (sign 206): stop at the line – always. The yellow diamond (sign 306) tells you that you are on the priority road.',
-    ],
-    targets: ['priority', 'priority', 'home'],
-  },
-  {
-    id: 'signals',
-    kind: 'route',
-    title: ['4 · Ampelkreuzungen und Abbiegen', '4 · Traffic lights and turning'],
-    intro: [
-      'Gelb heißt: anhalten, wenn es gefahrlos geht. Bei Grün links abbiegen: Gegenverkehr durchlassen. Rechts abbiegen: Schulterblick nach rechts, Radfahrer und Fußgänger haben Vorrang. Blinken nicht vergessen.',
-      'Amber means stop if you safely can. Turning left on green: let oncoming traffic pass. Turning right: shoulder check to the right, cyclists and pedestrians go first. Do not forget to indicate.',
-    ],
-    targets: ['signals', 'signals', 'home'],
-  },
-  {
-    id: 'roundabout',
-    kind: 'route',
-    title: ['5 · Kreisverkehr', '5 · Roundabout'],
-    intro: [
-      'Am Kreisverkehr (Zeichen 215 mit 205) hat der Verkehr im Kreis Vorfahrt. Beim Einfahren nicht blinken, beim Ausfahren rechts blinken. Auf Fußgänger an den Überwegen achten.',
-      'At a roundabout (sign 215 with 205) traffic on the roundabout has priority. Do not indicate when entering; indicate right when leaving. Watch for pedestrians at the crossings.',
-    ],
-    targets: ['roundabout', 'roundabout', 'home'],
-  },
-  {
-    id: 'rural',
-    kind: 'route',
-    title: ['6 · Überlandfahrt', '6 · Country roads'],
-    intro: [
-      'Hinter dem Ortsausgangsschild gilt ohne weitere Schilder 100 km/h, am Ortseingang (gelbe Ortstafel) wieder 50 km/h. Abstand: halber Tacho. Vor Kurven und Kuppen rechtzeitig Tempo anpassen.',
-      'Beyond the end-of-town sign the limit is 100 km/h unless signed otherwise; at the yellow town sign it is 50 km/h again. Distance: half your speed in metres. Adjust your speed early for bends and crests.',
-    ],
-    targets: ['rural', 'home'],
-  },
-  {
-    id: 'motorway',
-    kind: 'route',
-    title: ['7 · Autobahn A 49', '7 · Motorway A 49'],
-    intro: [
-      'Auf dem Beschleunigungsstreifen zügig beschleunigen, Spiegel, Schulterblick, blinken – der durchgehende Verkehr hat Vorfahrt. Rechts fahren, links überholen. Richtgeschwindigkeit 130 km/h. Ausfahrt: rechtzeitig blinken, erst auf dem Verzögerungsstreifen bremsen.',
-      'Accelerate briskly on the slip road, mirrors, shoulder check, indicate – through traffic has priority. Keep right, overtake on the left. Recommended speed 130 km/h. Exit: indicate early, brake only on the deceleration lane.',
-    ],
-    targets: ['motorway', 'home'],
-  },
-  {
-    id: 'exam',
-    kind: 'exam',
-    title: ['Prüfungsfahrt', 'Driving test'],
-    intro: [
-      'Der Prüfer sagt die Richtung an. Bewertet werden Verkehrsbeobachtung, Geschwindigkeit, Vorfahrt, Abbiegen und Fahrzeugbedienung. Eine Gefährdung oder mehrere schwere Fehler führen zum Nichtbestehen.',
-      'The examiner gives the directions. Observation, speed, right of way, turning and vehicle handling are assessed. A dangerous situation or several serious faults mean a fail.',
-    ],
-    targets: ['rbl', 'signals', 'roundabout', 'priority', 'rural', 'home'],
-  },
+  { id: 'basics', kind: 'basics', targets: [] },
+  { id: 'rbl', kind: 'route', targets: ['rbl', 'rbl', 'home'] },
+  { id: 'priority', kind: 'route', targets: ['priority', 'priority', 'home'] },
+  { id: 'signals', kind: 'route', targets: ['signals', 'signals', 'home'] },
+  { id: 'roundabout', kind: 'route', targets: ['roundabout', 'roundabout', 'home'] },
+  { id: 'rural', kind: 'route', targets: ['rural', 'home'] },
+  { id: 'motorway', kind: 'route', targets: ['motorway', 'home'] },
+  { id: 'exam', kind: 'exam', targets: ['rbl', 'signals', 'roundabout', 'priority', 'rural', 'home'] },
 ];
 
 /** Pick a destination edge of the wanted kind at a sensible distance from (x, z). */

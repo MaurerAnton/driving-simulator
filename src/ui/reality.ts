@@ -15,7 +15,7 @@ import { placeLinks, searchImages } from '../reality/providers.ts';
 import { SOURCE_NAME, rankImages } from '../reality/types.ts';
 import type { ImageSource, StreetImage } from '../reality/types.ts';
 import { PanoramaView } from '../render/panorama.ts';
-import { tr } from './i18n.ts';
+import { formatMonth, formatUnit, tr } from '../i18n/index.ts';
 
 export interface RealityPlace {
   lat: number;
@@ -436,7 +436,7 @@ export class RealityPanel {
     this.noteNode.textContent = this.note;
     const ranked = rankImages(this.all(), this.place.lat, this.place.lon, this.place.heading).filter((r) => r.dist <= FAR * 1.5);
     this.thumbs.replaceChildren();
-    for (const { image, dist } of ranked.slice(0, 24)) this.thumbs.append(this.thumbButton(image, `${Math.round(dist)} m`));
+    for (const { image, dist } of ranked.slice(0, 24)) this.thumbs.append(this.thumbButton(image, formatUnit(Math.round(dist), 'meter', this.host.settings.lang)));
     const loose = this.own.filter((i) => !i.located);
     if (loose.length > 0) {
       this.thumbs.append(el('div', 'rv-group', this.t('realityUnplaced', { n: loose.length })));
@@ -537,7 +537,7 @@ export class RealityPanel {
   private setCaption(image: StreetImage): void {
     const c = this.caption;
     c.replaceChildren();
-    const date = Number.isFinite(image.time) ? new Date(image.time).toLocaleDateString(this.host.settings.lang === 'de' ? 'de-DE' : 'en-GB', { year: 'numeric', month: 'long', timeZone: 'UTC' }) : '';
+    const date = Number.isFinite(image.time) ? formatMonth(image.time, this.host.settings.lang) : '';
     if (image.source === 'local') {
       c.append(el('span', '', [this.t('realityOwnPicture'), image.title, date].filter(Boolean).join(' · ')));
       if (!image.located) {

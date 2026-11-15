@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /** User settings, persisted in localStorage. */
+import { LANGS, pickLang } from '../i18n/index.ts';
 
 export type Transmission = 'assist' | 'manual' | 'automatic';
 export type Quality = 'low' | 'medium' | 'high';
@@ -18,7 +19,8 @@ export interface WheelMapping {
 }
 
 export interface Settings {
-  lang: 'de' | 'en';
+  /** language code, one of LANGS in src/i18n */
+  lang: string;
   transmission: Transmission;
   quality: Quality;
   /** off | one mirror per frame | all mirrors every frame */
@@ -54,7 +56,8 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  lang: typeof navigator !== 'undefined' && !navigator.language.toLowerCase().startsWith('de') ? 'en' : 'de',
+  // the first of the browser's languages that the simulator speaks
+  lang: typeof navigator !== 'undefined' ? pickLang(navigator.languages?.length ? navigator.languages : [navigator.language]) : 'en',
   transmission: 'assist',
   quality: 'medium',
   mirrors: 'alternate',
@@ -79,7 +82,9 @@ export function loadSettings(): Settings {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Settings>;
-      return { ...DEFAULT_SETTINGS, ...parsed, wheel: { ...DEFAULT_SETTINGS.wheel, ...(parsed.wheel ?? {}) }, reality: { ...DEFAULT_SETTINGS.reality, ...(parsed.reality ?? {}) } };
+      const s = { ...DEFAULT_SETTINGS, ...parsed, wheel: { ...DEFAULT_SETTINGS.wheel, ...(parsed.wheel ?? {}) }, reality: { ...DEFAULT_SETTINGS.reality, ...(parsed.reality ?? {}) } };
+      if (!LANGS.some((l) => l.code === s.lang)) s.lang = DEFAULT_SETTINGS.lang;
+      return s;
     }
   } catch {
     /* private mode or corrupted entry: fall back to defaults */

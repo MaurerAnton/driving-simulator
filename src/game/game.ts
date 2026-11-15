@@ -24,7 +24,8 @@ import { AddressIndex, findRoadSpot, mainNetwork } from './address.ts';
 import type { AddressHit, AddressJson } from './address.ts';
 import { Hud } from '../ui/hud.ts';
 import type { HudState } from '../ui/hud.ts';
-import { tr } from '../ui/i18n.ts';
+import { LANGS, isRtl, lessonIntro, lessonTitle, loadLang, localeOf, setKeyStyle, tr } from '../i18n/index.ts';
+import { initKeyLabels } from '../i18n/keys.ts';
 import { RealityPanel } from '../ui/reality.ts';
 import { LaneGraph } from '../world/lanes.ts';
 import type { Lane } from '../world/lanes.ts';
@@ -107,11 +108,22 @@ export class Game {
 
   async boot(q: URLSearchParams): Promise<void> {
     const app = this.app;
+    // ?lang=xx chooses the language for this visit
+    const ql = q.get('lang');
+    if (ql && LANGS.some((l) => l.code === ql)) this.settings.lang = ql;
+    // the texts of the chosen language and the letters of the player's keyboard
+    const [ok] = await Promise.all([loadLang(this.settings.lang), initKeyLabels()]);
+    if (!ok) this.settings.lang = 'en';
+    this.applyLanguage();
     const lang = this.settings.lang;
     // a first, world-less HUD only for the loading screen
     const loading = document.createElement('div');
     loading.className = 'overlay solid';
-    loading.innerHTML = `<div class="panel narrow"><h1>Fahrsim <span>Baunatal</span></h1><p>${tr('loading', lang)}</p><div class="progress"><i></i></div></div>`;
+    const panel = document.createElement('div');
+    panel.className = 'panel narrow';
+    panel.innerHTML = '<h1>Fahrsim <span>Baunatal</span></h1><p></p><div class="progress"><i></i></div>';
+    (panel.querySelector('p') as HTMLElement).textContent = tr('loading', lang);
+    loading.append(panel);
     this.ui.append(loading);
     await app.loadWorld();
     const world = app.world;
@@ -249,9 +261,19 @@ export class Game {
     }
   }
 
+  /** Language of the page: for the browser (hyphenation, fonts, screen readers) and the writing direction. */
+  private applyLanguage(): void {
+    const lang = this.settings.lang;
+    // the full tag (zh-CN, ja-JP …) also tells the browser which glyphs to take for Han characters
+    document.documentElement.lang = localeOf(lang);
+    this.ui.dir = isRtl(lang) ? 'rtl' : 'ltr';
+    document.title = tr('pageTitle', lang);
+  }
+
   private applySettings(): void {
     const s = this.settings;
     const app = this.app;
+    this.applyLanguage();
     const q = s.quality;
     app.pixelRatioCap = q === 'low' ? 1 : q === 'medium' ? 1.5 : 2;
     app.tiles.viewRadius = q === 'low' ? 850 : q === 'medium' ? 1250 : 1700;
@@ -345,8 +367,8 @@ export class Game {
     this.state = 'placing';
     this.car.root.visible = false;
     this.hud.showLoading(tr('loadingTiles', this.settings.lang));
-    const li = this.settings.lang === 'de' ? 0 : 1;
-    this.pendingIntro = this.lesson && !skipIntro ? { title: this.lesson.title[li], text: this.lesson.intro[li] } : null;
+    const lang = this.settings.lang;
+    this.pendingIntro = this.lesson && !skipIntro ? { title: lessonTitle(this.lesson.id, lang), text: lessonIntro(this.lesson.id, lang) } : null;
   }
 
   private pendingIntro: { title: string; text: string } | null = null;
@@ -395,9 +417,8 @@ export class Game {
     this.input.enabled = false;
     this.audio.suspend();
     this.hud.setHudVisible(false);
-    const li = this.settings.lang === 'de' ? 0 : 1;
     this.hud.showResult({
-      title: l ? l.title[li] : tr('free', this.settings.lang),
+      title: l ? lessonTitle(l.id, this.settings.lang) : tr('free', this.settings.lang),
       exam: !!exam,
       passed: !failed,
       log: this.rules.log.slice(),
@@ -594,17 +615,16 @@ export class Game {
     if (l.kind === 'basics') {
       const c = this.input.c;
       const auto = v.spec.transmission === 'automatic';
-      const de = lang === 'de';
       const steps: Array<[string, () => boolean]> = [
-        [de ? 'Anschnallen: B drücken' : 'Fasten your seat belt: press B', () => c.seatbelt],
-        [de ? (auto ? 'Bremse treten (S) und Motor starten: Enter halten' : 'Motor starten: Enter halten (Gang raus oder Kupplung treten)') : auto ? 'Hold the brake (S) and start the engine: hold Enter' : 'Start the engine: hold Enter (neutral or clutch pressed)', () => v.engineRunning],
-        [de ? (auto ? 'Wählhebel auf D: E drücken' : '1. Gang einlegen: Taste 1 (Kupplung treten, falls ohne Kupplungshilfe)') : auto ? 'Select D: press E' : 'Select 1st gear: key 1 (press the clutch if you drive without assist)', () => (auto ? c.gear === 1 : v.gear === 1)],
-        [de ? 'Handbremse lösen: Leertaste' : 'Release the handbrake: Space', () => c.handbrake < 0.5],
-        [de ? 'Sanft anfahren: etwas Gas (W), bis 15 km/h' : 'Pull away gently: a little throttle (W) up to 15 km/h', () => v.speed * 3.6 > 15],
-        [de ? (auto ? 'Weiter beschleunigen bis 30 km/h' : 'In den 2. Gang schalten (E) und bis 30 km/h beschleunigen') : auto ? 'Accelerate to 30 km/h' : 'Change up to 2nd (E) and accelerate to 30 km/h', () => v.speed * 3.6 > 30 && (auto || v.gear >= 2)],
-        [de ? 'Bis zum Stillstand bremsen (S)' : 'Brake to a standstill (S)', () => Math.abs(v.speed) < 0.1],
-        [de ? (auto ? 'Rückwärtsgang: R – und ein Stück zurücksetzen' : 'Rückwärtsgang: R – und ein Stück zurücksetzen') : 'Reverse gear: R – and back up a little', () => v.speed < -1],
-        [de ? 'Anhalten und Handbremse anziehen (Leertaste)' : 'Stop and apply the handbrake (Space)', () => Math.abs(v.speed) < 0.1 && c.handbrake > 0.5],
+        ['basics.belt', () => c.seatbelt],
+        [auto ? 'basics.startAuto' : 'basics.startManual', () => v.engineRunning],
+        [auto ? 'basics.gearAuto' : 'basics.gearManual', () => (auto ? c.gear === 1 : v.gear === 1)],
+        ['basics.handbrake', () => c.handbrake < 0.5],
+        ['basics.pullAway', () => v.speed * 3.6 > 15],
+        [auto ? 'basics.accelAuto' : 'basics.accelManual', () => v.speed * 3.6 > 30 && (auto || v.gear >= 2)],
+        ['basics.brake', () => Math.abs(v.speed) < 0.1],
+        ['basics.reverse', () => v.speed < -1],
+        ['basics.stop', () => Math.abs(v.speed) < 0.1 && c.handbrake > 0.5],
       ];
       if (this.basicsStep < steps.length && steps[this.basicsStep][1]()) {
         this.basicsStep++;
@@ -614,7 +634,7 @@ export class Game {
         this.finish();
         return;
       }
-      this.lessonLine = `${this.basicsStep + 1}/${steps.length} · ${steps[this.basicsStep][0]}`;
+      this.lessonLine = `${this.basicsStep + 1}/${steps.length} · ${tr(steps[this.basicsStep][0], lang)}`;
       return;
     }
     // routed lessons and the exam
@@ -651,7 +671,7 @@ export class Game {
       this.audio.click('chime');
       if (this.targetIdx >= l.targets.length) this.finish();
     }
-    this.lessonLine = `${l.title[lang === 'de' ? 0 : 1]} · ${this.targetIdx + 1}/${l.targets.length}`;
+    this.lessonLine = `${lessonTitle(l.id, lang)} · ${this.targetIdx + 1}/${l.targets.length}`;
   }
 
   private lessonLine = '';
@@ -673,6 +693,7 @@ export class Game {
       const want = this.settings.touchControls;
       this.inputMode = want === 'on' ? 'touch' : want === 'off' ? 'keys' : this.input.mode;
       this.hud.setInputMode(this.inputMode);
+      setKeyStyle(this.inputMode);
       this.stepDrive(dt);
       if (this.autoNotice && this.time - this.startTime > 0.3) {
         const kind = this.autoNotice;
@@ -908,14 +929,8 @@ export class Game {
       yaw: v.yaw,
     };
     if (!navText && !this.lesson) {
-      hs.navText = ctx.roadName || (lang === 'de' ? 'Freie Fahrt' : 'Free drive');
-      hs.navSub = touch
-        ? lang === 'de'
-          ? 'Hier tippen: Menü · Karte antippen: echte Fotos'
-          : 'Tap here: menu · tap the map: real photos'
-        : lang === 'de'
-          ? 'M: Fahrt beenden und auswerten · F: echte Fotos dieser Stelle'
-          : 'M: end the drive, show the result · F: real photos of this place';
+      hs.navText = ctx.roadName || tr('free', lang);
+      hs.navSub = tr(touch ? 'navSubTouch' : 'navSubKeys', lang);
       hs.navArrow = 0;
     }
     this.hud.update(hs, this.time);
@@ -929,7 +944,7 @@ export class Game {
     if (!stage || what === 'navFollow' || key === this.lastNavSpoken) return;
     this.lastNavSpoken = key;
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = this.settings.lang === 'de' ? 'de-DE' : 'en-GB';
+    u.lang = localeOf(this.settings.lang);
     u.volume = this.settings.volume;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
