@@ -80,6 +80,7 @@ unzip -o Baunatal-LoD2.zip -d data/raw/lod2
 npm run map:extract   # schneidet das Kartenrechteck aus dem PBF (eigener PBF-Leser, ~4 min)
 npm run map:lod2      # liest das CityGML ein (~1,5 min)
 npm run map:build     # baut Netz, Höhen, Vorfahrt, Schilder, Gebäude, Kacheln (~3 min)
+npm run map:addresses # Adressliste (Hausnummern aus OSM) für „Start an einer Adresse“ (~20 s)
 ```
 
 Die aktuellen Download-Adressen der HVBG enthalten ein Datum; die Verzeichnisstruktur lässt sich auch

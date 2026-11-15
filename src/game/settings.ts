@@ -41,6 +41,16 @@ export interface Settings {
    * a request tells the service the player's IP address and the place.
    */
   reality: { panoramax: boolean; kartaview: boolean; mapillary: boolean; mapillaryToken: string };
+  /**
+   * Driving controls on the screen (steering bar, pedals, buttons):
+   * 'auto' shows them while the screen is being touched and hides them as soon
+   * as a keyboard is used; 'on' / 'off' force them.
+   */
+  touchControls: 'auto' | 'on' | 'off';
+  /** how solid the on-screen controls are drawn, 0.15 … 1 */
+  touchOpacity: number;
+  /** short reminder of the keys while standing or crawling (keyboard only) */
+  keyHints: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -57,6 +67,9 @@ export const DEFAULT_SETTINGS: Settings = {
   wheel: { steerAxis: 0, throttleAxis: 2, brakeAxis: 5, clutchAxis: 1, pedalsInverted: true, wheelRange: 900, shifter: [12, 13, 14, 15, 16, 17, 18] },
   invertLookY: false,
   reality: { panoramax: false, kartaview: false, mapillary: false, mapillaryToken: '' },
+  touchControls: 'auto',
+  touchOpacity: 0.55,
+  keyHints: true,
 };
 
 const KEY = 'fahrsim-baunatal.settings.v1';

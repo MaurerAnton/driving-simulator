@@ -20,6 +20,8 @@ import { PropRenderer } from '../render/props.ts';
 import { SignRenderer } from '../render/signs.ts';
 import type { LoadedTile } from '../render/tiles.ts';
 import { latLonToWorld, worldToLatLon } from '../geo/utm.ts';
+import { AddressIndex, findRoadSpot, mainNetwork } from './address.ts';
+import type { AddressHit, AddressJson } from './address.ts';
 import { Hud } from '../ui/hud.ts';
 import type { HudState } from '../ui/hud.ts';
 import { tr } from '../ui/i18n.ts';
@@ -131,9 +133,12 @@ export class Game {
     this.hud = new Hud(this.ui, this.settings, world);
     this.input = new Input(app.canvas, this.settings);
     this.input.onAction((a) => this.onAction(a));
-    this.hud.onStart = (req) => this.begin(req.mode, req.spawn);
+    this.hud.onStart = (req) => this.begin(req.mode, req.spawn, false, req.address);
     this.hud.onResume = () => this.resume();
     this.hud.onReality = () => this.openReality();
+    this.hud.onPause = () => this.pause();
+    this.hud.loadAddresses = () => this.loadAddresses();
+    this.hud.onTeleport = (hit) => this.teleportTo(hit);
     this.reality = new RealityPanel(this.ui, {
       settings: this.settings,
       saveSettings: () => saveSettings(this.settings),
@@ -152,7 +157,7 @@ export class Game {
       this.audio.click('chime');
       if (v.severity === 'fail' && this.lesson?.kind === 'exam' && this.failT < 0) this.failT = this.time + 2.5;
     };
-    if (window.matchMedia('(pointer: coarse)').matches) this.hud.enableTouch(this.input);
+    this.hud.attachInput(this.input);
     // test overrides (not saved): ?quality=low|medium|high&mirrors=off|alternate|full&traffic=0..1
     const qq = q.get('quality');
     if (qq === 'low' || qq === 'medium' || qq === 'high') this.settings.quality = qq;
@@ -176,6 +181,11 @@ export class Game {
     // ?reality=1|test opens the reality view once the drive has started ("test": with a drawn panorama),
     // ?rv=panoramax,kartaview switches services on for this visit
     this.autoReality = q.get('reality') ?? '';
+    // ?notice=red|yellow|both shows sample notices, ?touch=on|off forces the on-screen controls,
+    // ?addr=<street and number> starts at that address
+    this.autoNotice = q.get('notice') ?? '';
+    const tc = q.get('touch');
+    if (tc === 'on' || tc === 'off' || tc === 'auto') this.settings.touchControls = tc;
     for (const s of (q.get('rv') ?? '').split(',')) {
       if (s === 'panoramax' || s === 'kartaview' || s === 'mapillary') this.settings.reality[s] = true;
     }
@@ -193,12 +203,19 @@ export class Game {
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
     const start = q.get('start');
-    if (start) this.begin(start, Number(q.get('spawn') ?? 0), true);
+    const addr = q.get('addr');
+    if (start && addr) {
+      void this.loadAddresses().then((ix) => this.begin(start, Number(q.get('spawn') ?? 0), true, ix?.search(addr, 1)[0]));
+    } else if (start) this.begin(start, Number(q.get('spawn') ?? 0), true);
     else this.toMenu();
   }
 
   private debugLook: [number, number] | null = null;
+  private inputMode: 'touch' | 'keys' = 'keys';
+  private addressIndex: Promise<AddressIndex | null> | null = null;
+  private mainLanes: Set<number> | null = null;
   private autoReality = '';
+  private autoNotice = '';
   private realityFrames = 0;
   private reality!: RealityPanel;
 
@@ -263,11 +280,46 @@ export class Game {
 
   private readonly menuFocus = new THREE.Vector3();
 
-  private begin(mode: string, spawnIdx: number, skipIntro = false): void {
+  /** The address list (house numbers of the map), fetched when somebody first searches. */
+  private loadAddresses(): Promise<AddressIndex | null> {
+    this.addressIndex ??= fetch(`${this.app.baseUrl}addresses.json`)
+      .then(async (res) => (res.ok ? new AddressIndex((await res.json()) as AddressJson) : null))
+      .catch(() => null);
+    return this.addressIndex;
+  }
+
+  /** The spot on the road in front of an address, as a starting point. */
+  private spawnAt(hit: AddressHit): SpawnJson | null {
+    this.mainLanes ??= mainNetwork(this.app.world, this.lanes);
+    const spot = findRoadSpot(this.app.world, this.lanes, hit.x, hit.z, hit.street, 220, this.mainLanes);
+    return spot ? { ...spot, name: hit.label } : null;
+  }
+
+  /** Free drive: jump to an address (from the pause menu). */
+  private teleportTo(hit: AddressHit): void {
+    if (this.state !== 'pause' || this.lesson) return;
+    const spot = this.spawnAt(hit);
+    if (!spot) {
+      this.hud.showPause();
+      this.hud.message(tr('addressNoRoad', this.settings.lang), hit.label);
+      return;
+    }
+    this.spawn = spot;
+    this.traffic.clear();
+    this.vehicle.vel.fill(0);
+    this.vehicle.angVel.fill(0);
+    this.input.c.handbrake = 1;
+    this.state = 'placing';
+    this.car.root.visible = false;
+    this.hud.showLoading(tr('loadingTiles', this.settings.lang));
+  }
+
+  private begin(mode: string, spawnIdx: number, skipIntro = false, address?: AddressHit): void {
     const world = this.app.world;
     this.audio.start();
-    this.spawn = world.json.spawns[Math.max(0, Math.min(world.json.spawns.length - 1, spawnIdx))] ?? { name: '', x: 0, z: 0, yaw: 0, kind: 'street' };
+    this.spawn = (address ? this.spawnAt(address) : null) ?? world.json.spawns[Math.max(0, Math.min(world.json.spawns.length - 1, spawnIdx))] ?? { name: '', x: 0, z: 0, yaw: 0, kind: 'street' };
     this.lesson = LESSONS.find((l) => l.id === mode) ?? null;
+    this.hud.canTeleport = !this.lesson;
     const spec = this.settings.transmission === 'automatic' ? COMPACT_CAR_AUTOMATIC : this.settings.transmission === 'assist' ? COMPACT_CAR_AUTOCLUTCH : COMPACT_CAR;
     this.vehicle = new Vehicle(spec, this.ground);
     this.input.setAutomatic(spec.transmission === 'automatic');
@@ -281,6 +333,7 @@ export class Game {
     c.seatbelt = !cold;
     this.vehicle.resetDrivetrain(!cold);
     this.rules.reset();
+    this.hud.clearNotices();
     this.rules.strict = this.lesson?.kind === 'exam';
     this.traffic.clear();
     this.nav.clear();
@@ -573,7 +626,14 @@ export class Game {
       if (!goal) {
         // nothing suitable in reach: skip this part
         this.targetIdx++;
-        if (this.targetIdx >= l.targets.length) this.finish();
+        if (this.targetIdx >= l.targets.length) {
+          if (this.visited.size === 0 && this.time - this.startTime < 20) {
+            // not a single destination from this starting point: drive freely instead of ending at once
+            this.lesson = null;
+            this.hud.canTeleport = true;
+            this.hud.message(tr('lessonNoRoute', lang));
+          } else this.finish();
+        }
         return;
       }
       this.visited.add(goal);
@@ -609,7 +669,19 @@ export class Game {
       tiles.update(this.spawn!.x, this.spawn!.z);
       this.tryPlace();
     } else if (this.state === 'drive') {
+      // fingers or keys: follows what the driver last used, unless the settings say otherwise
+      const want = this.settings.touchControls;
+      this.inputMode = want === 'on' ? 'touch' : want === 'off' ? 'keys' : this.input.mode;
+      this.hud.setInputMode(this.inputMode);
       this.stepDrive(dt);
+      if (this.autoNotice && this.time - this.startTime > 0.3) {
+        const kind = this.autoNotice;
+        this.autoNotice = '';
+        // (they stay: the automated check may take minutes for a frame)
+        const show = (id: string, severity: 'fail' | 'minor', data: Record<string, number> = {}): void => this.hud.toast({ id, severity, time: this.time, x: 0, z: 0, data }, 3600);
+        if (kind !== 'yellow') show('redLight', 'fail');
+        if (kind !== 'red') show('speed', 'minor', { limit: 30, speed: 42 });
+      }
       if (this.autoReality && this.time - this.startTime > 0.3) {
         const mode = this.autoReality;
         this.autoReality = '';
@@ -789,15 +861,22 @@ export class Game {
       if (h.lane !== 0) navText += ` – ${tr(h.lane < 0 ? 'laneLeft' : 'laneRight', lang)}`;
     } else if (this.lesson?.kind === 'basics') navText = this.lessonLine;
     let tip = this.time < this.tipUntil ? this.tipText : '';
+    // on a touch screen the tip says what to tap – and is itself the button for it
+    let tipAction = '';
+    const touch = this.inputMode === 'touch';
+    const say = (key: string, action: string): void => {
+      tip = tr(touch ? `${key}Touch` : key, lang);
+      tipAction = action;
+    };
     if (!tip) {
-      if (!v.engineRunning) tip = tr(this.rules.log.some((x) => x.id === 'stall' && this.time - x.time < 6) ? 'engineStalled' : 'startEngine', lang);
-      else if (!c.seatbelt && Math.abs(kmh) < 5) tip = tr('fastenBelt', lang);
-      else if (c.handbrake > 0.5 && c.throttle > 0.1) tip = tr('releaseHandbrake', lang);
-      else if (c.throttle > 0.1 && Math.abs(kmh) < 2 && (s.automatic ? c.gear === -2 || c.gear === 0 : v.gear === 0)) tip = tr(s.automatic ? 'selectDrive' : 'selectGear', lang);
+      if (!v.engineRunning) say(this.rules.log.some((x) => x.id === 'stall' && this.time - x.time < 6) ? 'engineStalled' : 'startEngine', 'Enter');
+      else if (!c.seatbelt && Math.abs(kmh) < 5) say('fastenBelt', 'KeyB');
+      else if (c.handbrake > 0.5 && c.throttle > 0.1) say('releaseHandbrake', 'Space');
+      else if (c.throttle > 0.1 && Math.abs(kmh) < 2 && (s.automatic ? c.gear === -2 || c.gear === 0 : v.gear === 0)) say(s.automatic ? 'selectDrive' : 'selectGear', 'KeyE');
       else {
         const lane = this.currentLane();
         if (lane && lane.to.ctrl === CTRL.MAP_END && lane.len - this.laneFront() < 120) tip = tr('offMap', lang);
-        else if (!ctx.onRoad && Math.abs(kmh) < 3 && this.time - this.lastGood.t > 6) tip = tr('resetHint', lang);
+        else if (!ctx.onRoad && Math.abs(kmh) < 3 && this.time - this.lastGood.t > 6) say('resetHint', 'KeyT');
       }
     }
     const gearText = s.automatic ? (c.gear === -2 ? 'P' : c.gear === -1 ? 'R' : c.gear === 0 ? 'N' : `D${v.gear}`) : v.gear === -1 ? 'R' : v.gear === 0 ? 'N' : String(v.gear);
@@ -811,11 +890,17 @@ export class Game {
       navText,
       navSub: this.lesson && this.lesson.kind !== 'basics' ? this.lessonLine : ctx.roadName,
       navArrow: h.arrow,
+      navActive: !!this.lesson && h.dist >= 0 && h.what !== 'navFollow' && h.what !== 'routeDone',
       tip,
+      tipAction,
       showDash: this.cameraMode !== 'cockpit',
       indicator: c.indicator,
       hazard: c.hazard,
       blinkOn: s.blinkOn,
+      handbrake: c.handbrake > 0.5,
+      seatbelt: c.seatbelt,
+      engineOn: v.engineRunning,
+      lights: c.lowBeam,
       points: this.rules.points,
       faults: this.rules.log.filter((x) => x.severity !== 'hint').length,
       x: this.mpos[0],
@@ -824,7 +909,13 @@ export class Game {
     };
     if (!navText && !this.lesson) {
       hs.navText = ctx.roadName || (lang === 'de' ? 'Freie Fahrt' : 'Free drive');
-      hs.navSub = lang === 'de' ? 'M: Fahrt beenden und auswerten · F: echte Fotos dieser Stelle' : 'M: end the drive, show the result · F: real photos of this place';
+      hs.navSub = touch
+        ? lang === 'de'
+          ? 'Hier tippen: Menü · Karte antippen: echte Fotos'
+          : 'Tap here: menu · tap the map: real photos'
+        : lang === 'de'
+          ? 'M: Fahrt beenden und auswerten · F: echte Fotos dieser Stelle'
+          : 'M: end the drive, show the result · F: real photos of this place';
       hs.navArrow = 0;
     }
     this.hud.update(hs, this.time);

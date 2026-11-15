@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /** Menus and the in-game HUD (plain DOM, no framework). */
+import type { AddressHit, AddressIndex } from '../game/address.ts';
 import { LESSONS } from '../game/nav.ts';
 import type { Settings } from '../game/settings.ts';
 import { saveSettings } from '../game/settings.ts';
@@ -10,6 +11,8 @@ import type { Lane } from '../world/lanes.ts';
 import { CTRL, ROLE } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
 import type { World } from '../world/world.ts';
+import { addressPicker } from './addresspicker.ts';
+import { NoticeBoard, noticeColour } from './notices.ts';
 import { VIOLATIONS, tr, violationTitle, violationWhy } from './i18n.ts';
 import type { Lang } from './i18n.ts';
 
@@ -24,11 +27,19 @@ export interface HudState {
   navText: string;
   navSub: string;
   navArrow: number;
+  /** a turn is announced (so a notice must not hide it) */
+  navActive: boolean;
   tip: string;
+  /** what tapping the tip does on a touch screen: a key code ('' = nothing) */
+  tipAction: string;
   showDash: boolean;
   indicator: number;
   hazard: boolean;
   blinkOn: boolean;
+  handbrake: boolean;
+  seatbelt: boolean;
+  engineOn: boolean;
+  lights: boolean;
   points: number;
   faults: number;
   x: number;
@@ -39,6 +50,8 @@ export interface HudState {
 export interface StartRequest {
   mode: string;
   spawn: number;
+  /** start at this address instead of one of the car parks */
+  address?: AddressHit;
 }
 
 export interface ResultSummary {
@@ -80,7 +93,14 @@ export class Hud {
   private roundel!: HTMLElement;
   private zone!: HTMLElement;
   private prio!: HTMLElement;
-  private toasts!: HTMLElement;
+  /**
+   * Notices (faults, hints) take the place of the street name; if several are
+   * current, the gravest one shows.
+   */
+  private readonly notices = new NoticeBoard();
+  private navExtra!: HTMLElement;
+  private navMeta!: HTMLElement;
+  private noticeShown: object | null = null;
   private dash!: HTMLElement;
   private dashV!: HTMLElement;
   private dashG!: HTMLElement;
@@ -88,8 +108,20 @@ export class Hud {
   private indL!: HTMLElement;
   private indR!: HTMLElement;
   private tip!: HTMLElement;
+  private tipAction = '';
   private score!: HTMLElement;
   private mapCanvas!: HTMLCanvasElement;
+  private keysBox!: HTMLElement;
+  private keysFor = '';
+  private input: Input | null = null;
+  private mode: 'touch' | 'keys' = 'keys';
+  private readonly lit = new Map<string, HTMLElement>();
+  private moreBox: HTMLElement | null = null;
+  private last: HudState | null = null;
+  /** free drive: the pause menu offers to jump to an address */
+  canTeleport = false;
+  /** fetches the address list when somebody starts typing an address */
+  loadAddresses: () => Promise<AddressIndex | null> = async () => null;
   private lastDom = 0;
   private lastMap = 0;
   private lastPrio = '';
@@ -97,6 +129,8 @@ export class Hud {
   onResume: () => void = () => {};
   onQuit: () => void = () => {};
   onReality: () => void = () => {};
+  onPause: () => void = () => {};
+  onTeleport: (a: AddressHit) => void = () => {};
   onSettingsChanged: () => void = () => {};
   routeLanes: Lane[] = [];
 
@@ -160,8 +194,30 @@ export class Hud {
       selSpawn.append(op);
     });
     selSpawn.value = String(spawn);
-    selSpawn.onchange = () => (spawn = Number(selSpawn.value));
+    let address: AddressHit | undefined;
+    const atAddress = el('option');
+    atAddress.value = 'address';
+    selSpawn.onchange = () => {
+      if (selSpawn.value === 'address') return;
+      spawn = Number(selSpawn.value);
+      address = undefined;
+    };
     rowSpawn.append(el('label', '', this.t('startPoint')), selSpawn);
+    // … or anywhere: street and house number
+    const rowAddr = el('div', 'row');
+    const picker = addressPicker({
+      placeholder: this.t('addressPlaceholder'),
+      loading: this.t('realityLoading'),
+      none: this.t('addressNone'),
+      load: () => this.loadAddresses(),
+      pick: (hit) => {
+        address = hit;
+        atAddress.textContent = hit.label;
+        if (!atAddress.parentNode) selSpawn.append(atAddress);
+        selSpawn.value = 'address';
+      },
+    });
+    rowAddr.append(el('label', '', this.t('startAddress')), picker.node);
     const rowTr = el('div', 'row');
     const selTr = el('select');
     for (const [v, k] of [['assist', 'trAssist'], ['manual', 'trManual'], ['automatic', 'trAutomatic']]) {
@@ -176,14 +232,14 @@ export class Hud {
       saveSettings(this.settings);
     };
     rowTr.append(el('label', '', this.t('transmission')), selTr);
-    opts.append(rowSpawn, rowTr);
+    opts.append(rowSpawn, rowAddr, rowTr);
     p.append(opts);
 
     p.append(el('h2', '', this.t('start')));
     const cards = el('div', 'cards');
     const card = (title: string, desc: string, mode: string): void => {
       const c = el('button', 'card', `<b>${title}</b><small>${desc}</small>`);
-      c.onclick = () => this.onStart({ mode, spawn });
+      c.onclick = () => this.onStart({ mode, spawn, address });
       cards.append(c);
     };
     card(this.t('free'), this.t('freeDesc'), 'free');
@@ -268,6 +324,9 @@ export class Hud {
     select(this.t('mirrors'), s.mirrors, [['off', this.t('mOff')], ['alternate', this.t('mAlt')], ['full', this.t('mFull')]], (v) => (s.mirrors = v as Settings['mirrors']));
     range(this.t('traffic'), s.traffic, (v) => (s.traffic = v));
     range(this.t('volume'), s.volume, (v) => (s.volume = v));
+    select(this.t('touchControls'), s.touchControls, [['auto', this.t('tcAuto')], ['on', this.t('tcOn')], ['off', this.t('tcOff')]], (v) => (s.touchControls = v as Settings['touchControls']));
+    range(this.t('touchOpacity'), s.touchOpacity, (v) => (s.touchOpacity = Math.max(0.15, v)));
+    check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
     check(this.t('hudRules'), s.hudRules, (v) => (s.hudRules = v));
     check(this.t('hudGear'), s.hudGear, (v) => (s.hudGear = v));
     check(this.t('voice'), s.voice, (v) => (s.voice = v));
@@ -297,7 +356,7 @@ export class Hud {
       ['<kbd>H</kbd>', de ? 'Hupe' : 'Horn'],
       ['<kbd>V</kbd>', de ? 'Kamera wechseln' : 'Change camera'],
       ['<kbd>T</kbd>', de ? 'Auto zurück auf die Straße setzen' : 'Put the car back on the road'],
-      ['<kbd>F</kbd>', de ? 'Realansicht: echte Fotos dieser Stelle' : 'Reality view: real photos of this place'],
+      ['<kbd>F</kbd>', de ? 'Realansicht: echte Fotos dieser Stelle (oder die Karte anklicken)' : 'Reality view: real photos of this place (or click the map)'],
       ['<kbd>Esc</kbd>', de ? 'Pause' : 'Pause'],
     ];
     const o = el('div', 'overlay');
@@ -306,6 +365,15 @@ export class Hud {
     const table = el('table', 'keys');
     for (const [k, d] of rows) table.append(el('tr', '', `<td>${k}</td><td>${d}</td>`));
     p.append(table);
+    p.append(
+      el(
+        'p',
+        '',
+        de
+          ? '<b>Maus und Touchscreen:</b> Straßenname oben links antippen = Menü und Einstellungen, Karte antippen = Realansicht. Auf dem Touchscreen: links die Lenkleiste und die Blinker, rechts Gas, Bremse, Gänge (▲ ▼) und Handbremse (P); „⋯“ oben öffnet Gurt, Anlasser, Licht, Hupe, Kamera und mehr. Über das Bild wischen = umsehen (Schulterblick), loslassen = wieder geradeaus. Gelbe Hinweise unten lassen sich antippen. Deckkraft und Anzeige der Bedienelemente stehen in den Einstellungen.'
+          : '<b>Mouse and touch screen:</b> tap the street name at the top left for the menu and settings, tap the map for the reality view. On a touch screen: steering bar and indicators on the left; throttle, brake, gears (▲ ▼) and handbrake (P) on the right; "⋯" at the top opens seat belt, starter, lights, horn, camera and more. Swipe across the picture to look around (shoulder check), let go to look ahead again. Yellow tips at the bottom can be tapped. Opacity and visibility of the controls are in the settings.',
+      ),
+    );
     p.append(
       el(
         'p',
@@ -378,6 +446,7 @@ export class Hud {
     const o = el('div', 'overlay');
     const p = el('div', 'panel narrow');
     p.append(el('h1', '', this.t('paused')));
+    if (this.last) p.append(el('p', '', `${this.t('faults')}: ${this.last.faults} · ${this.t('points')}: ${this.last.points}`));
     const b = el('div', 'buttons');
     const r = el('button', 'btn', this.t('resume'));
     r.onclick = () => this.onResume();
@@ -389,11 +458,40 @@ export class Hud {
     q.onclick = () => this.onQuit();
     const f = el('button', 'btn ghost', this.t('realityButton'));
     f.onclick = () => this.onReality();
-    b.append(r, f, s, c, q);
+    b.append(r, f);
+    if (this.canTeleport) {
+      const a = el('button', 'btn ghost', this.t('teleport'));
+      a.onclick = () => this.showTeleport();
+      b.append(a);
+    }
+    b.append(s, c, q);
     p.append(b);
     o.append(p);
     this.setOverlay(o);
     r.focus();
+  }
+
+  /** Free drive: put the car in front of an address. */
+  showTeleport(): void {
+    const o = el('div', 'overlay');
+    const p = el('div', 'panel narrow');
+    p.append(el('h1', '', this.t('teleport')), el('p', '', this.t('teleportText')));
+    const picker = addressPicker({
+      placeholder: this.t('addressPlaceholder'),
+      loading: this.t('realityLoading'),
+      none: this.t('addressNone'),
+      load: () => this.loadAddresses(),
+      pick: (hit) => this.onTeleport(hit),
+    });
+    p.append(picker.node);
+    const b = el('div', 'buttons');
+    const back = el('button', 'btn ghost', this.t('back'));
+    back.onclick = () => this.showPause();
+    b.append(back);
+    p.append(b);
+    o.append(p);
+    this.setOverlay(o);
+    picker.input.focus();
   }
 
   showResult(r: ResultSummary): void {
@@ -437,14 +535,19 @@ export class Hud {
     const text = el('div', 'text');
     this.navText = el('b');
     this.navSub = el('small');
-    text.append(this.navText, this.navSub);
-    this.navBox.append(this.navArrow, text);
+    this.navMeta = el('em');
+    this.navExtra = el('small', 'next');
+    text.append(this.navText, this.navSub, this.navMeta, this.navExtra);
+    // tap / click: pause menu with the settings (there is no Esc key on a phone)
+    const burger = el('span', 'burger', '☰');
+    this.navBox.append(this.navArrow, text, burger);
+    this.navBox.title = this.t('menuHint');
+    this.navBox.onclick = () => this.onPause();
     const assist = el('div', 'assist');
     this.prio = el('div', 'prio');
     this.zone = el('div', 'zone');
     this.roundel = el('div', 'roundel');
     assist.append(this.prio, this.zone, this.roundel);
-    this.toasts = el('div', 'toasts');
     this.dash = el('div', 'dash');
     this.indL = el('span', 'ind', '◀');
     this.dashV = el('span', 'v', '0');
@@ -459,9 +562,13 @@ export class Hud {
     this.mapCanvas = el('canvas');
     this.mapCanvas.width = 220;
     this.mapCanvas.height = 220;
-    map.append(this.mapCanvas);
+    // tap / click on the map: real photographs of this place (the F key of the keyboard)
+    map.append(this.mapCanvas, el('span', 'cam', '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 4 7.5 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.5L15 4H9zm3 4.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>'));
+    map.title = this.t('realityButton');
+    map.onclick = () => this.onReality();
     this.score = el('div', 'score');
-    h.append(this.navBox, assist, this.toasts, this.dash, this.tip, map, this.score);
+    this.keysBox = el('div', 'keyhelp');
+    h.append(this.navBox, assist, this.dash, this.tip, map, this.score, this.keysBox);
     return h;
   }
 
@@ -469,22 +576,17 @@ export class Hud {
     this.hud.style.display = v ? '' : 'none';
   }
 
-  toast(v: Violation): void {
-    const t = el('div', `toast ${v.severity}`);
-    t.append(el('b', '', violationTitle(v.id, this.lang, v.data)), el('small', '', violationWhy(v.id, this.lang)), el('em', '', `${this.t(v.severity)} · ${VIOLATIONS[v.id]?.ref ?? ''}`));
-    this.toasts.prepend(t);
-    while (this.toasts.children.length > 3) this.toasts.lastChild?.remove();
-    const life = v.severity === 'hint' ? 5500 : 8000;
-    setTimeout(() => t.remove(), life);
+  /** A fault or hint of the rule monitor: shown in the block of the street name. */
+  toast(v: Violation, seconds = v.severity === 'hint' ? 5.5 : 8): void {
+    this.notices.add(violationTitle(v.id, this.lang, v.data), violationWhy(v.id, this.lang), `${this.t(v.severity)} · ${VIOLATIONS[v.id]?.ref ?? ''}`, v.severity, seconds, performance.now());
   }
 
   message(title: string, sub = ''): void {
-    const t = el('div', 'toast hint');
-    t.append(el('b', '', title));
-    if (sub) t.append(el('small', '', sub));
-    this.toasts.prepend(t);
-    while (this.toasts.children.length > 3) this.toasts.lastChild?.remove();
-    setTimeout(() => t.remove(), 6000);
+    this.notices.add(title, sub, '', 'hint', 6, performance.now());
+  }
+
+  clearNotices(): void {
+    this.notices.clear();
   }
 
   update(s: HudState, now: number): void {
@@ -492,11 +594,29 @@ export class Hud {
       this.lastDom = now;
       const rules = this.settings.hudRules;
       // navigation box
-      const hasNav = s.navText !== '';
-      this.navBox.style.display = hasNav ? '' : 'none';
-      if (hasNav) {
-        this.navArrow.textContent = s.navArrow < 0 ? '↰' : s.navArrow > 0 ? '↱' : '↑';
-        this.navText.textContent = s.navText;
+      const arrow = s.navArrow < 0 ? '↰' : s.navArrow > 0 ? '↱' : '↑';
+      const note = this.notices.current(performance.now());
+      if (note) {
+        // a fault or hint takes the place of the street name (red: serious, yellow: minor)
+        if (note !== this.noticeShown) {
+          this.noticeShown = note;
+          this.navBox.className = `nav alert ${noticeColour(note)}`;
+          this.navText.textContent = note.title;
+          this.navSub.textContent = note.why;
+          this.navMeta.textContent = note.meta;
+        }
+        // an announced turn stays readable underneath
+        this.navArrow.textContent = s.navActive ? arrow : '!';
+        this.navExtra.textContent = s.navActive ? `${arrow} ${s.navText}` : '';
+      } else {
+        if (this.noticeShown) {
+          this.noticeShown = null;
+          this.navBox.className = 'nav';
+          this.navMeta.textContent = '';
+          this.navExtra.textContent = '';
+        }
+        this.navArrow.textContent = arrow;
+        this.navText.textContent = s.navText || 'Fahrsim Baunatal';
         this.navSub.textContent = s.navSub;
       }
       // speed limit
@@ -533,9 +653,11 @@ export class Hud {
           this.prio.innerHTML = `<svg viewBox="0 0 60 88"><rect x="8" y="1" width="44" height="86" rx="8" fill="#111" stroke="#666"/>${lamp(st === SIG.RED || st === SIG.RED_AMBER, '#ff2a1a')}${lamp(st === SIG.AMBER || st === SIG.RED_AMBER, '#ffb000')}${lamp(st === SIG.GREEN, '#1aff6a')}</svg>`;
         } else this.prio.innerHTML = key ? ICON[key] : '';
       }
-      // dashboard strip (outside views only; the cockpit has real instruments)
-      this.dash.style.display = s.showDash ? '' : 'none';
-      if (s.showDash) {
+      // dashboard strip: outside views (the cockpit has real instruments) – and on a
+      // phone, where the instruments are too small to read
+      const showDash = s.showDash || this.mode === 'touch';
+      this.dash.style.display = showDash ? '' : 'none';
+      if (showDash) {
         this.dashV.textContent = String(Math.round(Math.abs(s.speedKmh)));
         this.dashG.textContent = s.gear;
         this.dashRpm.style.width = `${Math.min(100, (s.rpm / 7000) * 100).toFixed(0)}%`;
@@ -544,7 +666,30 @@ export class Hud {
       }
       this.tip.style.display = s.tip ? '' : 'none';
       this.tip.textContent = s.tip;
+      this.tipAction = s.tipAction;
+      this.tip.classList.toggle('tap', this.mode === 'touch' && s.tipAction !== '');
       this.score.innerHTML = `${this.t('faults')}: <b>${s.faults}</b> · ${this.t('points')}: <b>${s.points}</b>`;
+      this.last = s;
+      if (this.mode === 'touch') {
+        // the buttons show what is switched on
+        const on = (code: string, v: boolean): void => void this.lit.get(code)?.classList.toggle('on', v);
+        on('KeyZ', s.blinkOn && (s.hazard || s.indicator < 0));
+        on('KeyC', s.blinkOn && (s.hazard || s.indicator > 0));
+        on('Space', s.handbrake);
+        on('KeyB', s.seatbelt);
+        on('KeyI', s.engineOn);
+        on('KeyL', s.lights);
+        on('KeyX', s.hazard);
+      } else {
+        // key reminder: while standing or crawling, out of the way once the car is rolling
+        const want = this.settings.keyHints && Math.abs(s.speedKmh) < 12;
+        this.keysBox.classList.toggle('show', want);
+        const key = `${this.lang}:${this.settings.transmission}`;
+        if (want && key !== this.keysFor) {
+          this.keysFor = key;
+          this.keysBox.innerHTML = this.keyReminder();
+        }
+      }
     }
     if (now - this.lastMap > 0.12) {
       this.lastMap = now;
@@ -615,7 +760,16 @@ export class Hud {
   }
 
   // ------------------------------------------------------------- touch input
-  enableTouch(input: Input): void {
+  // ------------------------------------------------------- on-screen controls
+  /**
+   * Steering bar, pedals and buttons for driving with the fingers.  They are
+   * always built and shown only in touch mode (see setInputMode).
+   *
+   * Left thumb: steering, indicators.  Right thumb: pedals, gears, handbrake.
+   * Everything else is behind "⋯".  The middle of the screen stays free.
+   */
+  attachInput(input: Input): void {
+    this.input = input;
     const t = el('div', 'touch');
     const steer = el('div', 'steer');
     const knob = el('i');
@@ -624,7 +778,7 @@ export class Hud {
       const r = steer.getBoundingClientRect();
       const v = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
       input.touch.steer = v;
-      input.touch.active = true;
+      input.touched();
       knob.style.left = `${43 + v * 43}%`;
     };
     steer.onpointerdown = (e) => {
@@ -634,16 +788,18 @@ export class Hud {
     steer.onpointermove = (e) => {
       if (e.buttons || e.pointerType === 'touch') move(e);
     };
-    steer.onpointerup = () => {
+    const centre = (): void => {
       input.touch.steer = 0;
       knob.style.left = '43%';
     };
+    steer.onpointerup = centre;
+    steer.onpointercancel = centre;
     const pedal = (cls: string, label: string, set: (v: number) => void): HTMLElement => {
       const p = el('div', `pedal ${cls}`, label);
       const mv = (e: PointerEvent): void => {
         const r = p.getBoundingClientRect();
         set(Math.max(0.15, Math.min(1, 1 - (e.clientY - r.top) / r.height + 0.15)));
-        input.touch.active = true;
+        input.touched();
       };
       p.onpointerdown = (e) => {
         p.setPointerCapture(e.pointerId);
@@ -656,28 +812,118 @@ export class Hud {
       p.onpointercancel = () => set(0);
       return p;
     };
-    const key = (label: string, code: string, right: string, bottom: string): HTMLElement => {
-      const b = el('button', 'tb', label);
-      b.style.right = right;
-      b.style.bottom = bottom;
+    /** A button that stands in for a key: down while the finger is on it. */
+    const key = (cls: string, label: string, code: string, title = ''): HTMLElement => {
+      const b = el('button', cls, label);
+      if (title) b.title = title;
+      let held = false;
+      const up = (): void => {
+        if (!held) return;
+        held = false;
+        input.press(code, false);
+      };
       b.onpointerdown = (e) => {
         e.preventDefault();
-        window.dispatchEvent(new KeyboardEvent('keydown', { code }));
+        b.setPointerCapture(e.pointerId);
+        held = true;
+        input.press(code, true);
       };
-      b.onpointerup = () => window.dispatchEvent(new KeyboardEvent('keyup', { code }));
+      b.onpointerup = up;
+      b.onpointercancel = up;
+      this.lit.set(code, b);
       return b;
     };
+    // everything that is needed now and then
+    const more = el('div', 'more');
+    more.hidden = true;
+    const item = (label: string, code: string): void => {
+      const b = key('mb', label, code);
+      b.addEventListener('pointerup', () => {
+        // a toggle is done with one tap; what must be held (horn, starter, glance) keeps the sheet open
+        if (!['KeyH', 'Enter', 'KeyJ', 'KeyK'].includes(code)) more.hidden = true;
+      });
+      more.append(b);
+    };
+    item(this.t('tbBelt'), 'KeyB');
+    item(this.t('tbStarter'), 'Enter');
+    item(this.t('tbIgnition'), 'KeyI');
+    item(this.t('tbLights'), 'KeyL');
+    item(this.t('tbHighBeam'), 'KeyO');
+    item(this.t('tbHazard'), 'KeyX');
+    item(this.t('tbHorn'), 'KeyH');
+    item(this.t('tbLookLeft'), 'KeyJ');
+    item(this.t('tbLookRight'), 'KeyK');
+    item(this.t('tbCamera'), 'KeyV');
+    item(this.t('tbReset'), 'KeyT');
+    const menu = el('button', 'mb', this.t('tbMenu'));
+    menu.onclick = () => {
+      more.hidden = true;
+      this.onPause();
+    };
+    more.append(menu);
+    this.moreBox = more;
+    const dots = el('button', 'tb more-btn', '⋯');
+    dots.title = this.t('tbMore');
+    dots.onclick = () => (more.hidden = !more.hidden);
     t.append(
       steer,
-      pedal('gas', 'GAS', (v) => (input.touch.throttle = v)),
-      pedal('brk', 'BREMSE', (v) => (input.touch.brake = v)),
-      key('▲', 'KeyE', '38vw', '6vh'),
-      key('▼', 'KeyQ', '38vw', '20vh'),
-      key('◀', 'KeyZ', '46vw', '6vh'),
-      key('▶', 'KeyC', '46vw', '20vh'),
-      key('P', 'Space', '38vw', '34vh'),
-      key('⏻', 'Enter', '46vw', '34vh'),
+      pedal('gas', this.t('tbGas'), (v) => (input.touch.throttle = v)),
+      pedal('brk', this.t('tbBrake'), (v) => (input.touch.brake = v)),
+      key('tb ind-l', '◀', 'KeyZ', this.t('tbIndLeft')),
+      key('tb ind-r', '▶', 'KeyC', this.t('tbIndRight')),
+      key('tb gear-up', '▲', 'KeyE', this.t('tbGearUp')),
+      key('tb gear-dn', '▼', 'KeyQ', this.t('tbGearDown')),
+      key('tb hb', 'P', 'Space', this.t('tbHandbrake')),
+      dots,
+      more,
     );
     this.hud.append(t);
+    // the tip line doubles as a button: "fasten your seat belt – tap here"
+    let tipHeld = '';
+    const tipUp = (): void => {
+      if (tipHeld) input.press(tipHeld, false);
+      tipHeld = '';
+    };
+    this.tip.onpointerdown = (e) => {
+      if (!this.tipAction || this.mode !== 'touch') return;
+      e.preventDefault();
+      this.tip.setPointerCapture(e.pointerId);
+      tipHeld = this.tipAction;
+      input.press(tipHeld, true);
+    };
+    this.tip.onpointerup = tipUp;
+    this.tip.onpointercancel = tipUp;
+  }
+
+  /** Fingers or keys?  Shows the on-screen controls or the key reminder. */
+  setInputMode(mode: 'touch' | 'keys'): void {
+    const o = String(Math.max(0.15, Math.min(1, this.settings.touchOpacity)));
+    if (this.hud.style.getPropertyValue('--touch-opacity') !== o) this.hud.style.setProperty('--touch-opacity', o);
+    if (mode === this.mode) return;
+    this.mode = mode;
+    this.hud.classList.toggle('touchmode', mode === 'touch');
+    if (this.moreBox) this.moreBox.hidden = true;
+  }
+
+  /** The short reminder of the keys, depending on the gearbox chosen. */
+  private keyReminder(): string {
+    const de = this.lang === 'de';
+    const k = (...keys: string[]): string => keys.map((x) => `<kbd>${x}</kbd>`).join('');
+    const tr = this.settings.transmission;
+    const parts: string[] = [];
+    if (tr === 'automatic') {
+      parts.push(`${k('E', 'Q')} ${de ? 'Wählhebel P·R·N·D' : 'selector P·R·N·D'}`, `${k('P')} ${de ? 'Parken' : 'park'}`, `${k('R')} ${de ? 'rückwärts' : 'reverse'}`, `${k('N')} ${de ? 'Leerlauf' : 'neutral'}`);
+    } else {
+      if (tr === 'manual') parts.push(`${k(de ? 'Umschalt' : 'Shift')} ${de ? 'Kupplung' : 'clutch'}`);
+      parts.push(`${k('1')}–${k('6')} ${de ? 'Gang' : 'gear'}`, `${k('R')} ${de ? 'rückwärts' : 'reverse'}`, `${k('N')} ${de ? 'Leerlauf' : 'neutral'}`, `${k('E', 'Q')} ${de ? 'hoch / runter' : 'up / down'}`);
+    }
+    parts.push(
+      `${k(de ? 'Leertaste' : 'Space')} ${de ? 'Handbremse' : 'handbrake'}`,
+      `${k('Enter')} ${de ? 'Motor starten' : 'start engine'}`,
+      `${k('Y', 'C')} ${de ? 'Blinker' : 'indicators'}`,
+      `${k('J', 'K')} ${de ? 'Schulterblick' : 'shoulder check'}`,
+      `${k('F1')} ${de ? 'alle Tasten' : 'all keys'}`,
+    );
+    return parts.map((x) => `<span>${x}</span>`).join('');
   }
 }

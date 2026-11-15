@@ -3,7 +3,9 @@
 //   node tools/dev/shot.mjs "<query string>" out.png [width] [height] [extraWaitMs]
 // Needs a running dev/preview server (default http://127.0.0.1:5173) and a
 // Chromium binary (CHROME_BIN, or the one Playwright cached).
-// Environment: FS_URL, FS_TIMEOUT (ms), FS_FILES (pictures for the reality view, separated like PATH).
+// Environment: FS_URL, FS_TIMEOUT (ms), FS_FILES (pictures for the reality view, separated like PATH),
+// FS_MOBILE=1 (a phone: touch screen, no mouse), FS_FILL="<selector>=<text>" (type into a field and wait
+// for FS_WAIT_FOR, a selector), FS_CLICK="<selector>" (then click).
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -31,7 +33,8 @@ const browser = await chromium.launch({
   headless: true,
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl', '--no-sandbox'],
 });
-const page = await browser.newPage({ viewport: { width: Number(w), height: Number(h) }, deviceScaleFactor: 1 });
+const mobile = !!process.env.FS_MOBILE;
+const page = await browser.newPage({ viewport: { width: Number(w), height: Number(h) }, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
 const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
@@ -56,6 +59,12 @@ if (process.env.FS_FILES) {
     }, null, { timeout: 240000 })
     .catch((e) => logs.push(`[shot] the files did not show: ${e.message.split('\n')[0]}`));
 }
+if (process.env.FS_FILL) {
+  const at = process.env.FS_FILL.indexOf('=');
+  await page.fill(process.env.FS_FILL.slice(0, at), process.env.FS_FILL.slice(at + 1));
+  if (process.env.FS_WAIT_FOR) await page.waitForSelector(process.env.FS_WAIT_FOR, { timeout: 120000 }).catch((e) => logs.push(`[shot] ${e.message.split('\n')[0]}`));
+}
+if (process.env.FS_CLICK) await page.click(process.env.FS_CLICK, { timeout: 120000 }).catch((e) => logs.push(`[shot] ${e.message.split('\n')[0]}`));
 await page.waitForTimeout(Number(extra));
 await page.screenshot({ path: out, timeout: 240000 });
 const info = await page.evaluate(() => (window.__fs ? window.__fs.info() : null)).catch(() => null);

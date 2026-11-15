@@ -68,6 +68,16 @@ export class Input {
   private gearMax = 6;
   /** touch state, written by the on-screen controls */
   touch = { active: false, steer: 0, throttle: 0, brake: 0 };
+  /**
+   * What the driver is using right now: fingers on the screen or keys.
+   * It follows the last real input, so a tablet with a keyboard works both ways.
+   */
+  mode: 'touch' | 'keys' = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches ? 'touch' : 'keys';
+  /** a finger glance: the view swings back when the finger lifts */
+  private glance = false;
+  private lookId = -1;
+  private lookX = 0;
+  private lookY = 0;
   /** suspend driving input (menus) */
   enabled = true;
   lastGamepadId = '';
@@ -78,15 +88,42 @@ export class Input {
     window.addEventListener('keyup', (e) => this.onKey(e, false));
     window.addEventListener('blur', () => this.keys.clear());
     canvas.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse' && e.button === 0) this.dragging = true;
+      if (e.pointerType === 'mouse') {
+        if (e.button === 0) this.dragging = true;
+        return;
+      }
+      // a finger on the view: swipe to glance left or right (shoulder check), let go to look ahead again
+      this.mode = 'touch';
+      if (this.lookId >= 0) return;
+      this.lookId = e.pointerId;
+      this.lookX = e.clientX;
+      this.lookY = e.clientY;
+      this.dragging = true;
+      this.glance = true;
     });
-    window.addEventListener('pointerup', () => {
-      this.dragging = false;
-    });
+    const release = (e: PointerEvent): void => {
+      if (e.pointerType === 'mouse') this.dragging = false;
+      else if (e.pointerId === this.lookId) {
+        this.lookId = -1;
+        this.dragging = false;
+      }
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
     canvas.addEventListener('pointermove', (e) => {
-      if (!this.dragging || e.pointerType !== 'mouse') return;
-      this.mouseLookYaw = clamp(this.mouseLookYaw - e.movementX * 0.005, -2.6, 2.6);
-      this.mouseLookPitch = clamp(this.mouseLookPitch - e.movementY * 0.004 * (settings.invertLookY ? -1 : 1), -0.8, 0.6);
+      if (!this.dragging) return;
+      const inv = settings.invertLookY ? -1 : 1;
+      if (e.pointerType === 'mouse') {
+        this.mouseLookYaw = clamp(this.mouseLookYaw - e.movementX * 0.005, -2.6, 2.6);
+        this.mouseLookPitch = clamp(this.mouseLookPitch - e.movementY * 0.004 * inv, -0.8, 0.6);
+      } else if (e.pointerId === this.lookId) {
+        // a thumb travels less than a mouse: a third of the screen is a full shoulder check
+        const k = 5.4 / Math.max(320, window.innerWidth);
+        this.mouseLookYaw = clamp(this.mouseLookYaw + (e.clientX - this.lookX) * k, -2.6, 2.6);
+        this.mouseLookPitch = clamp(this.mouseLookPitch + (e.clientY - this.lookY) * k * 0.5 * inv, -0.8, 0.6);
+        this.lookX = e.clientX;
+        this.lookY = e.clientY;
+      }
     });
     canvas.addEventListener('dblclick', () => {
       this.mouseLookYaw = 0;
@@ -96,6 +133,18 @@ export class Input {
 
   onAction(fn: (a: Action) => void): void {
     this.actions.push(fn);
+  }
+
+  /** The on-screen controls are being used. */
+  touched(): void {
+    this.mode = 'touch';
+    this.touch.active = true;
+  }
+
+  /** A button on the screen stands in for a key (down / up). */
+  press(code: string, down: boolean): void {
+    this.mode = 'touch';
+    this.onKey(new KeyboardEvent(down ? 'keydown' : 'keyup', { code }), down);
   }
 
   private fire(a: Action): void {
@@ -115,6 +164,11 @@ export class Input {
       if (e.repeat) {
         if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
         return;
+      }
+      // a real key (the on-screen buttons send untrusted ones): the driver is on the keyboard now
+      if (e.isTrusted && !e.ctrlKey && !e.metaKey && !e.altKey && code !== 'Escape') {
+        this.mode = 'keys';
+        this.touch.active = false;
       }
       this.keys.add(code);
       if (code === 'Escape') this.fire('pause');
@@ -270,6 +324,12 @@ export class Input {
     if (c.starter) c.ignition = true;
     c.horn = this.key('KeyH') || (pad?.horn ?? false);
 
+    // a finger glance swings back by itself
+    if (this.glance && !this.dragging) {
+      this.mouseLookYaw = approach(this.mouseLookYaw, 0, dt * 5);
+      this.mouseLookPitch = approach(this.mouseLookPitch, 0, dt * 2.5);
+      if (this.mouseLookYaw === 0 && this.mouseLookPitch === 0) this.glance = false;
+    }
     // shoulder check / look around
     let yaw = this.mouseLookYaw;
     const lookL = this.key('KeyJ');

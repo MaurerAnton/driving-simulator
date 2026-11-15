@@ -40,7 +40,11 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 - **Realansicht:** „Wie sieht es hier in echt aus?“ – Taste `F` zeigt echte Straßenfotos der Stelle, an der
   das Auto steht: aus den freien Bilddiensten Panoramax, KartaView und Mapillary oder aus eigenen Bildern
   (auch 360°-Panoramen, wie sie Street-View-Downloader speichern). Mehr dazu [unten](#realansicht).
-- Tastatur, Gamepad, **Lenkrad mit Pedalen und H-Schaltung** (Gamepad-API), Touch. Deutsch und Englisch.
+- **Start an jeder Adresse:** Straße und Hausnummer eintippen (rund 8 500 Hausnummern in 530 Straßen aus
+  OpenStreetMap) – das Auto steht am Straßenrand vor dem Haus. In der freien Fahrt auch als Sprung aus dem
+  Pausenmenü.
+- Tastatur, Gamepad, **Lenkrad mit Pedalen und H-Schaltung** (Gamepad-API) und **Touchscreen** – auf dem
+  Smartphone ist alles ohne Tastatur erreichbar. Deutsch und Englisch.
 
 ## Steuerung (Tastatur)
 
@@ -58,6 +62,32 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 | `B` · `L` `O` · `H` | Gurt · Abblend-/Fernlicht · Hupe |
 | `V` · `T` · `Esc` | Kamera · Auto zurück auf die Straße · Pause |
 | `F` | Realansicht: echte Fotos dieser Stelle |
+
+Beim Fahren mit der Tastatur blendet der Simulator im Stand eine kurze Tastenhilfe ein (Gänge, Handbremse,
+Blinker …); sie verschwindet, sobald das Auto rollt, und lässt sich in den Einstellungen abschalten.
+
+### Maus und Touchscreen
+
+| Antippen / Anklicken | Funktion |
+| --- | --- |
+| Straßenname oben links | Pausenmenü mit Einstellungen, Steuerung, Sprung zu einer Adresse |
+| Karte | Realansicht: echte Fotos dieser Stelle |
+| Über das Bild wischen | umsehen (Schulterblick); loslassen = wieder geradeaus |
+| Gelber Hinweis unten | führt den Hinweis aus (anschnallen, Motor starten, Handbremse lösen …) |
+
+Auf dem Touchscreen liegen links die Lenkleiste und die Blinker, rechts Gas, Bremse, Gänge (▲ ▼) und
+Handbremse (P); „⋯“ oben öffnet Gurt, Anlasser, Licht, Warnblinker, Hupe, Kamera und mehr. Die Mitte des
+Bildes bleibt frei. Die Bedienelemente erscheinen automatisch, sobald der Bildschirm berührt wird, und
+verschwinden, sobald eine Tastatur benutzt wird (praktisch bei Tablets mit Tastatur); in den Einstellungen
+lassen sie sich dauerhaft ein- oder ausschalten und in der **Deckkraft** verstellen.
+
+**Hinweise des Fahrlehrers** (Fehler rot, kleinere Fehler und Hinweise gelb) erscheinen in dem Feld, in dem
+sonst der Straßenname steht. Treffen mehrere zusammen, wird der schwerwiegendste angezeigt; eine
+angekündigte Abbiegung bleibt darunter lesbar.
+
+| | |
+| --- | --- |
+| ![Smartphone: Lenkleiste und Blinker links, Pedale, Gänge und Handbremse rechts, Hinweis im Straßennamen-Feld](docs/img/smartphone.jpg) | ![PC: Fehlerhinweis im Straßennamen-Feld mit Abbiegeansage, Tastenhilfe unten links, Start an einer Adresse](docs/img/hinweis.jpg) |
 
 ## Realansicht
 
@@ -107,7 +137,7 @@ geladen werden.
 ### Tests
 
 ```bash
-npm test             # 21 Abnahmetests der Fahrdynamik, 15 Tests der Realansicht (Metadaten, Bilddienste)
+npm test             # 45 Tests: Fahrdynamik (21), Realansicht (15), Adresssuche und Hinweise (9)
 npm run test:traffic # Verkehrssimulation im Dauerlauf auf der echten Karte
 npm run test:drive   # „virtueller Fahrschüler“ fährt alle Fahrstunden regelkonform ab
 ```
@@ -118,7 +148,7 @@ Die Karte entsteht vollständig automatisch aus offenen Daten – auch für ande
 anpassbar. Details, Download-Befehle und Lizenzen: **[docs/MAP_DATA.md](docs/MAP_DATA.md)**.
 
 ```bash
-npm run map:all    # OSM-Auszug schneiden → LoD2 einlesen → Karte bauen (ca. 5 Minuten)
+npm run map:all    # OSM-Auszug schneiden → LoD2 einlesen → Karte bauen → Adressliste (ca. 5 Minuten)
 ```
 
 **Ein Schild fehlt oder steht falsch?** Die Verkehrsregelung kommt aus OpenStreetMap. Am nachhaltigsten ist
@@ -193,6 +223,12 @@ traffic rules (StVO).
 - A rule monitor that explains every mistake with its legal basis: speeding, red lights, stop signs, right
   of way (signs, *right before left*, roundabouts), indicating, pedestrian crossings, wrong-way driving …
 - Lessons, a simulated driving test, ambient traffic and pedestrians, keyboard / gamepad / wheel / touch.
+  On a phone everything works without a keyboard: tap the street name for the menu, the map for real
+  photos, swipe to look around; the on-screen controls leave the middle of the picture free and their
+  opacity can be set. With a keyboard they hide and a short key reminder is shown instead.
+- Start at any address: type a street and house number (about 8,500 house numbers from OpenStreetMap).
+- The instructor's notices (red for serious faults, yellow for minor ones) appear in the street-name block;
+  if several coincide, the gravest is shown.
 - A **reality view** (key `F`): real street-level photographs of the place the car is at – from the free
   imagery services Panoramax, KartaView and Mapillary (CC BY-SA 4.0, only requested when you switch a
   service on) or from your own files, including 360° panoramas saved with street-view download tools

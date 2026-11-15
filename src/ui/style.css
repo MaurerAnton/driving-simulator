@@ -164,18 +164,17 @@ kbd {
 .hud .prio { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; }
 .hud .prio svg { width: 60px; height: 60px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
 .hud .prio .dist { position: absolute; margin-top: 78px; font-size: 12px; color: #fff; background: rgba(0,0,0,.55); border-radius: 6px; padding: 1px 6px; }
-.hud .toasts { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); width: min(560px, 92vw); display: flex; flex-direction: column; gap: 8px; }
-.hud .toast {
-  background: var(--panel); border: 1px solid var(--line); border-left: 6px solid var(--warn); border-radius: 10px; padding: 9px 13px;
-  animation: drop 0.18s ease-out;
-}
-.hud .toast.hint { border-left-color: #6aa9ff; }
-.hud .toast.major { border-left-color: #ff7a3a; }
-.hud .toast.fail { border-left-color: var(--bad); }
-.hud .toast b { display: block; }
-.hud .toast small { color: var(--muted); display: block; line-height: 1.38; margin-top: 2px; }
-.hud .toast em { color: #9fb2c4; font-style: normal; font-size: 12px; }
-@keyframes drop { from { opacity: 0; transform: translateY(-8px); } }
+/* a fault or hint takes the place of the street name: red = serious, yellow = minor */
+.hud .nav .text em { display: block; margin-top: 3px; font-style: normal; font-size: 12px; opacity: 0.85; }
+.hud .nav .text em:empty, .hud .nav .text .next:empty { display: none; }
+.hud .nav .text .next { margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, 0.35); font-weight: 600; }
+.hud .nav.alert { border-color: transparent; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45); }
+.hud .nav.alert .arrow { font-weight: 800; }
+.hud .nav.alert.red { background: rgba(196, 30, 36, 0.95); color: #fff; }
+.hud .nav.alert.red .arrow, .hud .nav.alert.red .text small, .hud .nav.alert.red .burger { color: #fff; }
+.hud .nav.alert.yellow { background: rgba(255, 200, 30, 0.96); color: #1c1500; }
+.hud .nav.alert.yellow .arrow, .hud .nav.alert.yellow .text small, .hud .nav.alert.yellow .burger { color: #1c1500; }
+.hud .nav.alert.yellow .text .next { border-top-color: rgba(0, 0, 0, 0.3); }
 .hud .dash {
   position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 18px; display: flex; gap: 18px; align-items: baseline;
@@ -194,19 +193,62 @@ kbd {
 .hud .score { position: absolute; right: 218px; bottom: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; font-size: 13px; color: var(--muted); }
 .hud .score b { color: var(--text); }
 
-/* ---------- touch controls ---------- */
-.touch { position: absolute; inset: 0; pointer-events: none; }
-.touch > * { pointer-events: auto; position: absolute; touch-action: none; }
-.touch .steer { left: 3vw; bottom: 26vh; width: 40vw; height: 18vh; border-radius: 14px; background: rgba(255,255,255,.08); border: 1px solid var(--line); }
-.touch .steer i { position: absolute; top: 10%; bottom: 10%; width: 14%; left: 43%; border-radius: 10px; background: rgba(255, 204, 0, 0.8); }
-.touch .pedal { bottom: 4vh; width: 15vw; height: 34vh; border-radius: 14px; border: 1px solid var(--line); display: flex; align-items: flex-end; justify-content: center; color: #fff; font-weight: 700; padding-bottom: 8px; }
-.touch .gas { right: 3vw; background: rgba(60, 200, 110, 0.22); }
-.touch .brk { right: 20vw; background: rgba(255, 80, 80, 0.22); }
-.touch .tb { width: 54px; height: 54px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); color: #fff; font-size: 20px; font-weight: 700; }
-@media (pointer: coarse) {
-  /* the pedals are bottom right on touch screens */
-  .hud .map { right: 14px; top: 92px; bottom: auto; width: 120px; height: 120px; }
-  .hud .score { right: 14px; }
+/* ---------- what can be clicked in the HUD ---------- */
+.hud .nav { pointer-events: auto; cursor: pointer; }
+.hud .nav .burger { margin-left: 6px; align-self: flex-start; font-size: 18px; color: var(--muted); }
+.hud .nav:hover .burger { color: var(--accent); }
+.hud .map { pointer-events: auto; cursor: pointer; }
+.hud .map .cam { position: absolute; left: 50%; top: 7px; transform: translateX(-50%); width: 26px; height: 26px; padding: 4px; border-radius: 50%; background: rgba(10, 16, 24, 0.7); color: #fff; }
+.hud .map .cam svg { display: block; width: 100%; height: 100%; }
+.hud .map:hover .cam { color: var(--accent); }
+.hud .tip.tap { pointer-events: auto; cursor: pointer; touch-action: none; background: rgba(255, 204, 0, 0.92); color: #111; font-weight: 600; white-space: normal; text-align: center; max-width: 92vw; }
+
+/* ---------- key reminder (driving with a keyboard) ---------- */
+.hud .keyhelp {
+  position: absolute; left: 14px; bottom: 12px; max-width: min(620px, calc(100vw - 480px)); display: flex; flex-wrap: wrap; gap: 4px 12px;
+  padding: 7px 11px; background: rgba(10, 16, 24, 0.62); border-radius: 10px; font-size: 12.5px; color: #dbe3ea;
+  opacity: 0; transition: opacity 0.5s; pointer-events: none;
+}
+.hud .keyhelp.show { opacity: 1; }
+.hud .keyhelp span { white-space: nowrap; }
+.hud .keyhelp kbd { display: inline-block; min-width: 18px; margin-right: 2px; padding: 0 4px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 4px; background: rgba(255, 255, 255, 0.1); font: inherit; font-weight: 600; text-align: center; }
+.hud.touchmode .keyhelp { display: none; }
+
+/* ---------- on-screen controls (touch) ----------
+   Left thumb: steering and indicators.  Right thumb: pedals, gears, handbrake.
+   The middle of the screen and the left door mirror stay free. */
+.touch { position: absolute; inset: 0; pointer-events: none; display: none; }
+.hud.touchmode .touch { display: block; }
+.touch > * { pointer-events: auto; position: absolute; touch-action: none; user-select: none; -webkit-user-select: none; opacity: var(--touch-opacity, 0.55); }
+.touch .steer { left: 3vw; bottom: 5vh; width: 34vw; height: 20vh; border-radius: 14px; background: rgba(20, 28, 38, 0.55); border: 1px solid rgba(255, 255, 255, 0.4); }
+.touch .steer i { position: absolute; top: 10%; bottom: 10%; width: 14%; left: 43%; border-radius: 10px; background: rgba(255, 204, 0, 0.95); }
+.touch .pedal { bottom: 5vh; width: 13vw; height: 36vh; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.4); display: flex; align-items: flex-end; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; padding-bottom: 8px; }
+.touch .gas { right: 3vw; background: rgba(40, 170, 90, 0.6); }
+.touch .brk { right: 18vw; background: rgba(210, 60, 60, 0.6); }
+.touch .tb { width: 52px; height: 52px; border-radius: 50%; background: rgba(20, 28, 38, 0.75); border: 1px solid rgba(255, 255, 255, 0.45); color: #fff; font-size: 20px; font-weight: 700; padding: 0; }
+.touch .tb.on { background: var(--accent); color: #111; border-color: var(--accent); }
+.touch .ind-l { left: 3vw; bottom: calc(27vh + 8px); }
+.touch .ind-r { left: calc(3vw + 62px); bottom: calc(27vh + 8px); }
+.touch .gear-dn { right: calc(3vw + 62px); bottom: calc(43vh + 8px); }
+.touch .gear-up { right: 3vw; bottom: calc(43vh + 8px); }
+.touch .hb { right: calc(3vw + 124px); bottom: calc(43vh + 8px); }
+.touch .more-btn { left: 50%; top: 10px; transform: translateX(-50%); width: 64px; height: 34px; border-radius: 17px; font-size: 22px; line-height: 1; }
+.touch .more { left: 50%; top: 52px; transform: translateX(-50%); width: min(92vw, 520px); display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; padding: 10px; border-radius: 14px; background: rgba(16, 24, 32, 0.96); border: 1px solid var(--line); opacity: 1; z-index: 2; }
+.touch .more[hidden] { display: none; }
+.touch .mb { padding: 11px 8px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.07); color: var(--text); font: inherit; font-size: 14px; }
+.touch .mb.on { background: var(--accent); color: #111; border-color: var(--accent); }
+/* with the fingers on the screen: the map moves to the top row, left of the signs (the pedals, gears and
+   handbrake have the right-hand side), a compact speed strip, no fault counter */
+.hud.touchmode .map { right: 214px; top: 8px; bottom: auto; width: 96px; height: 96px; }
+.hud.touchmode .map .cam { top: 4px; width: 22px; height: 22px; padding: 3px; }
+.hud.touchmode .score { display: none; }
+.hud.touchmode .nav { max-width: min(40vw, 420px); }
+.hud.touchmode .dash { bottom: 5vh; padding: 5px 12px; gap: 10px; }
+.hud.touchmode .dash .rpm { display: none; }
+.hud.touchmode .dash .v { font-size: 26px; min-width: 48px; }
+.hud.touchmode .tip { bottom: calc(5vh + 58px); }
+@media (max-width: 900px), (max-height: 520px) {
+  .hud .nav.alert .text small:not(.next) { display: none; }
 }
 @media (max-width: 720px) {
   .hud .map { width: 120px; height: 120px; }
@@ -214,6 +256,15 @@ kbd {
   .hud .nav .text b { font-size: 14px; }
   .panel { padding: 16px; }
 }
+
+/* ---------- address search ---------- */
+.addr { position: relative; flex: 1; min-width: 0; }
+.addr input { width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); color: var(--text); font: inherit; }
+.addr-list { display: grid; gap: 4px; margin-top: 6px; }
+.addr-list:empty { display: none; }
+.addr-list button { text-align: left; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; cursor: pointer; }
+.addr-list button:hover, .addr-list button:focus { border-color: var(--accent); }
+.addr-list small { color: var(--muted); padding: 4px 2px; }
 
 /* ---------- reality view: real photographs of the place ---------- */
 .overlay.reality {
