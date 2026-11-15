@@ -34,6 +34,10 @@ const page = await browser.newPage({ viewport: { width: Number(w), height: Numbe
 const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+page.on('response', (r) => {
+  if (r.status() >= 400) logs.push(`[http ${r.status()}] ${r.url()}`);
+});
+page.on('requestfailed', (r) => logs.push(`[failed] ${r.url()} ${r.failure()?.errorText ?? ''}`));
 const t0 = Date.now();
 await page.goto(base + (query ? `?${query}` : ''), { waitUntil: 'domcontentloaded', timeout: 240000 });
 try {

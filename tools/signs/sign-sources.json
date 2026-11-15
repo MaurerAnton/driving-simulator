@@ -625,11 +625,10 @@
     "title": "Polizei",
     "shape": "square"
   },
-  "365-50": {
+  "365-52": {
     "commonsFile": "File:Zeichen 365-52 - Tankstelle, StVO 2013.svg",
     "title": "Tankstelle",
-    "shape": "square",
-    "note": "Requested as '365-50 (Tankstelle)'. In the official VzKat the fuel-station sign is 365-52 and 365-50 is 'Fernsprecher'; rename this key to 365-52 if keys must equal catalogue numbers."
+    "shape": "square"
   },
   "394": {
     "commonsFile": "File:Zeichen 394 - Laternenring (selbstklebende Folie), StVO 2013.svg",
@@ -637,21 +636,14 @@
     "shape": "rect"
   },
   "450-50": {
-    "commonsFile": "File:Zeichen 450-21.svg",
-    "title": "Ankündigungsbake – dreistreifig (300 m)",
-    "shape": "rect",
-    "note": "Requested as '450-50, 450-51, 450-52 (300/200/100 m)'. The official VzKat (and the Commons file names) number them the other way round: 450-50 has one stripe (100 m), 450-52 three stripes (300 m). This key follows the requested distance; swap the commonsFile of 450-50 and 450-52 if keys must equal catalogue numbers. All newer Commons drawings of the 300 m beacon ('Zeichen 450-52 …, StVO 2013' etc.) are dimensioned technical drawings, hence this older plain one."
+    "commonsFile": "File:Zeichen 450-50 - Ankündigungsbake einstreifig (100 m), StVO 2013.svg",
+    "title": "Ankündigungsbake – einstreifig (100 m)",
+    "shape": "rect"
   },
   "450-51": {
     "commonsFile": "File:Zeichen 450-51 - Ankündigungsbake zweistreifig (200 m), StVO 2013.svg",
     "title": "Ankündigungsbake – zweistreifig (200 m)",
     "shape": "rect"
-  },
-  "450-52": {
-    "commonsFile": "File:Zeichen 450-50 - Ankündigungsbake einstreifig (100 m), StVO 2013.svg",
-    "title": "Ankündigungsbake – einstreifig (100 m)",
-    "shape": "rect",
-    "note": "See 450-50: in the official VzKat this one-stripe 100 m beacon is number 450-50."
   },
   "720": {
     "commonsFile": "File:Zeichen 720 - Grünpfeil, StVO 1994.svg",
@@ -685,7 +677,7 @@
   },
   "1001-30": {
     "commonsFile": "File:Zusatzzeichen 1001-30 - auf ... m, StVO 1992.svg",
-    "title": "Auf ... m",
+    "title": "Auf ... m (800 m)",
     "shape": "rect"
   },
   "1002-10": {
@@ -743,11 +735,10 @@
     "title": "Entfernungsangabe in m (100 m)",
     "shape": "rect"
   },
-  "1004-31": {
+  "1004-32": {
     "commonsFile": "File:Zusatzzeichen 1004-32 - nach 200 m, StVO 1992.svg",
     "title": "Entfernungsangabe in m (200 m)",
-    "shape": "rect",
-    "note": "Requested as '1004-31 (200 m)'. The '200 m' plate is VzKat-1992 number 1004-32 (Commons file name); in the current VzKat distances in m are value variants of 1004-30 and 1004-31 is 'Entfernungsangabe in km'."
+    "shape": "rect"
   },
   "1006-30": {
     "commonsFile": "File:Zusatzzeichen 1006-30 - Ölspur (600x330), StVO 1992.svg",
@@ -894,7 +885,8 @@
   "1048-12": {
     "commonsFile": "File:Zusatzzeichen 1048-12 - nur Kraftfahrzeuge mit einem zulässigen Gesamtgewicht über 2,8 t, einschließlich ihrer Anhänger, und Zugmaschinen, ausgenommen Personenkraftwagen und Kraftomnibusse, StVO 1992.svg",
     "title": "Nur Kraftfahrzeuge mit einer zulässigen Gesamtmasse über 3,5 t, einschließlich ihrer Anhänger, und Zugmaschinen, ausgenommen Personenkraftwagen und Kraftomnibusse",
-    "shape": "rect"
+    "shape": "rect",
+    "note": "VzKat 1992 number; since 2017 this lorry-symbol plate is 1010-51."
   },
   "1052-35": {
     "commonsFile": "File:Zusatzzeichen 1052-35 - Gewichtsangabe (7,5 t), StVO 1992.svg",

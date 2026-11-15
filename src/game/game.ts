@@ -80,6 +80,7 @@ export class Game {
   private lastGood = { x: 0, y: 0, z: 0, yaw: 0, t: 0 };
   private lastNavSpoken = '';
   private impact = 0;
+  private rolledT = 0;
   private readonly hit = newSurfaceHit();
   private readonly mpos = new Float64Array(3);
   private readonly wheelY = [0.316, 0.316, 0.316, 0.316];
@@ -424,6 +425,17 @@ export class Game {
         this.audio.click('crash');
       }
     }
+    // on its side or roof: that is the end of this drive – count it as a crash and start again on the road
+    if (v.upright < 0.35) {
+      this.rolledT += dt;
+      if (this.rolledT > 2.2 && Math.abs(v.speed) < 5) {
+        this.rolledT = 0;
+        this.impact = Math.max(this.impact, 12);
+        this.resetToRoad();
+        this.tipText = tr('rolledOver', this.settings.lang);
+        this.tipUntil = this.time + 6;
+      }
+    } else this.rolledT = 0;
     const impact = this.impact;
     if (impact > 1.2) this.audio.click(impact > 4 ? 'crash' : 'bump');
     this.impact = 0;
@@ -697,6 +709,8 @@ export class Game {
       else if (h.dist < 35) navText = tr('navNow', lang, { what });
       else navText = tr('navIn', lang, { d: Math.round(h.dist / 10) * 10, what });
       this.speak(h.what, h.dist, navText);
+      // § 9 StVO: get in lane in good time – the route goes on from a particular lane
+      if (h.lane !== 0) navText += ` – ${tr(h.lane < 0 ? 'laneLeft' : 'laneRight', lang)}`;
     } else if (this.lesson?.kind === 'basics') navText = this.lessonLine;
     let tip = this.time < this.tipUntil ? this.tipText : '';
     if (!tip) {

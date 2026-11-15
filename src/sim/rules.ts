@@ -101,6 +101,12 @@ export class RuleMonitor {
   private tailgateT = 0;
   private handbrakeT = 0;
   private lostT = 0;
+  /**
+   * The stop line was crossed on red.  That alone is "only" a stop-line
+   * offence (Zeichen 294); the red-light offence needs the protected area
+   * behind it (junction, crossing) – so we wait and see how far the car goes.
+   */
+  private redLine: { lane: Lane; x: number; z: number; tol: number; severity: Severity; lineReported: boolean } | null = null;
   private indicatorOnT = 0;
   private lastEdge: Edge | null = null;
   private readonly crossingState = new Map<object, number>();
@@ -117,6 +123,7 @@ export class RuleMonitor {
     this.cooldown.clear();
     this.lane = null;
     this.entry = null;
+    this.redLine = null;
     this.lastEdge = null;
     this.time = 0;
     this.speedOver = this.wrongSide = this.wrongWayT = this.sidewalkT = this.offRoadT = this.tailgateT = 0;
@@ -201,7 +208,10 @@ export class RuleMonitor {
       const tx = pl.pts[i * 3 + 3] - pl.pts[i * 3];
       const tz = pl.pts[i * 3 + 5] - pl.pts[i * 3 + 2];
       const tl = Math.hypot(tx, tz) || 1;
-      headingCos = ((fx * tx + fz * tz) / tl) * Math.sign(p.speed || 1);
+      // Which way the car faces, not which way it creeps: at a standstill the
+      // speed is ±0, and a car that rolls back a hand's breadth at the stop
+      // line has not changed to the oncoming lane.
+      headingCos = (fx * tx + fz * tz) / tl;
       dir = headingCos >= 0 ? 1 : -1;
     }
 
@@ -282,6 +292,8 @@ export class RuleMonitor {
       this.offRoadT += dt;
       if (this.offRoadT > 2.5) this.report('offRoad', 'minor', p, {}, 20);
     } else this.offRoadT = 0;
+
+    this.judgeRedLine(p);
 
     // --- leaving the junction: was the turn signalled? ---
     if (this.entry && edge && (hit.zone === 0 || near)) {
@@ -379,15 +391,23 @@ export class RuleMonitor {
 
     // crossing the stop / give-way line
     if (this.prevLaneS < lane.stopAt && front >= lane.stopAt && p.speed > 0.3) {
-      let red = false;
       if (arm.sg >= 0 && node.sc >= 0) {
         const st = this.signals.get(node.sc, arm.sg);
         const age = this.signals.age(node.sc, arm.sg);
         if (st === SIG.RED || st === SIG.RED_AMBER) {
-          // a second of grace right after the change to red
-          this.report('redLight', st === SIG.RED && age < 0.6 ? 'major' : 'fail', p, {}, 8);
-          red = true;
-        } else if (st === SIG.AMBER && age > 1.3 && p.speed < 14) {
+          // judged in judgeRedLine(); a moment of grace right after the change to red
+          this.redLine = {
+            lane,
+            x: p.x,
+            z: p.z,
+            tol: Math.max(1, Math.min(lane.len - lane.stopAt, 2)),
+            severity: st === SIG.RED && age < 0.6 ? 'major' : 'fail',
+            lineReported: false,
+          };
+        } else if (st === SIG.AMBER && age > 1 + p.speed / 7) {
+          // Amber: stop if that is possible with normal braking.  Whoever was
+          // closer than reaction distance plus a 3.5 m/s² stop when it came on
+          // may carry on – the amber phase is timed for exactly that.
           this.report('amberLight', 'minor', p, {}, 8);
         }
       } else if (arm.role === ROLE.STOP && !this.stoppedNearLine) {
@@ -406,7 +426,7 @@ export class RuleMonitor {
         lookedL: this.lookL > 0.2,
         lookedR: this.lookR > 0.2,
         yaw: p.yaw,
-        signalRed: red,
+        signalRed: false,
       };
       // roundabout: no indicator when entering (§ 8 (1a) StVO)
       if (node.ctrl === CTRL.ROUNDABOUT && !(lane.edge.flags & EF.ROUNDABOUT) && p.indicator !== 0 && !p.hazard) {
@@ -417,6 +437,34 @@ export class RuleMonitor {
     void dt;
     void fx;
     void fz;
+  }
+
+  /** Over the stop line on red: stopped just behind it, or driven on into the junction? */
+  private judgeRedLine(p: PlayerSnapshot): void {
+    const rl = this.redLine;
+    if (!rl) return;
+    const node = rl.lane.to;
+    const st = this.signals.get(node.sc, rl.lane.armTo.sg);
+    if (st !== SIG.RED && st !== SIG.RED_AMBER) {
+      // green (or amber again) before the car got any further: a rolling start
+      if (!rl.lineReported) this.report('stopLine', 'minor', p, {}, 8);
+      this.redLine = null;
+      return;
+    }
+    // backed off behind the line again
+    if (this.lane === rl.lane && this.laneS < rl.lane.stopAt - 0.2) {
+      this.redLine = null;
+      return;
+    }
+    const beyond = Math.hypot(p.x - rl.x, p.z - rl.z);
+    if (beyond > rl.tol) {
+      this.report('redLight', rl.severity, p, {}, 8);
+      if (this.entry && this.entry.lane === rl.lane) this.entry.signalRed = true;
+      this.redLine = null;
+    } else if (!rl.lineReported && Math.abs(p.speed) < 0.25) {
+      this.report('stopLine', 'minor', p, {}, 8);
+      rl.lineReported = true;
+    }
   }
 
   /** After a junction: which way did we go, and was it announced? */
@@ -504,11 +552,14 @@ export class RuleMonitor {
       const d = (c.s - s) * dir - c.w / 2 - p.length / 2;
       const prev = this.crossingState.get(c);
       this.crossingState.set(c, d);
-      if (prev === undefined || !(prev > 0 && d <= 0)) continue;
+      if (prev === undefined) continue;
       if (c.k === XING.SIGNAL && c.sc !== undefined) {
+        // the crossing is the protected area; the bumper a hand's breadth into it is not yet "over"
+        if (!(prev > -0.3 && d <= -0.3)) continue;
         const st = this.signals.get(c.sc, c.g ?? 0);
         if (st === SIG.RED || st === SIG.RED_AMBER) this.report('redLight', 'fail', p, {}, 8);
       } else if (c.k === XING.ZEBRA) {
+        if (!(prev > 0 && d <= 0)) continue;
         const ped = this.traffic.pedestrianAt(c);
         if (ped && (ped.state === 'cross' || ped.waited > 0.6)) this.report('zebra', 'fail', p, {}, 8);
         else if (Math.abs(p.speed) * 3.6 > 35 && ped) this.report('zebraSpeed', 'minor', p, {}, 8);

@@ -1062,12 +1062,12 @@
     "shape": "square"
   },
   "450-50": {
-    "title": "Ankündigungsbake – dreistreifig (300 m)",
-    "commonsFile": "File:Zeichen 450-21.svg",
-    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zeichen_450-21.svg",
+    "title": "Ankündigungsbake – einstreifig (100 m)",
+    "commonsFile": "File:Zeichen 450-50 - Ankündigungsbake einstreifig (100 m), StVO 2013.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zeichen_450-50_-_Ank%C3%BCndigungsbake_einstreifig_(100_m),_StVO_2013.svg",
     "license": "Public domain",
-    "width": 393,
-    "height": 899,
+    "width": 652,
+    "height": 1501,
     "shape": "rect"
   },
   "450-51": {
@@ -1077,15 +1077,6 @@
     "license": "Public domain",
     "width": 695,
     "height": 1602,
-    "shape": "rect"
-  },
-  "450-52": {
-    "title": "Ankündigungsbake – einstreifig (100 m)",
-    "commonsFile": "File:Zeichen 450-50 - Ankündigungsbake einstreifig (100 m), StVO 2013.svg",
-    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zeichen_450-50_-_Ank%C3%BCndigungsbake_einstreifig_(100_m),_StVO_2013.svg",
-    "license": "Public domain",
-    "width": 652,
-    "height": 1501,
     "shape": "rect"
   },
   "720": {
@@ -1143,7 +1134,7 @@
     "shape": "rect"
   },
   "1001-30": {
-    "title": "Auf ... m",
+    "title": "Auf ... m (800 m)",
     "commonsFile": "File:Zusatzzeichen 1001-30 - auf ... m, StVO 1992.svg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1001-30_-_auf_..._m,_StVO_1992.svg",
     "license": "Public domain",
@@ -1250,10 +1241,37 @@
     "height": 330,
     "shape": "rect"
   },
-  "1004-31": {
+  "1004-32": {
     "title": "Entfernungsangabe in m (200 m)",
     "commonsFile": "File:Zusatzzeichen 1004-32 - nach 200 m, StVO 1992.svg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1004-32_-_nach_200_m,_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 600,
+    "height": 330,
+    "shape": "rect"
+  },
+  "1008-30": {
+    "title": "Vorfahrt geändert",
+    "commonsFile": "File:Zusatzzeichen 1008-30 - Vorfahrt geändert (600x330), StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1008-30_-_Vorfahrt_ge%C3%A4ndert_(600x330),_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 600,
+    "height": 330,
+    "shape": "rect"
+  },
+  "1010-52": {
+    "title": "Radverkehr",
+    "commonsFile": "File:Zusatzzeichen 1010-52 - Radverkehr (600x330), StVO 2017.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1010-52_-_Radverkehr_(600x330),_StVO_2017.svg",
+    "license": "Public domain",
+    "width": 600,
+    "height": 330,
+    "shape": "rect"
+  },
+  "1010-58": {
+    "title": "Personenkraftwagen",
+    "commonsFile": "File:Zusatzzeichen 1010-58 - Personenkraftwagen (600x330), StVO 2017.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1010-58_-_Personenkraftwagen_(600x330),_StVO_2017.svg",
     "license": "Public domain",
     "width": 600,
     "height": 330,
@@ -1275,6 +1293,15 @@
     "license": "Public domain",
     "width": 600,
     "height": 330,
+    "shape": "rect"
+  },
+  "1012-32": {
+    "title": "Radfahrer absteigen",
+    "commonsFile": "File:Zusatzzeichen 1012-32 - Radfahrer absteigen (420x231), StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1012-32_-_Radfahrer_absteigen_(420x231),_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 421,
+    "height": 232,
     "shape": "rect"
   },
   "1020-12": {
@@ -1349,6 +1376,42 @@
     "height": 331,
     "shape": "rect"
   },
+  "1042-33": {
+    "title": "Zeitliche Beschränkung (Montag – Freitag, 16 – 18 h)",
+    "commonsFile": "File:Zusatzzeichen 1042-33 - Mo - Fr, 16 - 18 h (600x330), StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1042-33_-_Mo_-_Fr,_16_-_18_h_(600x330),_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 600,
+    "height": 330,
+    "shape": "rect"
+  },
+  "1048-12": {
+    "title": "Nur Kraftfahrzeuge mit einer zulässigen Gesamtmasse über 3,5 t, einschließlich ihrer Anhänger, und Zugmaschinen, ausgenommen Personenkraftwagen und Kraftomnibusse",
+    "commonsFile": "File:Zusatzzeichen 1048-12 - nur Kraftfahrzeuge mit einem zulässigen Gesamtgewicht über 2,8 t, einschließlich ihrer Anhänger, und Zugmaschinen, ausgenommen Personenkraftwagen und Kraftomnibusse, StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1048-12_-_nur_Kraftfahrzeuge_mit_einem_zul%C3%A4ssigen_Gesamtgewicht_%C3%BCber_2,8_t,_einschlie%C3%9Flich_ihrer_Anh%C3%A4nger,_und_Zugmaschinen,_ausgenommen_Personenkraftwagen_und_Kraftomnibusse,_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 600,
+    "height": 330,
+    "shape": "rect"
+  },
+  "1052-35": {
+    "title": "Gewichtsangabe (7,5 t)",
+    "commonsFile": "File:Zusatzzeichen 1052-35 - Gewichtsangabe (7,5 t), StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1052-35_-_Gewichtsangabe_(7,5_t),_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 420,
+    "height": 231,
+    "shape": "rect"
+  },
+  "1052-36": {
+    "title": "Bei Nässe",
+    "commonsFile": "File:Zusatzzeichen 1052-36 - bei Nässe, StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1052-36_-_bei_N%C3%A4sse,_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 601,
+    "height": 601,
+    "shape": "square"
+  },
   "1053-33": {
     "title": "Massenangabe – 7,5 t",
     "commonsFile": "File:Zusatzzeichen 1053-33 - Massenangabe – 7,5 t (420x231), StVO 2017.svg",
@@ -1356,6 +1419,15 @@
     "license": "Public domain",
     "width": 421,
     "height": 232,
+    "shape": "rect"
+  },
+  "1060-11": {
+    "title": "Auch Fahrräder und Mofas",
+    "commonsFile": "File:Zusatzzeichen 1060-11 - auch Fahrräder und Mofas, StVO 1992.svg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zusatzzeichen_1060-11_-_auch_Fahrr%C3%A4der_und_Mofas,_StVO_1992.svg",
+    "license": "Public domain",
+    "width": 330,
+    "height": 600,
     "shape": "rect"
   }
 }

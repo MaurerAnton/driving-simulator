@@ -33,6 +33,28 @@ const PAC_B = 1.9;
 const PAC_C = 1.5;
 const PAC_E = 0.2;
 
+/**
+ * Corners of the body shell relative to the point on the ground below the
+ * middle of the wheelbase (x right, y up, z back): bumpers/sills and roof.
+ */
+const BODY_POINTS: ReadonlyArray<readonly [number, number, number]> = [
+  [-0.8, 0.32, -2.02],
+  [0.8, 0.32, -2.02],
+  [-0.8, 0.32, 2.02],
+  [0.8, 0.32, 2.02],
+  [-0.84, 0.86, -0.9],
+  [0.84, 0.86, -0.9],
+  [-0.84, 0.92, 1.7],
+  [0.84, 0.92, 1.7],
+  [-0.58, 1.42, -0.42],
+  [0.58, 1.42, -0.42],
+  [-0.58, 1.42, 1.2],
+  [0.58, 1.42, 1.2],
+];
+const BODY_STIFFNESS = 160000; // N/m per corner
+const BODY_DAMPING = 9000; // N·s/m
+const BODY_FRICTION = 0.55;
+
 function pacejka(rho: number): number {
   const u = PAC_B * rho;
   return Math.sin(PAC_C * Math.atan(u - PAC_E * (u - Math.atan(u))));
@@ -65,6 +87,8 @@ export class Vehicle {
   // --- derived, refreshed every step ---
   speed = 0;
   yaw = 0;
+  /** vertical component of the body's up axis: 1 = on its wheels, 0 = on its side, -1 = on the roof */
+  upright = 1;
   rpm = 0;
   engineRunning = false;
   stalledEvent = false;
@@ -97,6 +121,10 @@ export class Vehicle {
   private readonly zx = new Float64Array(4);
   private readonly zy = new Float64Array(4);
   private readonly fxTyre = new Float64Array(4);
+  /** the body shell (not just the tyres) touches the ground: rolled over or stuck nose-down */
+  bodyContact = false;
+  /** 1 + (tyre damping seen by the wheel) · h / inertia: the wheel is integrated implicitly against it */
+  private readonly wheelImp = new Float64Array(4).fill(1);
   private readonly absMul = new Float64Array(4).fill(1);
   private readonly sample: GroundSample = { y: 0, nx: 0, ny: 1, nz: 0, grip: 1, rolling: 1 };
   private readonly staticComp: [number, number];
@@ -475,6 +503,7 @@ export class Vehicle {
         this.zx[i] *= 0.9;
         this.zy[i] *= 0.9;
         this.fxTyre[i] = 0;
+        this.wheelImp[i] = 1;
         wh.slipRatio = 0;
         wh.slipAngle = 0;
         wh.skid = 0;
@@ -546,12 +575,18 @@ export class Vehicle {
       const mu = s.muPeak * grip * clamp(1 - s.loadSensitivity * (N / staticLoad - 1), 0.75, 1.12);
       let fxT = 0;
       let fyT = 0;
+      // secant stiffness of the tyre curve (force per unit of normalised slip)
+      const F = rho > 1e-6 ? (mu * N * pacejka(rho)) / rho : mu * N * PAC_B * PAC_C;
       if (rho > 1e-6) {
-        const F = (mu * N * pacejka(rho)) / rho;
         fxT = F * sgx;
         fyT = F * sgy;
       }
       this.fxTyre[i] = fxT;
+      // The standstill damping is far too stiff for the light wheel to be
+      // integrated explicitly (it would flip-flop around the road speed and
+      // shake itself loose from a gently applied brake): remember how strongly
+      // the force reacts to the wheel speed, the wheel update divides by it.
+      this.wheelImp[i] = 1 + (((F * tau) / (s.relaxLong * kPeak)) * rad * rad * h) / s.wheelInertia;
       wh.slipRatio = (zx / s.relaxLong);
       wh.slipAngle = Math.atan(zy / s.relaxLat);
       wh.skid = clamp((rho - 1) / 1.5, 0, 1) * clamp(Math.hypot(vsx, vsy) / 2, 0, 1);
@@ -577,6 +612,47 @@ export class Vehicle {
     }
     this.frontLat = frontLat / 2;
     this.compPrev.set(this.comp);
+
+    // ---- body on the ground -----------------------------------------------------
+    // Only the wheels carry the car in normal driving.  Once it leans far over
+    // (rolled, or nose-down in a ditch) the corners of the body shell take over,
+    // so that it comes to rest on its side or roof instead of sinking away.
+    this.bodyContact = false;
+    if (upY < 0.9) {
+      const mo = this.modelOrigin;
+      for (const b of BODY_POINTS) {
+        const bx = b[0] + mo[0];
+        const by = b[1] + mo[1];
+        const bz = b[2] + mo[2];
+        const rx = r[0] * bx + r[1] * by + r[2] * bz;
+        const ry = r[3] * bx + r[4] * by + r[5] * bz;
+        const rz = r[6] * bx + r[7] * by + r[8] * bz;
+        this.ground.sample(px + rx, pz + rz, py + ry + 0.8, smp);
+        const depth = smp.y - (py + ry);
+        if (!(depth > 0)) continue;
+        const vpx = vx + wy * rz - wz * ry;
+        const vpy = vy + wz * rx - wx * rz;
+        const vpz = vz + wx * ry - wy * rx;
+        const vn = vpx * smp.nx + vpy * smp.ny + vpz * smp.nz;
+        const N = clamp(BODY_STIFFNESS * Math.min(depth, 0.4) - BODY_DAMPING * vn, 0, 90000);
+        if (N <= 0) continue;
+        // sheet metal sliding on the ground
+        const tx = vpx - vn * smp.nx;
+        const ty = vpy - vn * smp.ny;
+        const tz = vpz - vn * smp.nz;
+        const f = (-BODY_FRICTION * N) / Math.max(Math.hypot(tx, ty, tz), 0.4);
+        const bfx = N * smp.nx + f * tx;
+        const bfy = N * smp.ny + f * ty;
+        const bfz = N * smp.nz + f * tz;
+        Fx += bfx;
+        Fy += bfy;
+        Fz += bfz;
+        Tx += ry * bfz - rz * bfy;
+        Ty += rz * bfx - rx * bfz;
+        Tz += rx * bfy - ry * bfx;
+        this.bodyContact = true;
+      }
+    }
 
     // ---- engine ---------------------------------------------------------------
     const Ie = s.engineInertia;
@@ -622,7 +698,10 @@ export class Vehicle {
     }
 
     // ---- clutch as a friction constraint ---------------------------------------
-    const S = rollTorque(this.fxTyre[0], s.wheelRadius) + rollTorque(this.fxTyre[1], s.wheelRadius);
+    // inverse inertia of the two driven wheels (implicit against the tyre damping, see above)
+    const inv0 = 1 / (s.wheelInertia * this.wheelImp[0]);
+    const inv1 = 1 / (s.wheelInertia * this.wheelImp[1]);
+    const S = rollTorque(this.fxTyre[0], s.wheelRadius) * inv0 + rollTorque(this.fxTyre[1], s.wheelRadius) * inv1;
     // Gearbox and differential losses: less torque arrives when the engine
     // drives, more is taken when the wheels drive the engine.
     const driving = this.lastTc * ratio * driveOmega >= 0;
@@ -641,7 +720,7 @@ export class Vehicle {
       if (capacity > 0) {
         const win = ratio * driveOmega;
         const est = offFriction > 0 && Math.abs(we) > 0.5 ? -Math.sign(we) * offFriction : 0;
-        const lock = ((we - win) / h + (Te + est) / Ie + (ratio * S) / (2 * Iw)) / (1 / Ie + (ratio * wheelRatio) / (2 * Iw));
+        const lock = ((we - win) / h + (Te + est) / Ie + (ratio * S) / 2) / (1 / Ie + (ratio * wheelRatio * (inv0 + inv1)) / 4);
         Tc = clamp(lock, -capacity, capacity);
       }
     }
@@ -667,16 +746,17 @@ export class Vehicle {
     for (let i = 0; i < 4; i++) {
       const wh = w[i];
       const front = i < 2;
+      const Ii = Iw * this.wheelImp[i];
       let T = -this.fxTyre[i] * s.wheelRadius;
       if (front) T += (Tc * wheelRatio) / 2;
-      wh.omega += (T / Iw) * h;
+      wh.omega += (T / Ii) * h;
       let brake = inp.brake * s.brakeTorque * (front ? s.brakeBiasFront / 2 : (1 - s.brakeBiasFront) / 2) * this.absMul[i];
       if (!front) brake += inp.handbrake * (s.handbrakeTorque / 2);
       if (front && parkLock) brake += 6000;
       if (brake > 0) {
-        const need = (Math.abs(wh.omega) * Iw) / h;
+        const need = (Math.abs(wh.omega) * Ii) / h;
         if (brake >= need) wh.omega = 0;
-        else wh.omega -= (Math.sign(wh.omega) * brake * h) / Iw;
+        else wh.omega -= (Math.sign(wh.omega) * brake * h) / Ii;
       }
       if (this.absMul[i] < 0.9) absActive = true;
       wh.spin += wh.omega * h;
@@ -736,6 +816,7 @@ export class Vehicle {
     const fz = -r[8];
     this.speed = this.vel[0] * fx + this.vel[1] * fy + this.vel[2] * fz;
     this.yaw = Math.atan2(-fx, -fz);
+    this.upright = r[4];
     this.rpm = this.engineOmega * RPM;
     if (dt > 0) {
       const ax = (this.vel[0] - this.prevVel[0]) / dt;

@@ -58,9 +58,20 @@ const terrain = {
   heightAt(x: number, z: number): number {
     const { t, fx, fz } = this.tile(x, z);
     if (!t) return NaN;
-    const i = Math.min(t.n - 2, Math.floor(fx * (t.n - 1)));
-    const j = Math.min(t.n - 2, Math.floor(fz * (t.n - 1)));
-    return t.h[j * t.n + i];
+    // same triangle interpolation as the game (src/render/tiles.ts)
+    const n = t.n;
+    const gx = Math.max(0, Math.min(n - 1.0001, fx * (n - 1)));
+    const gz = Math.max(0, Math.min(n - 1.0001, fz * (n - 1)));
+    const i = Math.floor(gx);
+    const j = Math.floor(gz);
+    const tx = gx - i;
+    const tz = gz - j;
+    const k = j * n + i;
+    const h00 = t.h[k];
+    const h10 = t.h[k + 1];
+    const h01 = t.h[k + n];
+    const h11 = t.h[k + n + 1];
+    return tx + tz <= 1 ? h00 + (h10 - h00) * tx + (h01 - h00) * tz : h11 + (h01 - h11) * (1 - tx) + (h10 - h11) * (1 - tz);
   },
   coverAt(x: number, z: number): number {
     const { t, fx, fz } = this.tile(x, z);
@@ -70,10 +81,29 @@ const terrain = {
 };
 
 const DT = 1 / 120;
+
+/**
+ * Tracing for debugging a finding: DRIVE_DEBUG=<until s> [DRIVE_FROM=<from s>]
+ * prints the driver's state twice a second in that time window,
+ * DRIVE_NEAR=<x>,<z>,<radius m> whenever the car is near that point;
+ * DRIVE_UNTIL=<s> ends the drive early; DRIVE_VIA="x,z;x,z" replaces the
+ * lesson's destinations by the roads nearest to these points; DRIVE_NAV=1
+ * prints every destination with its route.
+ */
+const NEAR = (process.env.DRIVE_NEAR ?? '').split(',').map(Number);
+/** DRIVE_VIA="x,z;x,z;…": destinations to drive to one after the other (nearest road to each point) */
+const VIA = (process.env.DRIVE_VIA ?? '')
+  .split(';')
+  .filter((p) => p.includes(','))
+  .map((p) => p.split(',').map(Number));
+function traceHere(t: number, x: number, z: number): boolean {
+  if (process.env.DRIVE_DEBUG && t < Number(process.env.DRIVE_DEBUG) && t > Number(process.env.DRIVE_FROM ?? 0)) return true;
+  return NEAR.length === 3 && Math.hypot(x - NEAR[0], z - NEAR[1]) < NEAR[2];
+}
 const smp = newPolySample();
 const hit = newSurfaceHit();
 
-function runLesson(id: string, spawnIdx: number, obey = true): { km: number; minutes: number; findings: string[]; done: boolean } {
+function runLesson(id: string, spawnIdx: number, obey = true): { km: number; minutes: number; findings: string[]; done: boolean; where: string } {
   const lesson = LESSONS.find((l) => l.id === id)!;
   const signals = new SignalSystem(world.signals);
   const traffic = new Traffic(world, graph, signals);
@@ -98,10 +128,11 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
   let t = 0;
   let done = false;
   let stuck = 0;
+  let waited = 0;
   let lastTurn = 0;
   let lastNext: Connector | null = null;
   const proj = { s: 0, off: 0, d2: 0, seg: 0 };
-  const maxT = 60 * 40;
+  const maxT = Number(process.env.DRIVE_UNTIL ?? 60 * 40);
   while (t < maxT && !done) {
     v.getModelPosition(mpos);
     const lane = (rules as unknown as { lane: Lane | null }).lane;
@@ -110,27 +141,50 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
     if (lane) {
       if (!home) home = lane.edge;
       if (!nav.goal) {
-        const goal = findTarget(world, graph, lesson.targets[targetIdx], mpos[0], mpos[2], lane, home, visited);
+        let goal: Lane['edge'] | null = null;
+        if (VIA.length > 0) {
+          // debugging: drive past the given points instead of the lesson's destinations
+          if (targetIdx >= VIA.length) {
+            done = true;
+            continue;
+          }
+          if (world.nearestRoad(VIA[targetIdx][0], VIA[targetIdx][1], 40, 0, hit)) goal = hit.edge;
+        } else goal = findTarget(world, graph, lesson.targets[targetIdx], mpos[0], mpos[2], lane, home, visited);
         if (!goal) {
           targetIdx++;
-          if (targetIdx >= lesson.targets.length) done = true;
+          if (targetIdx >= (VIA.length || lesson.targets.length)) done = true;
           continue;
         }
         visited.add(goal);
         nav.setGoal(goal, lane);
+        if (process.env.DRIVE_NAV) {
+          const r = nav.route ?? [];
+          console.log(`nav t=${t.toFixed(0)} target ${targetIdx} → e${goal.id} "${goal.name}" (${goal.a.x.toFixed(0)},${goal.a.z.toFixed(0)})–(${goal.b.x.toFixed(0)},${goal.b.z.toFixed(0)}) len=${goal.len.toFixed(0)} cut=${goal.cutA.toFixed(1)}/${goal.cutB.toFixed(1)} lanes=${goal.lanesF}/${goal.lanesB} from lane ${lane.id}/e${lane.edge.id}; route ${r.length} connectors: ${r.map((c) => `e${c.to.edge.id}${'SLRU'[c.turn]}`).join(' ')}`);
+        }
       }
       const h = nav.update(DT, lane, laneS, mpos[0], mpos[2]);
       rules.allowed = new Set(nav.routeLanes.map((l) => l.edge));
       if (h.done) {
         targetIdx++;
         nav.clear();
-        if (targetIdx >= lesson.targets.length) done = true;
+        if (targetIdx >= (VIA.length || lesson.targets.length)) done = true;
       }
     }
     // --- path: current lane, then the route's connectors ---
     const route = nav.route ?? [];
     let next: Connector | null = null;
-    if (lane) next = route.find((c) => c.from === lane) ?? (lane.out.length === 1 ? lane.out[0] : null);
+    // the lane to follow: the one the monitor has us in – or its neighbour, if the route goes on from that one
+    let path: Lane | null = lane;
+    if (lane) {
+      next = route.find((c) => c.from === lane) ?? null;
+      if (!next) {
+        const rc = route.find((c) => c.from.edge === lane.edge && c.from.dir === lane.dir);
+        if (rc) {
+          next = rc;
+          path = rc.from; // get in lane
+        } else next = lane.out.length === 1 ? lane.out[0] : null;
+      }
+    }
     if (next) lastNext = next;
     else if (!lane) next = lastNext;
     // pure pursuit target point: lookahead along lane → connector → next lane
@@ -145,9 +199,34 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
     let mustStop = false;
     let crossStop = false;
     let turn = 0;
+    // A learner looks further than the next junction: every turn within braking
+    // distance along the route limits the speed (short links between junctions
+    // would otherwise hide a sharp turn until it is too late).
+    // `first` begins `dist` metres ahead of the front bumper (negative: we are on it).
+    const preview = (first: Connector | null, dist: number, cap: number): number => {
+      let c = first;
+      let d = dist;
+      let out = cap;
+      for (let hop = 0; c && hop < 8 && d < 110; hop++) {
+        if (c.turn !== TURN.STRAIGHT) out = Math.min(out, Math.sqrt(4.5 * 4.5 + 2 * 1.8 * Math.max(0, d - 4)));
+        const l2: Lane = c.to;
+        // a red light or a stop sign at the end of the lane behind it
+        const a2 = l2.armTo;
+        const dStop = d + c.len + l2.stopAt;
+        if (obey && dStop > 0 && l2.to.arms.length > 2 && ((a2.sg >= 0 && l2.to.sc >= 0 && signals.get(l2.to.sc, a2.sg) !== SIG.GREEN) || a2.role === ROLE.STOP)) {
+          out = Math.min(out, Math.sqrt(2 * 2.0 * Math.max(dStop - 2.5, 0.3)));
+        }
+        d += c.len + l2.len;
+        c = route.find((r) => r.from === l2) ?? (l2.out.length === 1 ? l2.out[0] : null);
+      }
+      return out;
+    };
     // inside a junction the monitor's lane position is frozen: measure along the connector instead
     const inJunction = world.surfaceAt(mpos[0], mpos[2], mpos[1] + 0.6, hit) && hit.node !== null && hit.node.arms.length > 1;
-    if ((inJunction || !lane) && next) {
+    // the monitor may already count us on the lane we are heading for (wide junction areas):
+    // then that lane is the path, not the connector at its far end
+    const onExitLane = lane !== null && laneS < Math.min(lane.stopAt, lane.len) - 0.5;
+    if (((inJunction && !onExitLane) || !lane) && next) {
       projectOnPolyline(next.pl, mpos[0], mpos[2], proj);
       const sj = proj.s + la;
       if (sj <= next.len) samplePolyline(next.pl, sj, smp);
@@ -155,6 +234,7 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
       tx = smp.x;
       tz = smp.z;
       limit = next.turn === TURN.STRAIGHT ? Math.min(Number.isFinite(next.to.limit) ? next.to.limit : 36, 14) : 4.5;
+      limit = preview(next, -proj.s, limit);
       turn = lastTurn;
     } else if (lane) {
       const centre = laneS - 2.14;
@@ -163,7 +243,7 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
       if (lane.edge.cls >= 13) limit = Math.min(limit, 6);
       let s = centre + la;
       if (s <= lane.len) {
-        lanePoint(lane, s, smp);
+        lanePoint(path ?? lane, s, smp);
         tx = smp.x;
         tz = smp.z;
       } else if (next) {
@@ -173,6 +253,7 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
         tx = smp.x;
         tz = smp.z;
       }
+      limit = preview(next, Math.max(0, lane.len - laneS), limit);
       distToLine = lane.stopAt - laneS;
       const node = lane.to;
       const arm = lane.armTo;
@@ -189,15 +270,6 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
         // slow down for the turn
         if (next.turn !== TURN.STRAIGHT && distToLine < 45) limit = Math.min(limit, 4.5 + Math.max(0, distToLine) * 0.12);
         else if (arm.role !== ROLE.PRIORITY && distToLine < 30) limit = Math.min(limit, 7);
-      }
-      // the junction after the next (short lanes in between): be able to stop there, too
-      if (obey && next && !mustStop) {
-        const l2 = next.to;
-        const d2 = lane.len - laneS + next.len + l2.stopAt;
-        const a2 = l2.armTo;
-        if (d2 < 70 && l2.to.arms.length > 2 && ((a2.sg >= 0 && l2.to.sc >= 0 && signals.get(l2.to.sc, a2.sg) !== SIG.GREEN) || a2.role === ROLE.STOP)) {
-          limit = Math.min(limit, Math.sqrt(2 * 2.0 * Math.max(d2 - 2, 0.5)));
-        }
       }
       // pedestrian lights between junctions
       if (obey) {
@@ -257,7 +329,7 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
     signals.update(DT);
     v.getModelPosition(mpos);
     rules.update(DT, { x: mpos[0], y: mpos[1], z: mpos[2], yaw: v.yaw, speed: v.speed, indicator, hazard: false, lookYaw: look, seatbelt: true, handbrake: 0, stalled: false, hitScenery: 0, length: 4.28 }, []);
-    if (process.env.DRIVE_DEBUG && t < Number(process.env.DRIVE_DEBUG) && t > Number(process.env.DRIVE_FROM ?? 0) && Math.abs(t * 2 - Math.round(t * 2)) < DT) {
+    if (traceHere(t, mpos[0], mpos[2]) && Math.abs(t * 2 - Math.round(t * 2)) < DT) {
       const armD = lane ? lane.armTo : null;
       console.log(`   arm role=${armD?.role} sg=${armD?.sg} sc=${lane?.to.sc} ctrl=${lane?.to.ctrl} sig=${armD && armD.sg >= 0 && lane!.to.sc >= 0 ? signals.get(lane!.to.sc, armD.sg) : '-'} dist=${distToLine.toFixed(1)} mustStop=${mustStop} cross=${crossStop} stopAt=${lane?.stopAt.toFixed(1)}`);
       const on = world.surfaceAt(mpos[0], mpos[2], mpos[1] + 0.6, hit);
@@ -266,9 +338,18 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
     t += DT;
     stuck = Math.abs(v.speed) < 0.1 && !mustStop && !crossStop ? stuck + DT : 0;
     if (stuck > 25) break;
+    // waiting for a light is fine – but not for ever
+    waited = Math.abs(v.speed) < 0.1 ? waited + DT : 0;
+    if (waited > 240) break;
   }
   const findings = rules.log.map((f) => `${f.severity}:${f.id}@(${f.x.toFixed(0)},${f.z.toFixed(0)}) t=${f.time.toFixed(0)}s ${JSON.stringify(f.data)}`);
-  return { km: v.odometer / 1000, minutes: t / 60, findings, done };
+  let where = '';
+  if (!done) {
+    const l = (rules as unknown as { lane: Lane | null }).lane;
+    const arm = l?.armTo;
+    where = ` – ${stuck > 25 ? 'stuck' : 'out of time'} at (${mpos[0].toFixed(0)},${mpos[2].toFixed(0)}) v=${v.speed.toFixed(1)} m/s, target ${targetIdx + 1}/${VIA.length || lesson.targets.length}${nav.goal ? ` e${nav.goal.id}` : ''}, ${l ? `lane ${l.id}/e${l.edge.id} at ${(rules as unknown as { laneS: number }).laneS.toFixed(1)}/${l.len.toFixed(1)} m, stop line ${l.stopAt.toFixed(1)}, node n${l.to.id} ctrl ${l.to.ctrl} role ${arm?.role} signal ${arm && arm.sg >= 0 && l.to.sc >= 0 ? signals.get(l.to.sc, arm.sg) : '-'}` : 'no lane'}, waited ${waited.toFixed(0)} s`;
+  }
+  return { km: v.odometer / 1000, minutes: t / 60, findings, done, where };
 }
 
 const ids = process.argv.slice(2).filter((a) => !a.startsWith('-'));
@@ -277,7 +358,8 @@ let serious = 0;
 for (const id of list) {
   const t0 = Date.now();
   const r = runLesson(id, 0);
-  console.log(`${id}: ${r.done ? 'completed' : 'NOT completed'}, ${r.km.toFixed(2)} km in ${r.minutes.toFixed(1)} sim-min (${((Date.now() - t0) / 1000).toFixed(0)} s wall), ${r.findings.length} findings`);
+  console.log(`${id}: ${r.done ? 'completed' : 'NOT completed'}, ${r.km.toFixed(2)} km in ${r.minutes.toFixed(1)} sim-min (${((Date.now() - t0) / 1000).toFixed(0)} s wall), ${r.findings.length} findings${r.where}`);
+  if (!r.done) serious++;
   for (const f of r.findings) {
     console.log(`   ${f}`);
     if (!f.startsWith('hint')) serious++;

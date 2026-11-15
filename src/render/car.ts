@@ -374,7 +374,9 @@ export class PlayerCar {
       }),
     );
     for (const side of [-1, 1]) {
-      const c = new THREE.Vector3(side * (hw + 0.1), belt + 0.06, sh.zCowl + 0.447);
+      // at the front corner of the door glass: there the left one is inside the
+      // forward view on an ordinary screen (about 39° off the line of sight)
+      const c = new THREE.Vector3(side * (hw + 0.1), belt + 0.06, sh.zCowl + 0.28);
       this.mirrors.push(
         new Mirror({
           name: side < 0 ? 'left' : 'right',
@@ -391,7 +393,7 @@ export class PlayerCar {
       this.cockpit.add(m.mesh, m.makeHousing(i === 0 ? 0.025 : 0.085, i === 0 ? plastic : this.exterior.paint));
     });
     // stalks that carry the door mirrors
-    for (const side of [-1, 1]) this.cockpit.add(new THREE.Mesh(box(0.1, 0.03, 0.05, side * (hw + 0.03), belt + 0.03, sh.zCowl + 0.42), plastic));
+    for (const side of [-1, 1]) this.cockpit.add(new THREE.Mesh(box(0.1, 0.03, 0.05, side * (hw + 0.03), belt + 0.03, sh.zCowl + 0.255), plastic));
   }
 
   update(s: CarVisualState, dt: number, now: number): void {

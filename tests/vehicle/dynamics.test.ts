@@ -266,6 +266,76 @@ test('hills: handbrake holds, neutral rolls, parked in gear, hill start', () => 
   assert.ok(kmh(h) > 5, 'drives off up the hill');
 });
 
+test('a light foot on the brake stops the car completely and holds it, on any slope', () => {
+  // Found by the virtual learner driver: the car kept crawling at 0.3 m/s
+  // against a half-pressed brake and rolled over a red stop line.
+  const cases: [string, typeof COMPACT_CAR, number][] = [
+    ['automatic in D', COMPACT_CAR_AUTOMATIC, 1],
+    ['manual in neutral', COMPACT_CAR, 0],
+    ['clutch assist in 1st', COMPACT_CAR_AUTOCLUTCH, 1],
+  ];
+  for (const [name, spec, gear] of cases) {
+    for (const grade of [0, -0.1, 0.1]) {
+      for (const brake of [0.25, 0.5]) {
+        const v = makeCar(new PlaneGround(grade), spec);
+        run(v, 3, () => input({ gear, throttle: 0.12 })); // roll (or creep) first
+        run(v, 4, () => input({ gear, brake }));
+        const x0 = v.pos[0];
+        const z0 = v.pos[2];
+        run(v, 5, () => input({ gear, brake }));
+        const moved = Math.hypot(v.pos[0] - x0, v.pos[2] - z0);
+        const what = `${name}, grade ${grade}, brake ${brake}`;
+        assert.ok(moved < 0.01, `${what}: crept ${(moved * 100).toFixed(1)} cm in 5 s`);
+        assert.ok(Math.abs(v.speed) < 0.005, `${what}: still moving at ${v.speed.toFixed(3)} m/s`);
+        for (const wh of v.wheels) assert.equal(wh.omega, 0, `${what}: wheel not held`);
+      }
+    }
+  }
+});
+
+test('rollover: the body shell carries the car, it does not sink into the ground', () => {
+  // Found by the virtual learner driver: once the car lay on its side the
+  // wheels no longer reached the ground and it fell through the world.
+  for (const [what, angle, lo, hi] of [
+    ['on the roof', Math.PI, 0.7, 1.0],
+    ['on its side', Math.PI / 2, 0.4, 1.0],
+  ] as const) {
+    const v = makeCar();
+    v.quat[0] = 0;
+    v.quat[1] = 0;
+    v.quat[2] = Math.sin(angle / 2); // roll about the longitudinal axis
+    v.quat[3] = Math.cos(angle / 2);
+    v.pos[1] = 1.15;
+    v.vel.fill(0);
+    v.angVel.fill(0);
+    let touched = false;
+    run(
+      v,
+      5,
+      () => input({ gear: 0 }),
+      () => {
+        if (v.bodyContact) touched = true;
+      },
+    );
+    assert.ok(touched, `${what}: the body never touched the ground`);
+    between(v.pos[1], lo, hi, `${what}: height of the centre of mass at rest`);
+    assert.ok(Math.hypot(v.vel[0], v.vel[1], v.vel[2]) < 0.05, `${what}: still moving`);
+  }
+  // and on its wheels the shell stays out of it
+  const v = makeCar();
+  let touched = false;
+  run(
+    v,
+    6,
+    (t) => input({ gear: 1, clutch: t < 0.3 ? 1 : 0, throttle: 0.5, steer: t > 3 ? 1 : 0 }),
+    () => {
+      if (v.bodyContact) touched = true;
+    },
+  );
+  assert.equal(touched, false, 'body contact while driving normally');
+  assert.ok(v.upright > 0.97, `leaning ${v.upright.toFixed(3)} in a tight turn`);
+});
+
 test('reverse gear', () => {
   const v = makeCar();
   run(v, 1, () => input({ gear: -1, clutch: 1 }));

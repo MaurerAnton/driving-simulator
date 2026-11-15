@@ -432,7 +432,13 @@ export class LaneGraph {
         const next = c.to;
         if (next.edge !== goal && !LaneGraph.drivable(next.edge, forTraffic)) continue;
         const v = Math.min(next.limit, 36);
-        const turnCost = c.turn === TURN.LEFT ? 6 : c.turn === TURN.RIGHT ? 3 : c.turn === TURN.UTURN ? 25 : 0;
+        // Turning round is for when there is no other way: it needs a turning
+        // circle or a three-point turn, and where the map ends (often a fast
+        // rural road) it is a last resort.
+        const uturn = c.from.to.ctrl === CTRL.MAP_END ? 900 : 150;
+        let turnCost = c.turn === TURN.LEFT ? 6 : c.turn === TURN.RIGHT ? 3 : c.turn === TURN.UTURN ? uturn : 0;
+        // two left turns a few metres apart = turning round through a gap in the median
+        if (c.turn === TURN.LEFT && lane.len < 15 && prev.get(lane.id)?.turn === TURN.LEFT) turnCost += 150;
         // "Anlieger frei" and car-park shortcuts are not through routes
         const through = next.edge !== goal && (next.edge.access === ACCESS.DESTINATION || (next.edge.flags & EF.MINOR_SERVICE) !== 0) ? 240 : 0;
         const nd = d + c.len / 6 + next.len / Math.max(v, 2) + turnCost + through;

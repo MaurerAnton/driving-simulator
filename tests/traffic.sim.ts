@@ -20,7 +20,7 @@ traffic.targetCount = 45;
 const places: Array<[string, number, number]> = [
   ['town centre', 690, -295],
   ['A49 junction', 1450, 2780],
-  ['Großenritte', -2700, -90],
+  ['Großenritte', -1160, 500],
 ];
 for (const [name, x, z] of places) {
   traffic.clear();
