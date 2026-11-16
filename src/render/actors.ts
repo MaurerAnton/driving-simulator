@@ -68,6 +68,9 @@ export class TrafficRenderer {
         }
         b.root.position.set(c.x, c.y, c.z);
         b.root.rotation.set(c.pitch, c.yaw, 0, 'YXZ');
+        // its line and where it goes, on the displays (drawn anew only when they change)
+        const line = c.bus?.line;
+        b.setLine(line?.ref ?? '', line?.to ?? '');
         const st = this.busState;
         st.wheelSpin.fill(c.wheelSpin);
         st.indicator = c.blinker;

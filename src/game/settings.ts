@@ -5,6 +5,7 @@ import { DEFAULT_TOUR_PREFS } from './tourlog.ts';
 import type { TourPrefs } from './tourlog.ts';
 import { vehicleKind } from './vehicles.ts';
 import type { VehicleKind } from './vehicles.ts';
+import type { TramSet } from '../sim/rail.ts';
 
 export type Transmission = 'assist' | 'manual' | 'automatic';
 /** a preset of the graphics – or 'custom': the advanced settings chosen one by one */
@@ -69,6 +70,12 @@ export interface Settings {
   limiter: boolean;
   /** how fast one runs on foot (km/h), one of RUN_SPEEDS */
   runSpeed: number;
+  /** on foot: through one's own eyes, or seen from behind (the camera key switches) */
+  footView: 'eyes' | 'behind';
+  /** the tram the player drives: one unit, two coupled units, or one with a trailer car */
+  tramSet: TramSet;
+  /** the main menu: rows of cards over the 3D scene, or the simple list of before */
+  menuStyle: 'carousel' | 'classic';
   /** what a tour is to lead along (the map's tour planner) */
   tourPrefs: TourPrefs;
   view: View;
@@ -132,6 +139,9 @@ export const DEFAULT_SETTINGS: Settings = {
   powers: {},
   limiter: true,
   runSpeed: 12,
+  footView: 'eyes',
+  tramSet: 'single',
+  menuStyle: 'carousel',
   tourPrefs: { ...DEFAULT_TOUR_PREFS },
   view: 'chase',
   cabinOpacity: 1,
@@ -181,6 +191,9 @@ function merge(parsed: Partial<Settings>): Settings {
   if (s.view !== 'chase' && s.view !== 'cockpit') s.view = d.view;
   if (!vehicleKind(s.vehicle)) s.vehicle = d.vehicle;
   if (!RUN_SPEEDS.includes(s.runSpeed)) s.runSpeed = d.runSpeed;
+  if (s.footView !== 'eyes' && s.footView !== 'behind') s.footView = d.footView;
+  if (s.tramSet !== 'single' && s.tramSet !== 'double' && s.tramSet !== 'trailer') s.tramSet = d.tramSet;
+  if (s.menuStyle !== 'carousel' && s.menuStyle !== 'classic') s.menuStyle = d.menuStyle;
   s.tourPrefs = { ...DEFAULT_TOUR_PREFS, ...(typeof parsed.tourPrefs === 'object' && parsed.tourPrefs ? parsed.tourPrefs : {}) };
   if (!['any', 'small', 'town', 'country'].includes(s.tourPrefs.mostly)) s.tourPrefs.mostly = 'any';
   // (stored before there was a far view: the one of the preset chosen then)

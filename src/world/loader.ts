@@ -16,7 +16,7 @@
 import { CHUNK, GRID_OFFSET, GridSet, TILE, gridIndex, gridStart } from './grid.ts';
 import { unpackNet } from './netfile.ts';
 import type { NetData } from './netfile.ts';
-import type { AirJson, LinesJson, MapIndexJson, RailJson, StopsJson, WorldChunkJson, WorldJson } from './types.ts';
+import type { AirJson, LinesJson, MapIndexJson, RailJson, StopsJson, TimetableJson, WorldChunkJson, WorldJson } from './types.ts';
 import { World } from './world.ts';
 import type { WorldChange, WorldOptions } from './world.ts';
 
@@ -87,6 +87,7 @@ export class MapLoader {
   private railData: Promise<RailJson[]> | null = null;
   private stopData: Promise<StopsJson | null> | null = null;
   private airData: Promise<AirJson | null> | null = null;
+  private timetableData: Promise<TimetableJson | null> | null = null;
   private farData: Promise<ArrayBuffer | null> | null = null;
   private lineData: Promise<LinesJson | null> | null = null;
 
@@ -291,6 +292,12 @@ export class MapLoader {
   lines(): Promise<LinesJson | null> {
     this.lineData ??= this.pieces ? readJson<LinesJson>(this.files, 'lines.json.gz').catch(() => null) : Promise.resolve(null);
     return this.lineData;
+  }
+
+  /** The timetables of the trams (timetable.json.gz) – null for a map without them. */
+  timetable(): Promise<TimetableJson | null> {
+    this.timetableData ??= this.pieces ? readJson<TimetableJson>(this.files, 'timetable.json.gz').catch(() => null) : Promise.resolve(null);
+    return this.timetableData;
   }
 
   /** The airfields of the region – null for a map without them. */

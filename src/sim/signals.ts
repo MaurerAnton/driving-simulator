@@ -66,6 +66,19 @@ export interface Arrow {
   since: number;
 }
 
+/** What the controllers around a place showed at a moment (SignalSystem.snapshot) – for a replay to show it again. */
+export interface SignalSnapshot {
+  time: number;
+  ids: Int32Array;
+  /** per controller: how many groups (the states and ages follow in that order), its own clock, its request */
+  groups: Uint8Array;
+  local: Float32Array;
+  asked: Uint8Array;
+  states: Uint8Array;
+  ages: Float32Array;
+  arrows: Array<[Arm, number, number]>;
+}
+
 export class SignalSystem {
   /** by their number in the map – with gaps where the map is not loaded */
   readonly controllers: SignalControllerJson[];
@@ -227,6 +240,65 @@ export class SignalSystem {
     if (!this.state[controller] || this.dark[controller] || this.asked[controller]) return false;
     this.asked[controller] = true;
     return true;
+  }
+
+  /**
+   * The state of the controllers within `radius` of (x, z): what each group
+   * shows and for how long, the crossings' own clocks and requests, the
+   * arrows.  `restore` puts it back (a replay; the live state around it).
+   */
+  snapshot(x: number, z: number, radius: number): SignalSnapshot {
+    const ids: number[] = [];
+    const groups: number[] = [];
+    const local: number[] = [];
+    const asked: number[] = [];
+    const states: number[] = [];
+    const ages: number[] = [];
+    const near = new Set<number>();
+    for (const i of this.ids) {
+      const c = this.controllers[i];
+      const st = this.state[i];
+      if (!c || !st || Math.abs(c.x - x) > radius || Math.abs(c.z - z) > radius) continue;
+      near.add(i);
+      ids.push(i);
+      groups.push(st.length);
+      local.push(this.local[i] ?? 0);
+      asked.push(this.asked[i] ? 1 : 0);
+      for (let g = 0; g < st.length; g++) {
+        states.push(st[g]);
+        ages.push(this.since[i][g]);
+      }
+    }
+    const arrows: Array<[Arm, number, number]> = [];
+    for (const [arm, a] of this.arrows) if (near.has(a.controller)) arrows.push([arm, a.state, a.since]);
+    return { time: this.time, ids: Int32Array.from(ids), groups: Uint8Array.from(groups), local: Float32Array.from(local), asked: Uint8Array.from(asked), states: Uint8Array.from(states), ages: Float32Array.from(ages), arrows };
+  }
+
+  /** Put back what `snapshot` took (controllers no longer loaded are left out). */
+  restore(s: SignalSnapshot): void {
+    this.time = s.time;
+    let k = 0;
+    for (let n = 0; n < s.ids.length; n++) {
+      const i = s.ids[n];
+      const count = s.groups[n];
+      const st = this.state[i];
+      if (st && st.length === count) {
+        this.local[i] = s.local[n];
+        this.asked[i] = s.asked[n] === 1;
+        for (let g = 0; g < count; g++) {
+          st[g] = s.states[k + g];
+          this.since[i][g] = s.ages[k + g];
+        }
+      }
+      k += count;
+    }
+    for (const [arm, state, since] of s.arrows) {
+      const a = this.arrows.get(arm);
+      if (a) {
+        a.state = state;
+        a.since = since;
+      }
+    }
   }
 
   /** Is a request waiting at this controller ("Signal kommt")? */

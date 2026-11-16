@@ -256,6 +256,113 @@ export interface LinesJson {
   lines: LineJson[];
 }
 
+/**
+ * A line of the city buses (buslines.json.gz, tools/build-buslines.ts): one
+ * direction of it, as a route relation of OpenStreetMap has it – the roads
+ * it drives along, in their order, and the stops it calls at.
+ *
+ * A road is named by its number in the whole map (the same in net.bin.gz
+ * and in every chunk of the network that holds it) and driven in one
+ * direction: a "way", road * 2 + (0: from its junction a to b, 1: from b to
+ * a), as routegraph.ts counts them.  The numbers belong to one build of the
+ * road network: `map` says which.
+ */
+export interface BusLineJson {
+  /** "52", "N3" ('' where the relation has none) */
+  ref: string;
+  name: string;
+  from: string;
+  to: string;
+  operator: string;
+  /** "#e3000f" or '' */
+  colour: string;
+  /** 0 bus, 1 trolleybus */
+  kind: number;
+  /** the route relation in OpenStreetMap */
+  osm: number;
+  /** the ways it drives, in order – each as the difference to the way before (the first as it is): mostly ±2 */
+  w: number[];
+  /**
+   * how many of the ways are the route itself: after them come the ways
+   * from its end round to where the line `back` begins (missing: none)
+   */
+  end?: number;
+  /** the stops it calls at, in order: stop place (its number in stops.json.gz), index into the ways, metres along that way (in the direction of travel) – three numbers each */
+  st: number[];
+  /** the line (index in `lines`) it goes on as at the end of its route – missing where none begins there */
+  back?: number;
+}
+
+export interface BusLinesJson {
+  v: number;
+  /** the build of the road network the road numbers belong to (meta.generated of map.json) */
+  map: string;
+  /** how many stop places stops.json.gz had (the stops are numbered in it) */
+  places: number;
+  lines: BusLineJson[];
+}
+
+/**
+ * The timetables of the trams (timetable.json.gz, tools/build-timetable.ts,
+ * read by src/sim/timetable.ts): for each line of lines.json.gz that has one,
+ * the ways its trips run – the stops in their order and the seconds between
+ * them – and when they leave, on a working day, a Saturday and a Sunday.
+ * Taken from a GTFS feed, from one ordinary week of it.
+ */
+export interface TimetableJson {
+  version: number;
+  /** when the file was made (ISO 8601) */
+  generated: string;
+  /** the feeds it was made from */
+  feeds: TimetableFeedJson[];
+  /** the days all of them are valid for (YYYY-MM-DD) */
+  valid: [string, string];
+  /** the week the trips were taken from (its Monday and Sunday) */
+  week: [string, string];
+  /** the day of it each day type comes from: Monday–Friday, Saturday, Sunday and holidays */
+  days: [string, string, string];
+  /** whom to name, and under which licence, wherever the times are shown */
+  attribution: string;
+  /** the names of the stops, as the tracks have them (rails.json.gz `sn`): the patterns refer to them by their place here */
+  stops: string[];
+  lines: TimetableLineJson[];
+}
+
+export interface TimetableFeedJson {
+  name: string;
+  version: string;
+  url: string;
+  /** first and last day it is valid for (YYYY-MM-DD) */
+  start: string;
+  end: string;
+}
+
+export interface TimetableLineJson {
+  /** the line's place in lines.json.gz `lines`, and its ref there (to see that the two files belong together) */
+  line: number;
+  ref: string;
+  patterns: TimetablePatternJson[];
+}
+
+/** One way the trips of a line run: the same stops at the same intervals. */
+export interface TimetablePatternJson {
+  /** its stops (indices into TimetableJson.stops), in the order it calls at them – only those of the line on the map */
+  s: number[];
+  /** the same stops by their place in the line's `stops` in lines.json.gz (where its piece of track and mark are) */
+  j: number[];
+  /** the departure from each, seconds after the departure from the first */
+  d: number[];
+  /** the arrival at each, the same way – only where some arrival differs from its departure */
+  a?: number[];
+  /** where its trams go: the last stop of the whole trip */
+  to: string;
+  /** 1: the trips come from further back than the first of `s` / go on beyond the last (the map's tracks end there) */
+  pre?: number;
+  post?: number;
+  /** when its trips leave the first stop, seconds after midnight, sorted (past 86 400: the night after) – Monday–Friday, Saturday, Sunday and holidays */
+  t: [number[], number[], number[]];
+}
+
 /** The airfields of the region (air.json.gz, tools/build-stops.ts). */
 export interface AirJson {
   v: number;

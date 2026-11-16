@@ -9,8 +9,10 @@
  */
 import { clamp, hash01, newPolySample, rng, samplePolyline } from '../core/geom.ts';
 import type { PolySample } from '../core/geom.ts';
+import type { BusLine, BusLineStop, BusLines } from '../world/buslines.ts';
 import { LaneGraph, TURN, lanePoint } from '../world/lanes.ts';
 import type { Connector, Lane } from '../world/lanes.ts';
+import { MinHeap, wayOf } from '../world/routegraph.ts';
 import { CLS, CTRL, EF, ROLE, XING } from '../world/types.ts';
 import type { CrossingJson } from '../world/types.ts';
 import type { Edge, World } from '../world/world.ts';
@@ -61,11 +63,41 @@ export interface TrafficCar {
   /**
    * A city bus (style BUS_STYLE): the stop it stands at – seconds left with
    * its doors open –, the pole it served last, and how long it still
-   * indicates to pull out again.
+   * indicates to pull out again; the line it runs (null: none), and how many
+   * roads it has driven since it last had one.
    */
-  bus?: { dwell: number; served: number; doors: boolean; pullOut: number };
+  bus?: { dwell: number; served: number; doors: boolean; pullOut: number; line?: BusOnLine | null; free?: number };
+  /**
+   * The lane of the same road it is moving over to (a bus whose line turns
+   * where its own lane does not lead) – and, once it has, how far it is
+   * still drawn to the left of the middle of its new lane (m) while it
+   * slides across.
+   */
+  merge?: Lane | null;
+  slide?: number;
+  /** a bus that has lost its line's way: the connectors back onto it, the next first ([]: none found) */
+  detour?: Connector[] | null;
   crashed: number;
   wheelSpin: number;
+}
+
+/**
+ * A bus running a line (src/world/buslines.ts): what its destination
+ * display shows, and where on the line's ways it is.
+ */
+export interface BusOnLine {
+  /** the line's number and where it goes – what the bus shows */
+  ref: string;
+  to: string;
+  /** the line (its number in BusLines.lines) and the way of it the bus is on (index into its ways) */
+  index: number;
+  k: number;
+  /**
+   * 0 while it is on its line's way; once it has lost it (its lane did not
+   * lead on there, or the map has no road for a piece) how many roads it has
+   * driven since – it drives on as the others do and looks for its way again
+   */
+  off: number;
 }
 
 export interface Pedestrian {
@@ -128,10 +160,20 @@ export interface PlayerState {
 /** the style of a traffic car that is a city bus (12 m, it calls at the stops) */
 export const BUS_STYLE = 3;
 
-/** A bus stop along a lane: where the front of a bus stands to serve it (metres along the lane) and the pole's number. */
+/**
+ * A bus stop along a lane: where the front of a bus stands to serve it
+ * (metres along the lane) and the pole's number – the stop place's number in
+ * the map's stops times 64, plus which of its poles (63: the place as a line
+ * of buses gives it, without a pole on this lane).
+ */
 export interface BusStopOnLane {
   s: number;
   id: number;
+}
+
+/** The stop place a pole's number (BusStopOnLane.id) belongs to. */
+export function stopPlaceOf(pole: number): number {
+  return Math.floor(pole / 64);
 }
 
 export type TrafficEvent =
@@ -172,8 +214,10 @@ export class Traffic {
    * with them, now and then a city bus is among the traffic.
    */
   busStops: ((lane: Lane) => readonly BusStopOnLane[]) | null = null;
-  /** the share of the traffic that are buses (where there are stops) */
+  /** the share of the traffic that are buses (where there are stops, or where a line runs) */
   busShare = 0.08;
+  /** the lines of the city buses (setBusLines) */
+  private lines: BusLines | null = null;
   private pedTimer = 0;
   targetCount = 24;
   spawnRadius = 330;
@@ -324,44 +368,419 @@ export class Traffic {
       // free space on the lane
       const others = this.onLane.get(lane.id);
       if (others && others.some((o) => Math.abs(o.s - s) < 14)) continue;
-      // now and then a city bus – on a street through the town, where stops are
-      const bus = this.busStops !== null && this.rand() < this.busShare && lane.edge.cls >= CLS.PRIMARY && lane.edge.cls <= CLS.RESIDENTIAL && lane.len > 30 && !this.cars.some((o) => o.bus && Math.hypot(o.x - tmp.x, o.z - tmp.z) < 250) && !(others && others.some((o) => Math.abs(o.s - s) < 22));
-      const style = bus ? BUS_STYLE : Math.floor(this.rand() * 3);
-      const car: TrafficCar = {
-        id: this.nextId++,
-        lane,
-        conn: null,
-        s,
-        v: Math.min(lane.limit, 13) * 0.8,
-        a: 0,
-        next: this.chooseNext(lane),
-        length: bus ? 12 : style === 1 ? 4.55 : 4.25,
-        width: bus ? 2.55 : 1.8,
-        color: COLORS[Math.floor(this.rand() * COLORS.length)],
-        style,
-        ...(bus ? { bus: { dwell: 0, served: -1, doors: false, pullOut: 0 } } : {}),
-        temper: 0.88 + this.rand() * 0.14,
-        x: tmp.x,
-        y: tmp.y,
-        z: tmp.z,
-        yaw: Math.atan2(-tmp.tx, -tmp.tz),
-        pitch: 0,
-        blinker: 0,
-        braking: false,
-        waited: 0,
-        yieldWait: 0,
-        stoppedAtLine: false,
-        stuck: 0,
-        blockedByPlayer: 0,
-        playerFirstGap: Infinity,
-        playerSeen: 0,
-        crashed: 0,
-        wheelSpin: 0,
-      };
-      this.cars.push(car);
-      this.attach(car);
+      // now and then a city bus – on a street through the town, where stops are, or on the way of a line
+      const lineHere = this.lines !== null && this.lines.has(wayOf(lane));
+      const bus =
+        (this.busStops !== null || lineHere) &&
+        this.rand() < this.busShare &&
+        (lineHere || (lane.edge.cls >= CLS.PRIMARY && lane.edge.cls <= CLS.RESIDENTIAL)) &&
+        lane.len > 30 &&
+        !this.cars.some((o) => o.bus && Math.hypot(o.x - tmp.x, o.z - tmp.z) < 250) &&
+        !(others && others.some((o) => Math.abs(o.s - s) < 22));
+      let at = lane;
+      let line: BusOnLine | null = null;
+      if (bus && lineHere) {
+        // one of the lines that run here – on the lane of the road from which it can follow its way
+        line = this.pickLine(lane);
+        if (line) {
+          at = this.laneFor(lane, line);
+          const there = this.onLane.get(at.id);
+          if (at !== lane && there && there.some((o) => Math.abs(o.s - s) < 22)) continue;
+        }
+      }
+      this.addCar(at, s, bus, line);
       return;
     }
+  }
+
+  /**
+   * Put a car of the traffic on a lane, its middle `s` metres along it – a
+   * city bus if `bus`, running `line` (undefined: one of the lines that run
+   * there, if any; null: none).  The traffic fills itself around the player;
+   * this is for putting one at a certain place.
+   */
+  addCar(lane: Lane, s: number, bus = false, line?: BusOnLine | null): TrafficCar {
+    const on = bus ? (line === undefined ? this.pickLine(lane) : line) : null;
+    lanePoint(lane, s, tmp);
+    const style = bus ? BUS_STYLE : Math.floor(this.rand() * 3);
+    const car: TrafficCar = {
+      id: this.nextId++,
+      lane,
+      conn: null,
+      s,
+      v: Math.min(lane.limit, 13) * 0.8,
+      a: 0,
+      // (a bus on a line chooses below, once it exists: it may have to move over to another lane first)
+      next: on ? null : this.chooseNext(lane),
+      length: bus ? 12 : style === 1 ? 4.55 : 4.25,
+      width: bus ? 2.55 : 1.8,
+      color: COLORS[Math.floor(this.rand() * COLORS.length)],
+      style,
+      ...(bus ? { bus: { dwell: 0, served: -1, doors: false, pullOut: 0, line: on, free: 0 } } : {}),
+      temper: 0.88 + this.rand() * 0.14,
+      x: tmp.x,
+      y: tmp.y,
+      z: tmp.z,
+      yaw: Math.atan2(-tmp.tx, -tmp.tz),
+      pitch: 0,
+      blinker: 0,
+      braking: false,
+      waited: 0,
+      yieldWait: 0,
+      stoppedAtLine: false,
+      stuck: 0,
+      blockedByPlayer: 0,
+      playerFirstGap: Infinity,
+      playerSeen: 0,
+      crashed: 0,
+      wheelSpin: 0,
+    };
+    if (on) car.next = this.nextFor(on, lane, car);
+    this.cars.push(car);
+    this.attach(car);
+    return car;
+  }
+
+  // --- the lines of the city buses ----------------------------------------------------
+
+  /** The lines of the city buses, as setBusLines was given them. */
+  get busLines(): BusLines | null {
+    return this.lines;
+  }
+
+  /**
+   * The lines of the city buses (src/world/buslines.ts – null: none).  A bus
+   * that appears where lines run gets one of them: it follows the line's way
+   * at the junctions, calls at the line's stops and, at the end of its
+   * route, goes on as the line back where that begins there.  The buses
+   * already under way are given lines anew.
+   */
+  setBusLines(lines: BusLines | null): void {
+    this.lines = lines;
+    for (const car of this.cars) {
+      if (!car.bus) continue;
+      car.bus.line = null;
+      car.bus.free = 0;
+      car.merge = null;
+      car.detour = null;
+      if (!car.lane) continue;
+      car.bus.line = this.pickLine(car.lane);
+      if (car.bus.line) car.next = this.nextFor(car.bus.line, car.lane, car);
+    }
+  }
+
+  private static onLine(line: BusLine, k: number): BusOnLine {
+    return { ref: line.ref, to: line.to, index: line.index, k, off: 0 };
+  }
+
+  /** A line for a bus on `lane`: one of those whose route runs along it, by chance (`prefer`: one of that number, if one runs here) – null if none does. */
+  private pickLine(lane: Lane, prefer = ''): BusOnLine | null {
+    if (!this.lines) return null;
+    // (not on the way round from the end of a route to the line back: there it shows where it came from)
+    const here = this.lines.at(wayOf(lane)).filter(({ line, k }) => k < line.end);
+    if (here.length === 0) return null;
+    const pick = (prefer ? here.find((h) => h.line.ref === prefer) : undefined) ?? here[Math.floor(this.rand() * here.length)];
+    return Traffic.onLine(pick.line, pick.k);
+  }
+
+  private readonly aheadWays: number[] = [];
+
+  /** The next `n` ways of a bus's line after the one it is on – on into the line back at its end (fewer where its line ends). */
+  private ahead(on: BusOnLine, n: number): readonly number[] {
+    const out = this.aheadWays;
+    out.length = 0;
+    if (!this.lines) return out;
+    let line = this.lines.lines[on.index];
+    let k = on.k + 1;
+    let last = line.ways[on.k];
+    for (let hops = 0; out.length < n; ) {
+      if (k < line.ways.length) {
+        last = line.ways[k++];
+        out.push(last);
+        continue;
+      }
+      const back = line.back;
+      if (!back || ++hops > 2) break;
+      line = back;
+      // (the line back may begin on the very road this one ends on)
+      k = back.ways[0] === last ? 1 : 0;
+    }
+    return out;
+  }
+
+  /** Can a vehicle on `lane` follow the ways ws[i], ws[i + 1], … through the next `depth` junctions?  (Beyond what is loaded it is taken that it can.) */
+  private reaches(lane: Lane, ws: readonly number[], i: number, depth: number): boolean {
+    if (depth === 0 || i >= ws.length || lane.out.length === 0) return true;
+    for (const c of lane.out) if (wayOf(c.to) === ws[i] && this.reaches(c.to, ws, i + 1, depth - 1)) return true;
+    return false;
+  }
+
+  /** Of the lanes of `lane`'s road in its direction, the one from which a bus can follow its line on – the right-most such. */
+  private laneFor(lane: Lane, on: BusOnLine): Lane {
+    const el = this.graph.edgeLanes[lane.edge.id];
+    const list = lane.dir > 0 ? el.fwd : el.back;
+    if (list.length < 2) return lane;
+    const ahead = [...this.ahead(on, 4)];
+    for (const l of list) if (this.reaches(l, ahead, 0, 3)) return l;
+    return list[0];
+  }
+
+  /**
+   * The connector to take at the end of `lane`: for a bus on a line the one
+   * into its line's next way – into the lane from which it can go on along
+   * it, the right-most such –, for every other car one at random.  Where the
+   * bus's lane does not lead there but another lane of the road does, it is
+   * to move over (`car.merge`, no connector yet); where none does, it loses
+   * its way (`off`).
+   */
+  private nextFor(on: BusOnLine | null | undefined, lane: Lane, car?: TrafficCar): Connector | null {
+    if (!on || !this.lines || lane.out.length === 0) return this.chooseNext(lane);
+    if (on.off === 0) {
+      const ahead = this.ahead(on, 4);
+      // (its line ends here, and none goes on from here)
+      if (ahead.length === 0) return this.chooseNext(lane);
+      let best: Connector | null = null;
+      let bestScore = -Infinity;
+      for (const c of lane.out) {
+        if (wayOf(c.to) !== ahead[0]) continue;
+        const score = (this.reaches(c.to, ahead, 1, 3) ? 100 : 0) - c.to.idx;
+        if (score > bestScore) {
+          bestScore = score;
+          best = c;
+        }
+      }
+      if (best) return best;
+      const other = car ? this.laneTowards(lane, ahead) : null;
+      if (car && other) {
+        car.merge = other;
+        return null;
+      }
+      on.off = 1;
+    }
+    // lost: along the shortest way back onto its line, where there is one
+    if (car) {
+      if (car.detour && car.detour.length > 0 && car.detour[0].from !== lane) car.detour = null;
+      car.detour ??= this.wayBack(lane, on) ?? [];
+      const c = car.detour.shift();
+      if (c) return c;
+    }
+    return this.chooseNext(lane);
+  }
+
+  /**
+   * A bus that has lost its line's way (a turn the map forbids, a lane it
+   * could not leave): the shortest drive back onto it – into one of its next
+   * ways, over the roads that are loaded, within 2.5 km – as the connectors
+   * to take, the first from `lane`.  Null if there is none.
+   */
+  private wayBack(lane: Lane, on: BusOnLine): Connector[] | null {
+    const lines = this.lines;
+    if (!lines) return null;
+    const line = lines.lines[on.index];
+    const goal = new Set<number>();
+    for (let j = on.k + 1; j < Math.min(line.ways.length, on.k + 13); j++) goal.add(line.ways[j]);
+    if (line.back && on.k >= line.ways.length - 3) for (let j = 0; j < Math.min(line.back.ways.length, 6); j++) goal.add(line.back.ways[j]);
+    goal.delete(wayOf(lane));
+    if (goal.size === 0) return null;
+    const dist = new Map<number, number>([[lane.id, 0]]);
+    const prev = new Map<number, Connector>();
+    const heap = new MinHeap(64);
+    heap.push(lane.id, 0);
+    let found: Lane | null = null;
+    for (let pops = 0; heap.size > 0 && pops < 6000; pops++) {
+      const d = heap.topKey;
+      const l = this.graph.lanes[heap.pop()];
+      if (!l || d > (dist.get(l.id) ?? Infinity)) continue;
+      if (l !== lane && goal.has(wayOf(l))) {
+        found = l;
+        break;
+      }
+      for (const c of l.out) {
+        const t = c.to;
+        // (not through private roads – unless they are its line's own, a turning loop for buses)
+        if (!LaneGraph.drivable(t.edge, false) && !goal.has(wayOf(t))) continue;
+        const nd = d + c.len + t.len + (c.turn === TURN.UTURN ? 80 : 0);
+        if (nd > 2500 || nd >= (dist.get(t.id) ?? Infinity)) continue;
+        dist.set(t.id, nd);
+        prev.set(t.id, c);
+        heap.push(t.id, nd);
+      }
+    }
+    if (!found) return null;
+    const path: Connector[] = [];
+    for (let l = found; l !== lane; ) {
+      const c = prev.get(l.id) as Connector;
+      path.push(c);
+      l = c.from;
+    }
+    return path.reverse();
+  }
+
+  /** Another lane of `lane`'s road in its direction from which the ways `ahead` can be followed – the nearest such (null: none). */
+  private laneTowards(lane: Lane, ahead: readonly number[]): Lane | null {
+    const el = this.graph.edgeLanes[lane.edge.id];
+    const list = lane.dir > 0 ? el.fwd : el.back;
+    let best: Lane | null = null;
+    let bestScore = -Infinity;
+    for (const l of list) {
+      if (l === lane || !l.out.some((c) => wayOf(c.to) === ahead[0])) continue;
+      const score = (this.reaches(l, ahead, 0, 3) ? 100 : 0) - Math.abs(l.idx - lane.idx);
+      if (score > bestScore) {
+        bestScore = score;
+        best = l;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * A car that is to move over to another lane of its road (`car.merge`)
+   * does so when there is room there beside and behind it – it waits for
+   * that before the stop line.  One that finds none for a long while gives
+   * up: a bus then loses its line's way.  (`listed`: the car is in the lists
+   * of the cars on each lane – not while it is being moved along.)
+   */
+  private moveOver(car: TrafficCar, listed = true): void {
+    const to = car.merge;
+    const lane = car.lane;
+    if (!to || !lane || to.edge !== lane.edge || to.dir !== lane.dir) {
+      car.merge = null;
+      return;
+    }
+    if (car.s >= lane.len || !this.roomOn(to, car.s, car.v, car.length)) {
+      if (car.stuck > 20) {
+        car.merge = null;
+        if (car.bus?.line) car.bus.line.off = 1;
+        car.next = this.nextFor(car.bus?.line, lane, car);
+      }
+      return;
+    }
+    if (listed) this.detach(car);
+    // (drawn where it was, it slides across: to the left of its new lane by the distance between the two)
+    car.slide = (car.slide ?? 0) + (lane.off - to.off) * lane.dir;
+    car.lane = to;
+    car.merge = null;
+    if (listed) this.attach(car);
+    car.next = this.nextFor(car.bus?.line, to, car);
+  }
+
+  /**
+   * A bus has come onto `lane`: where is that on its line?  Further along
+   * its way – or, at the end of its route, at the beginning of the line
+   * back, which it then runs; a bus whose line has ended, and one that never
+   * had one, takes one that runs here after a few roads.
+   */
+  private busOnLane(car: TrafficCar, lane: Lane): void {
+    const bus = car.bus;
+    const lines = this.lines;
+    if (!bus || !lines) return;
+    const w = wayOf(lane);
+    const on = bus.line;
+    if (!on) {
+      bus.free = (bus.free ?? 0) + 1;
+      if (bus.free > 2) {
+        bus.line = this.pickLine(lane);
+        if (bus.line) bus.served = -1;
+      }
+      return;
+    }
+    const line = lines.lines[on.index];
+    // (a few ways ahead: where the bus went round something; further once it has lost its way)
+    const reach = on.off > 0 ? 60 : 6;
+    for (let j = on.k + 1; j < Math.min(line.ways.length, on.k + 1 + reach); j++) {
+      if (line.ways[j] !== w) continue;
+      on.k = j;
+      on.off = 0;
+      car.detour = null;
+      return;
+    }
+    const back = line.back;
+    if (back && on.k >= line.ways.length - 2) {
+      for (let j = 0; j < Math.min(back.ways.length, 6); j++) {
+        if (back.ways[j] !== w) continue;
+        // the line back: its own number and destination, and its stops anew
+        bus.line = Traffic.onLine(back, j);
+        bus.served = -1;
+        car.detour = null;
+        return;
+      }
+    }
+    if (on.off === 0 && on.k >= line.ways.length - 1) {
+      // the end of its line, and none goes on from here: on without a line
+      bus.line = null;
+      bus.free = 0;
+      return;
+    }
+    // off its way: on along the way back if it has one (looked for anew now and then), else it gives up after a while
+    on.off++;
+    if (on.off % 4 === 0 && !car.detour?.length) car.detour = null;
+    if (on.off > (car.detour?.length ? 40 : 12)) {
+      bus.line = null;
+      bus.free = 0;
+      car.detour = null;
+    }
+  }
+
+  private readonly stopList: BusStopOnLane[] = [];
+  private readonly nearStops: BusLineStop[] = [];
+
+  /**
+   * The next stop a bus is to call at, within 70 m: on its lane (`here`) –
+   * or just beyond the junction ahead, where it has to begin braking on this
+   * side (a stop a few metres into a short road would come too late) – how
+   * far its front is from where it is to stand, and the pole.
+   */
+  private stopAhead(car: TrafficCar, lane: Lane | null, conn: Connector | null): { d: number; id: number; here: boolean } | null {
+    const bus = car.bus;
+    if (!bus) return null;
+    // (a bus on a line calls once at a stop place, at whichever of its poles)
+    const skip = (id: number): boolean => (bus.line ? stopPlaceOf(id) === stopPlaceOf(bus.served) : id === bus.served);
+    const front = car.s + car.length / 2;
+    if (lane) {
+      for (const st of this.stopsFor(lane, bus.line)) {
+        if (skip(st.id)) continue;
+        const d = st.s - front;
+        if (d < -1.5 || d > 70) continue;
+        return { d, id: st.id, here: true };
+      }
+    }
+    const via = lane ? car.next : conn;
+    if (!via) return null;
+    const rest = lane ? lane.len - front + via.len : via.len - front;
+    if (rest > 70) return null;
+    for (const st of this.stopsFor(via.to, bus.line, bus.line ? bus.line.k + 1 : 0)) {
+      if (skip(st.id)) continue;
+      return rest + st.s <= 70 ? { d: rest + st.s, id: st.id, here: false } : null;
+    }
+    return null;
+  }
+
+  /**
+   * The stops a bus calls at along `lane`: without a line every pole the map
+   * has there; on a line only those of its stops – at their poles where the
+   * map has them on this lane, else where the line says (`k`: the line's way
+   * the lane belongs to).  A bus that has lost its way calls nowhere until it
+   * has found it again.
+   */
+  private stopsFor(lane: Lane, on: BusOnLine | null | undefined, k = on?.k ?? 0): readonly BusStopOnLane[] {
+    if (!on || !this.lines) return this.busStops?.(lane) ?? [];
+    const out = this.stopList;
+    out.length = 0;
+    if (on.off > 0) return out;
+    const line = this.lines.lines[on.index];
+    // (the build puts each stop on one road; its pole may stand just beyond the junction, on the road before or after)
+    const near = this.lines.stopsOn(line, k - 1, k + 1, this.nearStops);
+    if (near.length === 0) return out;
+    for (const p of this.busStops?.(lane) ?? []) if (near.some((st) => st.place === stopPlaceOf(p.id))) out.push(p);
+    for (const st of near) {
+      if (st.k !== k || out.some((p) => stopPlaceOf(p.id) === st.place)) continue;
+      // the front door at the stop: the front of the bus a metre and a half beyond it, and the whole bus past the junction
+      const e = lane.edge;
+      const along = ((lane.dir > 0 ? st.m : e.len - st.m) - lane.s0) * lane.dir + 1.5;
+      out.push({ s: clamp(along, Math.min(12, lane.len - 0.5), lane.len - 0.5), id: st.place * 64 + 63 });
+    }
+    out.sort((a, b) => a.s - b.s);
+    return out;
   }
 
   private remove(car: TrafficCar): void {
@@ -884,6 +1303,8 @@ export class Traffic {
   }
 
   private drive(car: TrafficCar, dt: number, player: PlayerState): void {
+    // over to another lane of its road, where there is room (a bus whose line turns where its lane does not lead)
+    if (car.merge && !(car.bus && car.bus.dwell > 0)) this.moveOver(car);
     const lane = car.lane;
     const conn = car.conn;
     // a bus at its stop: the doors open, people get off and on – then the indicator, and off it goes
@@ -1042,6 +1463,8 @@ export class Traffic {
           if (stop) stopDist = Math.min(stopDist, Math.max(0, d));
         }
       }
+      // not yet over on the lane it needs: it waits before the stop line for room there
+      if (car.merge) stopDist = Math.min(stopDist, Math.max(0, lane.stopAt - car.s - car.length / 2 - 0.5));
     }
     if (conn) {
       // turning: wait in the junction while somebody crosses the road it turns into
@@ -1069,22 +1492,18 @@ export class Traffic {
         }
       }
     }
-    // a bus: the next stop on its lane – its front comes to stand at the pole
-    if (bus && lane && this.busStops) {
-      for (const st of this.busStops(lane)) {
-        if (st.id === bus.served) continue;
-        const d = st.s - (car.s + car.length / 2);
-        if (d < -1.5 || d > 70) continue;
-        if (d < 1.2 && car.v < 0.4) {
-          bus.served = st.id;
-          bus.doors = true;
-          bus.dwell = 10 + this.rand() * 10;
-          break;
-        }
-        stopDist = Math.min(stopDist, Math.max(0, d));
-        // (pulling in: the indicator to the right)
-        if (d < 45) car.blinker = 1;
-        break;
+    // a bus: the next stop on its way – its front comes to stand at the pole (on a line: the next of the line's stops)
+    if (bus && (this.busStops || bus.line)) {
+      const st = this.stopAhead(car, lane, conn);
+      // (its front at the pole – also where its middle is still in the junction before a short road)
+      if (st && st.d < 1.2 && car.v < 0.4) {
+        bus.served = st.id;
+        bus.doors = true;
+        bus.dwell = 10 + this.rand() * 10;
+      } else if (st) {
+        stopDist = Math.min(stopDist, Math.max(0, st.d));
+        // (pulling in: the indicator to the right – once it is on the road of the stop, not while it turns into it)
+        if (st.here && st.d < 45) car.blinker = 1;
       }
       if (bus.pullOut > 0) car.blinker = -1;
     }
@@ -1126,13 +1545,27 @@ export class Traffic {
         car.s -= car.conn.len;
         car.lane = car.conn.to;
         car.conn = null;
-        car.next = this.chooseNext(car.lane);
+        if (car.bus) this.busOnLane(car, car.lane);
+        car.next = this.nextFor(car.bus?.line, car.lane, car);
+        // (over at once where it can: a lane between two junctions may be a metre long)
+        if (car.merge) this.moveOver(car, false);
         car.stoppedAtLine = false;
         car.waited = 0;
         car.yieldWait = 0;
       } else if (car.lane) {
         if (car.s < car.lane.len) break;
-        const next = car.next ?? this.chooseNext(car.lane);
+        if (car.merge) {
+          // (too late to move over: on where its lane leads – a bus loses its line's way, and looks for the way back)
+          car.merge = null;
+          if (car.bus?.line) car.bus.line.off = 1;
+        }
+        let next = car.next ?? this.nextFor(car.bus?.line, car.lane, car);
+        if (!next && car.merge) {
+          // (no moving over at the very end of the lane, either)
+          car.merge = null;
+          if (car.bus?.line) car.bus.line.off = 1;
+          next = this.nextFor(car.bus?.line, car.lane, car);
+        }
         if (!next) {
           // dead end of the map: leave the simulation
           car.s = car.lane.len;
@@ -1153,7 +1586,16 @@ export class Traffic {
       lanePoint(car.lane!, car.s, tmp);
       tmp.y = this.world.edgeY(car.lane!.edge, car.lane!.s0 + car.lane!.dir * car.s, tmp.x, tmp.z);
     }
-    const yaw = Math.atan2(-tmp.tx, -tmp.tz);
+    let yaw = Math.atan2(-tmp.tx, -tmp.tz);
+    if (car.slide) {
+      // just moved over to another lane: it slides across from where it was, turned a little towards it
+      car.slide -= Math.sign(car.slide) * Math.min(Math.abs(car.slide), 1.2 * dt);
+      if (Math.abs(car.slide) < 0.02) car.slide = 0;
+      // (left of the direction of travel (tx, tz) is (tz, -tx))
+      tmp.x += tmp.tz * car.slide;
+      tmp.z -= tmp.tx * car.slide;
+      if (car.slide !== 0) yaw -= Math.sign(car.slide) * Math.atan2(1.2, Math.max(car.v, 3));
+    }
     // slope from the height change since the last frame
     if (ds > 0.01) car.pitch += (Math.atan2(tmp.y - car.y, ds) - car.pitch) * Math.min(1, dt * 6);
     car.x = tmp.x;

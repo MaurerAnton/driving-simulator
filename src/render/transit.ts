@@ -13,6 +13,7 @@
  */
 import * as THREE from 'three';
 import { hash01, newPolySample, samplePolyline } from '../core/geom.ts';
+import { carLayout } from '../sim/rail.ts';
 import type { RailTraffic, RailVehicle } from '../sim/rail.ts';
 import { SIG } from '../sim/signals.ts';
 import type { SignalSystem } from '../sim/signals.ts';
@@ -127,6 +128,11 @@ export class TransitScene {
   update(x: number, z: number, time: number, dt: number, signals: SignalSystem, buses: readonly TrafficCar[]): void {
     if (!this.group.visible) return;
     let budget = 1;
+    // the departure boards count down (a new picture now and then)
+    if (time - this.boardsAt > 20) {
+      this.boardsAt = time;
+      for (const v of this.places.values()) if (v.boards.length > 0) for (const b of v.boards) b.set(this.departures(v.place, time));
+    }
     // ---- the stops
     if (this.stops) {
       const want = new Set<number>();
@@ -355,8 +361,14 @@ export class TransitScene {
     return 0;
   }
 
-  /** What the departure board of a stop shows: the lines of the map that call there – and when, by the clock. */
+  /** the real departures at a stop by its name, from the timetables (set by the game; null where there are none) */
+  departuresFor: ((name: string) => Array<{ line: string; destination: string; minutes: number | string }> | null) | null = null;
+  private boardsAt = 0;
+
+  /** What the departure board of a stop shows: the trams of the timetables – or, without them, the lines of the map that call there, every ten or fifteen minutes. */
   private departures(place: StopPlace, time: number): Array<{ line: string; destination: string; minutes: number | string }> {
+    const real = this.departuresFor?.(place.name);
+    if (real) return real;
     const rows: Array<{ line: string; destination: string; minutes: number | string }> = [];
     const lines = this.lines.filter((l) => l.stops.includes(place.name));
     lines.forEach((l, i) => {
@@ -547,17 +559,18 @@ export class TransitScene {
   /** A tram's doors, on both sides (people come from wherever the platform is). */
   private tramDoors(rv: RailVehicle): Array<{ x: number; z: number }> {
     const out: Array<{ x: number; z: number }> = [];
-    for (const c of rv.cars) {
+    const roles = carLayout(rv.consist);
+    rv.cars.forEach((c, i) => {
       const s = Math.sin(c.yaw);
       const co = Math.cos(c.yaw);
       for (const along of [-0.25, 0.25]) {
         for (const side of [-1, 1]) {
-          const a = along * rv.consist.carLen;
+          const a = along * roles[i].len;
           const r = side * (rv.consist.width / 2 + 0.35);
           out.push({ x: c.x - s * a + co * r, z: c.z - co * a - s * r });
         }
       }
-    }
+    });
     return out;
   }
 

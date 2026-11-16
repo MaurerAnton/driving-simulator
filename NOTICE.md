@@ -21,6 +21,11 @@ License 1.0** – © OpenStreetMap-Mitwirkende, <https://www.openstreetmap.org/c
 Geländehöhen (DGM1) und Gebäude (3D-Gebäudemodelle LoD2): Hessische Verwaltung für Bodenmanagement und
 Geoinformation, offene Geobasisdaten nach § 18 HVGG („jede Nutzung ohne Einschränkung oder Bedingung“).
 
+Fahrpläne der Straßenbahnen und RegioTrams (`timetable.json.gz`): gtfs.de – GTFS für Deutschland
+(<https://gtfs.de>), Daten bereitgestellt von DELFI e.V. (<https://www.delfi.de>), mit Beiträgen von
+OpenStreetMap-Mitwirkenden; Lizenz **CC BY 4.0** (<https://creativecommons.org/licenses/by/4.0/>) – für das
+Spiel auf die Straßenbahnen und RegioTrams in Kassel gekürzt und umgerechnet.
+
 Die Herleitung beschreibt [docs/MAP_DATA.md](docs/MAP_DATA.md).
 
 ## Verkehrszeichen in `public/signs`

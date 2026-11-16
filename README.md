@@ -60,14 +60,22 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   Gleis eine Kreuzung quert. Eine Fahrstunde mit fünf Haltestellen, die freie Fahrt und eine Vorführfahrt, auf
   der die Bahn selbst fährt. Die Bahnen des Verkehrs fahren ihre echten **Linien** (1–8, RT1, RT4 und RT5,
   aus OpenStreetMap) mit Nummer und Ziel an der Front; die große Karte zeigt Gleise und Haltestellen.
+  **Echte Fahrpläne:** Die Bahnen des Verkehrs sind dort unterwegs, wo der Fahrplan (gtfs.de, Daten von DELFI e.V.)
+  sie gerade hat, und fahren an keiner Haltestelle zu früh ab; die Abfahrtsanzeiger zeigen die echten nächsten
+  Abfahrten, und an der Haltestelle sagt die Anzeige, ob die eigene Bahn pünktlich ist.
+  **Strom aus der Oberleitung:** Die Fahrt beginnt mit gesenktem **Stromabnehmer** – `P` (oder ein Tipp auf den
+  Hinweis) hebt ihn an den Fahrdraht, erst dann zieht die Bahn; gesenkt wird er nicht, solange die Motoren Strom
+  ziehen, und vor dem Ende des Fahrdrahts, wo die RegioTram mit ihrem Motor weiterfährt. Im Menü: eine Einheit,
+  **zwei gekuppelte Einheiten** (Doppeltraktion) oder eine Bahn mit **Beiwagen**, der nur Gewicht ist.
 - **Haltestellen zum Sehen:** 3 644 Haltestellen von Bus und Bahn mit ihren echten Namen – Bahnsteige,
   Wartehallen, das Haltestellenschild (Zeichen 224) mit dem Namen, Bänke, Abfahrtsanzeiger und Leute, die
   warten und ein- und aussteigen, wenn eine Bahn oder ein Bus hält; an der Haltemarke die Haltetafel (Sh 7).
   Über den Gleisen die Oberleitung mit ihren Masten, wo das Gleis eine Kreuzung mit Ampel quert die
   Straßenbahnsignale (F 0 bis F 5 nach BOStrab), vor den Weichen die Weichensignale (W 1 bis W 3), die zeigen,
   wohin die Weiche für die nächste Bahn gestellt ist.
-- **Bus auf der Linie:** Stadtbusse im Verkehr halten mit der vorderen Tür am Mast der Haltestelle und fahren
-  mit Blinker wieder an. Dazu eine Fahrstunde für die Busklassen: fünf Haltestellen bedienen – am Mast
+- **Bus auf der Linie:** Stadtbusse im Verkehr fahren ihre **echten Linien** aus OpenStreetMap (625 Linienwege in
+  Nordhessen) mit Nummer und Ziel an Front, Seite und Heck, halten an ihren Haltestellen mit der vorderen Tür
+  am Mast und fahren mit Blinker wieder an; am Ende der Linie geht es auf der Gegenrichtung zurück. Dazu eine Fahrstunde für die Busklassen: fünf Haltestellen bedienen – am Mast
   halten, Türen öffnen (`G`), Fahrgäste aus- und einsteigen lassen, Türen schließen, links blinken und
   anfahren (§ 10 StVO).
 - **Zu Fuß unterwegs:** „Zu Fuß“ im Fahrzeugmenü – durch die Stadt gehen und rennen (wie schnell, sagen die
@@ -75,7 +83,18 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   die Autos (§ 26 StVO), beim Abbiegen lassen sie einen gehen (§ 9 Abs. 3 StVO) – und an der Haltestelle in
   **Straßenbahn oder Bus einsteigen**, mitfahren und an einer späteren Haltestelle wieder aussteigen. Der
   Fahrlehrer achtet auch zu Fuß auf die Regeln: Gehweg statt Fahrbahn (§ 25 Abs. 1), über die Straße am
-  Überweg, wenn einer nah ist (§ 25 Abs. 3), nicht bei Rot (§ 37 Abs. 2 Nr. 5 StVO).
+  Überweg, wenn einer nah ist (§ 25 Abs. 3), nicht bei Rot (§ 37 Abs. 2 Nr. 5 StVO). Die Kamerataste (`V`)
+  zeigt einen **von hinten** – als eigene Figur, die geht und rennt.
+- **Wiederholung:** Jede Fahrt wird mitgeschrieben (die letzte halbe Stunde) und lässt sich aus dem Pausenmenü
+  oder dem Ergebnis **1:1 noch einmal ansehen** – das eigene Fahrzeug, der Verkehr, die Bahnen und die Ampeln,
+  wie sie waren; von hinten, vom Fahrersitz oder frei um das Fahrzeug, langsamer oder schneller, mit den
+  Hinweisen des Fahrlehrers als Marken auf der Zeitleiste.
+- **Hauptmenü in Reihen:** Fahrzeug, Ort und Startpunkt, die Optionen des Fahrzeugs und die Art der Fahrt als
+  Reihen von Karten zum Wischen über dem 3D-Bild – dahinter steht das gewählte Fahrzeug dort, wo die Fahrt
+  beginnt. Das einfache Menü von früher lässt sich in den Einstellungen wählen.
+- **Jedes Modell:** ein Testplatz auf dem Übungsplatz mit allen Fahrzeugen des Spiels nebeneinander (jede
+  Führerscheinklasse, mit und ohne Anhänger), den Autos, Radfahrern und Leuten des Verkehrs, zwei Straßenbahnen
+  und dem Flugzeug – zu Fuß oder mit dem eigenen Fahrzeug zwischen ihnen.
 - **Fliegen:** ein Leichtflugzeug (zweisitziger Schulterdecker, 100 bis 180 PS) startet von den
   21 Flugplätzen Nordhessens – vom Flughafen Kassel-Calden oder von einem der kleinen Plätze; Start- und
   Landebahnen, Rollwege und Vorfelder sind mit ihren Markierungen gezeichnet. Eigene Flugphysik (Auftrieb und
@@ -384,9 +403,10 @@ muss man zum Spielen und Entwickeln nicht.
 ### Tests
 
 ```bash
-npm test             # 267 Tests: Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
-                     # Klassen mit jeder Motorleistung (77), Flugphysik (25), Flugplätze (3), Straßenbahn fahren und ihre
-                     # Linien (6), Bus auf der Linie (2), zu Fuß an Ampel und Zebrastreifen (5), Fernsicht (2), Realansicht (15), Adresssuche, Hinweise, Fehlerprotokoll, Karte (16), Straßenbahnen (9),
+npm test             # 305 Tests: Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
+                     # Klassen mit jeder Motorleistung (77), Flugphysik (25), Flugplätze (3), Straßenbahn fahren, ihr
+                     # Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne im Verkehr (10), Fahrpläne
+                     # aus GTFS (21), Buslinien aus OpenStreetMap (9), Wiederholung (4), Bus auf der Linie (2), zu Fuß an Ampel und Zebrastreifen (5), Fernsicht (2), Realansicht (15), Adresssuche, Hinweise, Fehlerprotokoll, Karte (16), Straßenbahnen (9),
                      # Klasse CE (16), Sprachen (10), Rundfahrten mit Wünschen (8), Radfahrer (11), Ampeln mit Pfeil und ausgefallene
                      # Ampeln (9), zu Fuß (6), „Was ist neu“ (3), freie Fahrstreifen (5), Straßennetz in Stücken,
                      # Kachelformat, Kreuzungsflächen (12)
@@ -453,8 +473,8 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 267 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
-  Straßenbahn und ihre Linien, Bus auf der Linie, zu Fuß an Fußgängerampel und Zebrastreifen, Fernsicht, Anhänger, Aufgaben der Klasse CE,
+- **Automatisch geprüft:** 305 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
+  Straßenbahn mit Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne, Buslinien, die Wiederholung, Bus auf der Linie, zu Fuß an Fußgängerampel und Zebrastreifen, Fernsicht, Anhänger, Aufgaben der Klasse CE,
   Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
   Umgebungsverkehrs, eine Kontrolle der gebauten Karte (ein wagenbreiter Kreis fährt jeden Fahrstreifen
   ab: nichts steht darin) und ein „virtueller Fahrschüler“, der alle Fahrstunden und die Prüfungsfahrt
@@ -478,8 +498,7 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   vollständig prozedural erzeugt.
 - **Straßenbahn:** Die Straßenbahnsignale an Kreuzungen zeigen Halt (F 0), Fahrt (F 1) und „Halt erwarten“
   (F 4) nach der Ampel der Kreuzung, die Weichensignale die Stellung der Weiche (W 1 geradeaus, W 2 rechts,
-  W 3 links); das Heben und Senken des Stromabnehmers und Fahrpläne gibt es noch nicht, ebenso wenig
-  Doppeltraktion und Beiwagen. Die Fahrgäste der eigenen Bahn werden
+  W 3 links). Die Fahrgäste der eigenen Bahn werden
   gezählt; die an der Haltestelle sind gezeichnet. Die Fehler der Straßenbahn verweisen auf die BOStrab
   (§ 50 Geschwindigkeiten, § 54 Türen und Haltestellen).
 - **Fahrzeuge:** Das Motorrad fährt auf demselben Vierrad-Modell wie alles andere, nur schmal und mit tiefem
@@ -491,10 +510,17 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   stößt aber selbst nicht an Gebäude oder Schilder und kippt nicht. Das Verbinden und Trennen prüft die
   Reihenfolge der Handgriffe, nicht die Handgriffe selbst. Sattelzüge gibt es nicht.
 - **Straßenbahnen und Züge:** fahren ihre Linien (wo deren Weg in OpenStreetMap Lücken hat, wählen sie selbst),
-  aber ohne Fahrplan; sie beachten einander und Fahrzeuge auf dem Gleis, aber keine Signale; Schranken an
-  Bahnübergängen gibt es nicht.
-- **Zu Fuß:** man sieht mit den eigenen Augen – eine eigene Figur von außen gibt es noch nicht. Fußgänger
-  des Verkehrs gehen nur an Überwegen über die Straße.
+  die Straßenbahnen und RegioTrams nach dem Fahrplan einer typischen Woche (Montag bis Freitag, Samstag, Sonntag –
+  die Zusatzfahrten der Nacht zum Samstag fehlen), die Züge ohne Fahrplan; sie beachten einander und Fahrzeuge auf
+  dem Gleis, aber keine Signale; Schranken an Bahnübergängen gibt es nicht. Wer auf eine Bahn wartet, sieht sie erst,
+  wenn sie in den Umkreis von gut einem halben Kilometer kommt.
+- **Buslinien:** Abbiegeverbote der Karte gelten auch für Busse, Busspuren und Busstraßen fehlen – dort weicht ein
+  Bus vom echten Weg ab; ein Drittel der Linien ist nur teilweise auf der Karte (sie führen aus Nordhessen hinaus).
+- **Zu Fuß:** Die eigene Figur sieht immer gleich aus (wählen lässt sie sich noch nicht). Fußgänger des
+  Verkehrs gehen nur an Überwegen über die Straße.
+- **Wiederholung:** Sie zeigt, was gezeichnet war – Fahrzeuge, Leute, Bahnen und die Ampeln im Umkreis von
+  600 m; die Haltestellen und ihre Leute laufen nicht mit. Gespeichert wird sie nicht: sie gilt für die
+  laufende Fahrt.
 - **Flugzeug:** frei fliegen, ohne Funk, Flugverkehr, Navigationshilfen und Wetter; wer zu hart aufsetzt oder
   mit der Fläche den Boden berührt, beendet den Flug. Was jenseits der Kacheln liegt, zeigt die Fernsicht
   ohne Gebäude und Bäume.
@@ -524,7 +550,9 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   Quelltext anbieten.
 - **Kartendaten** (`public/map`): abgeleitete Datenbank aus © OpenStreetMap-Mitwirkende,
   [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/); Gelände und Gebäude aus offenen Geobasisdaten
-  der Hessischen Verwaltung für Bodenmanagement und Geoinformation.
+  der Hessischen Verwaltung für Bodenmanagement und Geoinformation. Die Fahrpläne der Straßenbahnen:
+  [gtfs.de](https://gtfs.de), Daten von DELFI e.V., [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
+  für das Spiel gekürzt.
 - **Verkehrszeichen** (`public/signs`): amtliche Werke, gemeinfrei (§ 5 Abs. 1 UrhG), Grafiken von
   Wikimedia Commons.
 - **Straßenfotos der Realansicht:** nicht Teil des Projekts – sie werden auf Wunsch live von Panoramax,
@@ -576,16 +604,32 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   while passengers get off and on; the instructor watches the speed in curves and on the street, every stop,
   the doors and red lights where the track crosses a junction. A lesson with five stops, free driving and a
   demonstration drive. The trams of the traffic run their **real lines** (1–8, RT1, RT4, RT5 from
-  OpenStreetMap) with number and destination on the front; the map shows the tracks and stops.
+  OpenStreetMap) with number and destination on the front, **to their real timetables** (gtfs.de, data from
+  DELFI e.V.) – the departure boards show the real departures, and at a stop you see whether your own tram is on
+  time; the map shows the tracks and stops. A drive
+  begins with the **pantograph** down: `P` raises it to the wire before the tram can pull, and it is lowered
+  before the wire ends (where the RegioTram goes on with its engine). In the menu: one unit, **two coupled
+  units**, or a tram with a **trailer car**.
 - **Stops you can see:** 3,644 bus and tram stops with their real names – platforms, shelters, the stop sign
   with its name, benches, departure boards and people who wait and get on and off; the tram's stop board
   (Sh 7), the overhead line with its masts, the tram signals (F 0 to F 5) where a track crosses a junction
   with lights, and the switch signals (W 1 to W 3) before the switches.
-- **The bus on a line:** city buses in the traffic stop at the stops and pull out with the indicator on; a
-  lesson for the bus classes serves five stops – front door at the pole, doors, passengers, indicator.
+- **The bus on a line:** city buses in the traffic run their **real lines** from OpenStreetMap (625 line routes in
+  northern Hesse) with number and destination on the front, side and back, stop at their stops and pull out with
+  the indicator on; a lesson for the bus classes serves five stops – front door at the pole, doors, passengers,
+  indicator.
 - **On foot as a pedestrian:** walk and run anywhere (the running speed is a setting), press the button at a
   pedestrian light ("Signal kommt"), cross at zebra crossings where cars stop for you, and ride trams and
-  buses as a passenger; the instructor watches the pedestrian rules (§ 25, § 37 Abs. 2 Nr. 5 StVO).
+  buses as a passenger; the instructor watches the pedestrian rules (§ 25, § 37 Abs. 2 Nr. 5 StVO). The camera
+  key shows you **from behind**, as a figure that walks and runs.
+- **Replays:** every drive is recorded (the last half hour) and can be **watched again 1:1** from the pause menu
+  or the result – your vehicle, the traffic, the trams and the lights as they were; from behind, from the
+  driver's seat or freely round it, slower or faster, with the instructor's notes as marks on the timeline.
+- **A main menu in rows:** the vehicle, the town and the place, its options and the kind of drive as rows of
+  cards to swipe over the 3D picture, with the chosen vehicle standing where the drive begins. The simple
+  menu of before can be chosen in the settings.
+- **Every model:** a test place on the practice yard with every vehicle of the game side by side, the cars,
+  cyclists and people of the traffic, two trams and the aeroplane – walk or drive among them.
 - **Flying:** a light two-seat high-wing aeroplane (100 to 180 PS) takes off from the 21 airfields of
   northern Hesse – Kassel Airport or one of the small fields, runways drawn with their markings – with flight
   physics of its own (lift and stall, propeller, gear, flaps) and a cockpit with all its instruments.
@@ -647,8 +691,9 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 267 unit tests (vehicle dynamics of every vehicle with every engine power, the tram, the trailer, the class-CE
-tasks, cyclists, traffic lights, on foot and the pedestrian lights, trams and their lines, the bus line, flight physics, airfields, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
+Verified automatically by 305 unit tests (vehicle dynamics of every vehicle with every engine power, the tram with its pantograph and
+coupled units, the trailer, the class-CE tasks, cyclists, traffic lights, on foot and the pedestrian lights, trams with their lines and
+timetables, bus lines, replays, the bus line, flight physics, airfields, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
 a check of the built map (a car-wide circle is driven along every lane: nothing stands in one) and a
 "virtual learner driver" – the driver of the demonstration drives – that completes every lesson and the
 driving test (about 56 km in total) without a single fault being reported, and with truck and trailer the

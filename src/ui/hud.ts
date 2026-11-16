@@ -18,6 +18,9 @@ import { NoticeBoard, noticeColour } from './notices.ts';
 import { LANGS, formatUnit, keyName, lessonIntro, lessonTitle, loadLang, localeOf, tr, violationRef, violationTitle, violationWhy } from '../i18n/index.ts';
 import { VIOLATION_REFS, citationParts } from '../i18n/violations.ts';
 import type { FaultLog } from '../game/faultlog.ts';
+import type { ReplayNote } from '../game/replay.ts';
+import { carouselMenu } from './carousel.ts';
+import type { MenuPreview } from './carousel.ts';
 import type { Lang } from '../i18n/index.ts';
 
 export interface HudState {
@@ -87,6 +90,26 @@ export interface TramStopChoice {
   town: string;
   x: number;
   z: number;
+}
+
+/** What the buttons of the replay bar do. */
+export interface ReplayBar {
+  toggle(): void;
+  step(seconds: number): void;
+  speed(): void;
+  seek(t: number): void;
+  camera(): void;
+  exit(): void;
+}
+
+/** What the replay bar shows: where the replay stands, how fast, which view. */
+export interface ReplayState {
+  t: number;
+  start: number;
+  end: number;
+  playing: boolean;
+  speed: number;
+  camera: 'behind' | 'driver' | 'free';
 }
 
 export interface ResultSummary {
@@ -173,6 +196,10 @@ export class Hud {
   onStart: (req: StartRequest) => void = () => {};
   onResume: () => void = () => {};
   onQuit: () => void = () => {};
+  /** watch the drive again (null: nothing recorded yet) */
+  onReplay: (() => void) | null = null;
+  /** the menu of rows: the vehicle chosen and where it would start, for the scene behind (null: the simple menu, no vehicle shown) */
+  onMenuPreview: (p: MenuPreview | null) => void = () => {};
   onReality: () => void = () => {};
   /** get out of the vehicle (offered in the pause menu while it stands) */
   onGetOut: (() => void) | null = null;
@@ -310,6 +337,11 @@ export class Hud {
   }
 
   showMenu(spawns: SpawnJson[]): void {
+    if (this.settings.menuStyle === 'carousel') {
+      this.showCarousel(spawns);
+      return;
+    }
+    this.onMenuPreview(null);
     const o = el('div', 'overlay');
     const p = el('div', 'panel');
     // the language first: whoever cannot read the page must be able to find it
@@ -483,6 +515,24 @@ export class Hud {
     rowVeh.append(el('label', '', this.t('vehicle')), selVeh);
     // (trucks, buses and tractors have automated gearboxes, as nearly all of them today)
     opts.append(...(tramMode || planeMode ? [rowStop, rowVeh] : [rowSpawn, rowAddr, rowVeh]));
+    if (tramMode) {
+      // the tram: one unit, two coupled, or one with a trailer car
+      const rowSet = el('div', 'row');
+      const selSet = el('select');
+      for (const [v, k] of [['single', 'tramSetSingle'], ['double', 'tramSetDouble'], ['trailer', 'tramSetTrailer']]) {
+        const op = el('option');
+        op.value = v;
+        op.textContent = this.t(k);
+        selSet.append(op);
+      }
+      selSet.value = this.settings.tramSet;
+      selSet.onchange = () => {
+        this.settings.tramSet = selSet.value as Settings['tramSet'];
+        saveSettings(this.settings);
+      };
+      rowSet.append(el('label', '', this.t('tramSet')), selSet);
+      opts.append(rowSet);
+    }
     // its engine: the powers a vehicle of its class may have, each kind of vehicle with its own
     if (def.powers.length > 1) {
       const rowPw = el('div', 'row');
@@ -523,6 +573,8 @@ export class Hud {
       card(this.t('demo'), this.t('demoDesc'), 'demo');
       card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
     }
+    // the test place: every model of the game on the practice yard – on foot or with a vehicle of the road
+    if (def.kind !== 'tram' && def.kind !== 'plane' && this.world.json.yard) card(this.t('showTitle'), this.t('showDesc'), 'show');
     // the lessons of the chosen vehicle: the practice yard first, the test last
     const rank = (kind: string): number => (kind === 'yard' ? 0 : kind === 'exam' ? 2 : 1);
     const kind = def.kind;
@@ -549,6 +601,46 @@ export class Hud {
     o.append(p);
     this.setOverlay(o);
     this.menuRedraw = () => this.showMenu(spawns);
+  }
+
+  /** The main menu in rows of cards over the 3D scene (ui/carousel.ts). */
+  private showCarousel(spawns: SpawnJson[]): void {
+    const o = el('div', 'overlay clear');
+    const redraw = (): void => this.showMenu(spawns);
+    o.append(
+      carouselMenu({
+        lang: this.lang,
+        t: (k, vars) => this.t(k, vars),
+        settings: this.settings,
+        spawns,
+        tramStops: this.tramStops,
+        runways: this.runways,
+        hasYard: !!this.world.json.yard,
+        language: this.languagePicker(redraw),
+        address: (pick) =>
+          addressPicker({
+            placeholder: this.t('addressPlaceholder'),
+            loading: this.t('realityLoading'),
+            none: this.t('addressNone'),
+            load: () => this.loadAddresses(),
+            near: () => spawns[this.settings.lastStart.spawn] ?? null,
+            pick,
+          }).node,
+        tools: [
+          [this.t('settings'), () => this.showSettings(redraw)],
+          [this.t('controls'), () => this.showControls(redraw)],
+          [this.t('logTitle'), () => this.showLog(redraw)],
+          [this.t('news'), () => this.showNews(redraw)],
+          [this.t('about'), () => this.showAbout(redraw)],
+        ],
+        version: this.t('newsVersion', { v: VERSION }),
+        start: (req) => this.onStart(req),
+        preview: (p) => this.onMenuPreview(p),
+        redraw,
+      }),
+    );
+    this.setOverlay(o);
+    this.menuRedraw = redraw;
   }
 
   /**
@@ -654,6 +746,8 @@ export class Hud {
     check(this.t('limiter'), s.limiter, (v) => (s.limiter = v));
     // on foot: how fast running is
     select(this.t('runSpeed'), String(s.runSpeed), RUN_SPEEDS.map((k): [string, string] => [String(k), `${k} km/h`]), (v) => (s.runSpeed = Number(v)));
+    // the main menu: rows over the 3D scene, or the simple list of before
+    select(this.t('menuStyle'), s.menuStyle, [['carousel', this.t('menuCarousel')], ['classic', this.t('menuClassic')]], (v) => (s.menuStyle = v as Settings['menuStyle']));
     // the picture
     select(this.t('startView'), s.view, [['chase', this.t('viewChase')], ['cockpit', this.t('viewCockpit')]], (v) => (s.view = v as Settings['view']));
     range(this.t('cabinOpacity'), (s.cabinOpacity - 0.2) / 0.8, (v) => (s.cabinOpacity = 0.2 + 0.8 * v));
@@ -809,6 +903,7 @@ export class Hud {
     p.append(el('h2', '', this.t('credits')));
     text('about.dataOsm');
     text('about.dataHessen');
+    text('about.timetables');
     text('about.signs');
     text('about.photos');
     p.append(el('h2', '', this.t('source')));
@@ -855,6 +950,12 @@ export class Hud {
     const m = el('button', 'btn ghost', this.t('mapTitle'));
     m.onclick = () => this.onMap();
     b.append(r, m, f);
+    if (this.onReplay) {
+      const rp = el('button', 'btn ghost', this.t('replay'));
+      const go = this.onReplay;
+      rp.onclick = () => go();
+      b.append(rp);
+    }
     if (this.canTeleport) {
       const a = el('button', 'btn ghost', this.t('teleport'));
       a.onclick = () => this.showTeleport();
@@ -939,6 +1040,12 @@ export class Hud {
     const log = el('button', 'btn ghost', this.t('logTitle'));
     log.onclick = () => this.showLog(() => this.showResult(r));
     b.append(q, log);
+    if (this.onReplay) {
+      const rp = el('button', 'btn ghost', this.t('replay'));
+      const go = this.onReplay;
+      rp.onclick = () => go();
+      b.append(rp);
+    }
     p.append(b);
     o.append(p);
     this.setOverlay(o);
@@ -1012,6 +1119,87 @@ export class Hud {
     o.append(p);
     this.setOverlay(o);
     bb.focus();
+  }
+
+  private replayBox: { root: HTMLElement; play: HTMLButtonElement; speed: HTMLButtonElement; cam: HTMLButtonElement; time: HTMLElement; note: HTMLElement; range: HTMLInputElement; marks: HTMLElement; shown: string } | null = null;
+  private replayNotes: readonly ReplayNote[] = [];
+
+  /**
+   * The bar of a replay, at the foot of the screen (the middle stays free for
+   * the picture): the clock and the note of the instructor at that moment,
+   * the timeline with a mark for each note (a tap jumps to just before it),
+   * and the buttons – back, play, on, how fast, which view, done.
+   */
+  showReplay(bar: ReplayBar, notes: readonly ReplayNote[], state: ReplayState): void {
+    this.hideReplay();
+    this.replayNotes = notes;
+    const root = el('div', 'replay');
+    const top = el('div', 'replay-top');
+    const time = el('span', 'replay-time');
+    const note = el('span', 'replay-note');
+    top.append(time, note);
+    const line = el('div', 'replay-line');
+    const range = el('input') as HTMLInputElement;
+    range.type = 'range';
+    range.min = '0';
+    range.max = '1000';
+    range.step = '1';
+    range.setAttribute('aria-label', this.t('replay'));
+    const span = Math.max(0.001, state.end - state.start);
+    range.oninput = () => bar.seek(state.start + (Number(range.value) / 1000) * span);
+    const marks = el('div', 'replay-marks');
+    for (const n of notes) {
+      const m = el('button', `replay-mark ${n.severity}`) as HTMLButtonElement;
+      m.style.left = `${((n.t - state.start) / span) * 100}%`;
+      m.title = violationTitle(n.id, this.lang, n.data);
+      m.setAttribute('aria-label', m.title);
+      m.onclick = () => bar.seek(n.t - 4);
+      marks.append(m);
+    }
+    line.append(range, marks);
+    const buttons = el('div', 'replay-buttons');
+    const btn = (label: string, aria: string, run: () => void): HTMLButtonElement => {
+      const b = el('button', 'btn ghost', label) as HTMLButtonElement;
+      b.setAttribute('aria-label', aria);
+      b.onclick = run;
+      return b;
+    };
+    const play = btn('⏸', this.t('replayPause'), () => bar.toggle());
+    const speed = btn('1×', this.t('replaySpeed'), () => bar.speed());
+    const cam = btn('', this.t('tbCamera'), () => bar.camera());
+    buttons.append(btn('⏪ 10 s', this.t('replayBack'), () => bar.step(-10)), play, btn('10 s ⏩', this.t('replayOn'), () => bar.step(10)), speed, cam, btn('✕', this.t('back'), () => bar.exit()));
+    root.append(top, line, buttons, el('div', 'replay-help', this.t('replayHelp')));
+    this.root.append(root);
+    this.replayBox = { root, play, speed, cam, time, note, range, marks, shown: '' };
+    this.updateReplay(state);
+  }
+
+  /** The bar as the replay stands now (only what changed is written). */
+  updateReplay(s: ReplayState): void {
+    const b = this.replayBox;
+    if (!b) return;
+    const clock = (t: number): string => {
+      const sec = Math.max(0, Math.round(t));
+      return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    };
+    // (the note of the instructor that fell within the last seconds)
+    const near = this.replayNotes.filter((n) => n.t <= s.t + 0.2 && n.t > s.t - 5).pop();
+    const key = `${Math.round(s.t * 4)}|${s.playing}|${s.speed}|${s.camera}|${near?.t ?? ''}`;
+    if (key === b.shown) return;
+    b.shown = key;
+    b.time.textContent = `${clock(s.t - s.start)} / ${clock(s.end - s.start)}`;
+    b.note.textContent = near ? violationTitle(near.id, this.lang, near.data) : '';
+    b.note.className = `replay-note ${near?.severity ?? ''}`;
+    b.range.value = String(Math.round(((s.t - s.start) / Math.max(0.001, s.end - s.start)) * 1000));
+    b.play.textContent = s.playing ? '⏸' : '▶';
+    b.play.setAttribute('aria-label', this.t(s.playing ? 'replayPause' : 'replayPlay'));
+    b.speed.textContent = `${s.speed < 1 ? '½' : s.speed}×`;
+    b.cam.textContent = this.t(s.camera === 'behind' ? 'replayBehind' : s.camera === 'driver' ? 'replayDriver' : 'replayFree');
+  }
+
+  hideReplay(): void {
+    this.replayBox?.root.remove();
+    this.replayBox = null;
   }
 
   hideOverlay(): void {

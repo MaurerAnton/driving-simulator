@@ -30,6 +30,9 @@ export const VIOLATION_REFS: Record<string, string> = {
   tramStopPlace: '§ 54 Abs. 2 BOStrab',
   tramDoorsMoving: '§ 54 Abs. 1 BOStrab',
   tramDoorsEarly: '§ 54 Abs. 1 BOStrab',
+  // the pantograph: the operating rules of the company (no paragraph of the BOStrab of its own)
+  tramPantoLoad: '@ref.tramRules',
+  tramPantoWireEnd: '@ref.tramRules',
   // on foot: the pavement (§ 25 Abs. 1), across the road straight and with an eye on the traffic – at a crossing
   // near by (§ 25 Abs. 3) –, the pedestrians' lights (§ 37 Abs. 2 Nr. 5)
   pedRed: '§ 37 Abs. 2 Nr. 5 StVO',

@@ -53,6 +53,82 @@ export interface Consist {
   brake: number;
   /** the kinds of track it may run on */
   tracks: number[];
+  /** units coupled together, each of `cars` sections with a driver's cab at both ends (double traction: 2; 1 if not said) */
+  units?: number;
+  /** a trailer car behind the unit(s): one body this long, without cab or motors (none if not said) */
+  trailer?: number;
+  /** the space at a coupling: between two units, before the trailer */
+  couple?: number;
+}
+
+/** What one body of a consist is: where it begins behind the front end, how long it is, and what it has. */
+export interface CarRole {
+  /** the unit it belongs to (the trailer: after the last unit) */
+  unit: number;
+  start: number;
+  len: number;
+  /** a driver's cab at its front end (looking ahead) or its back end (looking back) */
+  front: boolean;
+  back: boolean;
+  /** the end of the whole consist: its lamps are lit (white ahead, red behind) */
+  lampsFront: boolean;
+  lampsBack: boolean;
+  /** a trailer car (no cab, no motors) */
+  trailer: boolean;
+  /** the section with the pantograph on its roof */
+  panto: boolean;
+  /** bellows behind it to the next section of the same unit */
+  bellows: boolean;
+}
+
+const layouts = new WeakMap<Consist, CarRole[]>();
+
+/** The bodies of a consist from the front to the back. */
+export function carLayout(c: Consist): CarRole[] {
+  let list = layouts.get(c);
+  if (list) return list;
+  list = [];
+  const units = Math.max(1, c.units ?? 1);
+  const couple = c.couple ?? 1.3;
+  let at = 0;
+  for (let u = 0; u < units; u++) {
+    for (let i = 0; i < c.cars; i++) {
+      const last = i === c.cars - 1;
+      list.push({ unit: u, start: at, len: c.carLen, front: i === 0, back: last, lampsFront: u === 0 && i === 0, lampsBack: false, trailer: false, panto: c.cars === 1 || i === Math.floor((c.cars - 1) / 2), bellows: !last });
+      at += c.carLen + (last ? couple : c.gap);
+    }
+  }
+  if (c.trailer) list.push({ unit: units, start: at, len: c.trailer, front: false, back: false, lampsFront: false, lampsBack: false, trailer: true, panto: false, bellows: false });
+  list[list.length - 1].lampsBack = true;
+  layouts.set(c, list);
+  return list;
+}
+
+/** From the front end to the back end (m). */
+export function consistLength(c: Consist): number {
+  const l = carLayout(c);
+  const last = l[l.length - 1];
+  return last.start + last.len;
+}
+
+/** A consist of its kind as a single unit, two coupled units, or a unit with a trailer car. */
+export type TramSet = 'single' | 'double' | 'trailer';
+const variants = new Map<string, Consist>();
+export function consistOf(kind: number, set: TramSet = 'single'): Consist {
+  const base = CONSISTS[kind] ?? CONSISTS[RAIL.TRAM];
+  if (set === 'single' || kind === RAIL.TRAIN) return base;
+  const key = `${kind}:${set}`;
+  let c = variants.get(key);
+  if (!c) variants.set(key, (c = set === 'double' ? { ...base, units: 2, couple: 1.3 } : { ...base, trailer: kind === RAIL.LIGHT ? 14 : 12.4, couple: 1.1 }));
+  return c;
+}
+
+/** How much heavier a consist is than its single unit, and how much of its weight is driven (for the pull of the player's tram). */
+export function consistMass(c: Consist): { mass: number; driven: number } {
+  const units = Math.max(1, c.units ?? 1);
+  const unitLen = c.cars * c.carLen;
+  const trailer = c.trailer ? (c.trailer / unitLen) * 0.8 : 0;
+  return { mass: units + trailer, driven: units };
 }
 
 export const CONSISTS: Record<number, Consist> = {
@@ -97,6 +173,22 @@ export interface RailVehicle {
   player?: boolean;
   /** the line it runs (its number in RailTraffic.lines) and how far along it it is (the place in its pieces) */
   line?: { index: number; k: number } | null;
+  /** its pantographs: 0 down … 1 up against the wire (up if not said) */
+  panto?: number;
+  /** the trip of the timetable it runs (the schedule's own name for it), if it runs one */
+  trip?: string;
+}
+
+/**
+ * The timetable, as the traffic of the trams asks it (the game answers from
+ * sim/timetable.ts): which trips are under way round a place – and where –,
+ * and how long a tram still has to stand at a stop to leave on time.
+ */
+export interface RailSchedule {
+  /** the trips under way within `r1` of (x, z) – those further than `r0` only, unless `all` –: where each is, and how fast it runs */
+  due(x: number, z: number, r0: number, r1: number, all: boolean): Array<{ trip: string; line: number; path: number; s: number; dir: 1 | -1; k: number; speed: number }>;
+  /** how much longer the vehicle should stand at the stop at `mark` of piece `path` to leave on time (s; 0: it may go) */
+  wait(v: RailVehicle, path: number, mark: number): number;
 }
 
 /** A line of the trams (lines.json.gz): the pieces it runs, which way, and its stops. */
@@ -339,6 +431,8 @@ export class RailTraffic {
   readonly vehicles: RailVehicle[] = [];
   /** how many vehicles may be about at once */
   target = 4;
+  /** the share of the trams of the traffic that come as two coupled units */
+  doubleShare = 0.2;
   /** new vehicles appear this far from the player (out of the way, but soon in sight), and go when further than `far` */
   ringMin = 260;
   ringMax = 620;
@@ -355,6 +449,56 @@ export class RailTraffic {
 
   clear(): void {
     this.vehicles.length = 0;
+    this.fresh = true;
+  }
+
+  /** the timetable the trams of the traffic keep to (null: they come at random, every line as often) */
+  schedule: RailSchedule | null = null;
+  /** nothing on the tracks yet (a new drive, a jump): the trips are put where they are, also close to the player */
+  private fresh = true;
+
+  /**
+   * Where along line `line` a tram is that has left the stop `a` (piece,
+   * mark) for the stop `b` and done the share `frac` of the way: the piece,
+   * the metres on it, the direction, and its place in the line's pieces.
+   * Null if the line does not lead from a to b.
+   */
+  lineSpot(line: number, a: readonly [number, number], b: readonly [number, number], frac: number): { path: number; s: number; dir: 1 | -1; k: number } | null {
+    const l = this.lines[line];
+    if (!l) return null;
+    const seq = l.seq;
+    const ka = seq.findIndex((q) => q.path === a[0]);
+    if (ka < 0) return null;
+    let kb = -1;
+    for (let k = ka; k < seq.length; k++) {
+      if (seq[k].path !== b[0]) continue;
+      // (on the same piece the second stop must lie ahead of the first)
+      if (k === ka && (b[1] - a[1]) * seq[k].dir < 0) continue;
+      kb = k;
+      break;
+    }
+    if (kb < 0) return null;
+    const len = (k: number): number => this.net.paths[seq[k].path]?.len ?? 0;
+    /** metres from the start of seq[k] (in its direction) to a mark on it */
+    const into = (k: number, mark: number): number => (seq[k].dir > 0 ? mark : len(k) - mark);
+    let total = 0;
+    if (ka === kb) total = into(kb, b[1]) - into(ka, a[1]);
+    else {
+      total = len(ka) - into(ka, a[1]);
+      for (let k = ka + 1; k < kb; k++) total += len(k);
+      total += into(kb, b[1]);
+    }
+    let left = Math.max(0, Math.min(1, frac)) * Math.max(0, total);
+    let k = ka;
+    let at = into(ka, a[1]);
+    while (k < kb && at + left > len(k)) {
+      left -= len(k) - at;
+      at = 0;
+      k++;
+    }
+    const pos = Math.min(len(k), at + left);
+    const dir = seq[k].dir;
+    return { path: seq[k].path, s: dir > 0 ? pos : len(k) - pos, dir, k };
   }
 
   /** the lines of the trams (empty: they run where the tracks lead them) */
@@ -420,11 +564,11 @@ export class RailTraffic {
    * Put a vehicle on the track at a place (its front end), running in
    * direction `dir` of that piece.  Null if its length does not fit behind it.
    */
-  spawnAt(path: number, s: number, dir: 1 | -1, speed = 0): RailVehicle | null {
+  spawnAt(path: number, s: number, dir: 1 | -1, speed = 0, set: TramSet = 'single'): RailVehicle | null {
     const p = this.net.paths[path];
     if (!p || p.len < 2) return null;
-    const consist = CONSISTS[p.kind] ?? CONSISTS[RAIL.TRAM];
-    const length = consist.cars * consist.carLen + (consist.cars - 1) * consist.gap;
+    const consist = consistOf(p.kind, set);
+    const length = consistLength(consist);
     const n = Math.ceil((length + 6) / TRAIL_STEP) + 8;
     const trail = new Trail(n);
     // lay the vehicle out behind its front end: walk back along the track
@@ -465,7 +609,7 @@ export class RailTraffic {
       dwell: 0,
       noStop: 30,
       plan: [],
-      cars: Array.from({ length: consist.cars }, () => ({ x: 0, y: 0, z: 0, yaw: 0, pitch: 0 })),
+      cars: carLayout(consist).map(() => ({ x: 0, y: 0, z: 0, yaw: 0, pitch: 0 })),
       trail,
       blocked: false,
     };
@@ -478,12 +622,13 @@ export class RailTraffic {
   circles(skip: RailVehicle | null, out: RailObstacle[]): void {
     for (const v of this.vehicles) {
       if (v === skip) continue;
-      const half = v.consist.carLen / 2;
-      for (const c of v.cars) {
+      const roles = carLayout(v.consist);
+      v.cars.forEach((c, i) => {
+        const half = roles[i].len / 2;
         const fx = -Math.sin(c.yaw);
         const fz = -Math.cos(c.yaw);
         for (const k of [-0.7, 0, 0.7]) out.push({ x: c.x + fx * half * k, z: c.z + fz * half * k, r: v.consist.width / 2 + 0.2 });
-      }
+      });
     }
   }
 
@@ -498,7 +643,26 @@ export class RailTraffic {
       if (!this.vehicles[i].player && Math.hypot(c.x - player.x, c.z - player.z) > this.far) this.vehicles.splice(i, 1);
     }
     this.spawnT -= dt;
-    if (this.spawnT <= 0 && this.vehicles.length < this.target) {
+    if (this.schedule && this.lines.length > 0) {
+      // by the timetable: the trips under way round the player – each once
+      if (this.spawnT <= 0 && this.target > 0) {
+        this.spawnT = 2;
+        const all = this.fresh;
+        this.fresh = false;
+        for (const d of this.schedule.due(player.x, player.z, this.ringMin, this.ringMax, all)) {
+          if (this.vehicles.length >= this.target + 8) break;
+          if (this.vehicles.some((v) => v.trip === d.trip)) continue;
+          // (not into a tram that is there already)
+          this.net.sample(d.path, d.s, tmp);
+          if (this.vehicles.some((v) => v.cars.some((c) => Math.hypot(c.x - tmp.x, c.z - tmp.z) < 60))) continue;
+          const v = this.spawnAt(d.path, d.s, d.dir, 0, this.random() < this.doubleShare ? 'double' : 'single');
+          if (!v) continue;
+          v.trip = d.trip;
+          v.line = { index: d.line, k: d.k };
+          v.speed = Math.min(d.speed, v.consist.vmax * 0.6, tmp.cap);
+        }
+      }
+    } else if (this.spawnT <= 0 && this.vehicles.length < this.target) {
       this.spawnT = 1.5;
       this.spawnNear(player);
     }
@@ -536,7 +700,8 @@ export class RailTraffic {
       // on a double track keep to the right-hand one; a single track is run both ways
       const way = this.net.paths[path].way;
       const dir: 1 | -1 = way !== 0 ? way : this.random() < 0.5 ? 1 : -1;
-      const v = this.spawnAt(path, s, dir, 0);
+      // (now and then two units coupled together, as on the busy lines)
+      const v = this.spawnAt(path, s, dir, 0, this.random() < this.doubleShare ? 'double' : 'single');
       if (v) {
         v.speed = Math.min(v.consist.vmax * 0.6, tmp.cap);
         this.assignLine(v);
@@ -546,8 +711,24 @@ export class RailTraffic {
     return null;
   }
 
+  /**
+   * Whether there is an overhead wire along a piece: where the map says so,
+   * and on the tracks of the trams also where it does not say (they all have
+   * one); railway lines only where the map says.
+   */
+  wired(path: number): boolean {
+    const p = this.net.paths[path];
+    return !!p && (p.wire === 1 || (p.wire === -1 && p.kind !== RAIL.TRAIN));
+  }
+
   private step(v: RailVehicle, dt: number, obstacles: readonly RailObstacle[]): void {
     const c = v.consist;
+    // (the regional trams run on their engine where there is no wire: the pantographs come down there)
+    if (v.kind !== RAIL.TRAIN) {
+      const want = this.wired(v.path) ? 1 : 0;
+      const now = v.panto ?? 1;
+      if (now !== want) v.panto = want > now ? Math.min(1, now + dt / 3) : Math.max(0, now - dt / 1.5);
+    }
     if (v.dwell > 0) {
       v.dwell -= dt;
       v.speed = 0;
@@ -634,6 +815,13 @@ export class RailTraffic {
     if (v.speed === 0) {
       if (stopIn < 1.2) {
         v.dwell = 12 + this.random() * 8;
+        // (by the timetable: not before its time)
+        if (this.schedule && v.trip) {
+          const p = this.net.paths[v.path];
+          let mark = -1;
+          for (const m of p.stops) if (Math.abs(m - v.s) < 4) mark = m;
+          if (mark >= 0) v.dwell = Math.max(v.dwell, Math.min(600, this.schedule.wait(v, v.path, mark)));
+        }
         v.noStop = 70;
       } else if (endIn < 3 && blockIn === Infinity) {
         // the end of the line: wait, then go back the way it came
@@ -719,7 +907,7 @@ export class RailTraffic {
   /** The rear end becomes the front end. */
   private reverse(v: RailVehicle): void {
     const t = v.trail;
-    const length = v.consist.cars * v.consist.carLen + (v.consist.cars - 1) * v.consist.gap;
+    const length = consistLength(v.consist);
     const k = Math.min(t.count - 1, Math.round(length / TRAIL_STEP));
     const tail = t.at(k);
     const entries: Array<[number, number, number, number, number, number]> = [];
@@ -754,11 +942,12 @@ export class RailTraffic {
       out.y = t.y[a] + (t.y[b] - t.y[a]) * u;
       out.z = t.z[a] + (t.z[b] - t.z[a]) * u;
     };
-    for (let i = 0; i < c.cars; i++) {
-      const start = i * (c.carLen + c.gap);
+    const roles = carLayout(c);
+    for (let i = 0; i < roles.length; i++) {
+      const { start, len } = roles[i];
       // each car rides on two pivots a little in from its ends
-      at(start + c.carLen * 0.14, pivotA);
-      at(start + c.carLen * 0.86, pivotB);
+      at(start + len * 0.14, pivotA);
+      at(start + len * 0.86, pivotB);
       const car = v.cars[i];
       const fx = pivotA.x - pivotB.x;
       const fy = pivotA.y - pivotB.y;
@@ -782,11 +971,14 @@ export class RailTraffic {
   touching(player: RailPlayer): { nx: number; nz: number; depth: number; vx: number; vz: number } | null {
     let best: { nx: number; nz: number; depth: number; vx: number; vz: number } | null = null;
     for (const v of this.vehicles) {
-      for (const car of v.cars) {
+      const roles = carLayout(v.consist);
+      for (let i = 0; i < v.cars.length; i++) {
+        const car = v.cars[i];
         if (Math.abs(car.y - player.y) > 4) continue;
-        const reach = v.consist.carLen / 2 + player.length;
+        const half = roles[i].len / 2;
+        const reach = half + player.length;
         if (Math.abs(car.x - player.x) > reach || Math.abs(car.z - player.z) > reach) continue;
-        const hit = boxOverlap(player.x, player.z, player.yaw, player.length / 2, player.width / 2, car.x, car.z, car.yaw, v.consist.carLen / 2, v.consist.width / 2);
+        const hit = boxOverlap(player.x, player.z, player.yaw, player.length / 2, player.width / 2, car.x, car.z, car.yaw, half, v.consist.width / 2);
         if (hit && (!best || hit.depth > best.depth)) best = { ...hit, vx: -Math.sin(car.yaw) * v.speed, vz: -Math.cos(car.yaw) * v.speed };
       }
     }

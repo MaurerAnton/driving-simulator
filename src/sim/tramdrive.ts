@@ -10,7 +10,12 @@
  *    none: straight on), as on real trams; the switch is set some metres
  *    before it and then stays;
  *  - at a stop the doors are opened (the door key), the passengers get off
- *    and on, the doors are closed, and only then the tram moves.
+ *    and on, the doors are closed, and only then the tram moves;
+ *  - the power comes from the overhead wire: the pantograph is raised before
+ *    the tram can pull (it takes a few seconds), and lowered – not while the
+ *    motors draw current – before the wire ends, where a regional tram runs
+ *    on its engine; a second unit coupled on pulls with it, a trailer car is
+ *    only weight.
  *
  * What the instructor looks at (BOStrab, StVO where the track runs in the
  * street): the speed the curves and the road allow, stopping at every stop
@@ -19,8 +24,9 @@
  */
 import type { SignalSystem } from './signals.ts';
 import { SIG } from './signals.ts';
+import { consistMass } from './rail.ts';
 import type { RailTraffic, RailVehicle } from './rail.ts';
-import { CTRL } from '../world/types.ts';
+import { CTRL, RAIL } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { World } from '../world/world.ts';
 
@@ -42,7 +48,11 @@ export const TRAM = {
 const STOP_BEFORE = 7;
 const STOP_PAST = 4;
 
-export type TramFault = 'speed' | 'tramCurve' | 'redLight' | 'tramStopMissed' | 'tramStopPlace' | 'tramDoorsMoving' | 'tramDoorsEarly';
+export type TramFault = 'speed' | 'tramCurve' | 'redLight' | 'tramStopMissed' | 'tramStopPlace' | 'tramDoorsMoving' | 'tramDoorsEarly' | 'tramPantoLoad' | 'tramPantoWireEnd';
+
+/** how long the pantograph takes to rise to the wire, and to come down (s) */
+export const PANTO_UP_TIME = 3;
+export const PANTO_DOWN_TIME = 1.5;
 
 export interface TramEvent {
   fault: TramFault;
@@ -81,6 +91,8 @@ export class TramDriver {
     /** a junction with lights the track crosses: how far, what the light for the tram shows */
     signalIn: Infinity,
     signal: -1,
+    /** where the overhead wire ends ahead (m; Infinity: not within sight, or there is none here) */
+    wireEndIn: Infinity,
   };
   /** the speed limit here (km/h): the road's where the track runs in the street, else 70 */
   limit = 70;
@@ -94,6 +106,11 @@ export class TramDriver {
   /** a stop the front has come within reach of: was it served? – and the stop last stood at with open doors */
   private pending: { path: number; mark: number; s: number } | null = null;
   private lastAt: { path: number; mark: number } | null = null;
+  /** the pantograph: 0 down … 1 up against the wire, and which way the player has set it (up when a tram is taken over; the game begins a drive with it down) */
+  panto = 1;
+  pantoUp = true;
+  /** whether the piece the front is on has a wire (to notice where it ends) */
+  private wasWired = true;
   private overLimit = 0;
   private lastSignalNode = -1;
   private readonly random: () => number;
@@ -109,6 +126,27 @@ export class TramDriver {
 
   get speed(): number {
     return this.v.speed;
+  }
+
+  /** a regional tram, with an engine for the lines without a wire */
+  get hybrid(): boolean {
+    return this.v.kind === RAIL.LIGHT;
+  }
+
+  /** whether there is a wire over the tram here */
+  get wired(): boolean {
+    return this.rail.wired(this.v.path);
+  }
+
+  /** whether the motors get power: from the wire with the pantograph up – or, on a regional tram where there is no wire, from its engine */
+  get powered(): boolean {
+    return this.wired ? this.panto >= 0.999 : this.hybrid;
+  }
+
+  /** Raise or lower the pantograph (its key); lowering it while the motors draw current is a fault (it draws an arc). */
+  togglePanto(events: TramEvent[]): void {
+    if (this.pantoUp && this.powered && this.wired && this.lever > 0.05 && this.v.speed > 0.5) events.push({ fault: 'tramPantoLoad', severity: 'minor' });
+    this.pantoUp = !this.pantoUp;
   }
 
   /** passengers still getting off or on */
@@ -173,6 +211,12 @@ export class TramDriver {
     const A = this.ahead;
     const v = this.v;
     this.emergency = false;
+    // the pantograph: up under the wire, down before it ends (the regional tram goes on with its engine)
+    if (this.wired && A.wireEndIn > 40 && !this.pantoUp) this.pantoUp = true;
+    if (this.pantoUp && (A.wireEndIn < 40 || !this.wired) && this.hybrid) {
+      if (this.lever > 0) this.lever = 0;
+      this.pantoUp = false;
+    }
     if (this.doorsOpen) {
       this.lever = -0.5;
       if (this.passengers === 0) this.toggleDoors(events);
@@ -193,6 +237,8 @@ export class TramDriver {
     if (A.signalIn < 150 && (A.signal === SIG.RED || A.signal === SIG.RED_AMBER || (A.signal === SIG.AMBER && canStop))) {
       target = Math.min(target, Math.sqrt(2 * b * Math.max(0, A.signalIn - 2.5)));
     }
+    // (no power yet – the pantograph still rising –: wait standing)
+    if (!this.powered && v.speed < 0.3) target = 0;
     const err = target - v.speed;
     this.lever = Math.max(-1, Math.min(1, err * 0.8));
     if (target < 0.15 && v.speed < 0.3) this.lever = -0.5;
@@ -249,11 +295,23 @@ export class TramDriver {
       v.plan.length = 0;
       if (next) v.plan.push(next);
     }
-    // --- forces
+    // --- the pantograph: rising or coming down; where the wire ends it must be down
+    const want = this.pantoUp ? 1 : 0;
+    if (this.panto !== want) this.panto = want > this.panto ? Math.min(1, this.panto + dt / PANTO_UP_TIME) : Math.max(0, this.panto - dt / PANTO_DOWN_TIME);
+    v.panto = this.panto;
+    const wired = this.wired;
+    if (!wired && this.wasWired && this.panto > 0.5) {
+      // (it would catch on the end of the wire: lowered at once, and the instructor says so)
+      events.push({ fault: 'tramPantoWireEnd', severity: 'major' });
+      this.pantoUp = false;
+    }
+    this.wasWired = wired;
+    // --- forces (a second unit pulls as much as it weighs; a trailer car is only weight)
     const sp = v.speed;
+    const { mass, driven } = consistMass(v.consist);
     let a = 0;
     if (this.emergency) a = -TRAM.emergency;
-    else if (this.lever > 0.01) a = this.lever * Math.min(TRAM.accel, (TRAM.accel * TRAM.powerFrom) / Math.max(sp, 1));
+    else if (this.lever > 0.01 && this.powered) a = ((this.lever * driven) / mass) * Math.min(TRAM.accel, (TRAM.accel * TRAM.powerFrom) / Math.max(sp, 1));
     else if (this.lever < -0.01) a = this.lever * TRAM.brake;
     if (sp >= TRAM.vmax && a > 0) a = 0;
     // the doors are open: the tram is held (as by the door interlock)
@@ -307,6 +365,8 @@ export class TramDriver {
     A.switchIn = Infinity;
     A.signalIn = Infinity;
     A.signal = -1;
+    A.wireEndIn = Infinity;
+    const wiredHere = this.rail.wired(v.path);
     let cp = v.path;
     let cs = v.s;
     let cd = v.dir;
@@ -315,6 +375,7 @@ export class TramDriver {
     let firstNode = -1;
     for (let guard = 0; guard < 200 && dist < 300; guard++) {
       const p = net.paths[cp];
+      if (wiredHere && A.wireEndIn === Infinity && !this.rail.wired(cp)) A.wireEndIn = dist;
       net.sample(cp, cs, tmp);
       A.curve = Math.min(A.curve, Math.sqrt(tmp.cap * tmp.cap + 2 * TRAM.brake * 0.7 * dist));
       // a junction with lights the track runs through (within 80 m)

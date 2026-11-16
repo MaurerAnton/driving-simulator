@@ -30,6 +30,10 @@ export interface TownOptions {
   oneWay?: Array<[number, number, number, number]>;
   /** streets that are left out */
   missing?: Array<[number, number, number, number]>;
+  /** streets with two lanes in each direction (turning right from the right one, left from the left one) */
+  wide?: Array<[number, number, number, number]>;
+  /** forbidden turns: from the street (i0, j0)–(i1, j1) at (i1, j1) into the street (i1, j1)–(i2, j2) */
+  bans?: Array<[number, number, number, number, number, number]>;
   /** a cul-de-sac of this length (m) leading east from the last junction of the first row */
   deadEnd?: number;
   /** pavements of this width (m) on both sides of every street */
@@ -72,6 +76,7 @@ export function makeTown(opt: TownOptions = {}): Town {
     if (same(opt.missing, a, b) !== 0) return;
     const way = same(opt.oneWay, a, b);
     const one = way !== 0;
+    const lanes = same(opt.wide, a, b) !== 0 ? 2 : 1;
     const A = nodes[a];
     const B = nodes[b];
     const p: number[] = [];
@@ -84,10 +89,10 @@ export function makeTown(opt: TownOptions = {}): Town {
       c: CLS.RESIDENTIAL,
       n: `Street ${edges.length}`,
       p,
-      lf: one && way < 0 ? 0 : 1,
-      lb: one && way > 0 ? 0 : 1,
-      lw: one ? 3.5 : 2.75,
-      w: one ? 3.5 : 5.5,
+      lf: one && way < 0 ? 0 : lanes,
+      lb: one && way > 0 ? 0 : lanes,
+      lw: one ? 3.5 : lanes > 1 ? 3.25 : 2.75,
+      w: one ? 3.5 * lanes : lanes > 1 ? 13 : 5.5,
       mf: 50,
       mb: 50,
       f: EF.URBAN,
@@ -165,12 +170,19 @@ export function makeTown(opt: TownOptions = {}): Town {
     }
     crossings.push(x);
   }
+  const banned: number[][] = [];
+  for (const [i0, j0, i1, j1, i2, j2] of opt.bans ?? []) {
+    const from = byKey.get(key(at(i0, j0), at(i1, j1)));
+    const to = byKey.get(key(at(i1, j1), at(i2, j2)));
+    if (from === undefined || to === undefined) throw new Error('no such street');
+    banned.push([from, at(i1, j1), to]);
+  }
   const json: WorldJson = {
     version: 1,
     meta: { name: 'Test town', generated: '', minX: -200, maxX: cols * block + 400, minZ: -200, maxZ: rows * block + 200, tileSize: 500, originE: 0, originN: 0, attribution: [] },
     nodes,
     edges,
-    banned: [],
+    banned,
     signals,
     crossings,
     places: [],

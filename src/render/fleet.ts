@@ -115,6 +115,63 @@ function dial(group: THREE.Group, panelTex: THREE.Texture, at: THREE.Vector3, w:
 const BUS_PAINT = new THREE.MeshLambertMaterial({ color: 0xf0eee4 });
 const BUS_STRIPE = new THREE.MeshLambertMaterial({ color: 0x1f5fa8 });
 
+/** How much of the display's picture (from the top) the band with the number and the destination takes; below it, the number alone. */
+const BAND = 84 / 128;
+
+/** A plate showing part of a picture: u0 … u1 across, v0 … v1 up. */
+function platePart(w: number, h: number, u0: number, u1: number, v0: number, v1: number): THREE.PlaneGeometry {
+  const g = new THREE.PlaneGeometry(w, h);
+  const uv = g.getAttribute('uv') as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * (u1 - u0), v0 + uv.getY(i) * (v1 - v0));
+  return g;
+}
+
+/**
+ * The destination display of a city bus: its line and where it goes, amber
+ * on black.  One small picture per bus – the band with both above (for the
+ * front and the side), the number alone below it (for the back) –, drawn
+ * anew only when the line changes.
+ */
+class Destination {
+  private readonly canvas = document.createElement('canvas');
+  readonly texture: THREE.CanvasTexture;
+  readonly material: THREE.MeshBasicMaterial;
+  text = '';
+
+  constructor() {
+    this.canvas.width = 512;
+    this.canvas.height = 128;
+    this.texture = new THREE.CanvasTexture(this.canvas);
+    this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.texture.anisotropy = 4;
+    this.material = new THREE.MeshBasicMaterial({ map: this.texture });
+  }
+
+  draw(ref: string, to: string): void {
+    const g = this.canvas.getContext('2d');
+    if (!g) return;
+    const band = 128 * BAND;
+    g.fillStyle = '#0b0b0b';
+    g.fillRect(0, 0, 512, 128);
+    g.fillStyle = '#ffb21a';
+    g.textBaseline = 'middle';
+    g.textAlign = 'left';
+    let x = 14;
+    if (ref) {
+      g.font = 'bold 62px "Arial Narrow", Arial, sans-serif';
+      const w = Math.min(150, g.measureText(ref).width);
+      g.fillText(ref, x, band / 2 + 2, 150);
+      x += w + 24;
+    }
+    g.font = 'bold 44px "Arial Narrow", Arial, sans-serif';
+    g.fillText(to, x, band / 2 + 2, 512 - x - 12);
+    g.textAlign = 'center';
+    g.font = 'bold 38px "Arial Narrow", Arial, sans-serif';
+    g.fillText(ref, 64, (band + 128) / 2 + 1, 116);
+    this.texture.needsUpdate = true;
+  }
+}
+
 /** A low-floor city bus, 12 m, three doors on the right, the engine at the back. */
 export class PlayerBus implements VehicleModel {
   readonly root = new THREE.Group();
@@ -126,6 +183,12 @@ export class PlayerBus implements VehicleModel {
   private readonly shell = new Shell(BUS_PAINT);
   private readonly panelTex = new InstrumentPanel();
   private readonly spec: VehicleSpec;
+  /** the maker's name over the windscreen – where the destination display goes when the bus runs a line */
+  private readonly brand: THREE.Mesh;
+  /** the measures the displays are placed by: half width, the top of the windows, the roof, front and back */
+  private readonly body: { hw: number; top: number; roof: number; zf: number; zr: number; long: boolean };
+  /** the destination display at the front, on the right side and at the back (made when a line is first shown) */
+  private display: { dest: Destination; plates: THREE.Mesh[] } | null = null;
 
   /** `spec`: the bus (12 m, class D) or the minibus (class D1) – its length, height and doors follow from it. */
   constructor(spec: VehicleSpec = BUS) {
@@ -198,6 +261,8 @@ export class PlayerBus implements VehicleModel {
     sign.position.set(0, top + 0.12, zf - 0.012);
     sign.rotation.y = Math.PI;
     root.add(sign);
+    this.brand = sign;
+    this.body = { hw, top, roof: y1, zf, zr, long };
     for (const side of [-1, 1]) {
       const plate = lettering(BRAND, long ? 4.2 : 2.6, long ? 0.42 : 0.3);
       plate.position.set(side * (hw + 0.008), 0.95, long ? 1.6 : zf + 4.4);
@@ -259,6 +324,45 @@ export class PlayerBus implements VehicleModel {
 
   setCabinOpacity(opacity: number): void {
     this.shell.setOpacity(opacity);
+  }
+
+  /**
+   * Show a line on the destination displays: its number and where it goes
+   * over the windscreen and beside the front door, the number at the back
+   * ('' for both: no line – the maker's name as before).  Drawn anew only
+   * when they change.
+   */
+  setLine(ref: string, to: string): void {
+    const text = ref || to ? `${ref}\n${to}` : '';
+    if (text === (this.display?.dest.text ?? '')) return;
+    if (!text) {
+      if (this.display) {
+        this.display.dest.text = '';
+        for (const p of this.display.plates) p.visible = false;
+      }
+      this.brand.visible = true;
+      return;
+    }
+    if (!this.display) {
+      const dest = new Destination();
+      const { hw, top, roof, zf, zr, long } = this.body;
+      const front = new THREE.Mesh(platePart(long ? 2.0 : 1.7, long ? 0.33 : 0.28, 0, 1, 1 - BAND, 1), dest.material);
+      front.position.set(0, top + 0.12, zf - 0.016);
+      front.rotation.y = Math.PI;
+      const side = new THREE.Mesh(platePart(1.3, 0.215, 0, 1, 1 - BAND, 1), dest.material);
+      side.position.set(hw + 0.012, (top + roof) / 2, zf + (long ? 2.3 : 3.2));
+      side.rotation.y = Math.PI / 2;
+      const back = new THREE.Mesh(platePart(0.6, 0.205, 0, 0.25, 0, 1 - BAND), dest.material);
+      back.position.set(0, long ? (2.7 + roof) / 2 : roof - 0.2, zr + 0.012);
+      const plates = [front, side, back];
+      this.root.add(...plates);
+      this.display = { dest, plates };
+    }
+    const [ref0, to0] = text.split('\n');
+    this.display.dest.draw(ref0, to0);
+    this.display.dest.text = text;
+    for (const p of this.display.plates) p.visible = true;
+    this.brand.visible = false;
   }
 
   update(s: CarVisualState, _dt: number, now: number): void {

@@ -495,7 +495,7 @@ const KINDS: readonly Kind[] = [
 ];
 
 /** A person's look, worked out once from the look number. */
-interface Look {
+export interface Look {
   id: number;
   /** height / 1.72, and the head a little bigger on children */
   scale: number;
@@ -526,7 +526,7 @@ interface Look {
   bow: number;
 }
 
-function lookOf(id: number): Look {
+export function lookOf(id: number): Look {
   const r = (k: number): number => hash01(Math.imul(id | 0, 0x2c1b3c6d) ^ Math.imul(k + 1, 0x297a2d39));
   const pick = <T>(list: readonly T[], k: number): T => list[Math.min(list.length - 1, Math.floor(r(k) * list.length))];
   const kind = pick(KINDS, 0);

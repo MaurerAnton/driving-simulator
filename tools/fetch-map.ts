@@ -12,6 +12,11 @@
  * `map.release` at the top of the repository names the release the code at
  * hand goes with.
  *
+ * Data that is built after a map release – small files such as the tram
+ * timetables or the bus lines (EXTRA below) – may be added to the release
+ * as files of their own; they are fetched too when they are there, and take
+ * the place of those in map.tar.
+ *
  * Needs curl and tar.
  */
 import { spawn } from 'node:child_process';
@@ -25,6 +30,8 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
 const repo = pkg.repository.url.replace(/\.git$/, '');
 const url = `${repo}/releases/download/${tag}/map.tar`;
 const target = resolve(root, 'public');
+/** files a release may have beside map.tar, put into the map folder */
+const EXTRA = ['timetable.json.gz', 'buslines.json.gz'];
 
 console.log(`[map] ${url}`);
 mkdirSync(target, { recursive: true });
@@ -83,6 +90,20 @@ if (!ok || t !== 0 || !existsSync(resolve(fresh, 'map', 'map.json'))) {
   rmSync(fresh, { recursive: true, force: true });
   console.error(`[map] could not fetch the map (tar ${t}). Is there a release "${tag}" with a file map.tar or files map.tar.00 …?`);
   process.exit(1);
+}
+for (const name of EXTRA) {
+  try {
+    const to = resolve(fresh, 'map', name);
+    // (under another name first: a file that is not in this release leaves what map.tar had untouched)
+    const tmp = `${to}.part`;
+    if (await download(name, tmp)) {
+      renameSync(tmp, to);
+      console.log(`[map] ${name}`);
+    } else rmSync(tmp, { force: true });
+  } catch (e) {
+    rmSync(resolve(fresh, 'map', `${name}.part`), { force: true });
+    console.error(`[map] ${name}: ${(e as Error).message}`);
+  }
 }
 rmSync(resolve(target, 'map'), { recursive: true, force: true });
 renameSync(resolve(fresh, 'map'), resolve(target, 'map'));

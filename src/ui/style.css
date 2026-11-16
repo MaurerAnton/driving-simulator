@@ -521,3 +521,61 @@ kbd { direction: ltr; unicode-bidi: isolate; }
 .bm-tours summary { cursor: pointer; opacity: 0.85; }
 .bm-tour { display: block; width: 100%; text-align: start; background: none; border: 0; color: inherit; padding: 6px 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); font: inherit; cursor: pointer; }
 .bm-tour:hover { background: rgba(255, 255, 255, 0.06); }
+
+/* the replay: a bar at the foot of the screen – the picture above it stays free */
+.replay { position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(760px, calc(100% - 20px)); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px 6px; pointer-events: auto; display: flex; flex-direction: column; gap: 6px; }
+.replay-top { display: flex; gap: 12px; align-items: baseline; min-height: 20px; font-size: 14px; }
+.replay-time { font-variant-numeric: tabular-nums; color: var(--muted); flex: none; }
+.replay-note { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.replay-note.fail, .replay-note.major { color: var(--bad); }
+.replay-note.minor { color: var(--warn); }
+.replay-note.hint { color: #9fd3ff; }
+.replay-line { position: relative; height: 34px; }
+.replay-line input[type=range] { position: absolute; inset: 0; width: 100%; margin: 0; accent-color: var(--accent); height: 34px; }
+.replay-marks { position: absolute; left: 0; right: 0; top: 0; height: 12px; pointer-events: none; }
+.replay-mark { position: absolute; top: 0; width: 24px; height: 24px; margin-left: -12px; margin-top: -8px; border: 0; background: transparent; padding: 0; pointer-events: auto; cursor: pointer; }
+.replay-mark::after { content: ''; position: absolute; left: 9px; top: 6px; width: 6px; height: 12px; border-radius: 3px; background: var(--warn); }
+.replay-mark.fail::after, .replay-mark.major::after { background: var(--bad); }
+.replay-mark.hint::after { background: #9fd3ff; }
+.replay-buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.replay-buttons .btn { min-height: 44px; min-width: 52px; padding: 6px 12px; }
+.replay-help { font-size: 12px; color: var(--muted); text-align: center; }
+@media (max-height: 480px) { .replay-help { display: none; } }
+
+/* the menu of rows over the 3D scene: the middle stays free for the vehicle standing where the drive begins */
+.overlay.clear { background: none; backdrop-filter: none; pointer-events: none; display: block; overflow: hidden; }
+.cm { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.cm > * { pointer-events: auto; }
+.cm-top { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.cm-title { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 12px; font-size: 18px; font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.cm-title span { color: var(--accent); }
+.cm-title small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.cm-tools { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cm-tools .btn, .cm-tools select { min-height: 40px; background: var(--panel); }
+.cm-rows { display: flex; flex-direction: column; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; max-height: 62vh; overflow-y: auto; }
+.cm-row { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cm-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.cm-fold { background: none; border: 1px solid var(--line); color: var(--text); border-radius: 8px; min-width: 44px; min-height: 30px; cursor: pointer; display: flex; align-items: center; gap: 4px; max-width: 70%; text-transform: none; letter-spacing: 0; font-size: 13px; }
+.cm-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.cm-strip { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+.cm-strip > * { scroll-snap-align: start; flex: none; }
+.cm-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 104px; min-height: 64px; padding: 4px 6px; background: var(--panel-solid); color: var(--text); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font: inherit; }
+.cm-card .cm-icon { font-size: 24px; line-height: 1; }
+.cm-card .cm-name { font-size: 11.5px; line-height: 1.15; text-align: center; }
+.cm-chip { min-height: 40px; padding: 6px 12px; background: var(--panel-solid); color: var(--text); border: 1px solid var(--line); border-radius: 20px; cursor: pointer; font: inherit; font-size: 14px; white-space: nowrap; display: inline-flex; align-items: center; }
+.cm-chip.off { color: var(--muted); cursor: default; }
+.cm-card.on, .cm-chip.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cm-mode { display: flex; flex-direction: column; gap: 3px; width: 200px; min-height: 64px; padding: 8px 10px; text-align: left; background: var(--panel-solid); color: var(--text); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font: inherit; }
+.cm-mode b { font-size: 14px; }
+.cm-mode small { font-size: 11.5px; color: var(--muted); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cm-mode.main { background: var(--accent); color: #111; border-color: var(--accent); }
+.cm-mode.main small { color: #333; }
+.cm-address { margin: 2px 0 4px; }
+@media (max-height: 520px) {
+  .cm-card { width: 92px; min-height: 52px; }
+  .cm-card .cm-icon { font-size: 20px; }
+  .cm-chip { min-height: 36px; }
+  .cm-mode { min-height: 52px; }
+  .cm-mode small { -webkit-line-clamp: 2; }
+  .cm-rows { max-height: 70vh; }
+}

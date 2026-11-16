@@ -33,7 +33,7 @@ export interface Controls {
 }
 
 /** door: get out of the vehicle, or in again (on foot beside it) */
-export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door';
+export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto';
 
 /** Lateral acceleration (m/s²) the steering keys may ask for: brisk in town, gentle on the motorway. */
 const keyLateral = (v: number): number => 2.4 + 3.4 / (1 + (v / 15) * (v / 15));
@@ -430,6 +430,8 @@ export class Input {
           break;
         case 'KeyP':
           if (this.gearMin === -2) c.gear = -2;
+          // (in the tram: the pantograph up or down)
+          this.fire('panto');
           break;
         case 'Space':
           c.handbrake = c.handbrake > 0.5 ? 0 : 1;

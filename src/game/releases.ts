@@ -22,6 +22,11 @@ export interface Release {
 
 export const RELEASES: readonly Release[] = [
   {
+    version: '1.3.0',
+    date: '2026-11-16',
+    items: ['news.1_3_0.menu', 'news.1_3_0.replay', 'news.1_3_0.timetables', 'news.1_3_0.busLines', 'news.1_3_0.pantograph', 'news.1_3_0.coupled', 'news.1_3_0.figure', 'news.1_3_0.models'],
+  },
+  {
     version: '1.2.0',
     date: '2026-11-16',
     items: ['news.1_2_0.plane', 'news.1_2_0.onFoot', 'news.1_2_0.stops', 'news.1_2_0.tramLines', 'news.1_2_0.busLine', 'news.1_2_0.powers', 'news.1_2_0.motorcycle', 'news.1_2_0.farView', 'news.1_2_0.tours', 'news.1_2_0.loading', 'news.1_2_0.carModel', 'news.1_2_0.fixes'],

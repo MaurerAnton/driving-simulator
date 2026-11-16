@@ -7,9 +7,9 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { RailTraffic } from '../../src/sim/rail.ts';
+import { RailTraffic, carLayout, consistLength, consistOf } from '../../src/sim/rail.ts';
 import { SignalSystem } from '../../src/sim/signals.ts';
-import { TRAM, TramDriver, tramStart } from '../../src/sim/tramdrive.ts';
+import { PANTO_DOWN_TIME, PANTO_UP_TIME, TRAM, TramDriver, tramStart } from '../../src/sim/tramdrive.ts';
 import type { TramEvent } from '../../src/sim/tramdrive.ts';
 import { RAIL } from '../../src/world/types.ts';
 import type { RailJson, WorldJson } from '../../src/world/types.ts';
@@ -174,4 +174,110 @@ test('a tram of the traffic runs its line: at the switch the branch its line tak
     assert.equal(v.path, branch, `onto the line's branch (${branch})`);
     assert.equal(Math.sign(v.cars[0].z), side);
   }
+});
+
+test('the pantograph: down, the controller does nothing; raised it takes a few seconds; lowered while pulling is a fault', () => {
+  const { tram } = setup();
+  tram.panto = 0;
+  tram.pantoUp = false;
+  tram.lever = 1;
+  run(tram, 3);
+  assert.equal(tram.speed, 0, 'no power with the pantograph down');
+  const events: TramEvent[] = [];
+  tram.togglePanto(events);
+  run(tram, PANTO_UP_TIME * 0.5);
+  assert.equal(tram.speed, 0, 'still rising');
+  run(tram, PANTO_UP_TIME * 0.5 + 0.2);
+  run(tram, 3);
+  assert.ok(tram.speed > 2, `against the wire it pulls (${tram.speed.toFixed(2)} m/s)`);
+  assert.ok((tram.v.panto ?? 0) > 0.99, 'drawn raised');
+  tram.togglePanto(events);
+  assert.deepEqual(events.map((e) => e.fault), ['tramPantoLoad'], 'lowered under load');
+  const v0 = tram.speed;
+  run(tram, PANTO_DOWN_TIME + 0.5);
+  assert.ok(tram.speed < v0, 'only rolling now');
+  assert.ok((tram.v.panto ?? 1) < 0.01, 'drawn lowered');
+});
+
+test('where the wire ends: a tram with its pantograph up is told and it comes down; the regional tram goes on with its engine', () => {
+  const json: WorldJson = { version: 1, meta: { name: 'Test', generated: '', minX: -100, maxX: 800, minZ: -100, maxZ: 100, tileSize: 500, originE: 0, originN: 0, attribution: [] }, nodes: [], edges: [], banned: [], signals: [], crossings: [], places: [], spawns: [], tiles: [] };
+  const world = new World(json);
+  const main: number[] = [];
+  for (let x = 0; x <= 400; x += 10) main.push(x, 100, 0);
+  const rest: number[] = [];
+  for (let x = 400; x <= 1400; x += 10) rest.push(x, 100, 0);
+  // (a regional line: wire on the first 400 m, none after them)
+  const rails: RailJson[] = [
+    { k: RAIL.LIGHT, p: main, a: [], b: [1 * 2], e: 1 },
+    { k: RAIL.LIGHT, p: rest, a: [0 * 2 + 1], b: [], e: 0 },
+  ];
+  const rail = new RailTraffic(rails, () => 0.5);
+  rail.target = 0;
+  const v = rail.spawnAt(0, 120, 1, 0)!;
+  const tram = new TramDriver(rail, v, world, new SignalSystem([]), () => 0.5);
+  assert.ok(tram.hybrid);
+  tram.lever = 1;
+  const events: TramEvent[] = [];
+  let warned = Infinity;
+  run(tram, 40, events, () => {
+    if (tram.ahead.wireEndIn < Infinity) warned = Math.min(warned, tram.ahead.wireEndIn);
+  });
+  assert.ok(warned < 300, 'the end of the wire is seen ahead');
+  assert.ok(events.some((e) => e.fault === 'tramPantoWireEnd'), 'run under the end of the wire with the pantograph up');
+  assert.equal(tram.pantoUp, false, 'lowered');
+  const at = tram.speed;
+  run(tram, 5);
+  assert.ok(tram.powered && tram.speed >= at - 0.05, `on its engine (${at.toFixed(1)} → ${tram.speed.toFixed(1)} m/s)`);
+});
+
+test('two units coupled pull like one; with a trailer car the tram pulls away more slowly – and is laid out with its cabs where they belong', () => {
+  const pull = (set: 'single' | 'double' | 'trailer'): number => {
+    const json: WorldJson = { version: 1, meta: { name: 'Test', generated: '', minX: -100, maxX: 800, minZ: -100, maxZ: 100, tileSize: 500, originE: 0, originN: 0, attribution: [] }, nodes: [], edges: [], banned: [], signals: [], crossings: [], places: [], spawns: [], tiles: [] };
+    const rail = new RailTraffic(network(), () => 0.5);
+    rail.target = 0;
+    const v = rail.spawnAt(0, 200, 1, 0, set)!;
+    assert.ok(v, set);
+    const tram = new TramDriver(rail, v, new World(json), new SignalSystem([]), () => 0.5);
+    tram.lever = 1;
+    run(tram, 5);
+    return tram.speed;
+  };
+  const single = pull('single');
+  assert.ok(Math.abs(pull('double') - single) < 0.05, 'double traction');
+  assert.ok(pull('trailer') < single * 0.85, 'with a trailer car');
+  const roles = carLayout(consistOf(RAIL.TRAM, 'double'));
+  assert.deepEqual(roles.map((r) => `${r.front ? 'F' : '-'}${r.back ? 'B' : '-'}${r.panto ? 'P' : '-'}`), ['F--', '--P', '-B-', 'F--', '--P', '-B-']);
+  assert.deepEqual([roles[0].lampsFront, roles[2].lampsBack, roles[3].lampsFront, roles[5].lampsBack], [true, false, false, true], 'lit only at the ends');
+  const trailer = carLayout(consistOf(RAIL.TRAM, 'trailer'));
+  assert.ok(trailer[3].trailer && !trailer[3].panto && trailer[3].lampsBack && !trailer[2].lampsBack);
+  assert.ok(consistLength(consistOf(RAIL.TRAM, 'double')) > 2 * consistLength(consistOf(RAIL.TRAM, 'single')));
+});
+
+test('by the timetable: a trip is put on its line where the clock has it, once, and stands at a stop until its time', () => {
+  const main: number[] = [];
+  for (let x = 0; x <= 2000; x += 10) main.push(x, 100, 0);
+  const rail = new RailTraffic([{ k: RAIL.TRAM, p: main, a: [], b: [], st: [300, 900] }], () => 0.5);
+  rail.setLines([{ ref: '1', from: 'A', to: 'B', colour: '', kind: 0, seq: [{ path: 0, dir: 1 }] }]);
+  const half = rail.lineSpot(0, [0, 300], [0, 900], 0.5);
+  assert.deepEqual(half, { path: 0, s: 600, dir: 1, k: 0 });
+  assert.equal(rail.lineSpot(0, [0, 900], [0, 300], 0.5), null, 'not backwards along the line');
+  let asked = 0;
+  rail.schedule = {
+    due: () => [{ trip: 'T1', line: 0, path: 0, s: 250, dir: 1, k: 0, speed: 6 }],
+    wait: () => {
+      asked++;
+      return 40;
+    },
+  };
+  rail.target = 4;
+  const player = { x: 0, y: 100, z: 300, yaw: 0, length: 4, width: 2 };
+  rail.update(0.1, player);
+  assert.equal(rail.vehicles.length, 1);
+  const v = rail.vehicles[0];
+  assert.equal(v.trip, 'T1');
+  assert.equal(v.line?.index, 0);
+  // it runs to the stop at 300 m and stands there until its time – and the same trip is not put on twice
+  for (let t = 0; t < 30; t += 0.1) rail.update(0.1, player);
+  assert.equal(rail.vehicles.length, 1, 'one tram for the trip');
+  assert.ok(asked > 0 && v.dwell > 20, `waiting for its time (${v.dwell.toFixed(1)} s left)`);
 });
