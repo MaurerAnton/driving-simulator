@@ -3,7 +3,13 @@
  * Traffic-light controllers: fixed-time programmes with the German sequence
  * green → amber → red → red+amber → green.
  *
- * Two things beyond that:
+ * Three things beyond that:
+ *
+ *  - The light of a pedestrian crossing (one that belongs to no junction)
+ *    waits on green for the vehicles until somebody presses the button at
+ *    its pole ("Signal kommt"): then, after a least green for the vehicles,
+ *    the programme runs once through the pedestrians' time and comes back to
+ *    rest.  The people of the traffic press it as well.
  *
  *  - Lights that are out of order.  A few controllers – other ones every
  *    day – show nothing but a flashing amber.  Their junctions are ruled by
@@ -25,6 +31,11 @@ import type { Arm } from '../world/world.ts';
 export const SIG = { RED: 0, RED_AMBER: 1, GREEN: 2, AMBER: 3, FLASH: 4 } as const;
 
 const CODE: Record<string, number> = { R: SIG.RED, Y: SIG.RED_AMBER, G: SIG.GREEN, A: SIG.AMBER };
+
+/** a pedestrian crossing's light gives the vehicles at least this much green before a press is served (s) */
+const PED_LEAST_GREEN = 8;
+/** the vehicles have had red this long when the pedestrians get green (s) */
+export const PED_CLEAR = 1.5;
 
 /** how long an arrow shows amber when its time is over (s) */
 const ARROW_AMBER = 3;
@@ -69,6 +80,9 @@ export class SignalSystem {
   private readonly since: Float32Array[] = [];
   /** out of order */
   private readonly dark: boolean[] = [];
+  /** a pedestrian crossing's own clock in its programme (it stands still at rest), and whether the button was pressed */
+  private readonly local: number[] = [];
+  private readonly asked: boolean[] = [];
   private readonly lightsOut: (controller: number) => boolean;
   time = 0;
 
@@ -93,6 +107,9 @@ export class SignalSystem {
       this.since[i] = new Float32Array(c.groups);
       // (the light of a pedestrian crossing is never out: people could not cross there otherwise)
       this.dark[i] = !c.ped && this.lightsOut(i);
+      // (… and it begins at rest: green for the vehicles, long enough that a press is served soon)
+      if (c.ped) this.local[i] = Math.min(PED_LEAST_GREEN, c.phases[0]?.d ?? 0);
+      this.asked[i] = false;
       fresh = true;
     });
     if (fresh) this.update(0);
@@ -101,7 +118,7 @@ export class SignalSystem {
   /** What group `g` of a controller shows `ahead` seconds from now (by its programme). */
   private programmed(i: number, g: number, ahead: number): number {
     const c = this.controllers[i];
-    let t = (this.time + ahead + c.off) % this.cycle[i];
+    let t = ((c.ped ? this.local[i] : this.time + c.off) + ahead) % this.cycle[i];
     if (t < 0) t += this.cycle[i];
     let phase = c.phases[c.phases.length - 1];
     for (const p of c.phases) {
@@ -118,6 +135,18 @@ export class SignalSystem {
     this.time += dt;
     for (const i of this.ids) {
       const c = this.controllers[i];
+      if (c.ped) {
+        // at rest on the vehicles' green until the button is pressed; then once round
+        const green = c.phases[0]?.d ?? 0;
+        let t = this.local[i] + dt;
+        if (this.local[i] < green) {
+          if (this.asked[i] && t >= PED_LEAST_GREEN) t = Math.max(t, green);
+          else t = Math.min(t, green - 0.01);
+        }
+        // (a request is used up when the pedestrians get green – one made after that waits for the next round)
+        if (t >= this.cycle[i]) t -= this.cycle[i];
+        this.local[i] = t;
+      }
       const st = this.state[i];
       const since = this.since[i];
       for (let g = 0; g < c.groups; g++) {
@@ -186,6 +215,37 @@ export class SignalSystem {
   /** Is this controller out of order? */
   isDark(controller: number): boolean {
     return this.dark[controller] === true;
+  }
+
+  /**
+   * The button at a pedestrian light is pressed.  A pedestrian crossing's
+   * light then soon gives the pedestrians green; at a junction the light runs
+   * by its programme all the same – the lamp on the box says the request was
+   * taken either way.  Returns whether it was new.
+   */
+  request(controller: number): boolean {
+    if (!this.state[controller] || this.dark[controller] || this.asked[controller]) return false;
+    this.asked[controller] = true;
+    return true;
+  }
+
+  /** Is a request waiting at this controller ("Signal kommt")? */
+  requested(controller: number): boolean {
+    return this.asked[controller] === true;
+  }
+
+  /**
+   * What the pedestrians see at a crossing whose vehicles have group `g`:
+   * green while those vehicles have had red for a moment, red otherwise –
+   * dark when the light is out of order.  (A request is taken back once the
+   * pedestrians have green: the lamp "Signal kommt" goes out.)
+   */
+  pedestrian(controller: number, group: number): 'green' | 'red' | 'dark' {
+    const st = this.get(controller, group);
+    if (st === SIG.FLASH) return 'dark';
+    const go = st === SIG.RED && this.age(controller, group) > PED_CLEAR;
+    if (go) this.asked[controller] = false;
+    return go ? 'green' : 'red';
   }
 
   /**

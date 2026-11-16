@@ -426,10 +426,11 @@ export interface LessonDef {
   /** title and introduction are texts: "lesson.<id>.title", "lesson.<id>.intro" */
   id: string;
   /** 'yard': tasks on the practice yard only (class CE) */
-  kind: 'free' | 'basics' | 'route' | 'exam' | 'yard' | 'tram';
+  kind: 'free' | 'basics' | 'route' | 'exam' | 'yard' | 'tram' | 'bus';
   targets: TargetType[];
-  /** only for this vehicle (default: all but those in `notFor`) */
+  /** only for this vehicle (default: all but those in `notFor`) – or for these */
   vehicle?: VehicleKind;
+  vehicles?: VehicleKind[];
   notFor?: VehicleKind[];
   /** tasks on the practice yard, done one after the other before the drive (see game/ce.ts) */
   tasks?: Array<'couple' | 'corner' | 'ramp'>;
@@ -451,6 +452,8 @@ export const LESSONS: LessonDef[] = [
   { id: 'ceRamp', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['ramp'] },
   // the tram: a line with its stops (sim/tramdrive.ts)
   { id: 'tramLine', kind: 'tram', targets: [], vehicle: 'tram' },
+  // the bus on a line: five stops on the way, with their doors and passengers
+  { id: 'busLine', kind: 'bus', targets: [], vehicles: ['bus', 'busTrailer', 'minibus', 'minibusTrailer'] },
   { id: 'ceExam', kind: 'exam', targets: ['signals', 'roundabout', 'priority', 'rural', 'home'], vehicle: 'truck', tasks: ['couple', 'corner', 'ramp'] },
 ];
 

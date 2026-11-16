@@ -107,6 +107,38 @@ export function withPower(spec: VehicleSpec, ps: number): VehicleSpec {
   return { ...spec, name: `${spec.name}, ${ps} PS`, torqueCurve, clutchTorque: Math.max(spec.clutchTorque, spec.clutchTorque * k * 1.1) };
 }
 
+/** The highest power of an engine along its torque curve (PS). */
+export function peakPowerPs(spec: VehicleSpec): number {
+  let best = 0;
+  for (const [rpm, t] of spec.torqueCurve) best = Math.max(best, (t * rpm * Math.PI) / 30);
+  return best / 735.5;
+}
+
+/**
+ * Any vehicle with another engine of its kind: the whole torque curve scaled
+ * to the power asked for (PS) and the clutch made to hold it.  With an
+ * automatic gearbox a weaker engine gets a converter that takes its torque at
+ * the same engine speed as before (or it would be held down and stall); a
+ * stronger one keeps the converter – it then slips up to a higher speed, but
+ * at idle it pulls no harder than before, so that the brake still holds the
+ * vehicle at a red light.
+ */
+export function atPower(spec: VehicleSpec, ps: number): VehicleSpec {
+  const k = ps / peakPowerPs(spec);
+  if (!Number.isFinite(k) || k <= 0 || Math.abs(k - 1) < 0.01) return spec;
+  return {
+    ...spec,
+    name: `${spec.name}, ${ps} PS`,
+    // (a stronger engine pulls harder from just above idle on: at idle it turns the converter no harder than before)
+    torqueCurve: spec.torqueCurve.map(([rpm, t]): [number, number] => {
+      const f = k <= 1 ? k : 1 + (k - 1) * Math.min(1, Math.max(0, (rpm - spec.idleRpm * 1.3) / (spec.idleRpm * 0.7)));
+      return [rpm, Math.round(t * f * 100) / 100];
+    }),
+    clutchTorque: Math.max(spec.clutchTorque, spec.clutchTorque * k * 1.1),
+    ...(spec.auto ? { auto: { ...spec.auto, converter: spec.auto.converter * Math.min(1, k) } } : {}),
+  };
+}
+
 /**
  * A two-axle distribution truck as driving schools use it for the classes C
  * and CE: 12 t gross, 9.5 t as driven, 180 kW diesel, automated gearbox,

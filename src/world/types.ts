@@ -164,6 +164,102 @@ export interface RailJson {
   b: number[];
   /** stops: metres from the start */
   st?: number[];
+  /** their names, as the stops are signed (tools/build-stops.ts; '' where the map has none) */
+  sn?: string[];
+  /** on which side of the track their platform lies: 1 right, -1 left of the direction it was drawn in, 0 not known */
+  ss?: number[];
+  /** an overhead wire along it: 1 yes, 0 no – missing when the map does not say */
+  e?: number;
+}
+
+/** What a stop has, and what kind of stop it is (bits). */
+export const STOP_FLAG = {
+  SHELTER: 1,
+  BENCH: 2,
+  BIN: 4,
+  /** a departure board */
+  BOARD: 8,
+  /** tactile paving at the edge */
+  TACTILE: 16,
+  LIT: 32,
+  TRAM: 64,
+  BUS: 128,
+  RAIL: 256,
+  /** a pole that stands on the road itself: the tiles already show its sign */
+  ON_ROAD: 512,
+  /** a platform drawn as an area, not as a line */
+  AREA: 1024,
+} as const;
+
+/**
+ * The stops of the region (stops.json.gz, tools/build-stops.ts).  A place is
+ * one stop under one name – both directions, all its poles and platforms.
+ */
+export interface StopsJson {
+  v: number;
+  towns: string[];
+  /** name, index into towns, kind (STOP_FLAG.TRAM | BUS | RAIL), x, z (the middle of its members) */
+  places: Array<[string, number, number, number, number]>;
+  /** where people wait: place index, x, z, STOP_FLAG bits */
+  poles: Array<[number, number, number, number]>;
+  /** platforms drawn as ways: place index, STOP_FLAG bits, width (0: not known), x, z, … */
+  platforms: Array<[number, number, number, number[]]>;
+}
+
+export interface RunwayJson {
+  /** "04/22" */
+  ref: string;
+  /** the ends of its middle line */
+  x1: number;
+  z1: number;
+  x2: number;
+  z2: number;
+  /** width (m) and surface (OpenStreetMap: asphalt, concrete, grass, …) */
+  w: number;
+  s: string;
+}
+
+export interface AirfieldJson {
+  name: string;
+  icao: string;
+  /** airport, airfield or gliding */
+  kind: string;
+  x: number;
+  z: number;
+  runways: RunwayJson[];
+  taxiways: Array<{ w: number; s: string; p: number[] }>;
+  aprons: Array<{ s: string; p: number[] }>;
+}
+
+/**
+ * A line of the trams (lines.json.gz, tools/build-lines.ts): one direction of
+ * it – from its first stop to its last –, the pieces of track it runs (by
+ * their number in rails.json.gz, and which way: 1 as drawn, −1 against it)
+ * and the stops it calls at, in their order (piece, mark).
+ */
+export interface LineJson {
+  /** "5", "RT4" */
+  ref: string;
+  name: string;
+  from: string;
+  to: string;
+  /** "#e3000f" or '' */
+  colour: string;
+  /** 0 tram, 1 regional tram (light rail) */
+  kind: number;
+  paths: Array<[number, number]>;
+  stops: Array<[number, number]>;
+}
+
+export interface LinesJson {
+  v: number;
+  lines: LineJson[];
+}
+
+/** The airfields of the region (air.json.gz, tools/build-stops.ts). */
+export interface AirJson {
+  v: number;
+  airfields: AirfieldJson[];
 }
 
 /** Height of a standard kerb in metres. */

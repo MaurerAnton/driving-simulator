@@ -10,22 +10,32 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { VEHICLES, VEHICLE_KINDS } from '../../src/game/vehicles.ts';
+import { ROAD_VEHICLE_KINDS, VEHICLES } from '../../src/game/vehicles.ts';
 import { DT, PlaneGround, input, makeCar } from './harness.ts';
 
-// (the tram runs on its tracks: tests/game/tram.test.ts)
-for (const kind of VEHICLE_KINDS.filter((k) => k !== 'tram')) {
+// (the tram runs on its tracks: tests/game/tram.test.ts; on foot there is no vehicle)
+for (const kind of ROAD_VEHICLE_KINDS) {
   const def = VEHICLES[kind];
-  test(`${kind}: pulls away, stops, pulls away again – and keeps to its top speed`, () => {
-    const spec = def.spec('automatic', 150);
+  test(`${kind}: its engine powers – the one it comes with among them, within its class`, () => {
+    assert.ok(def.powers.includes(def.power), `${def.power} PS is one of ${def.powers.join(', ')}`);
+    assert.deepEqual([...def.powers].sort((a, b) => a - b), [...def.powers], 'listed from the weakest');
+    // AM at most 4 kW, A1 at most 11 kW, A2 at most 35 kW (Anlage 3 FeV / § 6 FeV)
+    const limitKw = { moped: 4, motorcycle125: 11, motorcycle35: 35 }[kind as string];
+    if (limitKw) for (const ps of def.powers) assert.ok(ps * 0.7355 <= limitKw + 0.05, `${ps} PS within ${limitKw} kW`);
+  });
+
+  // every engine one may choose: the weakest and the strongest as well as the usual one
+  for (const power of [...new Set([def.powers[0], def.power, def.powers[def.powers.length - 1]])])
+  test(`${kind} with ${power} PS: pulls away, stops, pulls away again – and keeps to its top speed`, () => {
+    const spec = def.spec('automatic', power);
     assert.equal(spec.transmission, 'automatic');
     const v = makeCar(new PlaneGround(), spec);
     const go = (secs: number, throttle: number, brake: number): void => {
       for (let i = 0; i < secs / DT; i++) v.step(DT, input({ throttle, brake, gear: 1 }));
     };
     go(6, 0.6, 0);
-    // (a moped built for 45 km/h takes its time)
-    const brisk = def.governed > 0 && def.governed < 50 ? 10 : 20;
+    // (a moped built for 45 km/h takes its time, and so does a 125 with its weakest engine)
+    const brisk = def.governed > 0 && def.governed < 50 ? 10 : power < 20 ? 15 : 20;
     assert.ok(v.speed * 3.6 > brisk, `under way (${(v.speed * 3.6).toFixed(0)} km/h)`);
     go(6, 0, 0.6);
     assert.ok(Math.abs(v.speed) < 0.1, `stopped (${v.speed.toFixed(2)} m/s)`);
@@ -41,7 +51,7 @@ for (const kind of VEHICLE_KINDS.filter((k) => k !== 'tram')) {
   });
 
   test(`${kind}: does not tip over in a tight bend`, () => {
-    const v = makeCar(new PlaneGround(), def.spec('automatic', 150));
+    const v = makeCar(new PlaneGround(), def.spec('automatic', def.power));
     for (let i = 0; i < 25 / DT && v.speed * 3.6 < 28; i++) v.step(DT, input({ throttle: 0.6, gear: 1 }));
     let upright = 1;
     for (let i = 0; i < 6 / DT; i++) {

@@ -7,6 +7,9 @@ import { SIG } from '../sim/signals.ts';
 import type { SignalSystem } from '../sim/signals.ts';
 import type { Cyclist } from '../sim/cyclists.ts';
 import type { Pedestrian, TrafficCar } from '../sim/traffic.ts';
+import { BUS_STYLE } from '../sim/traffic.ts';
+import type { CarVisualState } from './car.ts';
+import { PlayerBus } from './fleet.ts';
 import { CTRL, KERB_H, XING } from '../world/types.ts';
 import type { Arm, World } from '../world/world.ts';
 import { CarExterior } from './car.ts';
@@ -27,6 +30,13 @@ export class TrafficRenderer {
   private readonly peds = new Map<number, THREE.Group>();
   private readonly cyclists = new Map<number, CyclistModel>();
   private readonly cyclistPool: CyclistModel[] = [];
+  /** the city buses of the traffic (the bus one learns with, seen from outside) */
+  private readonly buses = new Map<number, PlayerBus>();
+  private readonly busPool: PlayerBus[] = [];
+  private readonly busState: CarVisualState = {
+    speedKmh: 0, rpm: 800, gear: 1, indicator: 0, hazard: false, blinkOn: false, lowBeam: true, highBeam: false, handbrake: false, ignition: true, engineRunning: true, abs: false, seatbelt: true, fuel: 0.6, automatic: true, showGear: false, odometerKm: 0,
+    steerWheel: 0, wheelSteer: [0, 0, 0, 0], wheelSpin: [0, 0, 0, 0], wheelY: [0.48, 0.48, 0.48, 0.48], clutch: 0, brake: 0, throttle: 0, handbrakeLever: 0, braking: false, reversing: false,
+  };
   private readonly pedGeo: { body: THREE.BufferGeometry; leg: THREE.BufferGeometry; head: THREE.BufferGeometry };
   private readonly skin = new THREE.MeshLambertMaterial({ color: 0xd9a989 });
   private readonly trousers = new THREE.MeshLambertMaterial({ color: 0x2a2d33 });
@@ -42,7 +52,31 @@ export class TrafficRenderer {
   update(cars: TrafficCar[], peds: Pedestrian[], time: number, cyclists: readonly Cyclist[] = []): void {
     const seen = new Set<number>();
     const blinkOn = Math.floor(time * 3) % 2 === 0;
+    const seenB = new Set<number>();
     for (const c of cars) {
+      if (c.style === BUS_STYLE) {
+        // a city bus: the lamps say where it is going (to the stop, out of it)
+        seenB.add(c.id);
+        let b = this.buses.get(c.id);
+        if (!b) {
+          b = this.busPool.pop() ?? new PlayerBus();
+          b.root.traverse((o) => {
+            if (o instanceof THREE.Mesh) o.castShadow = true;
+          });
+          this.buses.set(c.id, b);
+          this.group.add(b.root);
+        }
+        b.root.position.set(c.x, c.y, c.z);
+        b.root.rotation.set(c.pitch, c.yaw, 0, 'YXZ');
+        const st = this.busState;
+        st.wheelSpin.fill(c.wheelSpin);
+        st.indicator = c.blinker;
+        st.blinkOn = blinkOn;
+        st.braking = c.braking;
+        st.speedKmh = c.v * 3.6;
+        b.update(st, 0, time);
+        continue;
+      }
       seen.add(c.id);
       let m = this.cars.get(c.id);
       if (!m) {
@@ -63,6 +97,12 @@ export class TrafficRenderer {
       const style = STYLES.indexOf(m.dims);
       this.pool[style < 0 ? 0 : style].push(m);
       this.cars.delete(id);
+    }
+    for (const [id, b] of this.buses) {
+      if (seenB.has(id)) continue;
+      this.group.remove(b.root);
+      this.busPool.push(b);
+      this.buses.delete(id);
     }
     const seenP = new Set<number>();
     for (const p of peds) {

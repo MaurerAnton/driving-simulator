@@ -214,8 +214,11 @@ export const MINIBUS: VehicleSpec = {
 /** A tractor built for 60 km/h (class T; the 40 km/h tractor is class L). */
 export const TRACTOR_FAST: VehicleSpec = { ...TRACTOR, name: 'Traktor 150 kW, 60 km/h', finalDrive: TRACTOR.finalDrive * (40 / 60), torqueCurve: TRACTOR.torqueCurve.map(([rpm, t]): [number, number] => [rpm, Math.round(t * 1.3)]) };
 
-/** The smaller motorcycles: a moped built for 45 km/h (AM), a 125 (A1), one of 35 kW (A2). */
-function smaller(name: string, k: number, finalDrive: number): VehicleSpec {
+/**
+ * The smaller motorcycles: a moped built for 45 km/h (AM), a 125 (A1), one of 35 kW (A2) – the big one with
+ * `k` times its engine; `size` (default k) says how much lighter the machine is.
+ */
+function smaller(name: string, k: number, finalDrive: number, size = k): VehicleSpec {
   // (a smaller engine: less torque – and less friction and inertia inside it, or that would eat its torque)
   const [f0, f1] = MOTORCYCLE.engineFriction;
   return {
@@ -223,17 +226,23 @@ function smaller(name: string, k: number, finalDrive: number): VehicleSpec {
     name,
     torqueCurve: MOTORCYCLE.torqueCurve.map(([rpm, t]): [number, number] => [rpm, Math.round(t * k * 10) / 10]),
     engineFriction: [f0 * k, f1 * k],
-    engineInertia: MOTORCYCLE.engineInertia * Math.max(0.3, k),
+    // (through the moped's long gearing a heavy flywheel would weigh as much as three mopeds: a small engine has a small one)
+    engineInertia: MOTORCYCLE.engineInertia * Math.max(0.06, k),
     clutchTorque: MOTORCYCLE.clutchTorque * Math.max(0.3, k),
-    mass: MOTORCYCLE.mass - (1 - k) * 120,
+    mass: MOTORCYCLE.mass - (1 - Math.min(1, size)) * 120,
     finalDrive,
   };
 }
-/** … each with a manual gearbox and an automatic one whose coupling is sized for its engine (or it would hold it down) */
-function variants(name: string, k: number, finalDrive: number): { manual: VehicleSpec; auto: VehicleSpec } {
-  const manual = smaller(name, k, finalDrive);
+/**
+ * … each with a manual gearbox and an automatic one whose coupling is sized for its engine: a small engine's
+ * slips up to a higher speed – as a scooter's belt drive keeps its engine near its power while it pulls away –,
+ * and a stronger engine than the big one's keeps the big one's, so that it creeps no harder at a red light.
+ */
+export function variants(name: string, k: number, finalDrive: number, size = k): { manual: VehicleSpec; auto: VehicleSpec } {
+  const manual = smaller(name, k, finalDrive, size);
   const base = MOTORCYCLE_AUTOMATIC.auto as NonNullable<VehicleSpec['auto']>;
-  return { manual, auto: { ...manual, name: `${name}, Automatik`, transmission: 'automatic', auto: { ...base, converter: base.converter * k } } };
+  const coupling = k < 1 ? k * k : 1;
+  return { manual, auto: { ...manual, name: `${name}, Automatik`, transmission: 'automatic', auto: { ...base, converter: base.converter * coupling } } };
 }
 // (geared for its 45 km/h: at the rev limit in top gear it runs 46)
 export const MOPED = variants('Moped 50 cm³, 45 km/h', 0.12, 24);

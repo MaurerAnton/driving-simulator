@@ -13,10 +13,11 @@
  */
 import type { TrailerSpec } from '../sim/trailer.ts';
 import { BUS_TRAILER, CAR_TRAILER, LIGHT_TRUCK_TRAILER, MINIBUS_TRAILER, TANDEM_TRAILER, trailerOutline } from '../sim/trailer.ts';
-import { BUS, LIGHT_TRUCK, MINIBUS, MOPED, MOTORCYCLE, MOTORCYCLE_125, MOTORCYCLE_35KW, MOTORCYCLE_AUTOCLUTCH, MOTORCYCLE_AUTOMATIC, TRACTOR, TRACTOR_FAST } from '../sim/vehicle/fleet.ts';
-import { COMPACT_CAR, COMPACT_CAR_AUTOCLUTCH, COMPACT_CAR_AUTOMATIC, TRUCK, withPower } from '../sim/vehicle/index.ts';
+import { BUS, LIGHT_TRUCK, MINIBUS, MOTORCYCLE, TRACTOR, TRACTOR_FAST, variants } from '../sim/vehicle/fleet.ts';
+import { COMPACT_CAR, COMPACT_CAR_AUTOCLUTCH, COMPACT_CAR_AUTOMATIC, TRUCK, atPower, peakPowerPs, withPower } from '../sim/vehicle/index.ts';
 import type { VehicleSpec } from '../sim/vehicle/index.ts';
 import { COMPACT_DIMS } from '../render/carBody.ts';
+import { TRAINER } from '../sim/flightspec.ts';
 
 export type VehicleKind =
   | 'car'
@@ -35,11 +36,16 @@ export type VehicleKind =
   | 'busTrailer'
   | 'tractorSlow'
   | 'tractor'
-  | 'tram';
-/** in the order of the licence classes: B, BE, AM, A1, A2, A, C1, C1E, C, CE, D1, D1E, D, DE, L, T – and the tram */
-export const VEHICLE_KINDS: readonly VehicleKind[] = ['car', 'carTrailer', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'minibus', 'minibusTrailer', 'bus', 'busTrailer', 'tractorSlow', 'tractor', 'tram'];
+  | 'tram'
+  | 'plane'
+  | 'pedestrian';
+/** in the order of the licence classes: B, BE, AM, A1, A2, A, C1, C1E, C, CE, D1, D1E, D, DE, L, T – the tram, the aeroplane, and on foot */
+export const VEHICLE_KINDS: readonly VehicleKind[] = ['car', 'carTrailer', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'minibus', 'minibusTrailer', 'bus', 'busTrailer', 'tractorSlow', 'tractor', 'tram', 'plane', 'pedestrian'];
 
-export type ModelKind = 'car' | 'truck' | 'truckLight' | 'bus' | 'minibus' | 'tractor' | 'motorcycle' | 'tram';
+/** the kinds of vehicle that are driven on the road (not the tram on its tracks, not the aeroplane, not on foot) */
+export const ROAD_VEHICLE_KINDS: readonly VehicleKind[] = VEHICLE_KINDS.filter((k) => k !== 'tram' && k !== 'pedestrian' && k !== 'plane');
+
+export type ModelKind = 'car' | 'truck' | 'truckLight' | 'bus' | 'minibus' | 'tractor' | 'motorcycle' | 'tram' | 'walker' | 'plane';
 
 export interface VehicleDef {
   kind: VehicleKind;
@@ -48,8 +54,11 @@ export interface VehicleDef {
   /** i18n key of its name */
   name: string;
   model: ModelKind;
-  /** its physics, for the gearbox the player chose (and the engine power, for the car) */
+  /** its physics, for the gearbox and the engine power (PS) the player chose */
   spec(transmission: 'manual' | 'assist' | 'automatic', power: number): VehicleSpec;
+  /** the engine powers one may choose for it (PS) – within what its licence class allows – and the one it comes with */
+  powers: readonly number[];
+  power: number;
   trailer: TrailerSpec | null;
   /** its outline in the plan from the model origin (the ground point below the middle of the wheelbase) */
   outline: { front: number; rear: number; hw: number };
@@ -84,6 +93,8 @@ const carFront = COMPACT_DIMS.wheelbase / 2 + COMPACT_DIMS.frontOverhang;
 const car: Omit<VehicleDef, 'kind' | 'licence' | 'name' | 'trailer' | 'caps' | 'capFault'> = {
   model: 'car',
   spec: (t, power) => withPower(t === 'automatic' ? COMPACT_CAR_AUTOMATIC : t === 'assist' ? COMPACT_CAR_AUTOCLUTCH : COMPACT_CAR, power),
+  powers: [60, 75, 95, 115, 150, 200],
+  power: 75,
   outline: { front: carFront, rear: COMPACT_DIMS.length - carFront, hw: COMPACT_DIMS.width / 2 },
   axles: [COMPACT_DIMS.wheelbase / 2, -COMPACT_DIMS.wheelbase / 2],
   track: COMPACT_DIMS.track / 2,
@@ -101,7 +112,9 @@ const car: Omit<VehicleDef, 'kind' | 'licence' | 'name' | 'trailer' | 'caps' | '
 };
 const truck: Omit<VehicleDef, 'kind' | 'licence' | 'name' | 'trailer' | 'caps' | 'capFault' | 'zoom' | 'zoomMax'> = {
   model: 'truck',
-  spec: () => TRUCK,
+  spec: (_t, power) => atPower(TRUCK, power),
+  powers: [218, 257, 300, 354],
+  power: 257,
   outline: { front: 3.75, rear: 4.45, hw: 1.25 },
   axles: [2.35, -2.35],
   track: 1.1,
@@ -116,6 +129,18 @@ const truck: Omit<VehicleDef, 'kind' | 'licence' | 'name' | 'trailer' | 'caps' |
   dash: true,
 };
 
+/**
+ * A motorcycle of a class: the big one with an engine of the power chosen,
+ * `size` saying how much smaller the machine is, geared with `finalDrive`.
+ */
+const BIG_BIKE_PS = peakPowerPs(MOTORCYCLE);
+function bike(name: string, size: number, finalDrive: number): VehicleDef['spec'] {
+  return (t, power) => {
+    const v = variants(name, power / BIG_BIKE_PS, finalDrive, size);
+    return t === 'automatic' ? v.auto : t === 'assist' ? { ...v.manual, autoClutch: true } : v.manual;
+  };
+}
+
 /** what the motorcycles of every class have in common */
 const MOTO_DEF: Omit<VehicleDef, 'spec'> & { spec: VehicleDef['spec'] } = {
   ...car,
@@ -123,7 +148,9 @@ const MOTO_DEF: Omit<VehicleDef, 'spec'> & { spec: VehicleDef['spec'] } = {
   licence: 'A',
   name: 'vehMotorcycle',
   model: 'motorcycle',
-  spec: (t) => (t === 'automatic' ? MOTORCYCLE_AUTOMATIC : t === 'assist' ? MOTORCYCLE_AUTOCLUTCH : MOTORCYCLE),
+  spec: bike('Motorrad', 1, MOTORCYCLE.finalDrive),
+  powers: [48, 68, 95, 120, 150],
+  power: 95,
   trailer: null,
   caps: null,
   capFault: 'speed',
@@ -146,7 +173,9 @@ const LIGHT_TRUCK_DEF: VehicleDef = {
   licence: 'C1',
   name: 'vehLightTruck',
   model: 'truckLight',
-  spec: () => LIGHT_TRUCK,
+  spec: (_t, power) => atPower(LIGHT_TRUCK, power),
+  powers: [136, 170, 190, 218],
+  power: 170,
   trailer: null,
   caps: { rural: 80, motorway: 80 },
   capFault: 'classSpeed',
@@ -167,7 +196,9 @@ const MINIBUS_DEF: VehicleDef = {
   licence: 'D1',
   name: 'vehMinibus',
   model: 'minibus',
-  spec: () => MINIBUS,
+  spec: (_t, power) => atPower(MINIBUS, power),
+  powers: [116, 129, 150, 177],
+  power: 150,
   trailer: null,
   caps: { rural: 80, motorway: 100 },
   capFault: 'classSpeed',
@@ -189,7 +220,9 @@ const BUS_DEF: VehicleDef = {
   licence: 'D',
   name: 'vehBus',
   model: 'bus',
-  spec: () => BUS,
+  spec: (_t, power) => atPower(BUS, power),
+  powers: [279, 321, 354, 394],
+  power: 321,
   trailer: null,
   caps: { rural: 80, motorway: 100 },
   capFault: 'classSpeed',
@@ -219,10 +252,12 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     zoom: 10,
     zoomMax: 26,
     long: true,
+    // (a car that pulls a trailer comes with a stronger engine)
+    power: 115,
   },
   motorcycle: { ...MOTO_DEF },
   truckSolo: { ...truck, kind: 'truckSolo', licence: 'C', name: 'vehTruckSolo', trailer: null, caps: { rural: 60, motorway: 80 }, capFault: 'classSpeed', zoom: 14, zoomMax: 32 },
-  truck: { ...truck, kind: 'truck', licence: 'CE', name: 'vehTruck', trailer: TANDEM_TRAILER, caps: { rural: 60, motorway: 80 }, capFault: 'truckSpeed', zoom: 21, zoomMax: 45 },
+  truck: { ...truck, kind: 'truck', licence: 'CE', name: 'vehTruck', trailer: TANDEM_TRAILER, caps: { rural: 60, motorway: 80 }, capFault: 'truckSpeed', zoom: 21, zoomMax: 45, powers: [257, 300, 354, 408, 449], power: 354 },
   bus: BUS_DEF,
   tractor: {
     ...car,
@@ -230,7 +265,9 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     licence: 'T',
     name: 'vehTractor',
     model: 'tractor',
-    spec: () => TRACTOR_FAST,
+    spec: (_t, power) => atPower(TRACTOR_FAST, power),
+    powers: [143, 187, 231, 272],
+    power: 187,
     trailer: null,
     caps: null,
     capFault: 'speed',
@@ -253,7 +290,9 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     licence: 'L',
     name: 'vehTractorSlow',
     model: 'tractor',
-    spec: () => TRACTOR,
+    spec: (_t, power) => atPower(TRACTOR, power),
+    powers: [50, 75, 102, 143],
+    power: 102,
     trailer: null,
     caps: null,
     capFault: 'speed',
@@ -275,7 +314,10 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     kind: 'moped',
     licence: 'AM',
     name: 'vehMoped',
-    spec: (t) => (t === 'automatic' ? MOPED.auto : t === 'assist' ? { ...MOPED.manual, autoClutch: true } : MOPED.manual),
+    // (geared for its 45 km/h: at the rev limit in top gear it runs 46; class AM: at most 4 kW)
+    spec: bike('Moped 50 cm³, 45 km/h', 0.12, 24),
+    powers: [3, 4, 5],
+    power: 4,
     governed: 45,
     noMotorway: true,
   },
@@ -284,14 +326,20 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     kind: 'motorcycle125',
     licence: 'A1',
     name: 'vehMotorcycle125',
-    spec: (t) => (t === 'automatic' ? MOTORCYCLE_125.auto : t === 'assist' ? { ...MOTORCYCLE_125.manual, autoClutch: true } : MOTORCYCLE_125.manual),
+    // (class A1: at most 11 kW)
+    spec: bike('Leichtkraftrad 125 cm³', 0.3, 7.2),
+    powers: [11, 13, 15],
+    power: 15,
   },
   motorcycle35: {
     ...MOTO_DEF,
     kind: 'motorcycle35',
     licence: 'A2',
     name: 'vehMotorcycle35',
-    spec: (t) => (t === 'automatic' ? MOTORCYCLE_35KW.auto : t === 'assist' ? { ...MOTORCYCLE_35KW.manual, autoClutch: true } : MOTORCYCLE_35KW.manual),
+    // (class A2: at most 35 kW)
+    spec: bike('Motorrad bis 35 kW', 0.75, 5.8),
+    powers: [27, 35, 47],
+    power: 47,
   },
   lightTruck: { ...LIGHT_TRUCK_DEF },
   lightTruckTrailer: {
@@ -303,10 +351,11 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     caps: { rural: 60, motorway: 80 },
     zoom: 16,
     zoomMax: 36,
+    power: 190,
   },
   minibus: { ...MINIBUS_DEF },
-  minibusTrailer: { ...MINIBUS_DEF, kind: 'minibusTrailer', licence: 'D1E', name: 'vehMinibusTrailer', trailer: MINIBUS_TRAILER, caps: { rural: 80, motorway: 80 }, zoom: 15, zoomMax: 34 },
-  busTrailer: { ...BUS_DEF, kind: 'busTrailer', licence: 'DE', name: 'vehBusTrailer', trailer: BUS_TRAILER, caps: { rural: 80, motorway: 80 }, zoom: 22, zoomMax: 48 },
+  minibusTrailer: { ...MINIBUS_DEF, kind: 'minibusTrailer', licence: 'D1E', name: 'vehMinibusTrailer', trailer: MINIBUS_TRAILER, caps: { rural: 80, motorway: 80 }, zoom: 15, zoomMax: 34, power: 177 },
+  busTrailer: { ...BUS_DEF, kind: 'busTrailer', licence: 'DE', name: 'vehBusTrailer', trailer: BUS_TRAILER, caps: { rural: 80, motorway: 80 }, zoom: 22, zoomMax: 48, power: 354 },
   // The tram runs on the tracks (sim/tramdrive.ts), not on the road physics: what is given here is
   // what the rest of the game needs of a vehicle – where the driver sits, what the camera keeps to –
   // measured from the middle of its first car.
@@ -317,6 +366,9 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     name: 'vehTram',
     model: 'tram',
     spec: () => BUS,
+    // (electric: its traction is sim/tramdrive.ts's, nothing to choose)
+    powers: [],
+    power: 0,
     caps: null,
     capFault: 'speed',
     outline: { front: 4.7, rear: 4.7, hw: 1.2 },
@@ -332,11 +384,76 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     long: true,
     dash: true,
   },
+  // The light aeroplane flies (sim/flight.ts), it is not driven on the road physics: what is given here is what
+  // the rest of the game needs of a vehicle – the camera, its size. Its engine powers are those of TRAINER.
+  plane: {
+    ...car,
+    kind: 'plane',
+    licence: 'PPL',
+    name: 'vehPlane',
+    model: 'plane',
+    spec: () => COMPACT_CAR,
+    powers: TRAINER.powers,
+    power: TRAINER.power,
+    trailer: null,
+    caps: null,
+    capFault: 'speed',
+    outline: { front: 2.6, rear: 5.6, hw: TRAINER.span / 2 },
+    axles: [1.5, -0.35],
+    track: 1.15,
+    door: -0.4,
+    doorSide: -1,
+    circles: [-1.5, 0.5, 2.5, 4.5],
+    radius: 1.1,
+    zoom: 15,
+    zoomMax: 80,
+    governed: 0,
+    heavy: false,
+    noMotorway: true,
+    long: false,
+    dash: true,
+  },
+  // On foot there is no vehicle at all (game.ts walks with OnFoot, game/onfoot.ts): what is given here is
+  // what the rest of the game needs of "the vehicle" – the camera keeps to the person, the motorway is not
+  // for them (§ 18 Abs. 9 StVO).
+  pedestrian: {
+    ...car,
+    kind: 'pedestrian',
+    licence: '',
+    name: 'vehOnFoot',
+    model: 'walker',
+    spec: () => COMPACT_CAR,
+    powers: [],
+    power: 0,
+    trailer: null,
+    caps: null,
+    capFault: 'speed',
+    outline: { front: 0.25, rear: 0.25, hw: 0.3 },
+    axles: [0, 0],
+    track: 0.2,
+    door: 0,
+    doorSide: 0,
+    circles: [0],
+    radius: 0.3,
+    zoom: 3.4,
+    zoomMax: 12,
+    governed: 0,
+    heavy: false,
+    noMotorway: true,
+    long: false,
+    dash: true,
+  },
 };
 
 /** The outline of the trailer of a vehicle (null: it has none). */
 export function trailerOf(def: VehicleDef): ReturnType<typeof trailerOutline> | null {
   return def.trailer ? trailerOutline(def.trailer) : null;
+}
+
+/** The engine power (PS) to drive a vehicle with: the one chosen for it, if it may have it, else the one it comes with. */
+export function powerOf(def: VehicleDef, chosen: Partial<Record<string, number>>): number {
+  const p = chosen[def.kind];
+  return p !== undefined && def.powers.includes(p) ? p : def.power;
 }
 
 /** A vehicle kind from a setting or a link, or null. */

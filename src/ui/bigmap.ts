@@ -9,7 +9,9 @@
  */
 import type { DrivenPath } from '../game/track.ts';
 import { AERIAL_SOURCE, AerialCache, aerialLevel, aerialTileSize, aerialTiles } from '../reality/aerial.ts';
-import { formatUnit, tr } from '../i18n/index.ts';
+import { formatUnit, localeOf, tr } from '../i18n/index.ts';
+import { loadTours } from '../game/tourlog.ts';
+import type { TourPrefs } from '../game/tourlog.ts';
 import type { NetIndex } from '../world/netindex.ts';
 import { CLASS_TIER } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
@@ -45,9 +47,18 @@ export interface BigMapHost {
    * A tour of about `metres` through as many different streets as possible,
    * from where the car stands back to there – or on to `end`.  Null: none found.
    */
-  planTour(metres: number, end: SpawnJson | null): TourPreview | null;
+  planTour(metres: number, end: SpawnJson | null, progress?: (share: number) => void): Promise<TourPreview | null>;
   /** are the roads of the whole map known (for planning ways through it)? */
   roadsKnown(): boolean;
+  /** what a tour is to lead along (kept in the settings) */
+  tourPrefs(): TourPrefs;
+  setTourPrefs(p: TourPrefs): void;
+  /**
+   * Where trams can go: the tracks of trams and regional trams (x, z, … per
+   * piece) and their stops – `version` changes when the tracks were read anew.
+   * Null while they are not read.
+   */
+  tramways?(): { version: number; tracks: readonly Float32Array[]; stops: ReadonlyArray<{ x: number; z: number; name: string }> } | null;
   /** is a drive to places or a tour under way? – and a way to end it */
   tripActive(): boolean;
   endTrip(): void;
@@ -105,6 +116,13 @@ export class BigMap {
   private tour: TourPreview | null = null;
   private tourKm = 10;
   private tourNote = '';
+  /** the line of a tour driven before, shown on the map */
+  private pastTour: Float32Array | null = null;
+  /** the tram tracks as one path (world coordinates), and for which version of them it was made */
+  private tramPath: Path2D | null = null;
+  private tramVersion = -1;
+  /** a tour is being worked out (the button waits) */
+  private planning = false;
   private scaleBar!: HTMLElement;
   private scaleText!: HTMLElement;
   private credit!: HTMLElement;
@@ -371,9 +389,26 @@ export class BigMap {
     kmLabel.append(el('span', '', this.t('tourLength')), km, el('span', '', 'km'));
     const planIt = el('button', 'btn ghost', this.t('tourPlan'));
     planIt.type = 'button';
-    planIt.onclick = () => {
+    planIt.onclick = async () => {
+      if (this.planning) return;
       this.tourKm = Math.max(1, Math.min(300, Math.round(Number(km.value) || 10)));
-      this.tour = this.host.planTour(this.tourKm * 1000, this.stops[this.stops.length - 1] ?? null);
+      // a long tour takes a while to work out: a bar shows how far it is, the button waits
+      this.planning = true;
+      planIt.disabled = true;
+      const bar = el('div', 'bm-progress');
+      const fill = el('i');
+      const label = el('small', '', this.t('tourPlanning', { p: 0 }));
+      bar.append(fill);
+      tourBox.append(bar, label);
+      try {
+        this.tour = await this.host.planTour(this.tourKm * 1000, this.stops[this.stops.length - 1] ?? null, (share) => {
+          const p = Math.round(Math.max(0, Math.min(1, share)) * 100);
+          fill.style.width = `${p}%`;
+          label.textContent = this.t('tourPlanning', { p });
+        });
+      } finally {
+        this.planning = false;
+      }
       // (the roads of the whole map are read in the background after the start: until then, a moment's patience)
       this.tourNote = this.tour ? '' : this.host.roadsKnown() ? this.t('tourNone') : this.t('realityLoading');
       if (this.tour) this.showAll(this.tour.line);
@@ -385,12 +420,66 @@ export class BigMap {
       if (this.tour) changed();
     };
     row.append(kmLabel, planIt);
-    tourBox.append(row);
+    // what the tour is to lead along: roads left out, the kind of street looked for
+    const prefs = this.host.tourPrefs();
+    const wishes = el('div', 'bm-wishes');
+    const wish = (key: 'noMotorway' | 'noExpress' | 'noMain', label: string): void => {
+      const l = el('label', 'bm-check');
+      const box = el('input');
+      box.type = 'checkbox';
+      box.checked = prefs[key];
+      box.onchange = () => {
+        prefs[key] = box.checked;
+        this.host.setTourPrefs(prefs);
+      };
+      l.append(box, el('span', '', label));
+      wishes.append(l);
+    };
+    wish('noMotorway', this.t('tourNoMotorway'));
+    wish('noExpress', this.t('tourNoExpress'));
+    wish('noMain', this.t('tourNoMain'));
+    const mostly = el('select');
+    for (const [v, k] of [['any', 'tourAny'], ['small', 'tourSmall'], ['town', 'tourTown'], ['country', 'tourCountry']] as const) {
+      const op = el('option');
+      op.value = v;
+      op.textContent = this.t(k);
+      mostly.append(op);
+    }
+    mostly.value = prefs.mostly;
+    mostly.onchange = () => {
+      prefs.mostly = mostly.value as TourPrefs['mostly'];
+      this.host.setTourPrefs(prefs);
+    };
+    const ml = el('label', 'bm-check');
+    ml.append(el('span', '', this.t('tourMostly')), mostly);
+    wishes.append(ml);
+    tourBox.append(wishes, row);
     if (this.tour) {
       const t = this.tour.plan;
       const f = (m: number): string => formatUnit(m / 1000, 'kilometer', lang, 1);
       tourBox.append(el('small', 'bm-result', this.t('tourResult', { km: f(t.metres), fresh: f(t.fresh), again: f(t.again) })));
     } else if (this.tourNote) tourBox.append(el('small', 'bm-result', this.tourNote));
+    // the tours driven before, with their dates: each shown on the map at a tap
+    const driven = loadTours();
+    if (driven.length > 0) {
+      const list = el('details', 'bm-tours');
+      list.append(el('summary', '', this.t('toursDriven', { n: driven.length })));
+      const loc = localeOf(lang);
+      const f = (m: number): string => formatUnit(m / 1000, 'kilometer', lang, 1);
+      for (const t of driven.slice(0, 15)) {
+        const b = el('button', 'bm-tour');
+        b.type = 'button';
+        const d = new Date(t.date);
+        b.textContent = `${d.toLocaleDateString(loc)} ${d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })} · ${f(t.driven)} / ${f(t.planned)}${t.done ? ' ✓' : ''}`;
+        b.onclick = () => {
+          this.pastTour = Float32Array.from(t.line);
+          this.showAll(this.pastTour);
+          this.redraw();
+        };
+        list.append(b);
+      }
+      tourBox.append(list);
+    }
     box.append(tourBox);
 
     // --- go: the car drives, or the player ---
@@ -641,6 +730,25 @@ export class BigMap {
 
     g.globalAlpha = 1;
 
+    // the tram tracks: where a tram can go (one path for all of them, made once)
+    const trams = this.host.tramways?.() ?? null;
+    if (trams) {
+      if (!this.tramPath || this.tramVersion !== trams.version) {
+        const p = new Path2D();
+        for (const t of trams.tracks) {
+          p.moveTo(t[0], t[1]);
+          for (let i = 2; i < t.length; i += 2) p.lineTo(t[i], t[i + 1]);
+        }
+        this.tramPath = p;
+        this.tramVersion = trams.version;
+      }
+      g.strokeStyle = '#c070f0';
+      g.lineWidth = Math.max(2.4 / s, 1.6);
+      g.globalAlpha = aerial ? 0.9 : 0.8;
+      g.stroke(this.tramPath);
+      g.globalAlpha = 1;
+    }
+
     // where the car has been
     if (this.showPath) {
       const p = this.host.path.points;
@@ -660,6 +768,21 @@ export class BigMap {
       g.stroke();
     }
 
+    // a tour driven before (chosen from the list)
+    if (this.pastTour && this.pastTour.length >= 4) {
+      const p = this.pastTour;
+      g.strokeStyle = '#7fd4ff';
+      g.lineWidth = Math.max(4 / s, 3.5);
+      g.globalAlpha = 0.85;
+      g.setLineDash([10 / s, 7 / s]);
+      g.beginPath();
+      g.moveTo(p[0], p[1]);
+      for (let i = 2; i < p.length; i += 2) g.lineTo(p[i], p[i + 1]);
+      g.stroke();
+      g.setLineDash([]);
+      g.globalAlpha = 1;
+    }
+
     // the tour that was planned
     if (this.tour) {
       const p = this.tour.line;
@@ -677,6 +800,36 @@ export class BigMap {
     const sx = (x: number): number => W / 2 + (x - this.cx) * s;
     const sy = (z: number): number => H / 2 + (z - this.cz) * s;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // the tram stops: a dot each, their names when one is close enough to read them
+    if (trams && s > 0.05) {
+      g.fillStyle = '#ffffff';
+      g.strokeStyle = '#7a2fb0';
+      g.lineWidth = 2;
+      const named = s > 0.6;
+      g.font = '600 12px system-ui, sans-serif';
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      for (const st of trams.stops) {
+        const x = sx(st.x);
+        const y = sy(st.z);
+        if (x < -40 || y < -20 || x > W + 40 || y > H + 20) continue;
+        g.beginPath();
+        g.arc(x, y, named ? 4.5 : 3, 0, Math.PI * 2);
+        g.fill();
+        g.stroke();
+        if (named) {
+          g.lineWidth = 3;
+          g.strokeStyle = 'rgba(12, 18, 24, 0.85)';
+          g.strokeText(st.name, x + 7, y);
+          g.fillStyle = '#e8d4ff';
+          g.fillText(st.name, x + 7, y);
+          g.fillStyle = '#ffffff';
+          g.strokeStyle = '#7a2fb0';
+          g.lineWidth = 2;
+        }
+      }
+    }
 
     // names of towns and districts
     g.textAlign = 'center';

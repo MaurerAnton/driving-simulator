@@ -91,6 +91,9 @@ export class TileManager {
     return this.loading.size === 0 && this.wantCount === 0;
   }
 
+  /** the share of the tiles around the current position that are there (0 … 1: for a progress bar) */
+  progress = 1;
+
   update(x: number, z: number): void {
     const { x0: minX, z0: minZ, size: tileSize } = this.grid;
     const r = this.viewRadius;
@@ -114,6 +117,9 @@ export class TileManager {
     }
     wanted.sort((a, b) => a.d - b.d);
     this.wantCount = wanted.length;
+    let have = 0;
+    for (const key of keep) if (this.tiles.has(key)) have++;
+    this.progress = keep.size > 0 ? have / keep.size : 1;
     for (const w of wanted) {
       if (this.loading.size >= this.maxConcurrent) break;
       this.wantCount--;

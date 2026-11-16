@@ -16,7 +16,7 @@
 import { CHUNK, GRID_OFFSET, GridSet, TILE, gridIndex, gridStart } from './grid.ts';
 import { unpackNet } from './netfile.ts';
 import type { NetData } from './netfile.ts';
-import type { MapIndexJson, RailJson, WorldChunkJson, WorldJson } from './types.ts';
+import type { AirJson, LinesJson, MapIndexJson, RailJson, StopsJson, WorldChunkJson, WorldJson } from './types.ts';
 import { World } from './world.ts';
 import type { WorldChange, WorldOptions } from './world.ts';
 
@@ -85,6 +85,10 @@ export class MapLoader {
   keepRadius = 7000;
   private netData: Promise<NetData | null> | null = null;
   private railData: Promise<RailJson[]> | null = null;
+  private stopData: Promise<StopsJson | null> | null = null;
+  private airData: Promise<AirJson | null> | null = null;
+  private farData: Promise<ArrayBuffer | null> | null = null;
+  private lineData: Promise<LinesJson | null> | null = null;
 
   private constructor(files: MapFiles, world: World, tiles: TileGrid, chunks: GridSet | null) {
     this.files = files;
@@ -131,6 +135,17 @@ export class MapLoader {
   }
 
   /** Is the road network within `radius` of the place all there? */
+  /** The share of the pieces of the network within `radius` of a place that are there (0 … 1: for a progress bar). */
+  progress(x: number, z: number, radius = this.loadRadius): number {
+    let n = 0;
+    let have = 0;
+    for (const key of this.around(x, z, radius)) {
+      n++;
+      if (this.gaveUp(key) || (this.loaded.has(key) && !this.pending.has(key))) have++;
+    }
+    return n > 0 ? have / n : 1;
+  }
+
   ready(x: number, z: number, radius = this.loadRadius): boolean {
     for (const key of this.around(x, z, radius)) {
       if (this.gaveUp(key)) continue;
@@ -258,5 +273,29 @@ export class MapLoader {
       ? readJson<{ rails: RailJson[] }>(this.files, 'rails.json.gz').then((r) => r?.rails ?? [])
       : Promise.resolve(this.world.json.rails ?? []);
     return this.railData;
+  }
+
+  /** The stops of the region – null for a map without them (one built before version 1.2.0, a test map). */
+  stops(): Promise<StopsJson | null> {
+    this.stopData ??= this.pieces ? readJson<StopsJson>(this.files, 'stops.json.gz').catch(() => null) : Promise.resolve(null);
+    return this.stopData;
+  }
+
+  /** The far view of the region: its ground on a coarse grid (far.bin.gz, inflated) – null for a map without it. */
+  far(): Promise<ArrayBuffer | null> {
+    this.farData ??= this.pieces ? this.files.bytes('far.bin.gz').catch(() => null) : Promise.resolve(null);
+    return this.farData;
+  }
+
+  /** The lines of the trams – null for a map without them. */
+  lines(): Promise<LinesJson | null> {
+    this.lineData ??= this.pieces ? readJson<LinesJson>(this.files, 'lines.json.gz').catch(() => null) : Promise.resolve(null);
+    return this.lineData;
+  }
+
+  /** The airfields of the region – null for a map without them. */
+  air(): Promise<AirJson | null> {
+    this.airData ??= this.pieces ? readJson<AirJson>(this.files, 'air.json.gz').catch(() => null) : Promise.resolve(null);
+    return this.airData;
   }
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /** User settings, persisted in localStorage. */
 import { LANGS, pickLang } from '../i18n/index.ts';
+import { DEFAULT_TOUR_PREFS } from './tourlog.ts';
+import type { TourPrefs } from './tourlog.ts';
 import { vehicleKind } from './vehicles.ts';
 import type { VehicleKind } from './vehicles.ts';
 
@@ -20,20 +22,24 @@ export interface Graphics {
   facades: boolean;
   /** trees and signs cast shadows */
   propShadows: boolean;
+  /** how far the ground beyond the map is drawn – the hills on the horizon (m; 0: not at all) */
+  farView: number;
 }
 
 export const GRAPHICS_PRESETS: Record<Exclude<Quality, 'custom'>, Graphics> = {
-  low: { shadows: 'off', viewDistance: 700, propDensity: 0.35, facades: false, propShadows: false },
-  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false },
-  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true },
-  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true },
+  low: { shadows: 'off', viewDistance: 700, propDensity: 0.35, facades: false, propShadows: false, farView: 0 },
+  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false, farView: 8000 },
+  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true, farView: 12000 },
+  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true, farView: 20000 },
 };
 export const VIEW_DISTANCES = [500, 700, 1000, 1250, 1600, 2000, 2500, 3000];
+/** the ground beyond the map: off, or so far (m) */
+export const FAR_VIEWS = [0, 5000, 8000, 12000, 20000, 30000];
+/** running on foot (km/h): a jog … a sprint */
+export const RUN_SPEEDS = [8, 10, 12, 15, 18, 22, 26];
 /** the camera a drive starts with: behind the car, or at the driver's eyes */
 export type View = 'chase' | 'cockpit';
 
-/** Engine powers that can be chosen, in PS (metric horsepower) as printed in German vehicle papers. */
-export const ENGINE_POWERS = [60, 75, 95, 115, 150, 200] as const;
 
 export interface WheelMapping {
   steerAxis: number;
@@ -54,15 +60,22 @@ export interface Settings {
   /** a car (class B) or the truck with trailer (class CE) */
   vehicle: VehicleKind;
   transmission: Transmission;
-  /** engine power in PS, one of ENGINE_POWERS */
-  power: number;
+  /**
+   * the engine power chosen for each kind of vehicle, in PS (metric horsepower, as German vehicle papers print
+   * it); one of its VehicleDef.powers – a kind not listed has the power it comes with
+   */
+  powers: Partial<Record<VehicleKind, number>>;
   /** with keys or pedals on the screen the throttle eases off at the current speed limit */
   limiter: boolean;
+  /** how fast one runs on foot (km/h), one of RUN_SPEEDS */
+  runSpeed: number;
+  /** what a tour is to lead along (the map's tour planner) */
+  tourPrefs: TourPrefs;
   view: View;
   /** how solid the interior is drawn in the cockpit view, 0.2 (see-through) … 1 */
   cabinOpacity: number;
   /** where the last drive began: a start point of the map, or an address */
-  lastStart: { spawn: number; address: { label: string; street: string; x: number; z: number; exact: boolean } | null };
+  lastStart: { spawn: number; address: { label: string; street: string; x: number; z: number; exact: boolean } | null; /** the tram's: "name|town" */ tramStop?: string; /** the aeroplane's: "field|end" */ runway?: string };
   quality: Quality;
   /** the graphics as the preset (or the advanced settings) set them */
   graphics: Graphics;
@@ -116,8 +129,10 @@ export const DEFAULT_SETTINGS: Settings = {
   // what the playtesters asked for: an automatic, seen from behind, with an engine that is easy to dose
   vehicle: 'car',
   transmission: 'automatic',
-  power: 75,
+  powers: {},
   limiter: true,
+  runSpeed: 12,
+  tourPrefs: { ...DEFAULT_TOUR_PREFS },
   view: 'chase',
   cabinOpacity: 1,
   lastStart: { spawn: 0, address: null },
@@ -149,7 +164,7 @@ const KEY = 'fahrsim-baunatal.settings.v2';
 const OLD_KEY = 'fahrsim-baunatal.settings.v1';
 
 function fresh(): Settings {
-  return { ...DEFAULT_SETTINGS, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality }, lastStart: { ...DEFAULT_SETTINGS.lastStart } };
+  return { ...DEFAULT_SETTINGS, powers: {}, tourPrefs: { ...DEFAULT_TOUR_PREFS }, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality }, lastStart: { ...DEFAULT_SETTINGS.lastStart } };
 }
 
 /** Defaults, overlaid with what was stored – whatever is missing or implausible keeps its default. */
@@ -157,9 +172,20 @@ function merge(parsed: Partial<Settings>): Settings {
   const d = fresh();
   const s: Settings = { ...d, ...parsed, graphics: { ...d.graphics, ...(parsed.graphics ?? {}) }, wheel: { ...d.wheel, ...(parsed.wheel ?? {}) }, reality: { ...d.reality, ...(parsed.reality ?? {}) }, lastStart: { ...d.lastStart, ...(parsed.lastStart ?? {}) } };
   if (!LANGS.some((l) => l.code === s.lang)) s.lang = d.lang;
-  if (!(ENGINE_POWERS as readonly number[]).includes(s.power)) s.power = d.power;
+  // (before 1.2.0 there was one engine power, the car's)
+  const old = (parsed as { power?: unknown }).power;
+  s.powers = typeof parsed.powers === 'object' && parsed.powers !== null ? { ...parsed.powers } : {};
+  if (typeof old === 'number' && s.powers.car === undefined) s.powers.car = old;
+  delete (s as { power?: unknown }).power;
+  for (const k of Object.keys(s.powers) as VehicleKind[]) if (!vehicleKind(k) || typeof s.powers[k] !== 'number') delete s.powers[k];
   if (s.view !== 'chase' && s.view !== 'cockpit') s.view = d.view;
   if (!vehicleKind(s.vehicle)) s.vehicle = d.vehicle;
+  if (!RUN_SPEEDS.includes(s.runSpeed)) s.runSpeed = d.runSpeed;
+  s.tourPrefs = { ...DEFAULT_TOUR_PREFS, ...(typeof parsed.tourPrefs === 'object' && parsed.tourPrefs ? parsed.tourPrefs : {}) };
+  if (!['any', 'small', 'town', 'country'].includes(s.tourPrefs.mostly)) s.tourPrefs.mostly = 'any';
+  // (stored before there was a far view: the one of the preset chosen then)
+  if (parsed.graphics && typeof (parsed.graphics as Partial<Graphics>).farView !== 'number') s.graphics.farView = GRAPHICS_PRESETS[s.quality === 'custom' || !GRAPHICS_PRESETS[s.quality as Exclude<Quality, 'custom'>] ? 'medium' : (s.quality as Exclude<Quality, 'custom'>)].farView;
+  if (!FAR_VIEWS.includes(s.graphics.farView)) s.graphics.farView = FAR_VIEWS.reduce((a, b) => (Math.abs(b - s.graphics.farView) < Math.abs(a - s.graphics.farView) ? b : a));
   if (!['assist', 'manual', 'automatic'].includes(s.transmission)) s.transmission = d.transmission;
   if (!['low', 'medium', 'high', 'ultra', 'custom'].includes(s.quality)) s.quality = d.quality;
   // (stored before there were advanced graphics settings: what the level gave then)

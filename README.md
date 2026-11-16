@@ -1,8 +1,8 @@
 # Fahrsim Baunatal
 
 **Freier 3D-Fahrschulsimulator für Nordhessen – deutsche Verkehrsregeln im echten Straßennetz üben,
-mit einem Fahrzeug jeder Führerscheinklasse – vom Mofa bis zum Bus mit Anhänger – und mit der
-Straßenbahn.**
+mit einem Fahrzeug jeder Führerscheinklasse – vom Mofa bis zum Bus mit Anhänger –, mit der
+Straßenbahn, zu Fuß und im Flugzeug.**
 Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software unter **AGPL-3.0-only**.
 
 ▶ **Spielen:** <https://maureranton.github.io/driving-simulator/>
@@ -35,7 +35,9 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 - **Fahrphysik:** Sechs-Freiheitsgrade-Fahrzeug mit Federung, Reifenmodell (Haft- und Gleitreibung,
   Lastverlagerung), Motor mit Drehmomentkurve, **Kupplung mit Schleifpunkt, Abwürgen und Anlasser**,
   6-Gang-H-Schaltung, ABS, Handbremse, Berganfahren. Automatik (Voreinstellung), Kupplungshilfe oder
-  Schaltgetriebe; **Motorleistung wählbar** (60 bis 200 PS, voreingestellt 75 PS). Ein Tempobegrenzer nimmt
+  Schaltgetriebe; **Motorleistung wählbar** – für jedes Fahrzeug eigene Stufen im Rahmen seiner Klasse (Pkw
+  60 bis 200 PS, voreingestellt 75 PS; Moped höchstens 4 kW, 125er höchstens 11 kW, A2 höchstens 35 kW; Lkw,
+  Busse und Traktoren in ihren üblichen Größen). Ein Tempobegrenzer nimmt
   bei Tastatur und Touch das Gas am Tempolimit zurück, und die Tastaturlenkung richtet sich nach der
   Querbeschleunigung – auch bei Autobahntempo bleibt das Auto ruhig.
 - **Ein Fahrzeug für jede Klasse:** Pkw (B), Pkw mit Tandem-Kastenanhänger (BE), Mofa/Moped (AM),
@@ -47,14 +49,41 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   § 18 Abs. 5 StVO), Schrittgeschwindigkeit beim Rechtsabbiegen innerorts über 3,5 t (§ 9 Abs. 6 StVO) und
   das Autobahnverbot für Fahrzeuge, die bauartbedingt nicht schneller als 60 km/h fahren – Moped und
   Traktoren (§ 18 Abs. 1 StVO). Lkw und Busse sind abgeregelt. Die Wege der Navigation führen langsame
-  Fahrzeuge um die Autobahn herum.
-- **Straßenbahn:** auf den Gleisen von Kassel und Baunatal (106 km, rund 135 Haltestellen), vom Halt am
-  gewählten Ort aus. Ein Fahrschalter für Fahren und Bremsen (die Pedale), die Notbremse mit
-  Schienenbremse (die Handbremse), die Klingel (die Hupe); an der Weiche wählt der Blinker den Weg. An der
-  Haltestelle: an der Haltemarke halten, Türen öffnen (`G`), Fahrgäste steigen aus und ein, Türen
-  schließen – dann weiter. Der Fahrlehrer achtet auf das Tempo in Kurven und auf der Straße, auf jede
-  Haltestelle, auf die Türen und auf rote Ampeln, wo das Gleis eine Kreuzung quert. Eine Fahrstunde mit
-  fünf Haltestellen und die freie Fahrt.
+  Fahrzeuge um die Autobahn herum. Die Motorräder haben je Klasse ein eigenes Modell – vom Moped bis zur
+  großen Maschine – mit einem Fahrer, der den Lenker hält.
+- **Straßenbahn:** auf den Gleisen von Kassel und Baunatal (106 km, rund 135 Haltestellen), von der
+  Haltestelle aus, die man im Menü wählt (nach Gemeinden geordnet). Ein Fahrschalter für Fahren und Bremsen
+  (die Pedale), die Notbremse mit Schienenbremse (die Handbremse), die Klingel (die Hupe); an der Weiche
+  wählt der Blinker den Weg – sonst folgt die Bahn ihrer Linie. An der Haltestelle: an der Haltemarke halten,
+  Türen öffnen (`G`), Fahrgäste steigen aus und ein, Türen schließen – dann weiter. Der Fahrlehrer achtet auf
+  das Tempo in Kurven und auf der Straße, auf jede Haltestelle, auf die Türen und auf rote Ampeln, wo das
+  Gleis eine Kreuzung quert. Eine Fahrstunde mit fünf Haltestellen, die freie Fahrt und eine Vorführfahrt, auf
+  der die Bahn selbst fährt. Die Bahnen des Verkehrs fahren ihre echten **Linien** (1–8, RT1, RT4 und RT5,
+  aus OpenStreetMap) mit Nummer und Ziel an der Front; die große Karte zeigt Gleise und Haltestellen.
+- **Haltestellen zum Sehen:** 3 644 Haltestellen von Bus und Bahn mit ihren echten Namen – Bahnsteige,
+  Wartehallen, das Haltestellenschild (Zeichen 224) mit dem Namen, Bänke, Abfahrtsanzeiger und Leute, die
+  warten und ein- und aussteigen, wenn eine Bahn oder ein Bus hält; an der Haltemarke die Haltetafel (Sh 7).
+  Über den Gleisen die Oberleitung mit ihren Masten, wo das Gleis eine Kreuzung mit Ampel quert die
+  Straßenbahnsignale (F 0 bis F 5 nach BOStrab), vor den Weichen die Weichensignale (W 1 bis W 3), die zeigen,
+  wohin die Weiche für die nächste Bahn gestellt ist.
+- **Bus auf der Linie:** Stadtbusse im Verkehr halten mit der vorderen Tür am Mast der Haltestelle und fahren
+  mit Blinker wieder an. Dazu eine Fahrstunde für die Busklassen: fünf Haltestellen bedienen – am Mast
+  halten, Türen öffnen (`G`), Fahrgäste aus- und einsteigen lassen, Türen schließen, links blinken und
+  anfahren (§ 10 StVO).
+- **Zu Fuß unterwegs:** „Zu Fuß“ im Fahrzeugmenü – durch die Stadt gehen und rennen (wie schnell, sagen die
+  Einstellungen), an der Fußgängerampel den **Taster drücken** („Signal kommt“), am **Zebrastreifen** halten
+  die Autos (§ 26 StVO), beim Abbiegen lassen sie einen gehen (§ 9 Abs. 3 StVO) – und an der Haltestelle in
+  **Straßenbahn oder Bus einsteigen**, mitfahren und an einer späteren Haltestelle wieder aussteigen. Der
+  Fahrlehrer achtet auch zu Fuß auf die Regeln: Gehweg statt Fahrbahn (§ 25 Abs. 1), über die Straße am
+  Überweg, wenn einer nah ist (§ 25 Abs. 3), nicht bei Rot (§ 37 Abs. 2 Nr. 5 StVO).
+- **Fliegen:** ein Leichtflugzeug (zweisitziger Schulterdecker, 100 bis 180 PS) startet von den
+  21 Flugplätzen Nordhessens – vom Flughafen Kassel-Calden oder von einem der kleinen Plätze; Start- und
+  Landebahnen, Rollwege und Vorfelder sind mit ihren Markierungen gezeichnet. Eigene Flugphysik (Auftrieb und
+  Strömungsabriss, Propeller, Fahrwerk, Landeklappen), ein Cockpit mit allen Instrumenten; der Steuerknüppel
+  liegt auf den Pfeiltasten, dem Gamepad oder – auf dem Touchscreen – der Lenkleiste.
+- **Fernsicht:** jenseits der geladenen Kacheln das Gelände der ganzen Region (ein Punkt alle 100 m, mit
+  Wald, Feld und Ort) – die Hügel am Horizont und das Land unter dem Flugzeug; in den Grafikeinstellungen
+  5 bis 30 km weit oder aus.
 - **Lkw mit Anhänger (Klasse CE):** ein 12-Tonner mit Tandemanhänger (15,7 m, 15,5 t) und alles, was die
   praktische Prüfung verlangt – siehe [unten](#lkw-mit-anhänger-klasse-ce).
 - **Zu Fuß ums Fahrzeug:** Aussteigen (`G`, aus dem Pausenmenü oder per Fingertipp, wenn das Fahrzeug mit
@@ -96,7 +125,10 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   „Ansagen“), mit dem Fahrstreifen, in den man sich vor der Kreuzung einordnet. Mehr dazu [unten](#fahrt-planen).
 - **Rundfahrt durch die Straßen:** Länge in Kilometern wählen – der Simulator plant eine Strecke dieser
   Länge, die durch möglichst viele verschiedene Straßen führt und möglichst keine zweimal: vom Standort
-  zurück zum Standort oder zu einem Ziel. Zum Selbstfahren oder als Vorführfahrt.
+  zurück zum Standort oder zu einem Ziel. Zum Selbstfahren oder als Vorführfahrt. Dazu Wünsche: keine
+  Autobahnen, keine Schnellstraßen, Hauptstraßen nur zum Weiterkommen – und vor allem durch Straßen mit
+  kleinen Häusern, durch Wohnblocks und Ortskerne oder über Land. Beim Planen zeigt ein Balken, wie weit es
+  ist; gefahrene Rundfahrten werden mit Datum gespeichert und lassen sich auf der Karte wieder ansehen.
 - **Verkehr:** Fahrzeuge, die Ampeln, Vorfahrt und Abstand beachten, Fußgänger an Überwegen – und
   **Straßenbahnen und Züge**, die auf den echten Gleisen fahren, sobald welche in der Nähe sind, und an den
   Haltestellen halten.
@@ -121,7 +153,8 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   bis sehr hoch), die die Auflösung nicht ändern; davon getrennt Größe der Oberfläche, Bildschirm- und
   3D-Auflösung; in den erweiterten Einstellungen einzeln Schatten, Sichtweite, Bäume und Objekte am Rand,
   Gebäude mit oder ohne Fenster, Schatten von Bäumen und Schildern –, die Karte auf dem Bildschirm des
-  Autos (Fahrersicht), Spiegel, Verkehrsdichte, Lautstärke, Getriebe und Motorleistung, Tempobegrenzer,
+  Autos (Fahrersicht), die Fernsicht, Spiegel, Verkehrsdichte, Lautstärke, Getriebe, Laufgeschwindigkeit zu
+  Fuß, Tempobegrenzer,
   Kamera beim Start, durchscheinender Innenraum, Bildschirmsteuerung und ihre Deckkraft, Tastenhilfe,
   Regel-Hilfe, Ganganzeige, gesprochene Ansagen, Start neben dem Fahrzeug – und die **Bildrate** (Bilder
   pro Sekunde, oben rechts).
@@ -151,7 +184,8 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 | Maus ziehen (oder `Alt` halten und Maus bewegen) · Mausrad | umsehen bzw. Kamera um das Fahrzeug drehen · Abstand der Kamera |
 | `B` · `L` `O` · `H` | Gurt · Abblend-/Fernlicht · Hupe |
 | `P` · `0` | Automatik: Parkstellung · Leerlauf |
-| `G` | aussteigen (im Stand) / an der Fahrertür einsteigen – zu Fuß: `W` `S` gehen, `A` `D` drehen, Maus umsehen, `Umschalt` rennen |
+| `G` | aussteigen (im Stand) / an der Fahrertür einsteigen – zu Fuß: `W` `S` gehen, `A` `D` drehen, Maus umsehen, `Umschalt` rennen; an der Fußgängerampel den Taster drücken, in Bahn oder Bus ein- und aussteigen |
+| Flugzeug: `↑` `↓` `←` `→` · `W` `S` · `A` `D` · `Leertaste` · `G` | Steuerknüppel · Gas · Seitenruder · Bremsen · Landeklappen |
 | `F1` | Übersicht der Tasten |
 | `V` · `T` · `Esc` | Kamera (außen / Cockpit / frei) · Fahrzeug zurück auf die Straße · Pause |
 | freie Kamera: `Alt` + `W` `A` `S` `D` · `Alt` + `E` `Q` · rechte Maustaste ziehen | fliegen · höher / tiefer · verschieben (das Auto rollt solange von selbst weiter) |
@@ -350,9 +384,10 @@ muss man zum Spielen und Entwickeln nicht.
 ### Tests
 
 ```bash
-npm test             # 182 Tests: Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
-                     # Klassen (32), Straßenbahn fahren (4), Realansicht (15), Adresssuche, Hinweise, Fehlerprotokoll, Karte (16), Straßenbahnen (9),
-                     # Klasse CE (16), Sprachen (10), Rundfahrten (7), Radfahrer (11), Ampeln mit Pfeil und ausgefallene
+npm test             # 267 Tests: Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
+                     # Klassen mit jeder Motorleistung (77), Flugphysik (25), Flugplätze (3), Straßenbahn fahren und ihre
+                     # Linien (6), Bus auf der Linie (2), zu Fuß an Ampel und Zebrastreifen (5), Fernsicht (2), Realansicht (15), Adresssuche, Hinweise, Fehlerprotokoll, Karte (16), Straßenbahnen (9),
+                     # Klasse CE (16), Sprachen (10), Rundfahrten mit Wünschen (8), Radfahrer (11), Ampeln mit Pfeil und ausgefallene
                      # Ampeln (9), zu Fuß (6), „Was ist neu“ (3), freie Fahrstreifen (5), Straßennetz in Stücken,
                      # Kachelformat, Kreuzungsflächen (12)
 npm run i18n:check   # Übersetzungen prüfen (Vollständigkeit, Platzhalter, Längen)
@@ -395,17 +430,20 @@ src/world              Straßennetz-Modell: Knoten, Kanten, Kreuzungsgeometrie, 
                        stückweise um das Fahrzeug geladen (loader.ts); das Netz des ganzen Gebiets für
                        Routen und die große Karte (routegraph.ts, netfile.ts)
 src/sim/vehicle        Fahrdynamik von Pkw und Lkw (ohne Abhängigkeiten, deterministisch)
-src/sim                Verkehr, Ampeln, Regelwächter, Kollisionen, Anhänger, Straßenbahnen und Züge,
+src/sim                Verkehr, Ampeln, Regelwächter, Kollisionen, Anhänger, Straßenbahnen und Züge mit
+                       ihren Linien, die eigene Bahn (tramdrive.ts), Flugphysik (flight.ts) und Flugplätze,
                        der regeltreue Fahrer der Vorführfahrten (autodriver.ts), „nichts steht im
                        Fahrstreifen“ (clearlanes.ts)
-src/render             three.js: Kacheln, Gebäude, Schilder, Fahrzeuge, Cockpit, Spiegel, Übungsplatz
+src/render             three.js: Kacheln, Fernsicht, Gebäude, Schilder, Fahrzeuge, Flugzeug, Cockpit,
+                       Spiegel, Haltestellen mit Leuten, Oberleitung und Signalen (transit.ts), Übungsplatz
 src/i18n               Texte: eine Datei je Sprache, Tastenbeschriftung nach Tastaturbelegung
 src/reality            Realansicht: Bild-Metadaten (EXIF/XMP), eigene Bilder, freie Bilddienste, Luftbilder
 src/game, src/ui       Spielablauf, Fahrstunden, Aufgaben der Klasse CE, Navigation, Rundfahrten (tour.ts),
                        HUD, Menüs, große Karte
 tools/                 Kartenpipeline: Geodaten laden und verkleinern (fetch-geodata.py), OSM-PBF-Leser,
                        Straßennetz des Gebiets (build-graph.ts), Kacheln je Block (build-tiles.ts), Kontrolle
-                       (check-lanes.ts); Verzeichnis eigener Straßenbilder (tools/panos)
+                       (check-lanes.ts), Haltestellen und Flugplätze (build-stops.ts), Linien der Bahnen
+                       (build-lines.ts), Fernsicht (build-far.ts); Verzeichnis eigener Straßenbilder (tools/panos)
 tests/                 Fahrdynamik-Tests, Straßennetz in Stücken, Rundfahrten, Verkehrs-Dauerlauf,
                        virtueller Fahrschüler
 ```
@@ -415,7 +453,8 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 182 Tests (Fahrdynamik aller Fahrzeuge, Straßenbahn, Anhänger, Aufgaben der Klasse CE,
+- **Automatisch geprüft:** 267 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
+  Straßenbahn und ihre Linien, Bus auf der Linie, zu Fuß an Fußgängerampel und Zebrastreifen, Fernsicht, Anhänger, Aufgaben der Klasse CE,
   Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
   Umgebungsverkehrs, eine Kontrolle der gebauten Karte (ein wagenbreiter Kreis fährt jeden Fahrstreifen
   ab: nichts steht darin) und ein „virtueller Fahrschüler“, der alle Fahrstunden und die Prüfungsfahrt
@@ -437,20 +476,28 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   auf der Fahrbahn; sie kommen nur dort, wo Verkehr eingeschaltet ist.
 - **Darstellung:** Gebäude haben echte Form und Höhe, aber keine Fototexturen; Fahrzeuge und Cockpit sind
   vollständig prozedural erzeugt.
-- **Straßenbahn:** Ampeln gelten dort, wo das Gleis eine Kreuzung mit Ampel quert; eigene
-  Straßenbahnsignale (BOStrab) und Fahrpläne gibt es nicht. Die Haltestellen heißen nach der Straße, an der
-  sie liegen; die Fahrgäste werden gezählt, nicht gezeichnet. Die Fehler der Straßenbahn verweisen auf die
-  BOStrab (§ 50 Geschwindigkeiten, § 54 Türen und Haltestellen).
+- **Straßenbahn:** Die Straßenbahnsignale an Kreuzungen zeigen Halt (F 0), Fahrt (F 1) und „Halt erwarten“
+  (F 4) nach der Ampel der Kreuzung, die Weichensignale die Stellung der Weiche (W 1 geradeaus, W 2 rechts,
+  W 3 links); das Heben und Senken des Stromabnehmers und Fahrpläne gibt es noch nicht, ebenso wenig
+  Doppeltraktion und Beiwagen. Die Fahrgäste der eigenen Bahn werden
+  gezählt; die an der Haltestelle sind gezeichnet. Die Fehler der Straßenbahn verweisen auf die BOStrab
+  (§ 50 Geschwindigkeiten, § 54 Türen und Haltestellen).
 - **Fahrzeuge:** Das Motorrad fährt auf demselben Vierrad-Modell wie alles andere, nur schmal und mit tiefem
   Schwerpunkt – es kippt nicht und muss nicht balanciert werden; dass es sich in die Kurve legt, ist
-  gezeichnet. Der Bus fährt ohne Fahrgäste und hält nicht an Haltestellen, der Traktor ohne Anbaugeräte;
-  beide haben (noch) keine eigenen Fahrstunden. Beim Ein- und Aussteigen wird das Bild kurz dunkel – eine Tür, die aufgeht, ist nicht
-  gezeichnet.
+  gezeichnet. Der Traktor fährt ohne Anbaugeräte und hat (noch) keine eigenen Fahrstunden. Beim Ein- und
+  Aussteigen wird das Bild kurz dunkel – eine Tür, die aufgeht, ist nicht gezeichnet. Die Türen der Busse
+  sind gezeichnet, gehen aber nicht auf.
 - **Lkw:** Der Anhänger folgt der Kupplung als geführtes Modell – er wirkt mit seiner Masse auf den Lkw,
   stößt aber selbst nicht an Gebäude oder Schilder und kippt nicht. Das Verbinden und Trennen prüft die
   Reihenfolge der Handgriffe, nicht die Handgriffe selbst. Sattelzüge gibt es nicht.
-- **Straßenbahnen und Züge:** fahren ohne Fahrplan und Linien und beachten einander und Fahrzeuge auf dem
-  Gleis, aber keine Signale; Schranken an Bahnübergängen gibt es nicht.
+- **Straßenbahnen und Züge:** fahren ihre Linien (wo deren Weg in OpenStreetMap Lücken hat, wählen sie selbst),
+  aber ohne Fahrplan; sie beachten einander und Fahrzeuge auf dem Gleis, aber keine Signale; Schranken an
+  Bahnübergängen gibt es nicht.
+- **Zu Fuß:** man sieht mit den eigenen Augen – eine eigene Figur von außen gibt es noch nicht. Fußgänger
+  des Verkehrs gehen nur an Überwegen über die Straße.
+- **Flugzeug:** frei fliegen, ohne Funk, Flugverkehr, Navigationshilfen und Wetter; wer zu hart aufsetzt oder
+  mit der Fläche den Boden berührt, beendet den Flug. Was jenseits der Kacheln liegt, zeigt die Fernsicht
+  ohne Gebäude und Bäume.
 - **Größe der Karte:** Geladen wird immer nur die Umgebung – Kacheln im Sichtbereich, das Straßennetz im
   Umkreis von gut 3 km. Der Start dauert deshalb nicht länger als mit einer Stadt allein; wer sich weit
   versetzt, sieht kurz den Ladehinweis. Die Karte endet am Rand des gebauten Gebiets, spätestens an der
@@ -496,7 +543,7 @@ Einzelheiten: [NOTICE.md](NOTICE.md).
 **Fahrsim Baunatal** is a free (AGPL-3.0-only) browser-based 3D driving-school simulator set in the real
 north of the German state of Hesse – Kassel, Baunatal and five districts around them. It is meant to help
 learner drivers understand and practise German traffic rules (StVO) – with a vehicle of every licence
-class, from the moped to the bus with a trailer, and with the tram.
+class, from the moped to the bus with a trailer, with the tram, on foot and in a light aeroplane.
 
 - The real road network of northern Hesse – the city of Kassel and the districts of Kassel, Schwalm-Eder,
   Werra-Meißner, Waldeck-Frankenberg and Hersfeld-Rotenburg: about 6,900 km², 115 towns and
@@ -508,7 +555,8 @@ class, from the moped to the bus with a trailer, and with the tram.
   in 115 towns, or at any of about 310,000 addresses.
 - A physically based car: 6-DOF body, suspension, tyre model, engine, **clutch with biting point and
   stalling**, 6-speed H-gate gearbox, ABS, hill starts. Automatic by default, clutch assist or manual
-  optional; engine power can be chosen (60 to 200 PS, 75 by default); a speed limiter eases the throttle
+  optional; engine power can be chosen – every vehicle has steps of its own within its licence class (car
+  60 to 200 PS, 75 by default; moped at most 4 kW, 125 at most 11 kW, A2 at most 35 kW); a speed limiter eases the throttle
   off at the limit for keyboard and touch, and keyboard steering is limited by lateral acceleration, so
   the car stays calm at motorway speeds.
 - **A truck with a trailer (licence class CE):** a two-axle 12-tonne truck with a tandem centre-axle
@@ -521,11 +569,28 @@ class, from the moped to the bus with a trailer, and with the tram.
   trailer (CE), minibus (D1) and with a trailer (D1E), city bus (D) and with a trailer (DE), tractor up to
   40 km/h (L) and up to 60 km/h (T) – each with its own physics, model with cockpit and mirrors, and the
   rules of its class: speed caps outside built-up areas and on motorways, walking pace when turning right
-  in town above 3.5 t, no motorway for vehicles built for 60 km/h or less (routes lead round it).
-- **A tram** on the tracks of Kassel and Baunatal: one controller for power and brake, the way at a switch
-  chosen with the indicator, the doors at the stops while passengers get off and on; the instructor
-  watches the speed in curves and on the street, every stop, the doors and red lights where the track
-  crosses a junction. A lesson with five stops, and free driving.
+  in town above 3.5 t, no motorway for vehicles built for 60 km/h or less (routes lead round it). The
+  motorcycles have a model of their own for each class, with a rider who holds the handlebar.
+- **A tram** on the tracks of Kassel and Baunatal, from the stop you choose: one controller for power and
+  brake, the way at a switch chosen with the indicator (else it follows its line), the doors at the stops
+  while passengers get off and on; the instructor watches the speed in curves and on the street, every stop,
+  the doors and red lights where the track crosses a junction. A lesson with five stops, free driving and a
+  demonstration drive. The trams of the traffic run their **real lines** (1–8, RT1, RT4, RT5 from
+  OpenStreetMap) with number and destination on the front; the map shows the tracks and stops.
+- **Stops you can see:** 3,644 bus and tram stops with their real names – platforms, shelters, the stop sign
+  with its name, benches, departure boards and people who wait and get on and off; the tram's stop board
+  (Sh 7), the overhead line with its masts, the tram signals (F 0 to F 5) where a track crosses a junction
+  with lights, and the switch signals (W 1 to W 3) before the switches.
+- **The bus on a line:** city buses in the traffic stop at the stops and pull out with the indicator on; a
+  lesson for the bus classes serves five stops – front door at the pole, doors, passengers, indicator.
+- **On foot as a pedestrian:** walk and run anywhere (the running speed is a setting), press the button at a
+  pedestrian light ("Signal kommt"), cross at zebra crossings where cars stop for you, and ride trams and
+  buses as a passenger; the instructor watches the pedestrian rules (§ 25, § 37 Abs. 2 Nr. 5 StVO).
+- **Flying:** a light two-seat high-wing aeroplane (100 to 180 PS) takes off from the 21 airfields of
+  northern Hesse – Kassel Airport or one of the small fields, runways drawn with their markings – with flight
+  physics of its own (lift and stall, propeller, gear, flaps) and a cockpit with all its instruments.
+- **The far view:** the ground of the whole region on a 100 m grid beyond the loaded tiles – hills on the
+  horizon, the land below the aeroplane (5 to 30 km, or off).
 - **On foot:** get out (`G`, the pause menu, or a tap when the vehicle stands with the engine off and the
   parking brake on), walk round the vehicle and check it before driving off – tyres, lights front and
   back, with a trailer the coupling; rings on the ground show where –, then get in at the driver's door. A
@@ -560,7 +625,9 @@ class, from the moped to the bus with a trailer, and with the tram.
   shown the way.
 - **Tours of the streets:** pick a length in kilometres and the simulator plans a route of that length
   through as many different streets as possible, each only once where that can be done – back to where
-  you stand, or on to a destination. Drive it yourself or let the car drive it.
+  you stand, or on to a destination. Drive it yourself or let the car drive it. Wishes: no motorways, no
+  expressways, main roads only to get somewhere, mostly streets of small houses, of blocks and town centres,
+  or the open country; a bar shows how far the planning is, and driven tours are kept with their dates.
 - A **full-screen map** (`M`): where you are, the path already driven, and in free drive a tap puts the
   vehicle anywhere; optionally over the State of Hesse's official aerial photographs.
 - Keyboard / gamepad / wheel / touch. On a phone everything works without a keyboard: tap the street name
@@ -580,8 +647,8 @@ class, from the moped to the bus with a trailer, and with the tram.
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 182 unit tests (vehicle dynamics of every vehicle, the tram, the trailer, the class-CE
-tasks, cyclists, traffic lights, on foot, trams, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
+Verified automatically by 267 unit tests (vehicle dynamics of every vehicle with every engine power, the tram, the trailer, the class-CE
+tasks, cyclists, traffic lights, on foot and the pedestrian lights, trams and their lines, the bus line, flight physics, airfields, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
 a check of the built map (a car-wide circle is driven along every lane: nothing stands in one) and a
 "virtual learner driver" – the driver of the demonstration drives – that completes every lesson and the
 driving test (about 56 km in total) without a single fault being reported, and with truck and trailer the
@@ -591,8 +658,9 @@ provably the best one; the demonstration driver does not turn round in a dead en
 for it); rules
 missing in OpenStreetMap are filled in from the general StVO rules and may differ from reality; traffic-light
 timings are plausible fixed cycles; the ambient traffic is not perfect at large junctions, and neither is the
-demonstration driver among it; the trailer follows the coupling without colliding with scenery; trams keep
-no timetable and obey no signals; cyclists ride only in town beside streets with a pavement; the
+demonstration driver among it; the trailer follows the coupling without colliding with scenery; trams run
+their lines but keep no timetable and obey no signals; on foot you see through your own eyes only; the
+aeroplane flies without radio, other traffic or weather; cyclists ride only in town beside streets with a pavement; the
 motorcycle does not balance (it leans as drawn, not as simulated); and only German rules and Hessian data are
 supported – other countries would need their own data readers and rule sets.
 

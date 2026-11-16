@@ -170,7 +170,7 @@ const hit = newSurfaceHit();
 const KIND = vehicleKind(process.argv.find((a) => a.startsWith('--vehicle='))?.slice(10)) ?? (process.env.DRIVE_TRUCK === '1' || process.argv.includes('--truck') ? 'truck' : 'car');
 const DEF = VEHICLES[KIND];
 const TRUCK_RUN = DEF.long;
-const SPEC = DEF.spec('automatic', 150);
+const SPEC = DEF.spec('automatic', DEF.power);
 /** from the model origin to the front bumper */
 const FRONT = DEF.outline.front;
 void TRUCK;

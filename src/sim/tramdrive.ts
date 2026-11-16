@@ -162,12 +162,53 @@ export class TramDriver {
     return null;
   }
 
+  /**
+   * Driving by itself (a demonstration drive): the controller as a tram
+   * driver works it – up to the speed the line allows here, the curves ahead
+   * and what braking to the next stop or to a red light leaves – and at each
+   * stop the doors: open once it stands at the mark, closed once everybody
+   * is through.  Call it before step().
+   */
+  drive(events: TramEvent[]): void {
+    const A = this.ahead;
+    const v = this.v;
+    this.emergency = false;
+    if (this.doorsOpen) {
+      this.lever = -0.5;
+      if (this.passengers === 0) this.toggleDoors(events);
+      return;
+    }
+    if (this.atUnservedStop) {
+      this.lever = -0.5;
+      this.toggleDoors(events);
+      return;
+    }
+    const b = TRAM.brake * 0.55;
+    let target = Math.min(this.limit / 3.6 - 0.6, A.curve - 0.3);
+    // the next stop (not the one just served): come to stand with the front at its mark
+    const served = this.lastAt !== null && A.stopPath === this.lastAt.path && A.stopMark === this.lastAt.mark;
+    if (A.stop < Infinity && !served) target = Math.min(target, Math.sqrt(2 * b * Math.max(0, A.stop - 0.8)));
+    // a red light – or amber, if there is room to stop before it – where the track crosses a junction
+    const canStop = v.speed * v.speed <= 2 * b * 0.6 * Math.max(A.signalIn - 2, 0.1);
+    if (A.signalIn < 150 && (A.signal === SIG.RED || A.signal === SIG.RED_AMBER || (A.signal === SIG.AMBER && canStop))) {
+      target = Math.min(target, Math.sqrt(2 * b * Math.max(0, A.signalIn - 2.5)));
+    }
+    const err = target - v.speed;
+    this.lever = Math.max(-1, Math.min(1, err * 0.8));
+    if (target < 0.15 && v.speed < 0.3) this.lever = -0.5;
+  }
+
   /** Which of the ways on from the end of the piece being run to take: the one asked for, else straight on. */
   private choose(path: number, dir: 1 | -1): { path: number; dir: 1 | -1 } | null {
     const net = this.rail.net;
     const ways = net.waysOn(path, dir, this.v.consist.tracks);
     if (ways.length === 0) return null;
-    if (ways.length === 1 || this.wish === 0) return ways[0];
+    // without a wish: the way of its line (if it runs one), else straight on
+    if (this.wish === 0) {
+      const want = this.rail.lineNext(this.v, path, dir);
+      return (want && ways.find((w) => w.path === want.path && w.dir === want.dir)) ?? ways[0];
+    }
+    if (ways.length === 1) return ways[0];
     // the direction of travel at the end, and of each way on: the angle (+ to the left)
     const p = net.paths[path];
     const n = p.cum.length;
@@ -376,20 +417,23 @@ export class TramDriver {
  * with the direction the track is run in there (on a double track the
  * right-hand one).  Null when the map has no tram track.
  */
-export function tramStart(rail: RailTraffic, x: number, z: number, kinds: readonly number[]): { path: number; s: number; dir: 1 | -1; x: number; z: number } | null {
+export function tramStart(rail: RailTraffic, x: number, z: number, kinds: readonly number[], name = ''): { path: number; s: number; dir: 1 | -1; x: number; z: number } | null {
   const net = rail.net;
   let best: { path: number; s: number; dir: 1 | -1; x: number; z: number } | null = null;
   let bd = Infinity;
   net.paths.forEach((p, i) => {
     if (!kinds.includes(p.kind)) return;
-    for (const s of p.stops) {
+    p.stops.forEach((s, k) => {
       net.sample(i, s, tmp);
-      const d = Math.hypot(tmp.x - x, tmp.z - z);
-      if (d >= bd) continue;
+      // (a stop of the name asked for comes first: a platform of it may lie further away than another stop)
+      const d = Math.hypot(tmp.x - x, tmp.z - z) + (name && p.stopNames[k] !== name ? 5000 : 0);
+      if (d >= bd) return;
       bd = d;
-      const dir: 1 | -1 = p.way !== 0 ? p.way : 1;
+      // the way the trams run there: as a line runs, else with the platform on the right (they keep to the right)
+      const side = p.stopSides[k] ?? 0;
+      const dir: 1 | -1 = p.way !== 0 ? p.way : rail.hasLine(i, 1) ? 1 : rail.hasLine(i, -1) ? -1 : side < 0 ? -1 : 1;
       best = { path: i, s, dir, x: tmp.x, z: tmp.z };
-    }
+    });
   });
   return best;
 }

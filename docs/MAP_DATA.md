@@ -134,6 +134,10 @@ python3 -I tools/fetch-geodata.py --district "Kreisfreie Stadt Kassel" --distric
 npm run map:extract   # schneidet das Gebiet, für das Gelände vorliegt, in Blöcken aus dem PBF
 npm run map:build     # Straßennetz des ganzen Gebiets, dann die Kacheln Block für Block (mehrere zugleich)
 npm run map:addresses # Adressliste (Hausnummern aus OSM) für „Start an einer Adresse“
+npm run map:stops     # Haltestellen (Namen, Masten, Bahnsteige), Namen und Bahnsteigseite der Halte an den Gleisen,
+                      # Oberleitung; die Flugplätze mit Bahnen, Rollwegen und Vorfeldern
+npm run map:lines     # die Linien der Straßenbahnen und RegioTrams (Weg über die Gleise, Halte)
+npm run map:far       # die Fernsicht: Gelände, Bodenbedeckung und Gebäudehöhen alle 100 m (aus den Kacheln)
 npm run map:check     # prüft: Im gebauten Ergebnis steht nichts in einem Fahrstreifen
 ```
 
@@ -151,6 +155,9 @@ die Karte in einem anderen Ordner und kann am Ende in einem Zug gegen `public/ma
 | `tools/build-graph.ts` | das Straßennetz des ganzen Gebiets: `public/map/w/<cx>_<cz>.json.gz` (in Stücken von 4 km, wie das Spiel es lädt), `net.bin.gz` (jede Straße in wenigen Zahlen: für Routen, Rundfahrten und die große Karte), `rails.json.gz` (Gleise); dazu je Block, was der Kachelbau braucht (`data/work/graph`) |
 | `tools/build-tiles.ts` | `public/map/tiles/<ix>_<iz>.fsb`: die Kacheln eines Blocks |
 | `tools/build-map.ts` | ruft die beiden vorigen auf und schreibt `public/map/map.json`: Ortsnamen, Startpunkte, Übungsplatz, welche Kacheln und Netzstücke es gibt |
+| `tools/build-stops.ts` | `stops.json.gz`: jede Haltestelle von Bus und Bahn mit Namen und Gemeinde, ihren Masten (Wartehalle, Bank, Anzeiger) und Bahnsteigen; ergänzt in `rails.json.gz` die Namen der Halte, die Seite des Bahnsteigs und die Oberleitung; `air.json.gz`: die Flugplätze mit Start- und Landebahnen, Rollwegen und Vorfeldern |
+| `tools/build-lines.ts` | `lines.json.gz`: die Linien der Straßenbahnen und RegioTrams aus den Routen-Relationen von OSM – ihr Weg über die Gleisstücke und ihre Halte in der Reihenfolge (liest nur, was es braucht, aus dem PBF) |
+| `tools/build-far.ts` | `far.bin.gz`: die Fernsicht – Gelände, Bodenbedeckung und Gebäudehöhen des ganzen Gebiets alle 100 m, aus den Kacheln (rund 2 MB) |
 
 ### Stufen
 

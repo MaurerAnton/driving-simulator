@@ -30,6 +30,19 @@ export const VIOLATION_REFS: Record<string, string> = {
   tramStopPlace: '§ 54 Abs. 2 BOStrab',
   tramDoorsMoving: '§ 54 Abs. 1 BOStrab',
   tramDoorsEarly: '§ 54 Abs. 1 BOStrab',
+  // on foot: the pavement (§ 25 Abs. 1), across the road straight and with an eye on the traffic – at a crossing
+  // near by (§ 25 Abs. 3) –, the pedestrians' lights (§ 37 Abs. 2 Nr. 5)
+  pedRed: '§ 37 Abs. 2 Nr. 5 StVO',
+  pedRoad: '§ 25 Abs. 1 StVO',
+  pedCrossing: '§ 25 Abs. 3 StVO',
+  pedForcedBrake: '§ 25 Abs. 3 StVO',
+  pedHit: '§ 25 Abs. 3 StVO',
+  // the bus on a line: the stops are the company's to serve (no paragraph of its own); pulling out of the stop is § 10 StVO
+  busStopMissed: '@ref.busService',
+  busStopPlace: '@ref.busService',
+  busDoorsMoving: '@ref.busService',
+  busDoorsEarly: '@ref.busService',
+  busPullOut: '§ 10 StVO',
   classSpeed: '§ 3 Abs. 3, § 18 Abs. 5 StVO',
   motorwayBan: '§ 18 Abs. 1 StVO',
   doorTraffic: '§ 14 Abs. 1 StVO',

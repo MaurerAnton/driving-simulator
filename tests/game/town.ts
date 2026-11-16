@@ -6,8 +6,8 @@
  */
 import { angleOf } from '../../src/core/geom.ts';
 import { LaneGraph } from '../../src/world/lanes.ts';
-import { CLS, CTRL, EF, ROLE } from '../../src/world/types.ts';
-import type { EdgeJson, NodeJson, WorldJson } from '../../src/world/types.ts';
+import { CLS, CTRL, EF, ROLE, XING } from '../../src/world/types.ts';
+import type { CrossingJson, EdgeJson, NodeJson, WorldJson } from '../../src/world/types.ts';
 import { World, computeAllCuts } from '../../src/world/world.ts';
 
 export interface Town {
@@ -44,6 +44,11 @@ export interface TownOptions {
   lightsUnsigned?: boolean;
   /** the signal controllers (by their number: the order of `lights`) that are out of order */
   lightsOut?: (controller: number) => boolean;
+  /**
+   * Crossings for people on foot: on the street between two grid points, at a share of its length, a
+   * zebra crossing or a pedestrian light of its own (XING.ZEBRA, XING.SIGNAL) – 4 m wide
+   */
+  crossings?: Array<{ street: [number, number, number, number]; at: number; k: number }>;
 }
 
 export function makeTown(opt: TownOptions = {}): Town {
@@ -144,6 +149,22 @@ export function makeTown(opt: TownOptions = {}): Town {
       off: 0,
     });
   }
+  // crossings, each with a light of its own as the map build gives one (it rests on green for the vehicles)
+  const crossings: CrossingJson[] = [];
+  for (const c of opt.crossings ?? []) {
+    const [i0, j0, i1, j1] = c.street;
+    const e = byKey.get(key(at(i0, j0), at(i1, j1)));
+    if (e === undefined) throw new Error('no such street');
+    const E = edges[e];
+    const len = Math.hypot(nodes[E.b].x - nodes[E.a].x, nodes[E.b].z - nodes[E.a].z);
+    const x: CrossingJson = { e, s: len * c.at, k: c.k, w: 4 };
+    if (c.k === XING.SIGNAL) {
+      x.sc = signals.length;
+      x.g = 0;
+      signals.push({ x: 0, z: 0, groups: 1, phases: [{ d: 48, s: 'G' }, { d: 3, s: 'A' }, { d: 13, s: 'R' }, { d: 1, s: 'Y' }], off: 0, ped: true });
+    }
+    crossings.push(x);
+  }
   const json: WorldJson = {
     version: 1,
     meta: { name: 'Test town', generated: '', minX: -200, maxX: cols * block + 400, minZ: -200, maxZ: rows * block + 200, tileSize: 500, originE: 0, originN: 0, attribution: [] },
@@ -151,7 +172,7 @@ export function makeTown(opt: TownOptions = {}): Town {
     edges,
     banned: [],
     signals,
-    crossings: [],
+    crossings,
     places: [],
     spawns: [],
     tiles: [],

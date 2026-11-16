@@ -2,10 +2,10 @@
 /** Menus and the in-game HUD (plain DOM, no framework). */
 import type { AddressHit, AddressIndex } from '../game/address.ts';
 import { LESSONS } from '../game/nav.ts';
-import { VEHICLES, VEHICLE_KINDS } from '../game/vehicles.ts';
+import { VEHICLES, VEHICLE_KINDS, powerOf } from '../game/vehicles.ts';
 import { RELEASES, VERSION } from '../game/releases.ts';
 import type { Settings } from '../game/settings.ts';
-import { ENGINE_POWERS, GRAPHICS_PRESETS, VIEW_DISTANCES, saveSettings } from '../game/settings.ts';
+import { FAR_VIEWS, GRAPHICS_PRESETS, RUN_SPEEDS, VIEW_DISTANCES, saveSettings } from '../game/settings.ts';
 import type { Input } from '../input/input.ts';
 import type { Violation } from '../sim/rules.ts';
 import { SIG } from '../sim/signals.ts';
@@ -42,7 +42,7 @@ export interface HudState {
   showDash: boolean;
   /** on foot beside the vehicle: no dashboard strip, no reminder of the driving keys */
   onFoot?: boolean;
-  /** no reminder of the driving keys (the tram) */
+  /** no reminder of the driving keys (the tram, the aeroplane) */
   noKeyHints?: boolean;
   indicator: number;
   hazard: boolean;
@@ -65,6 +65,28 @@ export interface StartRequest {
   spawn: number;
   /** start at this address instead of one of the car parks */
   address?: AddressHit;
+  /** the tram: start at this stop */
+  stop?: TramStopChoice;
+  /** the aeroplane: start at this end of a runway */
+  runway?: RunwayChoice;
+}
+
+/** An end of a runway an aeroplane may take off from. */
+export interface RunwayChoice {
+  /** "Flughafen Kassel (EDVK)", "09" */
+  field: string;
+  end: string;
+  x: number;
+  z: number;
+  yaw: number;
+}
+
+/** A stop the tram may start at (a place of the stops of the map). */
+export interface TramStopChoice {
+  name: string;
+  town: string;
+  x: number;
+  z: number;
 }
 
 export interface ResultSummary {
@@ -176,6 +198,12 @@ export class Hud {
   where: () => { x: number; z: number } | null = () => null;
   onSettingsChanged: () => void = () => {};
   routeLanes: Lane[] = [];
+  /** the stops trams call at, by town and name – null until the map's list of stops is read */
+  private tramStops: TramStopChoice[] | null = null;
+  /** draws the menu again (while it is open) */
+  private menuRedraw: (() => void) | null = null;
+  /** the ends of the runways of the map's airfields – null until they are read */
+  private runways: RunwayChoice[] | null = null;
 
   constructor(root: HTMLElement, settings: Settings, world: World) {
     this.root = root;
@@ -227,7 +255,20 @@ export class Hud {
   }
 
   // ---------------------------------------------------------------- overlays
+  /** The ends of the runways (from the map): the start points of the aeroplane. */
+  setRunways(list: RunwayChoice[]): void {
+    this.runways = list;
+    if (this.menuRedraw && VEHICLES[this.settings.vehicle]?.kind === 'plane') this.menuRedraw();
+  }
+
+  /** The stops trams call at (from the map): the start points of the tram. */
+  setTramStops(list: TramStopChoice[]): void {
+    this.tramStops = list;
+    if (this.menuRedraw && VEHICLES[this.settings.vehicle]?.kind === 'tram') this.menuRedraw();
+  }
+
   private setOverlay(node: HTMLElement | null): void {
+    this.menuRedraw = null;
     this.overlay?.remove();
     this.overlay = node;
     if (node) this.root.append(node);
@@ -240,10 +281,25 @@ export class Hud {
   showLoading(text: string): void {
     const o = el('div', 'overlay solid');
     const p = el('div', 'panel narrow');
-    p.append(el('h1', '', 'Fahrsim <span>Baunatal</span>'), el('p', '', text), el('div', 'progress', '<i></i>'));
+    const bar = el('div', 'progress', '<i></i>');
+    const pct = el('small', 'progress-pct', '');
+    p.append(el('h1', '', 'Fahrsim <span>Baunatal</span>'), el('p', '', text), bar, pct);
     o.append(p);
     this.setOverlay(o);
+    this.loadingBar = { bar, pct };
   }
+
+  /** How far the loading is (0 … 1): the bar of the loading screen fills, and says so in per cent. */
+  setLoadingProgress(share: number): void {
+    const l = this.loadingBar;
+    if (!l || !l.bar.isConnected) return;
+    const p = Math.round(Math.max(0, Math.min(1, share)) * 100);
+    l.bar.classList.add('known');
+    (l.bar.firstElementChild as HTMLElement).style.width = `${p}%`;
+    l.pct.textContent = `${p} %`;
+  }
+
+  private loadingBar: { bar: HTMLElement; pct: HTMLElement } | null = null;
 
   showError(text: string): void {
     const o = el('div', 'overlay solid');
@@ -300,6 +356,81 @@ export class Hud {
       remember();
     };
     rowSpawn.append(el('label', '', this.t('startPoint')), selSpawn);
+    // the tram starts at one of its stops: those of the map, by town (the car parks above are for road vehicles)
+    const tramMode = (VEHICLES[this.settings.vehicle] ?? VEHICLES.car).kind === 'tram';
+    const planeMode = (VEHICLES[this.settings.vehicle] ?? VEHICLES.car).kind === 'plane';
+    let stop: TramStopChoice | undefined;
+    let runway: RunwayChoice | undefined;
+    const rowStop = el('div', 'row');
+    if (planeMode) {
+      // the aeroplane begins at the end of a runway of one of the map's airfields
+      const sel = el('select');
+      const list = this.runways;
+      if (!list || list.length === 0) {
+        const op = el('option');
+        op.textContent = list ? '–' : this.t('realityLoading');
+        op.disabled = true;
+        sel.append(op);
+      } else {
+        let g: HTMLOptGroupElement | null = null;
+        list.forEach((r, i) => {
+          if (g?.label !== r.field) {
+            g = document.createElement('optgroup');
+            g.label = r.field;
+            sel.append(g);
+          }
+          const op = el('option');
+          op.value = String(i);
+          op.textContent = this.t('runwayEnd', { end: r.end });
+          g.append(op);
+        });
+        const key = (r: RunwayChoice): string => `${r.field}|${r.end}`;
+        let at = list.findIndex((r) => key(r) === last.runway);
+        if (at < 0) at = 0;
+        runway = list[at];
+        sel.value = String(at);
+        sel.onchange = () => {
+          runway = list[Number(sel.value)];
+          last.runway = runway ? key(runway) : undefined;
+          saveSettings(this.settings);
+        };
+      }
+      rowStop.append(el('label', '', this.t('startPoint')), sel);
+    } else if (tramMode) {
+      const selStop = el('select');
+      const stops = this.tramStops;
+      if (!stops || stops.length === 0) {
+        const op = el('option');
+        op.textContent = stops ? '–' : this.t('realityLoading');
+        op.disabled = true;
+        selStop.append(op);
+      } else {
+        let g: HTMLOptGroupElement | null = null;
+        stops.forEach((s, i) => {
+          const op = el('option');
+          op.value = String(i);
+          op.textContent = s.name;
+          if (g?.label !== s.town) {
+            g = document.createElement('optgroup');
+            g.label = s.town;
+            selStop.append(g);
+          }
+          g.append(op);
+        });
+        // (the stop of the last drive – else one in the middle of Kassel)
+        const key = (s: TramStopChoice): string => `${s.name}|${s.town}`;
+        let at = stops.findIndex((s) => key(s) === last.tramStop);
+        if (at < 0) at = Math.max(0, stops.findIndex((s) => s.name === 'Königsplatz'));
+        stop = stops[at];
+        selStop.value = String(at);
+        selStop.onchange = () => {
+          stop = stops[Number(selStop.value)];
+          last.tramStop = stop ? key(stop) : undefined;
+          saveSettings(this.settings);
+        };
+      }
+      rowStop.append(el('label', '', this.t('startPoint')), selStop);
+    }
     // … or anywhere: street and house number
     const rowAddr = el('div', 'row');
     const picker = addressPicker({
@@ -351,7 +482,25 @@ export class Hud {
     };
     rowVeh.append(el('label', '', this.t('vehicle')), selVeh);
     // (trucks, buses and tractors have automated gearboxes, as nearly all of them today)
-    opts.append(rowSpawn, rowAddr, rowVeh);
+    opts.append(...(tramMode || planeMode ? [rowStop, rowVeh] : [rowSpawn, rowAddr, rowVeh]));
+    // its engine: the powers a vehicle of its class may have, each kind of vehicle with its own
+    if (def.powers.length > 1) {
+      const rowPw = el('div', 'row');
+      const selPw = el('select');
+      for (const ps of def.powers) {
+        const op = el('option');
+        op.value = String(ps);
+        op.textContent = `${ps} PS (${Math.round(ps * 0.7355)} kW)`;
+        selPw.append(op);
+      }
+      selPw.value = String(powerOf(def, this.settings.powers));
+      selPw.onchange = () => {
+        this.settings.powers[def.kind] = Number(selPw.value);
+        saveSettings(this.settings);
+      };
+      rowPw.append(el('label', '', this.t('enginePower')), selPw);
+      opts.append(rowPw);
+    }
     if (!truck) opts.append(rowTr);
     p.append(opts);
 
@@ -364,19 +513,20 @@ export class Hud {
       const d = el('small');
       d.textContent = desc;
       c.append(b, d);
-      c.onclick = () => this.onStart({ mode, spawn, address });
+      c.onclick = () => this.onStart(planeMode ? { mode, spawn, runway } : tramMode ? { mode, spawn, stop } : { mode, spawn, address });
       cards.append(c);
     };
-    card(this.t('free'), this.t(def.kind === 'tram' ? 'freeTramDesc' : 'freeDesc'), 'free');
-    // (the drives the car does by itself, and the tours, are on the roads)
-    if (def.kind !== 'tram') {
+    card(this.t(def.kind === 'plane' ? 'freeFly' : 'free'), this.t(def.kind === 'tram' ? 'freeTramDesc' : def.kind === 'pedestrian' ? 'freeWalkDesc' : def.kind === 'plane' ? 'freeFlyDesc' : 'freeDesc'), 'free');
+    // (the drives the car does by itself, and the tours, are on the roads – and by car)
+    if (def.kind === 'tram') card(this.t('demo'), this.t('demoTramDesc'), 'demo');
+    if (def.kind !== 'tram' && def.kind !== 'pedestrian' && def.kind !== 'plane') {
       card(this.t('demo'), this.t('demoDesc'), 'demo');
       card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
     }
     // the lessons of the chosen vehicle: the practice yard first, the test last
     const rank = (kind: string): number => (kind === 'yard' ? 0 : kind === 'exam' ? 2 : 1);
     const kind = def.kind;
-    const lessons = LESSONS.filter((l) => (l.vehicle ? l.vehicle === kind : kind !== 'tram' && !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
+    const lessons = LESSONS.filter((l) => (l.vehicles ? l.vehicles.includes(kind) : l.vehicle ? l.vehicle === kind : kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane' && !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
     // (the lessons on the road were written for the car: what is different with this vehicle is said first)
     const note = def.caps ? `${this.t('lesson.capNote', { vehicle: this.t(def.name), rural: def.caps.rural, motorway: def.caps.motorway })} ` : def.noMotorway ? `${this.t('lesson.slowNote', { vehicle: this.t(def.name), max: def.governed })} ` : '';
     for (const l of lessons) card(lessonTitle(l.id, this.lang), l.id === 'exam' ? this.t('examDesc') : `${l.kind === 'route' ? note : ''}${lessonIntro(l.id, this.lang)}`, l.id);
@@ -398,6 +548,7 @@ export class Hud {
     p.append(el('p', 'version', this.t('newsVersion', { v: VERSION })));
     o.append(p);
     this.setOverlay(o);
+    this.menuRedraw = () => this.showMenu(spawns);
   }
 
   /**
@@ -499,15 +650,10 @@ export class Hud {
       p.append(row);
     }
     select(this.t('transmission'), s.transmission, [['assist', this.t('trAssist')], ['manual', this.t('trManual')], ['automatic', this.t('trAutomatic')]], (v) => (s.transmission = v as Settings['transmission']));
-    // the car
-    select(
-      this.t('enginePower'),
-      String(s.power),
-      ENGINE_POWERS.map((ps): [string, string] => [String(ps), `${ps} PS (${Math.round(ps * 0.7355)} kW)`]),
-      (v) => (s.power = Number(v)),
-    );
     p.append(el('p', 'note', this.t('settingsNextDrive')));
     check(this.t('limiter'), s.limiter, (v) => (s.limiter = v));
+    // on foot: how fast running is
+    select(this.t('runSpeed'), String(s.runSpeed), RUN_SPEEDS.map((k): [string, string] => [String(k), `${k} km/h`]), (v) => (s.runSpeed = Number(v)));
     // the picture
     select(this.t('startView'), s.view, [['chase', this.t('viewChase')], ['cockpit', this.t('viewCockpit')]], (v) => (s.view = v as Settings['view']));
     range(this.t('cabinOpacity'), (s.cabinOpacity - 0.2) / 0.8, (v) => (s.cabinOpacity = 0.2 + 0.8 * v));
@@ -537,6 +683,8 @@ export class Hud {
       select(this.t('gfxTrees'), String(g.propDensity), pct([0, 0.35, 0.6, 0.8, 1]), (v) => custom(() => (g.propDensity = Number(v)))());
       check(this.t('gfxFacades'), g.facades, (v) => custom(() => (g.facades = v))());
       check(this.t('gfxPropShadows'), g.propShadows, (v) => custom(() => (g.propShadows = v))());
+      // the ground beyond the map: the hills on the horizon
+      select(this.t('gfxFar'), String(g.farView), FAR_VIEWS.map((m): [string, string] => [String(m), m === 0 ? this.t('farOff') : `${m / 1000} km`]), (v) => custom(() => (g.farView = Number(v)))());
       // (the rows were added to the panel: into the folded box with them)
       while (p.childElementCount > at) box.append(p.children[at]);
       p.append(box);
@@ -1257,8 +1405,12 @@ export class Hud {
       const r = steer.getBoundingClientRect();
       const v = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
       input.touch.steer = v;
+      // (flying, the bar is a stick: down the bar is pulled back)
+      const u = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+      input.touch.pitch = this.root.classList.contains('flying') ? u : 0;
       input.touched();
       knob.style.left = `${43 + v * 43}%`;
+      knob.style.top = this.root.classList.contains('flying') ? `${40 + u * 40}%` : '';
     };
     steer.onpointerdown = (e) => {
       steer.setPointerCapture(e.pointerId);
@@ -1269,7 +1421,9 @@ export class Hud {
     };
     const centre = (): void => {
       input.touch.steer = 0;
+      input.touch.pitch = 0;
       knob.style.left = '43%';
+      knob.style.top = '';
     };
     steer.onpointerup = centre;
     steer.onpointercancel = centre;

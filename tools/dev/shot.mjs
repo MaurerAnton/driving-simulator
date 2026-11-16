@@ -65,7 +65,7 @@ if (process.env.FS_FILL) {
   if (process.env.FS_WAIT_FOR) await page.waitForSelector(process.env.FS_WAIT_FOR, { timeout: 120000 }).catch((e) => logs.push(`[shot] ${e.message.split('\n')[0]}`));
 }
 if (process.env.FS_CLICK) await page.click(process.env.FS_CLICK, { timeout: 120000 }).catch((e) => logs.push(`[shot] ${e.message.split('\n')[0]}`));
-// FS_STEPS="key:Escape;;click:<selector>;;wait:800;;hold:KeyU;;select:<selector>=<value>;;eval:<statements using g>"
+// FS_STEPS="key:Escape;;click:<selector>;;wait:800;;until:<expression using g>;;shot:<file>;;hold:KeyU;;select:<selector>=<value>;;eval:<statements using g>"
 // – things to do one after the other before the picture is taken
 for (const step of (process.env.FS_STEPS ?? '').split(';;').filter(Boolean)) {
   const at = step.indexOf(':');
@@ -75,7 +75,13 @@ for (const step of (process.env.FS_STEPS ?? '').split(';;').filter(Boolean)) {
     else if (what === 'hold') await page.keyboard.down(arg);
     else if (what === 'click') await page.click(arg, { timeout: 120000 });
     else if (what === 'wait') await page.waitForTimeout(Number(arg));
-    else if (what === 'select') {
+    else if (what === 'until') {
+      // until:<expression using g> – wait (up to FS_UNTIL ms) until it is true, e.g. until something is built
+      await page.waitForFunction((src) => !!new Function('g', `return (${src});`)(window.__fs.game), arg, { timeout: Number(process.env.FS_UNTIL ?? 600000), polling: 2000 });
+    } else if (what === 'shot') {
+      // shot:<file> – a picture now (the last one is taken at the end, as always)
+      await page.screenshot({ path: arg, timeout: 0 });
+    } else if (what === 'select') {
       // select:<selector>=<value> chooses an option of a list
       const eq = arg.lastIndexOf('=');
       await page.selectOption(arg.slice(0, eq), arg.slice(eq + 1), { timeout: 120000 });

@@ -143,3 +143,35 @@ test('at the switch the tram takes the way the indicator asks for', () => {
     assert.equal(Math.sign(car.z), side, `${wish > 0 ? 'left' : 'right'}: ${car.z.toFixed(1)}`);
   }
 });
+
+test('by itself (a demonstration drive): it comes to stand at the stop, lets the people through and drives on – without a fault', () => {
+  const { tram } = setup();
+  const events: TramEvent[] = [];
+  let stood = false;
+  run(tram, 150, events, () => {
+    tram.drive(events);
+    if (tram.doorsOpen) stood = true;
+  });
+  assert.ok(stood, 'the doors were opened at the stop');
+  assert.equal(tram.served, 1, 'the stop was served');
+  assert.deepEqual(events.map((e) => e.fault), [], 'nothing to say');
+  assert.ok(tram.v.s > 600 || tram.v.path !== 0, `and on its way again (${tram.v.s.toFixed(0)} m)`);
+});
+
+test('a tram of the traffic runs its line: at the switch the branch its line takes, whichever that is', () => {
+  for (const [branch, side] of [
+    [1, -1],
+    [2, 1],
+  ] as const) {
+    const rail = new RailTraffic(network(), () => 0.5);
+    rail.target = 0;
+    rail.setLines([{ ref: '5', from: 'A', to: 'B', colour: '', kind: 0, seq: [{ path: 0, dir: 1 }, { path: branch, dir: 1 }] }]);
+    const v = rail.spawnAt(0, END - 80, 1, 8)!;
+    assert.ok(rail.assignLine(v, '5'), 'it runs line 5');
+    // (somebody standing a little way off: near enough that the tram is kept, not in its way)
+    const player = { x: END, y: 100, z: 120, yaw: 0, length: 4, width: 2 };
+    for (let t = 0; t < 30; t += DT) rail.update(DT, player);
+    assert.equal(v.path, branch, `onto the line's branch (${branch})`);
+    assert.equal(Math.sign(v.cars[0].z), side);
+  }
+});

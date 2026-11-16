@@ -504,3 +504,20 @@ kbd { direction: ltr; unicode-bidi: isolate; }
 
 /* the tram follows its rails: no steering bar (the indicator buttons choose the way at a switch) */
 #ui.rail .touch .steer { display: none; }
+
+/* how far the planning of a tour is */
+.bm-progress { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.15); overflow: hidden; margin: 8px 0 4px; }
+.bm-progress i { display: block; height: 100%; width: 0; background: #4fa3ff; transition: width 0.15s; }
+
+/* the loading bar once it is known how far the loading is */
+.progress.known i { animation: none; transition: width 0.25s; }
+.progress-pct { display: block; margin-top: 6px; opacity: 0.75; font-variant-numeric: tabular-nums; }
+
+/* what a tour is to lead along, and the tours driven before */
+.bm-wishes { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 6px 0 8px; font-size: 0.9em; }
+.bm-check { display: inline-flex; align-items: center; gap: 6px; }
+.bm-check select { margin-left: 4px; }
+.bm-tours { margin-top: 8px; }
+.bm-tours summary { cursor: pointer; opacity: 0.85; }
+.bm-tour { display: block; width: 100%; text-align: start; background: none; border: 0; color: inherit; padding: 6px 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); font: inherit; cursor: pointer; }
+.bm-tour:hover { background: rgba(255, 255, 255, 0.06); }

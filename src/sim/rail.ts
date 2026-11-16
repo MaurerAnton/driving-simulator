@@ -25,6 +25,11 @@ export interface RailPath {
   b: number[];
   /** stops: metres from the start */
   stops: number[];
+  /** their names ('' where the map has none) and the side of their platforms (1 right, -1 left of the way the piece runs, 0 not known) */
+  stopNames: string[];
+  stopSides: number[];
+  /** an overhead wire along it: 1 yes, 0 no, -1 the map does not say */
+  wire: number;
   /** the speed its curves allow at each point (m/s) */
   cap: Float32Array;
   /**
@@ -90,6 +95,18 @@ export interface RailVehicle {
   blocked: boolean;
   /** driven by the player (sim/tramdrive.ts): not by the logic here, and it stays when the others go */
   player?: boolean;
+  /** the line it runs (its number in RailTraffic.lines) and how far along it it is (the place in its pieces) */
+  line?: { index: number; k: number } | null;
+}
+
+/** A line of the trams (lines.json.gz): the pieces it runs, which way, and its stops. */
+export interface RailLine {
+  ref: string;
+  from: string;
+  to: string;
+  colour: string;
+  kind: number;
+  seq: Array<{ path: number; dir: 1 | -1 }>;
 }
 
 /** Something a rail vehicle must not run into: a circle on the ground. */
@@ -184,7 +201,8 @@ export class RailNetwork {
         const turn = Math.abs(Math.atan2(ax * bz - az * bx, ax * bx + az * bz));
         if (turn > 0.01) cap[i] = Math.sqrt(1.1 * ((la + lb) / 2 / turn));
       }
-      this.paths.push({ kind: r.k, pts, cum, len: n > 0 ? cum[n - 1] : 0, a: r.a, b: r.b, stops: r.st ?? [], cap, way: 0 });
+      const stops = r.st ?? [];
+      this.paths.push({ kind: r.k, pts, cum, len: n > 0 ? cum[n - 1] : 0, a: r.a, b: r.b, stops, stopNames: stops.map((_, i) => r.sn?.[i] ?? ''), stopSides: stops.map((_, i) => r.ss?.[i] ?? 0), wire: r.e ?? -1, cap, way: 0 });
     }
     this.paths.forEach((p, pi) => {
       const n = p.cum.length;
@@ -339,6 +357,65 @@ export class RailTraffic {
     this.vehicles.length = 0;
   }
 
+  /** the lines of the trams (empty: they run where the tracks lead them) */
+  lines: RailLine[] = [];
+  /** for each piece and direction ("path:dir"): the lines that run it, and where on them */
+  private readonly onLine = new Map<string, Array<[number, number]>>();
+
+  setLines(lines: RailLine[]): void {
+    this.lines = lines;
+    this.onLine.clear();
+    lines.forEach((l, i) =>
+      l.seq.forEach((e, k) => {
+        const key = `${e.path}:${e.dir}`;
+        const list = this.onLine.get(key);
+        if (list) list.push([i, k]);
+        else this.onLine.set(key, [[i, k]]);
+      }),
+    );
+    for (const v of this.vehicles) if (!v.player) this.assignLine(v);
+  }
+
+  /**
+   * A line for a vehicle that runs a piece of it: one of the lines of its
+   * kind through where it stands, by chance – or `prefer` (a line's number)
+   * where that one runs here.  Null if none does.
+   */
+  /** Whether a line runs along the piece `path` in the direction `dir`. */
+  hasLine(path: number, dir: 1 | -1): boolean {
+    return (this.onLine.get(`${path}:${dir}`)?.length ?? 0) > 0;
+  }
+
+  assignLine(v: RailVehicle, prefer = ''): RailVehicle['line'] {
+    const here = (this.onLine.get(`${v.path}:${v.dir}`) ?? []).filter(([i]) => this.lines[i].kind === (v.kind === RAIL.LIGHT ? 1 : 0) || v.player);
+    const pick = here.find(([i]) => this.lines[i].ref === prefer) ?? here[Math.floor(this.random() * here.length)];
+    v.line = pick ? { index: pick[0], k: pick[1] } : null;
+    return v.line;
+  }
+
+  /** The piece that comes after (path, dir) on the vehicle's line – null where it has no line, or the line ends. */
+  lineNext(v: RailVehicle, path: number, dir: 1 | -1): { path: number; dir: 1 | -1 } | null {
+    const l = v.line ? this.lines[v.line.index] : null;
+    if (!l || !v.line) return null;
+    for (let j = v.line.k; j < Math.min(l.seq.length - 1, v.line.k + 16); j++) if (l.seq[j].path === path && l.seq[j].dir === dir) return l.seq[j + 1];
+    return null;
+  }
+
+  /** The vehicle has come onto another piece: where is that on its line? (on to the line back at its end) */
+  private followLine(v: RailVehicle): void {
+    if (!v.line) return;
+    const l = this.lines[v.line.index];
+    for (let j = v.line.k; j < Math.min(l.seq.length, v.line.k + 16); j++) {
+      if (l.seq[j].path === v.path && l.seq[j].dir === v.dir) {
+        v.line.k = j;
+        return;
+      }
+    }
+    // off its line (or past its end): the line back from here, else any that runs here
+    const back = (this.onLine.get(`${v.path}:${v.dir}`) ?? []).find(([i]) => this.lines[i].ref === l.ref);
+    v.line = back ? { index: back[0], k: back[1] } : this.assignLine(v);
+  }
+
   /**
    * Put a vehicle on the track at a place (its front end), running in
    * direction `dir` of that piece.  Null if its length does not fit behind it.
@@ -462,6 +539,7 @@ export class RailTraffic {
       const v = this.spawnAt(path, s, dir, 0);
       if (v) {
         v.speed = Math.min(v.consist.vmax * 0.6, tmp.cap);
+        this.assignLine(v);
         return v;
       }
     }
@@ -523,8 +601,10 @@ export class RailTraffic {
       if (!next) {
         const ways = this.net.waysOn(cp, cd, c.tracks);
         if (ways.length > 0) {
-          // mostly straight on, now and then the branch
-          const pick = ways.length > 1 && this.random() < 0.3 ? ways[1 + Math.floor(this.random() * (ways.length - 1))] : ways[0];
+          // its line's way – else mostly straight on, now and then the branch
+          const want = this.lineNext(v, cp, cd);
+          const onLine = want ? ways.find((w) => w.path === want.path && w.dir === want.dir) : undefined;
+          const pick = onLine ?? (ways.length > 1 && this.random() < 0.3 ? ways[1 + Math.floor(this.random() * (ways.length - 1))] : ways[0]);
           next = { path: pick.path, dir: pick.dir };
           v.plan.push(next);
         }
@@ -573,6 +653,37 @@ export class RailTraffic {
   }
 
   /**
+   * The next stop a vehicle will call at: where (piece of track, mark) and how
+   * far ahead of its front – the one it stands at does not count.  Null if
+   * there is none within `reach` metres of its way.
+   */
+  nextStop(v: RailVehicle, reach = 4000): { path: number; mark: number; dist: number } | null {
+    let cp = v.path;
+    let cs = v.s;
+    let cd = v.dir;
+    let dist = 0;
+    let planned = 0;
+    for (let guard = 0; guard < 400 && dist <= reach; guard++) {
+      const p = this.net.paths[cp];
+      if (!p) return null;
+      let best: { path: number; mark: number; dist: number } | null = null;
+      for (const st of p.stops) {
+        const ahead = (st - cs) * cd;
+        const d = dist + ahead;
+        if (ahead >= 0 && d > (v.dwell > 0 ? 2 : 0.5) && (!best || d < best.dist)) best = { path: cp, mark: st, dist: d };
+      }
+      if (best) return best;
+      dist += cd > 0 ? p.len - cs : cs;
+      const next = v.plan[planned++] ?? this.net.waysOn(cp, cd, v.consist.tracks)[0];
+      if (!next) return null;
+      cp = next.path;
+      cd = next.dir;
+      cs = cd > 0 ? 0 : this.net.paths[cp].len;
+    }
+    return null;
+  }
+
+  /**
    * Move the front end of a vehicle `move` metres on along its way (the
    * pieces in its plan), leaving the trail its cars follow.  False if the
    * way ended before (it then stands at the end).
@@ -599,6 +710,7 @@ export class RailTraffic {
         v.path = next.path;
         v.dir = next.dir;
         v.s = v.dir > 0 ? 0 : this.net.paths[v.path].len;
+        this.followLine(v);
       }
     }
     return true;
@@ -623,6 +735,8 @@ export class RailTraffic {
     t.since = 0;
     for (const e of entries) t.push(...e);
     v.plan.length = 0;
+    // (at the end of its line: the line back)
+    if (v.line) this.followLine(v);
   }
 
   /** Put the cars on the trail behind the front end. */

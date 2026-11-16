@@ -79,7 +79,8 @@ export class Input {
   private gearMin = -1;
   private gearMax = 6;
   /** touch state, written by the on-screen controls */
-  touch = { active: false, steer: 0, throttle: 0, brake: 0 };
+  /** the controls on the screen: the steering bar (and, flying, its height: the stick pulled or pushed, + pulled), the pedals */
+  touch = { active: false, steer: 0, pitch: 0, throttle: 0, brake: 0 };
   /**
    * What the driver is using right now: fingers on the screen or keys.
    * It follows the last real input, so a tablet with a keyboard works both ways.
@@ -260,6 +261,36 @@ export class Input {
       run ||= pad.throttle > 0.95;
     }
     return { fwd: clamp(fwd, -1, 1), turn: clamp(turn, -1, 1), run };
+  }
+
+  /**
+   * Flying: the stick (pitch + = pulled, roll + = to the right), the rudder
+   * pedals (+ = right), which way the throttle is moved (+ open, − close) and
+   * the wheel brakes – from the arrow keys (the stick), W S (the throttle),
+   * A D (the rudder) and Space (the brakes); the steering bar on the screen as
+   * the stick, its pedals as the throttle (the left one brakes on the ground
+   * too); a gamepad's left stick and its triggers.
+   */
+  flightInput(): { pitch: number; roll: number; yaw: number; throttle: number; brake: number } {
+    let pitch = (this.key('ArrowDown') ? 1 : 0) - (this.key('ArrowUp') ? 1 : 0);
+    let roll = (this.key('ArrowRight') ? 1 : 0) - (this.key('ArrowLeft') ? 1 : 0);
+    let yaw = (this.key('KeyD') ? 1 : 0) - (this.key('KeyA') ? 1 : 0);
+    let throttle = (this.key('KeyW') ? 1 : 0) - (this.key('KeyS') ? 1 : 0);
+    let brake = this.key('Space') ? 1 : 0;
+    if (this.touch.active) {
+      roll += this.touch.steer;
+      pitch += this.touch.pitch;
+      throttle += (this.touch.throttle > 0.2 ? 1 : 0) - (this.touch.brake > 0.2 ? 1 : 0);
+      brake = Math.max(brake, this.touch.brake > 0.2 ? this.touch.brake : 0);
+    }
+    const pad = this.readPad();
+    if (pad && pad.kind === 'standard') {
+      roll += pad.steer;
+      pitch += pad.pitch;
+      throttle += pad.throttle - pad.brake;
+      brake = Math.max(brake, pad.brake);
+    }
+    return { pitch: clamp(pitch, -1, 1), roll: clamp(roll, -1, 1), yaw: clamp(yaw, -1, 1), throttle: clamp(throttle, -1, 1), brake: clamp(brake, 0, 1) };
   }
 
   takeCam(): Readonly<{ yaw: number; pitch: number; right: number; fwd: number; dolly: number; keyRight: number; keyFwd: number; keyUp: number; fast: boolean; reset: boolean }> {
@@ -587,7 +618,7 @@ export class Input {
     return this.key('KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight');
   }
 
-  private readPad(): { kind: 'standard' | 'wheel'; steer: number; throttle: number; brake: number; clutch: number; lookX: number; buttons: boolean[]; starter: boolean; horn: boolean } | null {
+  private readPad(): { kind: 'standard' | 'wheel'; steer: number; pitch: number; throttle: number; brake: number; clutch: number; lookX: number; buttons: boolean[]; starter: boolean; horn: boolean } | null {
     if (typeof navigator === 'undefined' || !navigator.getGamepads) return null;
     let gp: Gamepad | null = null;
     for (const g of navigator.getGamepads()) {
@@ -615,6 +646,7 @@ export class Input {
       return {
         kind: 'wheel',
         steer,
+        pitch: 0,
         throttle: dead(pedal(m.throttleAxis), 0.03),
         brake: dead(pedal(m.brakeAxis), 0.03),
         clutch: dead(pedal(m.clutchAxis), 0.05),
@@ -628,6 +660,8 @@ export class Input {
     return {
       kind: 'standard',
       steer: dead(gp.axes[0] ?? 0, 0.1),
+      // (the left stick's height: back is pulled)
+      pitch: dead(gp.axes[1] ?? 0, 0.1),
       throttle: dead(b(7), 0.04),
       brake: dead(b(6), 0.04),
       clutch: 0,

@@ -58,6 +58,12 @@ export interface TrafficCar {
    */
   playerFirstGap: number;
   playerSeen: number;
+  /**
+   * A city bus (style BUS_STYLE): the stop it stands at – seconds left with
+   * its doors open –, the pole it served last, and how long it still
+   * indicates to pull out again.
+   */
+  bus?: { dwell: number; served: number; doors: boolean; pullOut: number };
   crashed: number;
   wheelSpin: number;
 }
@@ -115,6 +121,17 @@ export interface PlayerState {
   s?: number;
   /** among the obstacles: a part of the player's vehicle (its trailer) */
   own?: boolean;
+  /** the player is on foot (then x, z are where they stand and yaw where they look) */
+  onFoot?: boolean;
+}
+
+/** the style of a traffic car that is a city bus (12 m, it calls at the stops) */
+export const BUS_STYLE = 3;
+
+/** A bus stop along a lane: where the front of a bus stands to serve it (metres along the lane) and the pole's number. */
+export interface BusStopOnLane {
+  s: number;
+  id: number;
 }
 
 export type TrafficEvent =
@@ -150,6 +167,13 @@ export class Traffic {
   private readonly rand = rng(20261114);
   private nextId = 1;
   private spawnTimer = 0;
+  /**
+   * The bus stops along a lane (set by the game from the stops of the map) –
+   * with them, now and then a city bus is among the traffic.
+   */
+  busStops: ((lane: Lane) => readonly BusStopOnLane[]) | null = null;
+  /** the share of the traffic that are buses (where there are stops) */
+  busShare = 0.08;
   private pedTimer = 0;
   targetCount = 24;
   spawnRadius = 330;
@@ -300,7 +324,9 @@ export class Traffic {
       // free space on the lane
       const others = this.onLane.get(lane.id);
       if (others && others.some((o) => Math.abs(o.s - s) < 14)) continue;
-      const style = Math.floor(this.rand() * 3);
+      // now and then a city bus – on a street through the town, where stops are
+      const bus = this.busStops !== null && this.rand() < this.busShare && lane.edge.cls >= CLS.PRIMARY && lane.edge.cls <= CLS.RESIDENTIAL && lane.len > 30 && !this.cars.some((o) => o.bus && Math.hypot(o.x - tmp.x, o.z - tmp.z) < 250) && !(others && others.some((o) => Math.abs(o.s - s) < 22));
+      const style = bus ? BUS_STYLE : Math.floor(this.rand() * 3);
       const car: TrafficCar = {
         id: this.nextId++,
         lane,
@@ -309,10 +335,11 @@ export class Traffic {
         v: Math.min(lane.limit, 13) * 0.8,
         a: 0,
         next: this.chooseNext(lane),
-        length: style === 1 ? 4.55 : 4.25,
-        width: 1.8,
+        length: bus ? 12 : style === 1 ? 4.55 : 4.25,
+        width: bus ? 2.55 : 1.8,
         color: COLORS[Math.floor(this.rand() * COLORS.length)],
         style,
+        ...(bus ? { bus: { dwell: 0, served: -1, doors: false, pullOut: 0 } } : {}),
         temper: 0.88 + this.rand() * 0.14,
         x: tmp.x,
         y: tmp.y,
@@ -859,6 +886,21 @@ export class Traffic {
   private drive(car: TrafficCar, dt: number, player: PlayerState): void {
     const lane = car.lane;
     const conn = car.conn;
+    // a bus at its stop: the doors open, people get off and on – then the indicator, and off it goes
+    const bus = car.bus;
+    if (bus && bus.dwell > 0) {
+      bus.dwell -= dt;
+      car.v = 0;
+      car.a = 0;
+      car.braking = true;
+      car.blinker = 0;
+      if (bus.dwell <= 0) {
+        bus.doors = false;
+        bus.pullOut = 3.5;
+      }
+      return;
+    }
+    if (bus && bus.pullOut > 0) bus.pullOut -= dt;
     // --- desired speed ---
     let limit = lane ? lane.limit : conn!.to.limit;
     if (!Number.isFinite(limit)) limit = 36; // Richtgeschwindigkeit 130 km/h
@@ -974,6 +1016,8 @@ export class Traffic {
         if (!mustStop && distToLine > -1.5 && distToLine < 32 && this.boxBlocked(next)) mustStop = true;
         // whoever turns right lets the cyclists beside and behind ride on first (§ 9 Abs. 3 StVO)
         if (!mustStop && next.turn === TURN.RIGHT && distToLine > -1.5 && distToLine < 20 && this.cyclists.blocksRightTurn(lane, car.s, car.length / 2)) mustStop = true;
+        // … and lets the people on foot who cross the road it turns into go first (§ 9 Abs. 3 StVO)
+        if (!mustStop && (next.turn === TURN.RIGHT || next.turn === TURN.LEFT) && distToLine > -1.5 && distToLine < 25 && this.peopleCrossing(next.to, player)) mustStop = true;
         if (mustStop && distToLine > -1.5) stopDist = Math.max(0, distToLine);
         void reason;
       }
@@ -992,12 +1036,16 @@ export class Traffic {
             stop = st === SIG.RED || st === SIG.RED_AMBER || (st === SIG.AMBER && (car.v * car.v) / (2 * Math.max(d, 0.5)) < 3.2 && d > 0);
           } else if (x.k === XING.ZEBRA) {
             for (const p of this.peds) if (p.crossing === x && p.state !== 'gone' && (p.state === 'cross' || p.waited > 0.3)) stop = true;
+            // the player on foot: on the zebra, or at its kerb and about to step out (§ 26 Abs. 1 StVO)
+            if (!stop && player.onFoot && this.atZebra(x, player)) stop = true;
           }
           if (stop) stopDist = Math.min(stopDist, Math.max(0, d));
         }
       }
     }
     if (conn) {
+      // turning: wait in the junction while somebody crosses the road it turns into
+      if ((conn.turn === TURN.RIGHT || conn.turn === TURN.LEFT) && this.peopleCrossing(conn.to, player)) stopDist = Math.min(stopDist, Math.max(0, conn.len - car.s - car.length / 2 - 0.5));
       for (const k of conn.conflicts) {
         const dSelf = k.sSelf - car.s - car.length / 2;
         if (dSelf < -1) continue; // already past the conflict point
@@ -1020,6 +1068,25 @@ export class Traffic {
           if (wait) stopDist = Math.min(stopDist, Math.max(0, dSelf - (k.merge ? 1.0 : 3.0)));
         }
       }
+    }
+    // a bus: the next stop on its lane – its front comes to stand at the pole
+    if (bus && lane && this.busStops) {
+      for (const st of this.busStops(lane)) {
+        if (st.id === bus.served) continue;
+        const d = st.s - (car.s + car.length / 2);
+        if (d < -1.5 || d > 70) continue;
+        if (d < 1.2 && car.v < 0.4) {
+          bus.served = st.id;
+          bus.doors = true;
+          bus.dwell = 10 + this.rand() * 10;
+          break;
+        }
+        stopDist = Math.min(stopDist, Math.max(0, d));
+        // (pulling in: the indicator to the right)
+        if (d < 45) car.blinker = 1;
+        break;
+      }
+      if (bus.pullOut > 0) car.blinker = -1;
     }
     if (stopDist < Infinity) {
       brakeFor(stopDist + 0.4, 0, 0.6);
@@ -1169,9 +1236,9 @@ export class Traffic {
         p.waited += dt;
         let go = p.waited > 0.8;
         if (c.k === XING.SIGNAL && c.sc !== undefined) {
-          // walk while the vehicles have red
-          const st = this.signals.get(c.sc, c.g ?? 0);
-          go = st === SIG.RED && this.signals.age(c.sc, c.g ?? 0) > 1.5;
+          // press the button, and walk on the pedestrians' green
+          this.signals.request(c.sc);
+          go = this.signals.pedestrian(c.sc, c.g ?? 0) === 'green';
         } else {
           // zebra: step out when approaching traffic can still stop comfortably (or has stopped)
           const dp = Math.hypot(player.x - p.x, player.z - p.z);
@@ -1218,6 +1285,56 @@ export class Traffic {
     const wx = tmp.tz * p.dir;
     const wz = -tmp.tx * p.dir;
     p.yaw = Math.atan2(-wx, -wz);
+  }
+
+  /**
+   * Somebody walking across the road `lane` leads into, on a crossing within
+   * 20 m of the junction – one of the traffic's pedestrians, or the player on
+   * foot on the road there.
+   */
+  private peopleCrossing(lane: Lane, player: PlayerState): boolean {
+    for (const x of lane.edge.xings) {
+      if (x.k !== XING.ZEBRA && x.k !== XING.SIGNAL && x.k !== XING.UNMARKED) continue;
+      const pos = lane.dir > 0 ? x.s - lane.s0 : lane.s0 - x.s;
+      if (pos < -2 || pos > 20) continue;
+      for (const p of this.peds) if (p.crossing === x && p.state === 'cross') return true;
+      if (player.onFoot && this.onCrossing(x, player)) return true;
+    }
+    return false;
+  }
+
+  /** Is the player standing on the road at this crossing (between the kerbs, on its strip)? */
+  private onCrossing(c: CrossingJson, player: PlayerState): boolean {
+    const e = this.world.edges[c.e];
+    if (!e) return false;
+    samplePolyline(e.pl, c.s, tmp2);
+    const dx = player.x - tmp2.x;
+    const dz = player.z - tmp2.z;
+    return Math.abs(dx * tmp2.tx + dz * tmp2.tz) <= c.w / 2 + 0.8 && Math.abs(dx * tmp2.tz - dz * tmp2.tx) <= e.width / 2 + 0.3;
+  }
+
+  /**
+   * Is the player on foot at this zebra crossing: on its stripes, or standing
+   * at its kerb facing the road (somebody who wants to cross, § 26 Abs. 1 StVO)?
+   */
+  atZebra(c: CrossingJson, player: PlayerState): boolean {
+    const e = this.world.edges[c.e];
+    if (!e) return false;
+    samplePolyline(e.pl, c.s, tmp2);
+    const dx = player.x - tmp2.x;
+    const dz = player.z - tmp2.z;
+    const along = dx * tmp2.tx + dz * tmp2.tz;
+    // (left of the edge direction is (tz, -tx))
+    const across = dx * tmp2.tz - dz * tmp2.tx;
+    if (Math.abs(along) > c.w / 2 + 0.6) return false;
+    const half = e.width / 2;
+    if (Math.abs(across) <= half) return true;
+    if (Math.abs(across) > half + 1.6) return false;
+    // at the kerb: looking out over the road (towards the other side)
+    const fx = -Math.sin(player.yaw);
+    const fz = -Math.cos(player.yaw);
+    const out = -Math.sign(across);
+    return (fx * tmp2.tz - fz * tmp2.tx) * out > 0.5;
   }
 
   /** Is a pedestrian waiting at or walking on the given crossing? */

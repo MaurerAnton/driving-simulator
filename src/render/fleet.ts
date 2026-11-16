@@ -32,7 +32,7 @@ export interface VehicleModel {
 const OFF = new THREE.MeshLambertMaterial({ color: 0x3a2d2a });
 
 /** The lamps every vehicle has: brake lamps, indicators (by side), and their switching. */
-class Lamps {
+export class Lamps {
   readonly brake: THREE.Mesh[] = [];
   readonly indicators: Array<{ mesh: THREE.Mesh; side: number }> = [];
 
@@ -393,118 +393,8 @@ export class PlayerTractor implements VehicleModel {
 }
 
 // ----------------------------------------------------------------------------- the motorcycle
-const BIKE_PAINT = new THREE.MeshLambertMaterial({ color: 0x1d6fb8 });
-const JACKET = new THREE.MeshLambertMaterial({ color: 0x2b2e33 });
-const HELMET = new THREE.MeshLambertMaterial({ color: 0xe8e8e8 });
-
-/**
- * A motorcycle with its rider.  It leans into the bend (`setLean`) – the
- * camera of the rider's eyes leans with it.
- */
-export class PlayerBike implements VehicleModel {
-  readonly root = new THREE.Group();
-  readonly eye = new THREE.Vector3(0, 1.42, 0.06);
-  readonly mirrors: Mirror[] = [];
-  /** everything that leans: the root stays upright, so that the game can place it */
-  private readonly body = new THREE.Group();
-  private readonly front = new THREE.Group();
-  private readonly wheels: THREE.Group[] = [];
-  private readonly lamps = new Lamps();
-  private readonly panelTex = new InstrumentPanel();
-  private lean = 0;
-
-  constructor() {
-    const root = this.root;
-    root.name = 'motorcycle';
-    const b = this.body;
-    const r = 0.31;
-    // frame, engine, tank, seat, tail
-    b.add(box(-0.08, 0.08, 0.55, 0.75, -0.55, 0.45, FRAME));
-    b.add(box(-0.17, 0.17, 0.3, 0.72, -0.32, 0.18, DARK)); // engine
-    b.add(box(-0.18, 0.18, 0.78, 1.02, -0.42, 0.02, BIKE_PAINT)); // tank
-    b.add(box(-0.15, 0.15, 0.8, 0.9, 0.02, 0.62, DARK)); // seat
-    b.add(box(-0.12, 0.12, 0.82, 0.95, 0.55, 0.88, BIKE_PAINT)); // tail
-    b.add(box(0.12, 0.2, 0.32, 0.42, 0.1, 0.85, FRAME)); // exhaust
-    const stop = box(-0.07, 0.07, 0.86, 0.92, 0.87, 0.9, TAIL, false);
-    this.lamps.brake.push(stop);
-    b.add(stop);
-    for (const side of [-1, 1]) {
-      const ind = box(side * 0.14 - 0.03, side * 0.14 + 0.03, 0.84, 0.88, 0.86, 0.9, OFF, false);
-      this.lamps.indicators.push({ mesh: ind, side });
-      b.add(ind);
-    }
-    // the rider: legs on the pegs, the body leaning forwards, arms to the bar, the helmet
-    for (const side of [-1, 1]) {
-      b.add(box(side * 0.17 - 0.07, side * 0.17 + 0.07, 0.86, 1.0, -0.12, 0.38, JACKET)); // thigh
-      b.add(box(side * 0.19 - 0.06, side * 0.19 + 0.06, 0.38, 0.9, -0.05, 0.08, JACKET)); // shin
-      const arm = box(-0.045, 0.045, -0.04, 0.04, -0.3, 0.12, JACKET);
-      arm.position.set(side * 0.24, 1.22, -0.2);
-      arm.rotation.x = 0.55;
-      b.add(arm);
-    }
-    const torso = box(-0.21, 0.21, 0, 0.6, -0.12, 0.12, JACKET);
-    torso.position.set(0, 0.95, 0.24);
-    torso.rotation.x = -0.45;
-    b.add(torso);
-    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 10), HELMET);
-    helmet.position.set(0, 1.47, 0.1);
-    b.add(helmet);
-    // the front: fork, wheel, headlamp, handlebar with its instruments and mirrors – it turns with the steering
-    this.front.position.set(0, 0, -0.52);
-    const f = this.front;
-    for (const side of [-1, 1]) f.add(box(side * 0.1 - 0.025, side * 0.1 + 0.025, r, 1.0, -0.23, -0.18, FRAME));
-    f.add(box(-0.12, 0.12, 0.85, 1.05, -0.32, -0.15, BIKE_PAINT)); // headlamp housing
-    f.add(box(-0.08, 0.08, 0.9, 1.0, -0.34, -0.32, LAMP, false));
-    f.add(box(-0.36, 0.36, 1.08, 1.12, 0.02, 0.06, DARK)); // bar
-    for (const side of [-1, 1]) {
-      const ind = box(side * 0.18 - 0.03, side * 0.18 + 0.03, 0.9, 0.94, -0.3, -0.26, OFF, false);
-      this.lamps.indicators.push({ mesh: ind, side });
-      f.add(ind);
-    }
-    dial(f, this.panelTex.texture, new THREE.Vector3(0, 1.1, -0.1), 0.24, 0.9);
-    b.add(f);
-    // the wheels (the front one in the turning part)
-    for (const z of [-0.725, 0.725]) {
-      const g = wheel(r, 0.14);
-      g.position.set(0, r, z);
-      this.wheels.push(g);
-      (z < 0 ? f : b).add(g);
-      if (z < 0) g.position.z = z + 0.52;
-    }
-    root.add(b);
-    // mirrors at the ends of the bar (in the root's frame: they lean with the body through the camera, not on their own)
-    for (const side of [-1, 1]) {
-      const c = new THREE.Vector3(side * 0.42, 1.28, -0.6);
-      const m = sideMirror(f, this.eye.clone().sub(new THREE.Vector3(0, 0, -0.52)), c.clone().sub(new THREE.Vector3(0, 0, -0.52)), side, [0.12, 0.09], 1.6, [160, 120]);
-      this.mirrors.push(m);
-    }
-  }
-
-  setCabinOpacity(): void {
-    /* nothing hides the road on a motorcycle */
-  }
-
-  /** How far it leans into the bend (rad, + = to the right). */
-  setLean(angle: number): void {
-    this.lean = angle;
-  }
-
-  update(s: CarVisualState, dt: number, now: number): void {
-    // the lean follows the bend smoothly
-    const z = -this.lean;
-    this.body.rotation.z += (z - this.body.rotation.z) * Math.min(1, dt * 6);
-    this.front.rotation.y = -(s.wheelSteer[0] ?? 0);
-    this.wheels[0].rotation.x = -(s.wheelSpin[0] ?? 0);
-    this.wheels[1].rotation.x = -(s.wheelSpin[2] ?? 0);
-    this.lamps.update(s);
-    this.panelTex.update(s, now);
-  }
-
-  /** The lean as drawn right now (for the camera of the rider's eyes). */
-  get leaning(): number {
-    return -this.body.rotation.z;
-  }
-}
+// (with its rider, in a build for each class: render/bike.ts)
+export { PlayerBike } from './bike.ts';
 
 // ------------------------------------------------------------------------- the car's trailer
 const TRAILER_PAINT = new THREE.MeshLambertMaterial({ color: 0x8a9096 });

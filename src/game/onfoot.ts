@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * On foot, beside the vehicle: before the drive (with the start "beside the
- * vehicle") or after getting out.
+ * vehicle") or after getting out – or without any vehicle, as a pedestrian
+ * in the town (then nothing holds one near anything).
  *
  * Whoever drives off has looked at the vehicle first – the check before the
  * drive (Abfahrtkontrolle: part of the test for the classes C and CE, and
@@ -65,8 +66,10 @@ export interface WalkVehicle {
 /** eye height (m) */
 export const EYE = 1.62;
 const RADIUS = 0.28;
-const WALK = 1.45;
-const RUN = 3.3;
+/** walking pace (m/s) */
+export const WALK = 1.45;
+/** running, unless the settings say otherwise (m/s: 12 km/h) */
+export const RUN = 3.3;
 /** how far from the vehicle one may walk (m) */
 export const TETHER = 45;
 /** how long something has to be looked at (s) */
@@ -140,30 +143,50 @@ export class OnFoot {
   yaw: number;
   pitch = -0.12;
   readonly spots: CheckSpot[];
-  private readonly vehicle: WalkVehicle;
+  private readonly vehicle: WalkVehicle | null;
   private walked = 0;
   /** too far from the vehicle a moment ago */
   tooFar = false;
+  /** how fast running is (m/s) – the settings say */
+  runSpeed = RUN;
+  /** the speed of the last step (m/s), and whether it was run */
+  speed = 0;
+  running = false;
+  /** metres walked in all (for the gait of the figure) */
+  distance = 0;
 
-  /** Beside the driver's door of `vehicle`, looking along it. */
-  constructor(vehicle: WalkVehicle) {
+  /**
+   * Beside the driver's door of `vehicle`, looking along it – or, without a
+   * vehicle, at `start`.
+   */
+  constructor(vehicle: WalkVehicle | null, start?: { x: number; y: number; z: number; yaw: number }) {
     this.vehicle = vehicle;
-    this.spots = checkSpots(vehicle);
-    const p = this.doorSpot();
-    this.x = p.x;
-    this.z = p.z;
-    this.y = vehicle.y;
-    this.yaw = vehicle.units[0].yaw + 0.35;
+    this.spots = vehicle ? checkSpots(vehicle) : [];
+    if (vehicle) {
+      const p = this.doorSpot();
+      this.x = p.x;
+      this.z = p.z;
+      this.y = vehicle.y;
+      this.yaw = vehicle.units[0].yaw + 0.35;
+    } else {
+      this.x = start?.x ?? 0;
+      this.y = start?.y ?? 0;
+      this.z = start?.z ?? 0;
+      this.yaw = start?.yaw ?? 0;
+    }
   }
 
-  /** Where one stands to get in: beside the driver's door. */
+  /** Where one stands to get in: beside the driver's door (where one stands, without a vehicle). */
   doorSpot(): { x: number; z: number } {
-    const u = this.vehicle.units[0];
-    return at(u, this.vehicle.door, (this.vehicle.doorSide ?? -1) * (u.hw + 0.6));
+    const v = this.vehicle;
+    if (!v) return { x: this.x, z: this.z };
+    const u = v.units[0];
+    return at(u, v.door, (v.doorSide ?? -1) * (u.hw + 0.6));
   }
 
   /** Close enough to the door to open it. */
   get atDoor(): boolean {
+    if (!this.vehicle) return false;
     const p = this.doorSpot();
     return Math.hypot(this.x - p.x, this.z - p.z) < 1.3;
   }
@@ -196,7 +219,9 @@ export class OnFoot {
   update(dt: number, move: WalkMove, look: WalkLook, ground: (x: number, z: number, yRef: number) => number, blocked: (x: number, y: number, z: number, r: number) => boolean): { step: boolean; checked: CheckSpot | null } {
     this.yaw += look.yaw + move.turn * 1.9 * dt;
     this.pitch = Math.max(-1.3, Math.min(1.1, this.pitch + look.pitch));
-    const speed = move.run ? RUN : WALK;
+    const speed = move.run ? this.runSpeed : WALK;
+    const x0 = this.x;
+    const z0 = this.z;
     const s = Math.sin(this.yaw);
     const c = Math.cos(this.yaw);
     // forwards = (−sin, −cos), to the right = (cos, −sin)
@@ -216,13 +241,14 @@ export class OnFoot {
         if (mx === 0 && mz === 0) continue;
         const nx = this.x + mx;
         const nz = this.z + mz;
-        if (this.vehicle.units.some((u) => inside(u, nx, nz, RADIUS))) continue;
+        const v = this.vehicle;
+        if (v?.units.some((u) => inside(u, nx, nz, RADIUS))) continue;
         const ny = ground(nx, nz, this.y + 0.6);
         // (a step up of a kerb, not up a wall)
         if (!Number.isFinite(ny) || ny > this.y + 0.45 || blocked(nx, ny, nz, RADIUS)) continue;
-        // not too far from the vehicle
-        const u = this.vehicle.units[0];
-        const far = Math.hypot(nx - u.x, nz - u.z) > TETHER;
+        // not too far from the vehicle (on foot alone: anywhere)
+        const u = v?.units[0];
+        const far = !!u && Math.hypot(nx - u.x, nz - u.z) > TETHER;
         this.tooFar = far;
         if (far) break;
         this.walked += Math.hypot(mx, mz);
@@ -236,6 +262,10 @@ export class OnFoot {
         step = true;
       }
     }
+    const moved = Math.hypot(this.x - x0, this.z - z0);
+    this.distance += moved;
+    this.speed = dt > 0 ? moved / dt : 0;
+    this.running = move.run && this.speed > WALK * 1.2;
     // --- what is looked at ---
     let checked: CheckSpot | null = null;
     const cp = Math.cos(this.pitch);

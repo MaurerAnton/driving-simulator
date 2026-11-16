@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three';
 import { CONSISTS } from '../sim/rail.ts';
-import type { Consist, RailVehicle } from '../sim/rail.ts';
+import type { Consist, RailLine, RailVehicle } from '../sim/rail.ts';
 import { RAIL } from '../world/types.ts';
 
 type Rgb = [number, number, number];
@@ -168,8 +168,42 @@ export class RailActors {
     return g;
   }
 
-  /** Show the vehicles where the simulation has them. */
-  update(vehicles: readonly RailVehicle[]): void {
+  /** the vehicle the player rides in (its outside is not drawn: they sit inside it) */
+  hidden: RailVehicle | null = null;
+  /** the destination displays: one texture per text, and what each vehicle shows */
+  private readonly displays = new Map<string, THREE.MeshBasicMaterial>();
+  private readonly showing = new Map<number, string>();
+  private readonly displayGeo = new THREE.PlaneGeometry(1.7, 0.32);
+
+  /** The display at the front of a tram: the line and where it goes, in amber dots on black. */
+  private displayMaterial(text: string): THREE.MeshBasicMaterial {
+    let m = this.displays.get(text);
+    if (m) return m;
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 96;
+    const g = c.getContext('2d') as CanvasRenderingContext2D;
+    g.fillStyle = '#0b0b0b';
+    g.fillRect(0, 0, 512, 96);
+    g.fillStyle = '#ffb21a';
+    g.font = 'bold 56px "Arial Narrow", Arial, sans-serif';
+    g.textBaseline = 'middle';
+    const [ref, ...rest] = text.split('\n');
+    g.textAlign = 'left';
+    g.fillText(ref, 14, 50, 110);
+    g.textAlign = 'left';
+    g.font = 'bold 46px "Arial Narrow", Arial, sans-serif';
+    g.fillText(rest.join(' '), 140, 50, 360);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    m = new THREE.MeshBasicMaterial({ map: tex });
+    this.displays.set(text, m);
+    return m;
+  }
+
+  /** Show the vehicles where the simulation has them (`lines`: the lines, for the displays at their fronts). */
+  update(vehicles: readonly RailVehicle[], lines: readonly RailLine[] = []): void {
     const seen = new Set<number>();
     for (const v of vehicles) {
       seen.add(v.id);
@@ -185,16 +219,42 @@ export class RailActors {
         this.shown.set(v.id, g);
         this.group.add(g);
       }
+      g.visible = v !== this.hidden;
       v.cars.forEach((car, i) => {
         const m = g!.children[i];
         m.position.set(car.x, car.y, car.z);
         m.rotation.set(car.pitch, car.yaw, 0);
       });
+      // the line and its destination over the windscreen (and at the back of the last car)
+      const line = v.line ? lines[v.line.index] : null;
+      const text = line ? `${line.ref}\n${line.to}` : '';
+      if (this.showing.get(v.id) !== text) {
+        this.showing.set(v.id, text);
+        for (const m of [g.children[0], g.children[v.cars.length - 1]]) {
+          const old = m.getObjectByName('display');
+          if (old) m.remove(old);
+        }
+        if (text) {
+          const c = v.consist;
+          const front = new THREE.Mesh(this.displayGeo, this.displayMaterial(text));
+          front.name = 'display';
+          front.position.set(0, c.height - 0.42, -c.carLen / 2 - 0.035);
+          front.rotation.y = Math.PI;
+          g.children[0].add(front);
+          if (v.cars.length > 1) {
+            const back = new THREE.Mesh(this.displayGeo, this.displayMaterial(text));
+            back.name = 'display';
+            back.position.set(0, c.height - 0.42, c.carLen / 2 + 0.035);
+            g.children[v.cars.length - 1].add(back);
+          }
+        }
+      }
     }
     for (const [id, g] of this.shown) {
       if (seen.has(id)) continue;
       this.group.remove(g);
       this.shown.delete(id);
+      this.showing.delete(id);
     }
   }
 

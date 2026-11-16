@@ -15,11 +15,29 @@ import { CheckMarkers, EYE, OnFoot } from './onfoot.ts';
 import type { CheckId, WalkUnit, WalkVehicle } from './onfoot.ts';
 import { SIG, SignalSystem } from '../sim/signals.ts';
 import { Traffic } from '../sim/traffic.ts';
-import type { PlayerState } from '../sim/traffic.ts';
+import type { BusStopOnLane, PlayerState, TrafficCar } from '../sim/traffic.ts';
 import { Vehicle } from '../sim/vehicle/index.ts';
 import { LIGHT_TRUCK, MINIBUS } from '../sim/vehicle/fleet.ts';
 import type { DriverInput } from '../sim/vehicle/index.ts';
 import { SignalRenderer, TrafficRenderer } from '../render/actors.ts';
+import { PedLightRenderer } from '../render/pedlights.ts';
+import { WalkerModel } from '../render/walker.ts';
+import { FLOOR as TRAM_FLOOR, PassengerView } from '../render/passenger.ts';
+import { FarTerrain } from '../render/far.ts';
+import { TransitScene } from '../render/transit.ts';
+import { AirfieldRenderer } from '../render/airfield.ts';
+import { PlaneModel } from '../render/plane.ts';
+import type { PlaneVisualState } from '../render/plane.ts';
+import { AirfieldGround, runwayEnd, runwayStart } from '../sim/airfield.ts';
+import { Aircraft } from '../sim/flight.ts';
+import type { FlightControls } from '../sim/flight.ts';
+import { TRAINER } from '../sim/flightspec.ts';
+import { farHeight } from '../world/far.ts';
+import type { AirJson } from '../world/types.ts';
+import type { LinesJson } from '../world/types.ts';
+import { farBuilt, parseFar } from '../world/far.ts';
+import { pedPoles, poleInReach } from '../world/pedlights.ts';
+import type { PedPole } from '../world/pedlights.ts';
 import { PlayerCar } from '../render/car.ts';
 import type { CarVisualState } from '../render/car.ts';
 import { PropRenderer } from '../render/props.ts';
@@ -29,20 +47,24 @@ import { latLonToWorld, worldToLatLon } from '../geo/utm.ts';
 import { AddressIndex, findRoadSpot, mainNetwork } from './address.ts';
 import type { AddressHit, AddressJson } from './address.ts';
 import { Hud } from '../ui/hud.ts';
-import type { HudState } from '../ui/hud.ts';
+import type { HudState, RunwayChoice, TramStopChoice } from '../ui/hud.ts';
+import { Stops } from '../world/stops.ts';
 import { LANGS, formatUnit, isRtl, lessonIntro, lessonTitle, loadLang, localeOf, setKeyStyle, tr } from '../i18n/index.ts';
 import { initKeyLabels } from '../i18n/keys.ts';
 import { RealityPanel } from '../ui/reality.ts';
 import { LaneGraph, TURN, lanePoint } from '../world/lanes.ts';
 import type { Lane } from '../world/lanes.ts';
-import { newPolySample, projectOnPolyline } from '../core/geom.ts';
-import { CLS, CTRL, RAIL, SURF_ROLLING } from '../world/types.ts';
+import { newPolySample, projectOnPolyline, samplePolyline } from '../core/geom.ts';
+import { CLS, CTRL, RAIL, STOP_FLAG, SURF_ROLLING, XING } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { Edge, Node as Junction } from '../world/world.ts';
 import { App } from './app.ts';
 import { LESSONS, Navigator, findTarget } from './nav.ts';
-import { planTour } from './tour.ts';
+import { planTourInSlices } from './tour.ts';
+import { BusService } from './busline.ts';
+import type { BusEvent } from './busline.ts';
+import { saveTour, thinLine } from './tourlog.ts';
 import type { TourPlan } from './tour.ts';
 import { quickest, quickestToEdge, routeFor, routeGraphOf, wayOf } from '../world/routegraph.ts';
 import type { RouteGraph } from '../world/routegraph.ts';
@@ -56,14 +78,16 @@ import { DrivenPath } from './track.ts';
 import { BigMap } from '../ui/bigmap.ts';
 import type { TourPreview } from '../ui/bigmap.ts';
 import { RailTraffic } from '../sim/rail.ts';
-import type { RailObstacle } from '../sim/rail.ts';
+import type { RailObstacle, RailVehicle } from '../sim/rail.ts';
+import type { CrossingJson } from '../world/types.ts';
 import { RailActors } from '../render/trams.ts';
 import { PlayerTruck } from '../render/truck.ts';
 import { CarTrailerModel, PlayerBike, PlayerBus, PlayerTractor, TramCab } from '../render/fleet.ts';
+import type { BikeVariant } from '../render/bike.ts';
 import { TramDriver, tramStart } from '../sim/tramdrive.ts';
 import type { TramEvent } from '../sim/tramdrive.ts';
 import type { VehicleModel } from '../render/fleet.ts';
-import { VEHICLES, trailerOf, vehicleKind } from './vehicles.ts';
+import { VEHICLES, powerOf, trailerOf, vehicleKind } from './vehicles.ts';
 import type { ModelKind, VehicleDef } from './vehicles.ts';
 import { YardScene } from '../render/yard.ts';
 import { Trailer } from '../sim/trailer.ts';
@@ -84,12 +108,23 @@ const PHYS_DT = 1 / 240;
 
 /** stops in the tram lesson */
 const TRAM_STOPS = 5;
+/** … and the bus lesson */
+const BUS_STOPS = 5;
 /** the lean of the motorcycle, for the rider's eyes */
 const BIKE_ROLL = new THREE.Quaternion();
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
 /** what is checked round the vehicle, by the key of its name */
 const CHECK_TEXT: Record<CheckId, string> = { tyres: 'checkTyres', front: 'checkFront', rear: 'checkRear', coupling: 'checkCoupling' };
 
+/** The motorcycle of each class has its own build (render/bike.ts): moped, 125, 35 kW, the big one. */
+function bikeVariant(kind: string): BikeVariant {
+  return kind === 'moped' ? 'moped' : kind === 'motorcycle125' ? 'light' : kind === 'motorcycle35' ? 'mid' : 'big';
+}
+
+/** Which model a vehicle is drawn with: its kind of model – for a motorcycle, the build of its class. */
+function modelKey(def: VehicleDef): string {
+  return def.model === 'motorcycle' ? `motorcycle:${bikeVariant(def.kind)}` : def.model;
+}
 
 export class Game {
   readonly app: App;
@@ -113,7 +148,12 @@ export class Game {
   private trailer: Trailer | null = null;
   /** the vehicle driven now (by its licence class), and the models of the vehicles made so far */
   private def: VehicleDef = VEHICLES.car;
-  private readonly models = new Map<ModelKind, VehicleModel>();
+  /**
+   * the models of the vehicles driven so far, by modelKey (each motorcycle class has its own build) – the car's
+   * from the start (without it, the first drive of class B made a motorcycle for the car: the model of a kind
+   * not yet in here is made when it is first driven)
+   */
+  private readonly models = new Map<string, VehicleModel>([['car', this.car]]);
   /** the box trailer behind a car (class BE) */
   private carTrailer: CarTrailerModel | null = null;
   /** the car's centre display, for the HUD to draw the map on */
@@ -154,7 +194,7 @@ export class Game {
     searchAt: number;
     stuck: number;
     /** a tour: the ways to drive (world/routegraph.ts), the way they begin behind, and what it comes to */
-    tour: { ways: number[]; from: number; metres: number; fresh: number; odo: number; set: boolean } | null;
+    tour: { ways: number[]; from: number; metres: number; fresh: number; odo: number; set: boolean; line: Float32Array } | null;
   } | null = null;
   /** the road network as the route planner sees it, of a map in one piece (made when a way is first planned) */
   private routeGraph: RouteGraph | null = null;
@@ -179,6 +219,32 @@ export class Game {
   private readonly railBoxes: PlayerState[] = [];
   private readonly railOthers: RailObstacle[] = [];
   signalHeads!: SignalRenderer;
+  /** the pedestrian lights: their poles (with the buttons) and their heads */
+  private pedPoles: PedPole[] = [];
+  private readonly pedHeads = new PedLightRenderer();
+  /** inside the tram one rides in as a passenger */
+  private readonly passengerView = new PassengerView();
+  /** the ground beyond the map's tiles: the hills on the horizon */
+  private readonly far = new FarTerrain();
+  /** stops, platforms, people waiting, the overhead line and the tram signals around the camera */
+  private transit!: TransitScene;
+  // ------------------------------------------------- the aeroplane
+  /** the aeroplane being flown (null: none), its model, and the airfields of the map with their firm ground */
+  private aircraft: Aircraft | null = null;
+  private planeModel: PlaneModel | null = null;
+  private air: AirJson | null = null;
+  private airGround: AirfieldGround | null = null;
+  private airfieldView!: AirfieldRenderer;
+  /** a flight is to begin once the runway is placed */
+  private planePending = false;
+  /** the throttle lever (0 … 1), the flap lever (0 … 3: 0°, 10°, 20°, 30°), the trim (−1 … 1), when it crashed */
+  private readonly flight = { throttle: 0, flaps: 1, trim: 0.15, crashT: -1 };
+  private readonly flightControls: FlightControls = { throttle: 0, elevator: 0, aileron: 0, rudder: 0, flaps: 0, trim: 0, brake: 0, parkingBrake: false, engineOn: true };
+  /** the lines of the trams (null: the map has none) – and whether the departure boards still have to learn them */
+  private lines: LinesJson | null = null;
+  private lineStopsDirty = false;
+  /** the rail traffic that was given the lines (a new one is made when the tracks are read) */
+  private linesFor: RailTraffic | null = null;
   readonly collider = new SceneryCollider();
   readonly audio = new GameAudio();
   state: State = 'loading';
@@ -282,8 +348,11 @@ export class Game {
     await this.signs.init();
     this.signalHeads = new SignalRenderer(world, this.signals);
     this.collider.add({ key: 'signals', rings: null, ringCounts: null, segments: null, discs: this.signalHeads.poles });
+    this.buildPedLights();
+    this.transit = new TransitScene(world, (x, z, yRef) => this.footGround(x, z, yRef));
+    this.airfieldView = new AirfieldRenderer((x, z) => this.groundHeight(x, z), (x, z) => !Number.isNaN(this.app.tiles.heightAt(x, z)));
     app.tiles.onTile((tile, loaded) => this.onTile(tile, loaded));
-    app.scene.add(this.car.root, this.actors.group, this.railActors.group, this.signalHeads.group, this.yardScene.group, this.markers.group);
+    app.scene.add(this.car.root, this.actors.group, this.railActors.group, this.signalHeads.group, this.pedHeads.group, this.passengerView.group, this.far.group, this.transit.group, this.airfieldView.group, this.yardScene.group, this.markers.group);
     this.fadeEl.className = 'fade';
     this.ui.append(this.fadeEl);
     this.yardFrame = world.json.yard ? new YardFrame(world.json.yard) : null;
@@ -300,6 +369,42 @@ export class Game {
         this.rail = new RailTraffic(rails);
         this.applySettings();
       });
+      // the airfields: drawn on the ground, firm under an aeroplane's wheels, and the ends of their runways to take off from
+      void app.map.air().then((json) => {
+        if (!json) return;
+        this.air = json;
+        this.airGround = new AirfieldGround(this.ground, json.airfields);
+        this.airfieldView.set(json.airfields);
+        const ends: RunwayChoice[] = [];
+        for (const f of json.airfields) {
+          const field = f.icao ? `${f.name || f.icao} (${f.icao})` : f.name;
+          for (const r of f.runways) {
+            if (Math.hypot(r.x2 - r.x1, r.z2 - r.z1) < 300) continue;
+            for (const second of [false, true]) ends.push({ field, end: runwayEnd(r, second), ...runwayStart(r, second) });
+          }
+        }
+        this.hud.setRunways(ends);
+      });
+      // the lines of the trams: which way they run and where they call (with the tracks, the departure boards know them)
+      void app.map.lines().then((json) => {
+        this.lines = json;
+        this.lineStopsDirty = true;
+      });
+      // the ground of the whole region, coarse: what lies beyond the tiles
+      void app.map.far().then((buf) => {
+        const f = buf ? parseFar(buf) : null;
+        if (f) this.far.set(f);
+      });
+      // the stops (their names, poles and platforms): the tram's start points in the menu, what is drawn at a stop
+      void app.map.stops().then((json) => {
+        if (!json) return;
+        this.stops = new Stops(json);
+        this.transit.setStops(this.stops);
+        this.hud.setTramStops(this.stops.tramPlaces().map((p) => ({ name: p.name, town: p.town, x: p.x, z: p.z })));
+        // with the stops, city buses come with the traffic: they call at the stops on their way
+        this.laneStops.clear();
+        this.traffic.busStops = (lane) => this.busStopsOn(lane);
+      });
     }
     this.car.root.visible = false;
     loading.remove();
@@ -307,7 +412,7 @@ export class Game {
     this.hud = new Hud(this.ui, this.settings, world);
     this.input = new Input(app.canvas, this.settings);
     this.input.onAction((a) => this.onAction(a));
-    this.hud.onStart = (req) => this.begin(req.mode, req.spawn, false, req.address);
+    this.hud.onStart = (req) => this.begin(req.mode, req.spawn, false, req.address, req.stop, req.runway);
     this.hud.onResume = () => this.resume();
     this.hud.onReality = () => this.openReality();
     this.hud.onGetOut = () => {
@@ -353,7 +458,13 @@ export class Game {
       loadAddresses: () => this.loadAddresses(),
       spotOf: (hit) => this.spawnAt(hit),
       startTrip: (stops, self, tour) => this.startTrip(stops, self, tour),
-      planTour: (metres, end) => this.planTour(metres, end),
+      planTour: (metres, end, progress) => this.planTour(metres, end, progress),
+      tramways: () => this.tramways(),
+      tourPrefs: () => this.settings.tourPrefs,
+      setTourPrefs: (p) => {
+        this.settings.tourPrefs = { ...p };
+        saveSettings(this.settings);
+      },
       roadsKnown: () => this.routeGraphNow() !== null,
       tripActive: () => this.demo !== null,
       endTrip: () => this.endDemo('ended'),
@@ -605,8 +716,15 @@ export class Game {
     app.setShadows(gx.shadows === 'off' ? 0 : gx.shadows === 'near' ? 1536 : 3072, gx.shadows === 'far' ? 120 : 55);
     app.tiles.viewRadius = gx.viewDistance;
     app.tiles.setFacades(gx.facades);
-    app.sky.fog.near = app.tiles.viewRadius * 0.3;
-    app.sky.fog.far = app.tiles.viewRadius * 1.05;
+    // the ground beyond the tiles, as far as asked: then the haze lies over the far hills, not over the near streets
+    const farView = gx.farView;
+    this.far.group.visible = farView > 0;
+    this.far.radius = farView;
+    this.far.inner = Math.max(300, app.tiles.viewRadius - 200);
+    app.sky.fog.near = app.tiles.viewRadius * (farView > 0 ? 0.6 : 0.3);
+    app.sky.fog.far = farView > 0 ? Math.max(app.tiles.viewRadius * 1.6, farView * 0.95) : app.tiles.viewRadius * 1.05;
+    app.camera.far = Math.max(4500, farView * 1.1);
+    app.camera.updateProjectionMatrix();
     this.props.density = gx.propDensity;
     this.props.setShadows(gx.propShadows);
     this.ui.style.setProperty('zoom', String(s.uiScale));
@@ -630,6 +748,8 @@ export class Game {
 
   // ------------------------------------------------------------------- flow
   private toMenu(): void {
+    // (a tour that is left for the menu is kept as far as it was driven)
+    if (this.demo?.tour) this.endDemo('ended');
     this.state = 'menu';
     this.demo = null;
     this.endTasks();
@@ -657,14 +777,46 @@ export class Game {
 
   private readonly menuFocus = new THREE.Vector3();
 
+  /** The model a kind of vehicle is drawn with – every kind named (a new one cannot end up as somebody else's). */
+  private makeModel(def: VehicleDef): VehicleModel {
+    const mk = def.model;
+    switch (mk) {
+      case 'car':
+        return this.car;
+      case 'truck':
+        return (this.truck = new PlayerTruck());
+      case 'truckLight':
+        return new PlayerTruck(LIGHT_TRUCK);
+      case 'bus':
+        return new PlayerBus();
+      case 'minibus':
+        return new PlayerBus(MINIBUS);
+      case 'tractor':
+        return new PlayerTractor();
+      case 'tram':
+        return new TramCab();
+      case 'walker':
+        return new WalkerModel();
+      case 'plane':
+        return this.planeAdapter();
+      case 'motorcycle':
+        return new PlayerBike(bikeVariant(def.kind));
+      default: {
+        const none: never = mk;
+        return none;
+      }
+    }
+  }
+
   /** The vehicle the player sits in: the car or the truck. */
   private get model(): VehicleModel {
-    return this.models.get(this.def.model) ?? this.car;
+    return this.models.get(modelKey(this.def)) ?? this.car;
   }
 
   private showModel(on: boolean): void {
     this.car.root.visible = on && this.def.model === 'car';
-    for (const [kind, model] of this.models) if (model !== this.car) model.root.visible = on && kind === this.def.model;
+    const key = modelKey(this.def);
+    for (const [k, model] of this.models) if (model !== this.car) model.root.visible = on && k === key;
     if (this.carTrailer) this.carTrailer.group.visible = on && !!this.def.trailer && this.def.model !== 'truck';
     if (this.truck) {
       this.truck.trailer.visible = on && this.def.kind === 'truck';
@@ -848,9 +1000,28 @@ export class Game {
     this.spawn = spot;
     this.traffic.clear();
     this.rail.clear();
+    if (this.def.kind === 'tram') {
+      // The tram is one of the rail vehicles that were just cleared away: it is put on the tracks anew, at the
+      // stop nearest to the place chosen – as when a drive begins (tryPlace).  (Before, its driver kept running
+      // a tram that was no longer drawn: only the cab was to be seen.)
+      this.tram = null;
+      this.tramAt = null;
+      this.tramStopName = '';
+      this.tramWait = this.time;
+    }
+    // on foot: on the pavement there (and nobody rides a tram or a bus any more) – somebody who got out of the
+    // vehicle gets out again beside it there (before, they stayed behind, tied to a vehicle far away)
+    if (this.walker && this.def.kind !== 'pedestrian') {
+      this.leaveWalk();
+      this.footAfterJump = true;
+    }
+    this.riding = null;
+    this.busRide = null;
+    this.railActors.hidden = null;
+    this.passengerView.show(null);
     this.vehicle.vel.fill(0);
     this.vehicle.angVel.fill(0);
-    this.input.c.handbrake = 1;
+    this.input.c.handbrake = this.def.kind === 'tram' ? 0 : 1;
     this.path.breakLine();
     this.keepClock = true;
     this.state = 'placing';
@@ -907,7 +1078,7 @@ export class Game {
    * A tour of about `metres` through as many different streets as possible:
    * from where the car stands back to there, or on to `end`.
    */
-  private planTour(metres: number, end: SpawnJson | null): TourPreview | null {
+  private async planTour(metres: number, end: SpawnJson | null, progress?: (share: number) => void): Promise<TourPreview | null> {
     this.wantNet();
     const v = this.vehicle;
     v.getModelPosition(this.mpos);
@@ -924,8 +1095,11 @@ export class Game {
     const ends = [last, last ^ 1].filter((w) => g.len[w] > 0);
     const seed = this.tourSeed++;
     let plan: TourPlan | null = null;
+    // what the driver wishes: roads to leave out, the kind of street to look for
+    const wish = this.tourWishes(g);
+    // (a slice at a time: a long tour takes a while, and the map shows how far the planning is)
     for (const goal of ends) {
-      plan = planTour(g, start, goal, metres, { budgetMs: 500, seed });
+      plan = await planTourInSlices(g, start, goal, metres, { budgetMs: 500, seed, progress, ...wish });
       if (plan) break;
     }
     let canTurn = false;
@@ -933,9 +1107,9 @@ export class Game {
     if (!plan && canTurn) {
       // from a street with no way on (a cul-de-sac): turn round at its end first
       for (const goal of ends) {
-        const back = planTour(g, start ^ 1, goal, Math.max(0, metres - g.len[start]), { budgetMs: 500, seed });
+        const back = await planTourInSlices(g, start ^ 1, goal, Math.max(0, metres - g.len[start]), { budgetMs: 500, seed, progress, ...wish });
         if (!back) continue;
-        plan = { ways: [start ^ 1, ...back.ways], metres: back.metres + g.len[start], fresh: back.fresh, again: back.again + g.len[start] };
+        plan = { ways: [start ^ 1, ...back.ways], metres: back.metres + g.len[start], fresh: back.fresh, again: back.again + g.len[start], valued: back.valued };
         break;
       }
     }
@@ -982,7 +1156,16 @@ export class Game {
     if (this.lesson || (stops.length === 0 && !tour) || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
     // (on foot beside the vehicle: back into the seat first; a tram is driven by hand only)
     if (this.walker) this.leaveWalk();
-    if (this.tram) return;
+    if (this.tram) {
+      // the tram follows its tracks: "by itself" is its demonstration drive (the places chosen do not matter to it)
+      if (!self) {
+        this.tramAuto = true;
+        this.tramTake = 0;
+        if (this.state === 'map') this.closeMap();
+        this.hud.message(tr('tramAutoOn', this.settings.lang));
+      }
+      return;
+    }
     if (this.state === 'map') {
       this.mapFrom = 'drive';
       this.closeMap();
@@ -993,7 +1176,7 @@ export class Game {
       if (this.vehicle.spec.transmission !== 'automatic') {
         const old = this.vehicle;
         old.getModelPosition(this.mpos);
-        const spec = this.def.spec('automatic', this.settings.power);
+        const spec = this.def.spec('automatic', powerOf(this.def, this.settings.powers));
         const v = new Vehicle(spec, this.ground);
         v.teleport(this.mpos[0], this.mpos[1] + 0.02, this.mpos[2], old.yaw);
         v.odometer = old.odometer;
@@ -1031,7 +1214,7 @@ export class Game {
       lost: 0,
       searchAt: 0,
       stuck: 0,
-      tour: tour ? { ways: tour.plan.ways, from: tour.from, metres: tour.plan.metres, fresh: tour.plan.fresh, odo: this.vehicle.odometer, set: false } : null,
+      tour: tour ? { ways: tour.plan.ways, from: tour.from, metres: tour.plan.metres, fresh: tour.plan.fresh, odo: this.vehicle.odometer, set: false, line: tour.line } : null,
     };
     this.hud.clearNotices();
   }
@@ -1041,6 +1224,11 @@ export class Game {
     const demo = this.demo;
     if (!demo) return;
     this.demo = null;
+    // a tour is kept with its date – also one given up half-way (but not one hardly begun)
+    if (demo.tour) {
+      const driven = this.vehicle.odometer - demo.tour.odo;
+      if (driven > 200) saveTour({ date: new Date().toISOString(), planned: Math.round(demo.tour.metres), driven: Math.round(driven), fresh: Math.round(demo.tour.fresh), done: why === 'arrived', line: thinLine(demo.tour.line), prefs: { ...this.settings.tourPrefs } });
+    }
     this.nav.clear();
     this.hud.routeLanes = [];
     this.rules.allowed = null;
@@ -1174,18 +1362,52 @@ export class Game {
     } else this.resume();
   }
 
-  private begin(mode: string, spawnIdx: number, skipIntro = false, address?: AddressHit): void {
+  private begin(mode: string, spawnIdx: number, skipIntro = false, address?: AddressHit, stop?: TramStopChoice, runway?: RunwayChoice): void {
+    if (VEHICLES[this.settings.vehicle]?.kind === 'plane' && !runway && !this.air && !this.airAwaited && this.app.map.pieces) {
+      // (a flight asked for by a link before the airfields were read: it begins once they are)
+      this.airAwaited = true;
+      void this.app.map.air().then(() => this.begin(mode, spawnIdx, skipIntro, address, stop, runway));
+      return;
+    }
     const world = this.app.world;
     this.audio.start();
     this.spawnStreet = address?.street ?? '';
     this.spawn = (address ? this.spawnAt(address) : null) ?? world.json.spawns[Math.max(0, Math.min(world.json.spawns.length - 1, spawnIdx))] ?? { name: '', x: 0, z: 0, yaw: 0, kind: 'street' };
+    // (the aeroplane: at the end of the runway chosen in the menu – the first of the map's if none was)
+    this.aircraft = null;
+    this.planePending = false;
+    this.ui.classList.remove('flying');
+    if (VEHICLES[this.settings.vehicle]?.kind === 'plane') {
+      const r = runway ?? this.firstRunway();
+      if (r) {
+        this.spawn = { name: `${r.field} ${r.end}`, x: r.x, z: r.z, yaw: r.yaw, kind: 'street' };
+        this.planePending = true;
+      }
+    }
+    // (the tram: at the stop chosen in the menu – and, for a demonstration drive, driving by itself)
+    this.tramStopName = '';
+    this.tramAuto = false;
+    this.tramAutoPending = mode === 'demo' && VEHICLES[this.settings.vehicle]?.kind === 'tram';
+    if (stop && VEHICLES[this.settings.vehicle]?.kind === 'tram') {
+      this.spawn = { name: stop.name, x: stop.x, z: stop.z, yaw: 0, kind: 'street' };
+      this.tramStopName = stop.name;
+    }
     this.lesson = LESSONS.find((l) => l.id === mode) ?? null;
     this.demo = null;
     if (this.walker) this.leaveWalk();
+    this.footAfterJump = false;
+    // (nobody rides a tram or a bus any more)
+    this.riding = null;
+    this.busRide = null;
+    // (the bus on a line: its stops from here on)
+    this.busService = this.lesson?.kind === 'bus' ? new BusService() : null;
+    this.busNav = '';
+    this.railActors.hidden = null;
+    this.passengerView.show(null);
     this.doorT = -1;
     this.fadeEl.classList.remove('on');
-    // ("demo" and "tour" are free drives that begin with the map open, for planning)
-    this.planDemo = mode === 'demo' || mode === 'tour';
+    // ("demo" and "tour" are free drives that begin with the map open, for planning – the tram's drives by itself at once)
+    this.planDemo = (mode === 'demo' || mode === 'tour') && !this.tramAutoPending;
     this.hud.canTeleport = !this.lesson;
     this.hud.canFinish = !this.lesson;
     this.keepClock = false;
@@ -1204,14 +1426,12 @@ export class Game {
     this.lanes.longVehicle = this.def.long;
     this.lanes.noMotorway = this.def.noMotorway;
     routeFor.noMotorway = this.def.noMotorway;
-    const spec = this.def.spec(this.settings.transmission, this.settings.power);
+    const spec = this.def.spec(this.settings.transmission, powerOf(this.def, this.settings.powers));
     this.vehicle = new Vehicle(spec, this.ground);
-    if (!this.models.has(this.def.model)) {
+    if (!this.models.has(modelKey(this.def))) {
       // the model of a vehicle is made when it is first driven
-      const mk = this.def.model;
-      const m: VehicleModel =
-        mk === 'truck' ? (this.truck = new PlayerTruck()) : mk === 'truckLight' ? new PlayerTruck(LIGHT_TRUCK) : mk === 'bus' ? new PlayerBus() : mk === 'minibus' ? new PlayerBus(MINIBUS) : mk === 'tractor' ? new PlayerTractor() : mk === 'tram' ? new TramCab() : new PlayerBike();
-      this.models.set(this.def.model, m);
+      const m = this.makeModel(this.def);
+      this.models.set(modelKey(this.def), m);
       this.app.scene.add(m.root);
       if (this.truck && m === this.truck) this.app.scene.add(this.truck.trailer);
       for (const mirror of m.mirrors) mirror.setEnabled(this.settings.mirrors !== 'off');
@@ -1283,7 +1503,7 @@ export class Game {
         return;
       }
       this.tramWait = -1;
-      const at = tramStart(this.rail, this.spawn!.x, this.spawn!.z, [RAIL.TRAM, RAIL.LIGHT]);
+      const at = tramStart(this.rail, this.spawn!.x, this.spawn!.z, [RAIL.TRAM, RAIL.LIGHT], this.tramStopName);
       if (at) {
         const smp = { x: 0, y: 0, z: 0, tx: 0, tz: 0, cap: 0 };
         this.rail.net.sample(at.path, at.s, smp);
@@ -1297,7 +1517,18 @@ export class Game {
         return;
       }
     }
+    if (this.planePending) {
+      // the aeroplane: on its wheels at the end of the runway, once the ground there is there
+      const p = this.spawn!;
+      this.hud.setLoadingProgress(this.app.tiles.progress);
+      if (Number.isNaN(this.app.tiles.heightAt(p.x, p.z)) || !this.app.tiles.settled) return;
+      this.planePending = false;
+      this.startPlane(p);
+      return;
+    }
     let sp = this.spawn!;
+    // how far the loading is: the roads around the place, then the tiles (the bar of the loading screen)
+    this.hud.setLoadingProgress(this.app.map.pieces ? 0.35 * this.app.map.progress(sp.x, sp.z, 1500) + 0.65 * this.app.tiles.progress : this.app.tiles.progress);
     // (the roads around the place: without them there is no lane to stand in, and nothing to drive on)
     if (!this.app.map.ready(sp.x, sp.z, 1500)) return;
     if (sp.rough) {
@@ -1324,7 +1555,8 @@ export class Game {
     this.trailer?.coupleBehind(this.vehicle);
     this.lastGood = { x: place.x, y, z: place.z, yaw: place.yaw, t: 0 };
     // (on foot first – not on the yard of the class CE tasks, not when the car is to drive by itself)
-    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker && this.def.kind !== 'tram';
+    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker && this.def.kind !== 'tram' && this.def.kind !== 'pedestrian';
+    this.footPending = this.def.kind === 'pedestrian';
     if (this.tramAt) {
       // the player's tram, its front at the stop's mark (the other way round if it does not fit behind it there)
       const at = this.tramAt;
@@ -1332,7 +1564,11 @@ export class Game {
       const rv = this.rail.spawnAt(at.path, at.s, at.dir, 0) ?? this.rail.spawnAt(at.path, at.s, at.dir > 0 ? -1 : 1, 0);
       if (rv) {
         this.tram = new TramDriver(this.rail, rv, this.app.world, this.signals);
+        // a line that calls at this stop: the switches are set for it unless the indicator asks for another way
+        this.rail.assignLine(rv);
         this.placeTramProxy();
+        this.tramAuto = this.tramAutoPending;
+        this.tramTake = 0;
         // (the handbrake is the tram's emergency brake: not on when the drive begins at the stop)
         this.input.c.handbrake = 0;
       }
@@ -1369,7 +1605,18 @@ export class Game {
       this.walkPending = false;
       this.startOnFoot();
     }
+    if (this.footPending) {
+      this.footPending = false;
+      this.startPedestrian();
+    }
+    if (this.footAfterJump) {
+      this.footAfterJump = false;
+      if (!this.walker) this.enterWalk();
+    }
   }
+
+  /** somebody on foot beside the vehicle jumped elsewhere on the map: on foot again there once it is placed */
+  private footAfterJump = false;
 
   /** "What's new" is to be shown when the menu first comes up */
   private showNewsOnce = newsDue(playedBefore());
@@ -1388,6 +1635,7 @@ export class Game {
 
   private finish(): void {
     this.path.save();
+    if (this.demo?.tour) this.endDemo('ended');
     this.demo = null;
     const l = this.lesson;
     const exam = l?.kind === 'exam';
@@ -1442,6 +1690,19 @@ export class Game {
       else if (this.state === 'pause') this.resume();
       else if (this.state === 'reality') this.closeReality();
       else if (this.state === 'map') this.closeMap();
+    } else if (a === 'door' && this.state === 'drive' && this.def.kind === 'pedestrian') {
+      this.footAction();
+    } else if (a === 'door' && this.state === 'drive' && this.aircraft) {
+      // the flap lever, a notch at a time: 0°, 10°, 20°, 30° – and back up
+      this.flight.flaps = (this.flight.flaps + 1) % 4;
+      this.audio.click('tick');
+    } else if (a === 'door' && this.state === 'drive' && this.busService && !this.walker) {
+      // the bus on a line: its doors
+      const ev: BusEvent[] = [];
+      const { front, stops } = this.busStopsHere();
+      this.busService.toggleDoors(front, stops, this.vehicle.speed, ev);
+      this.audio.click('door');
+      for (const e of ev) this.rules.noteAt(e.fault, e.severity, this.mpos[0], this.mpos[2], {}, 8);
     } else if (a === 'door' && this.state === 'drive') {
       if (this.tram) {
         // the tram's doors
@@ -1581,6 +1842,14 @@ export class Game {
     }
     if (this.tram) {
       this.stepTram(dt);
+      return;
+    }
+    if (this.def.kind === 'pedestrian') {
+      this.stepFoot(dt);
+      return;
+    }
+    if (this.aircraft) {
+      this.stepFlight(dt);
       return;
     }
     const d = this.driver;
@@ -1899,6 +2168,8 @@ export class Game {
     const w = new OnFoot(this.walkVehicle());
     w.y = this.footGround(w.x, w.z, this.mpos[1] + 1);
     this.walker = w;
+    // (nobody sits on the motorcycle while its rider walks round it)
+    if (this.model instanceof PlayerBike) this.model.setRider(false);
     this.walkSince = this.time;
     this.input.resetLook(false, true);
     this.markers.show(w.spots, (x, z) => this.footGround(x, z, this.mpos[1] + 1));
@@ -1906,6 +2177,7 @@ export class Game {
 
   private leaveWalk(): void {
     this.walker = null;
+    if (this.model instanceof PlayerBike) this.model.setRider(true);
     if (this.def.model === 'motorcycle') this.input.c.seatbelt = true;
     this.markers.hide();
     this.cameraMode = 'cockpit';
@@ -1958,14 +2230,485 @@ export class Game {
     }
   }
 
+  // ------------------------------------------------- on foot, as a pedestrian
+  /** the drive of a pedestrian is to begin once the start point is placed */
+  private footPending = false;
+  /** the crossing the person is on (to judge its light once, when stepping onto the road), whether they were on the road a moment ago, and how far they have walked along it */
+  private footCrossing: CrossingJson | null = null;
+  private footOnRoad = false;
+  private footAlong = 0;
+  /** the pole whose button is within reach */
+  private footPole: PedPole | null = null;
+  /** riding a tram as a passenger: the vehicle and the car one is in, and the side of its doors one got in by */
+  private riding: { v: RailVehicle; car: number; side: number } | null = null;
+  /** a tram standing at a stop close enough to get in */
+  private footBoard: { v: RailVehicle; car: number; side: number } | null = null;
+  /** the bus on a line (its lesson): the stops served, the doors, the passengers – and what the HUD says of the next stop */
+  private busService: BusService | null = null;
+  private busNav = '';
+  /** riding a bus of the traffic as a passenger – and a bus at its stop with the front door within reach */
+  private busRide: TrafficCar | null = null;
+  private footBus: TrafficCar | null = null;
+
+  /** On foot, as a pedestrian: on the pavement beside the start point (to the right of the road), looking along it. */
+  private startPedestrian(): void {
+    const v = this.vehicle;
+    v.getModelPosition(this.mpos);
+    const yaw = v.yaw;
+    const rx = Math.cos(yaw);
+    const rz = -Math.sin(yaw);
+    let x = this.mpos[0];
+    let z = this.mpos[2];
+    for (let d = 1.5; d <= 16; d += 0.5) {
+      const px = this.mpos[0] + rx * d;
+      const pz = this.mpos[2] + rz * d;
+      const road = this.app.world.surfaceAt(px, pz, this.mpos[1] + 2, this.hit) && this.hit.zone === 0;
+      const y = this.footGround(px, pz, this.mpos[1] + 1);
+      if (!road && Number.isFinite(y) && !this.collider.circleBlocked(px, y, pz, 0.35)) {
+        x = px;
+        z = pz;
+        break;
+      }
+    }
+    const w = new OnFoot(null, { x, y: this.footGround(x, z, this.mpos[1] + 1), z, yaw });
+    w.runSpeed = this.settings.runSpeed / 3.6;
+    this.walker = w;
+    this.walkSince = this.time;
+    this.riding = null;
+    this.footCrossing = null;
+    this.footOnRoad = false;
+    this.footAlong = 0;
+    this.cameraMode = 'cockpit';
+    this.input.resetLook(false, true);
+    v.teleport(x, w.y, z, yaw);
+    v.getModelPosition(this.mpos);
+  }
+
+  /**
+   * A step on foot: walking (or running), the traffic around – which sees a
+   * person, not a car –, the trams, and what the rules ask of somebody on foot.
+   */
+  private stepFoot(dt: number): void {
+    const w = this.walker;
+    if (!w) return;
+    const bus = this.busRide;
+    if (bus) {
+      // on the bus: a seat behind the driver; it takes them along
+      if (!this.traffic.cars.includes(bus)) this.alightBus();
+      else {
+        const look = this.input.takeCam();
+        w.yaw += look.yaw;
+        w.pitch = Math.max(-1.2, Math.min(1, w.pitch + look.pitch));
+        w.x = bus.x;
+        w.y = bus.y;
+        w.z = bus.z;
+        w.speed = bus.v;
+      }
+    }
+    const ride = this.riding;
+    if (bus) {
+      /* (taken along by the bus) */
+    } else if (ride) {
+      // a passenger: sitting in the car, looking round; the tram takes them along
+      if (!this.rail.vehicles.includes(ride.v)) this.alight();
+      else {
+        const look = this.input.takeCam();
+        w.yaw += look.yaw;
+        w.pitch = Math.max(-1.2, Math.min(1, w.pitch + look.pitch));
+        const car = ride.v.cars[ride.car];
+        w.x = car.x;
+        w.y = car.y + TRAM_FLOOR;
+        w.z = car.z;
+        w.speed = ride.v.speed;
+        this.passengerView.show(ride.v);
+      }
+    } else this.stepWalk(dt);
+    // the game's vehicle stands where the person is: the camera, the map, the traffic keep to it
+    this.vehicle.teleport(w.x, w.y, w.z, this.riding ? this.riding.v.cars[this.riding.car].yaw : this.busRide ? this.busRide.yaw : w.yaw);
+    this.vehicle.getModelPosition(this.mpos);
+    this.rules.time += dt;
+    this.signals.update(dt);
+    // (riding, the passenger is no obstacle to anybody: the vehicle around them is)
+    const riding = !!this.riding || !!this.busRide;
+    const player: PlayerState = { x: w.x, y: w.y, z: w.z, yaw: w.yaw, speed: w.speed, length: riding ? 0.1 : 0.6, width: riding ? 0.1 : 0.6, onFoot: !riding };
+    const others = this.railOthers;
+    others.length = 0;
+    for (const car of this.traffic.cars) others.push({ x: car.x, z: car.z, r: 1.3 });
+    this.rail.update(dt, player, others);
+    const boxes = this.railBoxes;
+    boxes.length = 0;
+    for (const rv of this.rail.vehicles) for (const rc of rv.cars) boxes.push({ x: rc.x, y: rc.y, z: rc.z, yaw: rc.yaw, speed: rv.speed, length: rv.consist.carLen, width: rv.consist.width });
+    this.traffic.obstacles = boxes;
+    this.traffic.update(dt, player);
+    const lang = this.settings.lang;
+    for (const e of this.traffic.events) {
+      if (e.type === 'collision') this.rules.noteAt('pedHit', 'fail', w.x, w.z, {}, 6);
+      else if (e.type === 'forcedBrake') this.rules.noteAt('pedForcedBrake', 'major', w.x, w.z, {}, 10);
+    }
+    if (!riding) {
+      // a tram does not give way: whoever stands on its track is hit
+      if (this.rail.touching(player)) this.rules.noteAt('pedHit', 'fail', w.x, w.z, {}, 6);
+      this.footRules(dt, w);
+      // what is within reach: a button, a tram to get in
+      this.footPole = poleInReach(this.pedPoles, w.x, w.z);
+      this.footBoard = this.boardable(w.x, w.z);
+      this.footBus = this.footBoard ? null : this.busAt(w.x, w.z);
+    } else {
+      this.footPole = null;
+      this.footBoard = null;
+      this.footBus = null;
+    }
+    if (this.failT < 0 && this.rules.failed) {
+      this.failT = this.time + 2.5;
+      this.tipText = tr('pedHitTip', lang);
+      this.tipUntil = this.time + 4;
+    }
+    if (this.failT > 0 && this.time > this.failT) this.finish();
+  }
+
+  /**
+   * What the rules ask of somebody on foot (§ 25, § 37 Abs. 2 Nr. 5 StVO): to
+   * keep to the pavement, to cross the road straight across – at the crossing
+   * if there is one near – and not against the red light of a pedestrian light.
+   */
+  private footRules(dt: number, w: OnFoot): void {
+    const world = this.app.world;
+    const onRoad = world.surfaceAt(w.x, w.z, w.y + 1, this.hit) && this.hit.zone === 0 && this.hit.edge !== null;
+    if (!onRoad || !this.hit.edge) {
+      this.footOnRoad = false;
+      this.footCrossing = null;
+      this.footAlong = Math.max(0, this.footAlong - dt * 2);
+      return;
+    }
+    const e = this.hit.edge;
+    // where along the road, and which crossing (if any) the person is on
+    const proj = this.proj;
+    projectOnPolyline(e.pl, w.x, w.z, proj);
+    let at: CrossingJson | null = null;
+    let near: CrossingJson | null = null;
+    for (const c of e.xings) {
+      if (c.k !== XING.SIGNAL && c.k !== XING.ZEBRA && c.k !== XING.UNMARKED) continue;
+      const d = Math.abs(proj.s - c.s);
+      if (d <= c.w / 2 + 1) at = c;
+      else if (d < 30 && (c.k === XING.SIGNAL || c.k === XING.ZEBRA)) near = c;
+    }
+    const stepping = !this.footOnRoad;
+    this.footOnRoad = true;
+    if (stepping) {
+      this.footCrossing = at;
+      // onto the road against the red light (once green turns red on the way, one goes on – that is allowed)
+      if (at && at.k === XING.SIGNAL && at.sc !== undefined && this.signals.pedestrian(at.sc, at.g ?? 0) === 'red') this.rules.noteAt('pedRed', 'major', w.x, w.z, {}, 15);
+      // across the road a few steps from a crossing (or a light) that is not used
+      else if (!at && near) this.rules.noteAt('pedCrossing', 'minor', w.x, w.z, {}, 20);
+    }
+    // along the road rather than across it, where there is a pavement
+    samplePolyline(e.pl, proj.s, this.smp);
+    const along = Math.abs(Math.cos(w.yaw) * -this.smp.tz + Math.sin(w.yaw) * -this.smp.tx) * w.speed;
+    this.footAlong += along * dt;
+    if (this.footAlong > 25 && (e.swL > 0 || e.swR > 0)) {
+      this.rules.noteAt('pedRoad', 'minor', w.x, w.z, {}, 30);
+      this.footAlong = 0;
+    }
+  }
+
+  /** A tram (or train) standing at a stop with a car whose doors are within a step or two – null if there is none. */
+  private boardable(x: number, z: number): { v: RailVehicle; car: number; side: number } | null {
+    for (const rv of this.rail.vehicles) {
+      if (rv.player || Math.abs(rv.speed) > 0.05 || rv.dwell <= 0.5) continue;
+      for (let i = 0; i < rv.cars.length; i++) {
+        const c = rv.cars[i];
+        const s = Math.sin(c.yaw);
+        const co = Math.cos(c.yaw);
+        const dx = x - c.x;
+        const dz = z - c.z;
+        const ahead = -dx * s - dz * co;
+        const right = dx * co - dz * s;
+        const hw = rv.consist.width / 2;
+        if (Math.abs(ahead) < rv.consist.carLen / 2 - 0.6 && Math.abs(right) > hw - 0.2 && Math.abs(right) < hw + 2.2) return { v: rv, car: i, side: Math.sign(right) };
+      }
+    }
+    return null;
+  }
+
+  /** Into the tram at its stop: a seat in the car by the door, looking ahead; the driver waits a moment. */
+  private board(at: { v: RailVehicle; car: number; side: number }): void {
+    const w = this.walker;
+    if (!w) return;
+    this.riding = at;
+    at.v.dwell = Math.max(at.v.dwell, 4);
+    w.yaw = 0;
+    w.pitch = -0.05;
+    this.railActors.hidden = at.v;
+    this.passengerView.show(at.v);
+    this.audio.click('door');
+  }
+
+  /** Out of the tram: beside the door one got in by (the platform side), facing away from it. */
+  private alight(): void {
+    const w = this.walker;
+    const ride = this.riding;
+    this.riding = null;
+    this.railActors.hidden = null;
+    this.passengerView.show(null);
+    if (!w || !ride) return;
+    const car = ride.v.cars[ride.car];
+    const s = Math.sin(car.yaw);
+    const c = Math.cos(car.yaw);
+    const out = ride.v.consist.width / 2 + 0.9;
+    // the nearer of the car's doors (a quarter in from either end)
+    const ahead = (w.yaw > -Math.PI / 2 && w.yaw < Math.PI / 2 ? 1 : -1) * ride.v.consist.carLen * 0.25;
+    w.x = car.x - s * ahead + c * out * ride.side;
+    w.z = car.z - c * ahead - s * out * ride.side;
+    w.y = this.footGround(w.x, w.z, car.y + 1.5);
+    w.yaw = car.yaw - (ride.side * Math.PI) / 2;
+    w.pitch = -0.1;
+    this.audio.click('door');
+  }
+
+  /** A bus of the traffic standing at its stop with its doors open, its front door within a step or two – null if there is none. */
+  private busAt(x: number, z: number): TrafficCar | null {
+    for (const b of this.traffic.cars) {
+      if (!b.bus?.doors || b.v > 0.05) continue;
+      const fx = -Math.sin(b.yaw);
+      const fz = -Math.cos(b.yaw);
+      const rx = Math.cos(b.yaw);
+      const rz = -Math.sin(b.yaw);
+      const dx = b.x + fx * (b.length / 2 - 1.3) + rx * (b.width / 2 + 0.6) - x;
+      const dz = b.z + fz * (b.length / 2 - 1.3) + rz * (b.width / 2 + 0.6) - z;
+      if (Math.hypot(dx, dz) < 2.4) return b;
+    }
+    return null;
+  }
+
+  /** Off the bus: out of the front door onto the pavement, facing away from it. */
+  private alightBus(): void {
+    const w = this.walker;
+    const b = this.busRide;
+    this.busRide = null;
+    if (!w || !b) return;
+    const fx = -Math.sin(b.yaw);
+    const fz = -Math.cos(b.yaw);
+    const rx = Math.cos(b.yaw);
+    const rz = -Math.sin(b.yaw);
+    w.x = b.x + fx * (b.length / 2 - 1.3) + rx * (b.width / 2 + 1.0);
+    w.z = b.z + fz * (b.length / 2 - 1.3) + rz * (b.width / 2 + 1.0);
+    w.y = this.footGround(w.x, w.z, b.y + 1.5);
+    w.yaw = b.yaw - Math.PI / 2;
+    w.pitch = -0.1;
+    this.audio.click('door');
+  }
+
+  /** The door key on foot: press the button of a pedestrian light, get into a tram, get out of it. */
+  private footAction(): void {
+    const lang = this.settings.lang;
+    if (this.busRide) {
+      const b = this.busRide;
+      if (b.v < 0.05 && b.bus?.doors) this.alightBus();
+      else {
+        this.tipText = tr('rideWaitBus', lang);
+        this.tipUntil = this.time + 3;
+      }
+      return;
+    }
+    if (this.footBus && this.walker) {
+      // on through the front door: the driver waits a moment longer
+      const b = this.footBus;
+      if (b.bus) b.bus.dwell = Math.max(b.bus.dwell, 4);
+      this.busRide = b;
+      this.walker.yaw = 0;
+      this.walker.pitch = -0.05;
+      this.audio.click('door');
+      return;
+    }
+    if (this.riding) {
+      // out at a stop, once it stands there with its doors open
+      if (Math.abs(this.riding.v.speed) < 0.05 && this.riding.v.dwell > 0) this.alight();
+      else {
+        this.tipText = tr('rideWait', lang);
+        this.tipUntil = this.time + 3;
+      }
+      return;
+    }
+    if (this.footBoard) {
+      this.board(this.footBoard);
+      return;
+    }
+    if (this.footPole) {
+      const p = this.footPole;
+      const st = this.signals.pedestrian(p.controller, p.group);
+      if (st === 'dark') this.tipText = tr('pedLightDark', lang);
+      else if (st === 'green') this.tipText = tr('pedLightGreen', lang);
+      else {
+        this.signals.request(p.controller);
+        this.audio.click('tick');
+        this.tipText = tr('pedRequested', lang);
+      }
+      this.tipUntil = this.time + 4;
+    }
+  }
+
+  // ------------------------------------------------- flying
+  /** The ground's height: the tiles' where they are loaded, else the far view's (an aeroplane sees far). */
+  private groundHeight(x: number, z: number): number {
+    const y = this.app.tiles.heightAt(x, z);
+    if (!Number.isNaN(y)) return y;
+    const f = this.far.data ? farHeight(this.far.data, x, z) : Number.NaN;
+    return Number.isNaN(f) ? 0 : f;
+  }
+
+  /** whether a flight asked for before the airfields were read has waited for them (once is enough: a map may have none) */
+  private airAwaited = false;
+
+  /** The first end of a runway of the map (a flight asked for without a choice, by a link). */
+  private firstRunway(): RunwayChoice | null {
+    const f = this.air?.airfields.find((a) => a.runways.some((r) => Math.hypot(r.x2 - r.x1, r.z2 - r.z1) >= 300));
+    const r = f?.runways.find((q) => Math.hypot(q.x2 - q.x1, q.z2 - q.z1) >= 300);
+    if (!f || !r) return null;
+    return { field: f.name, end: runwayEnd(r, false), ...runwayStart(r, false) };
+  }
+
+  /** The aeroplane's model, as the game holds every vehicle's – its parts move with the flight (planeVisual). */
+  private planeAdapter(): VehicleModel {
+    const pm = new PlaneModel();
+    pm.root.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.castShadow = true;
+    });
+    this.planeModel = pm;
+    return { root: pm.root, eye: pm.eye, mirrors: [], setCabinOpacity: (o: number) => pm.setCabinOpacity(o), update: () => {} };
+  }
+
+  /** On its wheels at the end of the runway, engine running, flaps at 10°: ready to take off. */
+  private startPlane(sp: SpawnJson): void {
+    const a = new Aircraft(TRAINER, powerOf(this.def, this.settings.powers));
+    a.placeOnGround(sp.x, sp.z, sp.yaw, this.airGround ?? this.ground, true);
+    this.aircraft = a;
+    this.flight.throttle = 0;
+    this.flight.flaps = 1;
+    this.flight.trim = 0.15;
+    this.flight.crashT = -1;
+    // (the gear buttons are the flap lever now: from where they stand nothing is to be moved)
+    this.input.c.gear = 0;
+    this.ui.classList.add('flying');
+    this.placePlaneProxy();
+    this.lastGood = { x: sp.x, y: a.pos.y, z: sp.z, yaw: sp.yaw, t: 0 };
+    this.camSnap = true;
+    this.showModel(true);
+    if (!this.keepClock) {
+      this.startOdo = this.vehicle.odometer;
+      this.startTime = this.time;
+    }
+    this.keepClock = false;
+    this.resume();
+  }
+
+  /** The game's vehicle stands below the aeroplane: the map, the tiles and the minimap keep to it. */
+  private placePlaneProxy(): void {
+    const a = this.aircraft as Aircraft;
+    this.vehicle.teleport(a.pos.x, a.pos.y, a.pos.z, a.yaw);
+    this.mpos[0] = a.pos.x;
+    this.mpos[1] = a.pos.y;
+    this.mpos[2] = a.pos.z;
+  }
+
+  /**
+   * A step of the flight: the stick, the rudder, the throttle lever (it
+   * stays where it is put), the flaps, the trim – which follows a stick held
+   * off the middle for a while, so that the aeroplane keeps the attitude it
+   * is put in –, the brakes on the ground.  The traffic goes on below.
+   */
+  private stepFlight(dt: number): void {
+    const a = this.aircraft as Aircraft;
+    const f = this.flight;
+    const fi = this.input.flightInput();
+    // the flap lever also on the gear buttons (▲ ▼ on the screen, E Q on the keys): down for more flap, up for less
+    const ci = this.input.c;
+    if (ci.gear !== 0) {
+      f.flaps = Math.max(0, Math.min(3, f.flaps + (ci.gear < 0 ? 1 : -1)));
+      ci.gear = 0;
+      this.audio.click('tick');
+    }
+    f.throttle = Math.max(0, Math.min(1, f.throttle + fi.throttle * dt * 0.5));
+    if (!a.onGround) f.trim = Math.max(-1, Math.min(1, f.trim + fi.pitch * dt * 0.06));
+    const c = this.flightControls;
+    c.throttle = f.throttle;
+    c.elevator = fi.pitch;
+    c.aileron = fi.roll;
+    // the rudder: from its keys, else a little with the ailerons (turns stay balanced) – and on the ground the nose wheel follows the stick
+    c.rudder = Math.max(-1, Math.min(1, fi.yaw + fi.roll * (a.onGround ? 0.9 : 0.25)));
+    c.flaps = f.flaps / 3;
+    c.trim = f.trim;
+    c.brake = fi.brake;
+    c.parkingBrake = false;
+    c.engineOn = true;
+    if (f.crashT < 0) a.step(dt, c, this.airGround ?? this.ground);
+    this.placePlaneProxy();
+    this.rules.time += dt;
+    this.signals.update(dt);
+    // below: the trains and trams, the traffic (high up nobody comes near enough to be in the way)
+    const player: PlayerState = { x: a.pos.x, y: a.pos.y, z: a.pos.z, yaw: a.yaw, speed: 0, length: 0.1, width: 0.1 };
+    this.rail.update(dt, player, []);
+    this.traffic.obstacles = [];
+    this.traffic.update(dt, player);
+    this.airfieldView.update(a.pos.x, a.pos.z);
+    const lang = this.settings.lang;
+    if (a.crashed && f.crashT < 0) {
+      f.crashT = this.time;
+      this.hud.message(tr('planeCrashed', lang), tr(`planeCrash.${a.crashed}`, lang));
+    }
+    if (f.crashT > 0 && this.time - f.crashT > 4) this.finish();
+  }
+
+  /** How the aeroplane looks: its control surfaces, wheels, propeller, lights – and its instruments. */
+  private planeVisual(a: Aircraft): PlaneVisualState {
+    const s = a.surfaces;
+    const c = this.flightControls;
+    const deg = 180 / Math.PI;
+    return {
+      aileron: s.aileron,
+      elevator: s.elevator,
+      rudder: s.rudder,
+      flapsDeg: a.flapsDeg,
+      throttle: this.flight.throttle,
+      rpm: a.rpm,
+      propAngle: a.propAngle,
+      wheels: a.wheels.map((w) => ({ compression: w.compression, spin: w.spin, steer: w.steer })),
+      yoke: { pitch: c.elevator, roll: c.aileron },
+      pedals: c.rudder,
+      lights: { nav: true, beacon: a.engineRunning, strobe: !a.onGround, landing: a.agl < 300, taxi: a.onGround },
+      iasKt: a.ias * 1.94384,
+      altitudeFt: a.altitude * 3.28084,
+      vsFpm: a.verticalSpeed * 196.85,
+      headingDeg: a.heading,
+      pitchDeg: a.pitch * deg,
+      bankDeg: a.bank * deg,
+      slip: a.slip,
+      turnRateDegS: a.turnRate * deg,
+      rpmGauge: a.rpm,
+      fuel: a.fuel / TRAINER.fuel,
+      flapsGauge: a.flapsDeg,
+      stallWarning: a.stallWarning,
+      parkingBrake: false,
+      engineOn: a.engineRunning,
+    };
+  }
+
   // ------------------------------------------------- the tram
   /** the player's tram (null: a road vehicle), and the stop it is to start at */
   private tram: TramDriver | null = null;
   private tramAt: { path: number; s: number; dir: 1 | -1; x: number; z: number } | null = null;
   /** since when the tram waits for the tracks to be read (−1: it does not) */
   private tramWait = -1;
+  /** the stop chosen to start at ('' : the one nearest to the start point) */
+  private tramStopName = '';
+  /** the tram drives by itself (a demonstration drive) – and is to, once it is placed */
+  private tramAuto = false;
+  private tramAutoPending = false;
+  /** how long the controller has been touched during a demonstration drive (taking over) */
+  private tramTake = 0;
+  /** the stops of the map (null: a map without the list) */
+  private stops: Stops | null = null;
   private readonly tramEvents: TramEvent[] = [];
-  /** the names of the stops (the street they are in), by piece of track and mark */
+  /** the names of stops the map does not name (the street they are in), by piece of track and mark */
   private readonly stopNames = new Map<string, string>();
 
   /** The game's vehicle stands where the tram's first car is: the camera, the map, the traffic keep to it. */
@@ -1979,8 +2722,11 @@ export class Game {
     for (const e of events) this.rules.noteAt(e.fault, e.severity, this.mpos[0], this.mpos[2], e.data ?? {}, 8);
   }
 
-  /** A stop's name: the street it is in. */
+  /** A stop's name: as the map names it – or, on an older map, the street it is in. */
   private stopName(path: number, mark: number): string {
+    const p = this.rail.net.paths[path];
+    const i = p ? p.stops.findIndex((s) => Math.abs(s - mark) < 0.5) : -1;
+    if (i >= 0 && p.stopNames[i]) return p.stopNames[i];
     const key = `${path}:${Math.round(mark)}`;
     let name = this.stopNames.get(key);
     if (name === undefined) {
@@ -1996,12 +2742,22 @@ export class Game {
   private stepTram(dt: number): void {
     const tram = this.tram as TramDriver;
     const c = this.input.c;
-    tram.lever = Math.max(-1, Math.min(1, c.throttle - c.brake));
-    tram.emergency = c.handbrake > 0.5;
-    // the indicator asks for the way at the next switch
-    tram.wish = c.indicator < 0 ? 1 : c.indicator > 0 ? -1 : 0;
     const ev = this.tramEvents;
     ev.length = 0;
+    if (this.tramAuto) {
+      // driving by itself – until the controller is touched for a moment: then the player drives
+      this.tramTake = c.throttle > 0.2 || c.brake > 0.2 || c.handbrake > 0.5 ? this.tramTake + dt : 0;
+      if (this.tramTake > 0.18) {
+        this.tramAuto = false;
+        this.hud.message(tr('demoTaken', this.settings.lang), tr('tramAutoAgain', this.settings.lang));
+      } else tram.drive(ev);
+    }
+    if (!this.tramAuto) {
+      tram.lever = Math.max(-1, Math.min(1, c.throttle - c.brake));
+      tram.emergency = c.handbrake > 0.5;
+    }
+    // the indicator asks for the way at the next switch
+    tram.wish = c.indicator < 0 ? 1 : c.indicator > 0 ? -1 : 0;
     tram.step(dt, ev);
     this.placeTramProxy();
     this.rules.time += dt;
@@ -2031,6 +2787,107 @@ export class Game {
       if (tram.served >= TRAM_STOPS && tram.speed < 0.1 && !tram.doorsOpen) this.finish();
     }
     if (this.failT > 0 && this.time > this.failT) this.finish();
+  }
+
+  /** the bus stops along each lane (worked out when a bus first needs them) */
+  private readonly laneStops = new Map<number, BusStopOnLane[]>();
+
+  /**
+   * The bus stops along a lane: the poles of the map's stops at the right of
+   * it (people wait at the kerb on the right), each where the front of a bus
+   * comes to stand – a metre and a half past the pole, the front door at it.
+   */
+  private busStopsOn(lane: Lane): readonly BusStopOnLane[] {
+    const known = this.laneStops.get(lane.id);
+    if (known) return known;
+    const list: BusStopOnLane[] = [];
+    const stops = this.stops;
+    const e = lane.edge;
+    if (stops && e.len > 10) {
+      samplePolyline(e.pl, e.len / 2, this.smp);
+      const proj = { s: 0, off: 0, d2: 0, seg: 0 };
+      for (const place of stops.near(this.smp.x, this.smp.z, e.len / 2 + 40)) {
+        if (!(place.kind & STOP_FLAG.BUS)) continue;
+        for (const pole of place.poles) {
+          if (pole.flags & STOP_FLAG.TRAM && !(pole.flags & STOP_FLAG.BUS)) continue;
+          projectOnPolyline(e.pl, pole.x, pole.z, proj);
+          if (proj.s < 1 || proj.s > e.len - 1 || Math.abs(proj.off) > e.width / 2 + 7) continue;
+          // on the right of the lane's direction: left of the edge (off > 0) when it runs against it
+          if ((lane.dir > 0 ? -proj.off : proj.off) < 0.5) continue;
+          const s = (lane.dir > 0 ? proj.s - lane.s0 : lane.s0 - proj.s) + 1.5;
+          if (s > 12 && s < lane.len) list.push({ s, id: place.id * 64 + place.poles.indexOf(pole) });
+        }
+      }
+      list.sort((a, b) => a.s - b.s);
+    }
+    this.laneStops.set(lane.id, list);
+    return list;
+  }
+
+  /**
+   * The wishes for a tour (settings.tourPrefs) as the planner takes them:
+   * motorways and expressways left out altogether if so wished; main roads
+   * still used to get somewhere but not looked for; streets of the kind of
+   * houses asked for (from the far view's buildings) more welcome than others.
+   */
+  private tourWishes(g: RouteGraph): { avoid?: (way: number) => boolean; like?: (edge: number) => number } {
+    const p = this.settings.tourPrefs;
+    const avoid = p.noMotorway || p.noExpress ? (w: number): boolean => (p.noMotorway && g.cls[w] <= CLS.MOTORWAY_LINK) || (p.noExpress && g.cls[w] >= CLS.TRUNK && g.cls[w] <= CLS.TRUNK_LINK) : undefined;
+    const far = this.far.data;
+    const kind = (e: number): number => (far ? farBuilt(far, (g.x1[e * 2] + g.x1[e * 2 + 1]) / 2, (g.z1[e * 2] + g.z1[e * 2 + 1]) / 2) : -1);
+    const mostly: Record<string, number[]> = {
+      // welcome by the buildings along the street: none, small houses, rows and blocks, tall ones
+      small: [0.35, 2.5, 0.6, 0.3],
+      town: [0.25, 0.7, 1.8, 2.5],
+      country: [2.2, 0.7, 0.4, 0.3],
+    };
+    const by = mostly[p.mostly];
+    const like =
+      p.noMain || by
+        ? (e: number): number => {
+            const c = g.cls[e * 2];
+            const main = c >= CLS.PRIMARY && c <= CLS.SECONDARY_LINK;
+            const k = by ? kind(e) : -1;
+            return (p.noMain && main ? 0.15 : 1) * (by && k >= 0 ? by[k] : 1);
+          }
+        : undefined;
+    return { avoid, like };
+  }
+
+  /** where trams can go, for the big map: their tracks and stops (made once per set of tracks) */
+  private tramMap: { version: number; tracks: Float32Array[]; stops: Array<{ x: number; z: number; name: string }> } | null = null;
+  private tramMapOf: RailTraffic | null = null;
+  private tramMapStops: Stops | null = null;
+
+  private tramways(): { version: number; tracks: readonly Float32Array[]; stops: ReadonlyArray<{ x: number; z: number; name: string }> } | null {
+    if (this.rail.net.paths.length === 0) return null;
+    if (this.tramMap && this.tramMapOf === this.rail && this.tramMapStops === this.stops) return this.tramMap;
+    const tracks: Float32Array[] = [];
+    for (const p of this.rail.net.paths) {
+      if (p.kind !== RAIL.TRAM && p.kind !== RAIL.LIGHT) continue;
+      const n = p.pts.length / 3;
+      const t = new Float32Array(n * 2);
+      for (let i = 0; i < n; i++) {
+        t[i * 2] = p.pts[i * 3];
+        t[i * 2 + 1] = p.pts[i * 3 + 2];
+      }
+      tracks.push(t);
+    }
+    const stops = (this.stops?.tramPlaces() ?? []).map((p) => ({ x: p.x, z: p.z, name: p.name }));
+    this.tramMap = { version: (this.tramMap?.version ?? 0) + 1, tracks, stops };
+    this.tramMapOf = this.rail;
+    this.tramMapStops = this.stops;
+    return this.tramMap;
+  }
+
+  /** The pedestrian lights of the roads that are loaded: their heads, and their poles in the way of whoever moves. */
+  private buildPedLights(): void {
+    this.pedPoles = pedPoles(this.app.world);
+    this.pedHeads.rebuild(this.pedPoles);
+    const discs: number[] = [];
+    for (const p of this.pedPoles) discs.push(p.x, p.y, p.z, 0.07);
+    this.collider.remove('pedlights');
+    this.collider.add({ key: 'pedlights', rings: null, ringCounts: null, segments: null, discs });
   }
 
   /** the junction whose lights were last said to be out of order, and for how long the car has stood at a lit green arrow */
@@ -2073,12 +2930,40 @@ export class Game {
     return (this.rules as unknown as { laneS: number }).laneS;
   }
 
+  /** The stops on the lane the bus is in, with their names. */
+  private busStopsHere(): { front: number; stops: Array<{ id: number; s: number; name: string }> } {
+    const lane = this.currentLane();
+    if (!lane) return { front: 0, stops: [] };
+    const places = this.stops?.places ?? [];
+    return { front: this.laneFront(), stops: this.busStopsOn(lane).map((s) => ({ id: s.id, s: s.s, name: places[Math.floor(s.id / 64)]?.name ?? '' })) };
+  }
+
+  /** The bus on a line: the next stop, the doors and the passengers there, pulling out – five stops, then the lesson is done. */
+  private updateBusLine(dt: number): void {
+    const bs = this.busService;
+    if (!bs) return;
+    const v = this.vehicle;
+    const lang = this.settings.lang;
+    const { front, stops } = this.busStopsHere();
+    const ev: BusEvent[] = [];
+    bs.step(dt, front, stops, v.speed, this.input.c.indicator, ev);
+    for (const e of ev) this.rules.noteAt(e.fault, e.severity, this.mpos[0], this.mpos[2], {}, 8);
+    const next = bs.next(front, stops);
+    this.busNav = next ? tr('tramNextStop', lang, { name: next.name || tr('tramStop', lang), d: Math.max(0, Math.round(next.s - front)) }) : tr('tramNoStop', lang);
+    this.lessonLine = tr('tramProgress', lang, { n: Math.min(bs.served, BUS_STOPS), max: BUS_STOPS });
+    if (bs.served >= BUS_STOPS && !bs.doorsOpen && Math.abs(v.speed) < 0.3) this.finish();
+  }
+
   private updateLesson(dt: number, p: PlayerState): void {
     const l = this.lesson;
     const lane = this.currentLane();
     const v = this.vehicle;
     const lang = this.settings.lang;
     if (!l) return;
+    if (l.kind === 'bus') {
+      this.updateBusLine(dt);
+      return;
+    }
     if (l.kind === 'basics') {
       const c = this.input.c;
       const auto = v.spec.transmission === 'automatic';
@@ -2192,6 +3077,8 @@ export class Game {
       this.signalHeads.rebuild(app.world, this.signals);
       this.collider.remove('signals');
       this.collider.add({ key: 'signals', rings: null, ringCounts: null, segments: null, discs: this.signalHeads.poles });
+      this.buildPedLights();
+      this.laneStops.clear();
     }
     if (this.state === 'placing') {
       tiles.update(this.spawn!.x, this.spawn!.z);
@@ -2243,9 +3130,11 @@ export class Game {
         this.startTrip(stops, this.autoSelf, null);
       }
       if (this.autoTour > 0 && this.time - this.startTime > 0.3 && this.currentLane() && this.routeGraphNow()) {
-        const tour = this.planTour(this.autoTour * 1000, null);
+        const km = this.autoTour;
         this.autoTour = 0;
-        if (tour) this.startTrip([], this.autoSelf, tour);
+        void this.planTour(km * 1000, null).then((tour) => {
+          if (tour) this.startTrip([], this.autoSelf, tour);
+        });
       }
       if (this.autoMap && this.time - this.startTime > 0.3) {
         const mode = this.autoMap;
@@ -2280,6 +3169,14 @@ export class Game {
       if (t && this.carTrailer && this.def.model !== 'truck') this.carTrailer.place(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, this.lastVisual);
       // a motorcycle leans into the bend: as far as it must for the speed and the curve
       if (model instanceof PlayerBike) model.setLean(Math.atan(Math.max(-8, Math.min(8, v.accLat)) / 9.81));
+      // the aeroplane: where the flight has it, turned every way it is
+      if (this.aircraft && this.planeModel) {
+        const ac = this.aircraft;
+        model.root.position.set(ac.pos.x, ac.pos.y, ac.pos.z);
+        model.root.quaternion.set(ac.q[0], ac.q[1], ac.q[2], ac.q[3]);
+        model.root.updateMatrixWorld(true);
+        this.planeModel.update(this.planeVisual(ac), dt, this.time);
+      }
       tiles.update(this.mpos[0], this.mpos[2]);
       this.props.update(this.mpos[0], this.mpos[2]);
       this.updateVisuals(dt);
@@ -2301,8 +3198,21 @@ export class Game {
     }
     this.signs.flush();
     this.signalHeads.update(this.signals);
+    this.pedHeads.update(this.signals);
     this.actors.update(this.traffic.cars, this.traffic.peds, this.time, this.traffic.cyclists.list);
-    this.railActors.update(this.rail.vehicles);
+    this.railActors.update(this.rail.vehicles, this.rail.lines);
+    // the stops, the overhead line, the tram signals, the people at the stops – around the camera
+    this.transit.setRail(this.rail);
+    if (this.lines && this.rail.net.paths.length > 0 && (this.lineStopsDirty || this.linesFor !== this.rail)) {
+      // the lines: the trams run them, the departure boards list them
+      this.lineStopsDirty = false;
+      this.linesFor = this.rail;
+      const paths = this.rail.net.paths;
+      this.transit.lines = this.lines.lines.map((l) => ({ ref: l.ref, to: l.to, stops: l.stops.map(([p, mark]) => paths[p]?.stopNames[paths[p].stops.indexOf(mark)] ?? '') }));
+      this.rail.setLines(this.lines.lines.filter((l) => l.paths.every(([p]) => p < paths.length)).map((l) => ({ ref: l.ref, from: l.from, to: l.to, colour: l.colour, kind: l.kind, seq: l.paths.map(([p, d]) => ({ path: p, dir: d > 0 ? 1 : -1 })) })));
+    }
+    const cam = this.app.camera.position;
+    this.transit.update(cam.x, cam.z, this.time, dt, this.signals, this.traffic.cars);
 
     if (this.state === 'reality') {
       // the panel covers the window: only a 360° panorama is drawn, not the world behind it
@@ -2311,6 +3221,7 @@ export class Game {
       // the map covers the window: nothing of the world needs drawing
     } else if (haveCar) {
       this.updateCamera(dt);
+      this.far.update(this.app.camera.position.x, this.app.camera.position.z);
       const mode = this.settings.mirrors;
       if (this.cameraMode === 'cockpit' && mode !== 'off' && !this.walker) {
         const mirrors = model.mirrors;
@@ -2457,6 +3368,7 @@ export class Game {
       // § 9 StVO: get in lane in good time – the route goes on from a particular lane
       if (h.lane !== 0) navText += ` – ${tr(h.lane < 0 ? 'laneLeft' : 'laneRight', lang)}`;
     } else if (this.lesson?.kind === 'basics' || this.task) navText = this.lessonLine;
+    else if (this.lesson?.kind === 'bus') navText = `${this.lessonLine} · ${this.busNav}`;
     let tip = this.time < this.tipUntil ? this.tipText : '';
     // on a touch screen the tip says what to tap – and is itself the button for it
     let tipAction = '';
@@ -2465,6 +3377,14 @@ export class Game {
       tip = tr(touch ? `${key}Touch` : key, lang);
       tipAction = action;
     };
+    // the bus on a line: the doors at the stop, the people, the indicator to pull out
+    const bs = this.busService;
+    if (!tip && bs && v.engineRunning) {
+      const here = this.busStopsHere();
+      if (bs.doorsOpen && bs.passengers > 0) tip = tr('tramPassengers', lang, { n: bs.passengers });
+      else if (bs.doorsOpen) say('tramCloseDoors', 'KeyG');
+      else if (bs.atStop(here.front, here.stops, v.speed)) say('tramOpenDoors', 'KeyG');
+    }
     if (!tip) {
       if (!v.engineRunning) say(this.rules.log.some((x) => x.id === 'stall' && this.time - x.time < 6) ? 'engineStalled' : 'startEngine', 'Enter');
       else if (!c.seatbelt && Math.abs(kmh) < 5) say('fastenBelt', 'KeyB');
@@ -2500,8 +3420,9 @@ export class Game {
       // (on foot there is nothing to read off a dashboard)
       showDash: this.cameraMode !== 'cockpit' || this.def.dash,
       onFoot: !!this.walker,
-      // (the reminder of the keys is the car's: not for the tram – its lesson says how it is driven)
-      noKeyHints: !!this.tram,
+      // (the reminder of the keys is the car's: not for the tram – its lesson says how it is driven – nor for the
+      // aeroplane, whose keys the tip line names)
+      noKeyHints: !!this.tram || !!this.aircraft,
       indicator: c.indicator,
       hazard: c.hazard,
       blinkOn: s.blinkOn,
@@ -2540,7 +3461,10 @@ export class Game {
       const control = tram.emergency ? tr('tramEmergency', lang) : tram.lever > 0.02 ? tr('tramPower', lang, { p: Math.round(tram.lever * 100) }) : tram.lever < -0.02 ? tr('tramBrake', lang, { p: Math.round(-tram.lever * 100) }) : tr('tramCoast', lang);
       const way = tr(tram.wish > 0 ? 'tramWayLeft' : tram.wish < 0 ? 'tramWayRight' : 'tramWayStraight', lang);
       const parts = [control, way, tr(tram.doorsOpen ? 'tramDoorsOpen' : 'tramDoorsClosed', lang)];
+      const line = tram.v.line ? this.rail.lines[tram.v.line.index] : null;
+      if (line) parts.unshift(tr('tramLineTo', lang, { line: line.ref, to: line.to }));
       if (this.lesson?.kind === 'tram') parts.unshift(this.lessonLine);
+      if (this.tramAuto) parts.unshift(tr('tramAutoRunning', lang));
       hs.navSub = parts.join(' · ');
       hs.navArrow = 0;
       hs.navActive = false;
@@ -2556,7 +3480,55 @@ export class Game {
       } else if (A.switchIn < 60 && tram.speed > 0.5) hs.tip = tr('tramSwitchAhead', lang, { d: Math.round(A.switchIn) });
     }
     const w = this.walker;
-    if (w) {
+    if (w && this.def.kind === 'pedestrian' && this.busRide) {
+      // on the bus: how fast, and getting off at its stop
+      const b = this.busRide;
+      hs.navText = tr('busRide', lang, { speed: Math.round(b.v * 3.6) });
+      hs.navSub = '';
+      hs.navArrow = 0;
+      hs.navActive = false;
+      hs.tip = '';
+      hs.tipAction = '';
+      if (this.time < this.tipUntil) hs.tip = this.tipText;
+      else if (b.v < 0.05 && b.bus?.doors) {
+        hs.tip = tr(touch ? 'rideGetOffTouch' : 'rideGetOff', lang);
+        hs.tipAction = 'KeyG';
+      }
+    } else if (w && this.def.kind === 'pedestrian' && this.riding) {
+      // riding along: the next stop, and getting off there
+      const rv = this.riding.v;
+      const next = this.rail.nextStop(rv);
+      hs.navText = next ? tr('tramNextStop', lang, { name: this.stopName(next.path, next.mark), d: Math.round(next.dist) }) : tr('tramNoStop', lang);
+      hs.navSub = tr('rideSpeed', lang, { speed: Math.round(Math.abs(rv.speed) * 3.6) });
+      hs.navArrow = 0;
+      hs.navActive = false;
+      hs.tip = '';
+      hs.tipAction = '';
+      if (this.time < this.tipUntil) hs.tip = this.tipText;
+      else if (Math.abs(rv.speed) < 0.05 && rv.dwell > 0) {
+        hs.tip = tr(touch ? 'rideGetOffTouch' : 'rideGetOff', lang);
+        hs.tipAction = 'KeyG';
+      }
+    } else if (w && this.def.kind === 'pedestrian') {
+      // on foot in the town: the speed, and what there is to do here – a button, a tram to get in
+      hs.navText = tr(w.running ? 'footRunning' : 'footWalking', lang, { speed: Math.round(w.speed * 3.6) });
+      hs.navSub = '';
+      hs.navArrow = 0;
+      hs.navActive = false;
+      hs.tip = '';
+      hs.tipAction = '';
+      if (this.time < this.tipUntil) hs.tip = this.tipText;
+      else if (this.footBoard) {
+        hs.tip = tr(touch ? 'footBoardTouch' : 'footBoard', lang);
+        hs.tipAction = 'KeyG';
+      } else if (this.footBus) {
+        hs.tip = tr(touch ? 'footBusTouch' : 'footBus', lang);
+        hs.tipAction = 'KeyG';
+      } else if (this.footPole && this.signals.pedestrian(this.footPole.controller, this.footPole.group) === 'red' && !this.signals.requested(this.footPole.controller)) {
+        hs.tip = tr(touch ? 'footButtonTouch' : 'footButton', lang);
+        hs.tipAction = 'KeyG';
+      } else if (this.time - this.walkSince < 12) hs.tip = tr(touch ? 'footHelpTouch' : 'footHelp', lang);
+    } else if (w) {
       // on foot: what there is to check round the vehicle, and how far that is done
       hs.navText = tr(w.allChecked ? 'checkDone' : 'walkTitle', lang);
       hs.navSub = w.progress().map((p) => `${tr(CHECK_TEXT[p.id], lang)} ${p.done >= p.of ? '✓' : p.of > 1 ? `${p.done}/${p.of}` : '·'}`).join('  ');
@@ -2573,6 +3545,23 @@ export class Game {
       // standing, engine off, parking brake on: getting out is offered
       hs.tip = tr(touch ? 'getOutHintTouch' : 'getOutHint', lang);
       hs.tipAction = 'KeyG';
+    }
+    const ac = this.aircraft;
+    if (ac) {
+      // flying: how fast through the air (the strip in km/h, the line in knots), how high, climbing or sinking
+      hs.speedKmh = ac.ias * 3.6;
+      hs.rpm = ac.rpm;
+      hs.rpmMax = 2800;
+      hs.gear = `${this.flight.flaps * 10}°`;
+      hs.limit = 0;
+      hs.zone = 0;
+      hs.junction = null;
+      hs.navText = tr('flyStatus', lang, { ias: Math.round(ac.ias * 1.94384), alt: Math.round((ac.altitude * 3.28084) / 10) * 10, vs: Math.round((ac.verticalSpeed * 196.85) / 50) * 50 });
+      hs.navSub = tr('flySub', lang, { t: Math.round(this.flight.throttle * 100), f: this.flight.flaps * 10, rpm: Math.round(ac.rpm / 10) * 10 });
+      hs.navArrow = 0;
+      hs.navActive = false;
+      hs.tipAction = '';
+      hs.tip = this.time < this.tipUntil ? this.tipText : ac.stallWarning ? tr('flyStall', lang) : this.time - this.startTime < 20 ? tr(touch ? 'flyHelpTouch' : 'flyHelp', lang) : '';
     }
     this.hud.update(hs, this.time);
   }
@@ -2607,7 +3596,23 @@ export class Game {
       cam.fov = 62;
       const to = this.tmpV;
       const q = this.tmpQ;
-      if (w) {
+      if (w && this.busRide) {
+        // on the bus: a seat behind the driver on the right, looking round from there
+        const b = this.busRide;
+        const s = Math.sin(b.yaw);
+        const co = Math.cos(b.yaw);
+        const ahead = b.length / 2 - 3.6;
+        to.set(b.x - s * ahead + co * 0.6, b.y + 1.95, b.z - co * ahead - s * 0.6);
+        q.setFromEuler(new THREE.Euler(w.pitch, b.yaw + w.yaw, 0, 'YXZ'));
+      } else if (w && this.riding) {
+        // a passenger: on a seat by the window, looking round from there
+        const car = this.riding.v.cars[this.riding.car];
+        const s = Math.sin(car.yaw);
+        const co = Math.cos(car.yaw);
+        const side = this.riding.side * (this.riding.v.consist.width / 2 - 0.55);
+        to.set(car.x + co * side, car.y + TRAM_FLOOR + 1.22, car.z - s * side);
+        q.setFromEuler(new THREE.Euler(w.pitch, car.yaw + w.yaw, 0, 'YXZ'));
+      } else if (w) {
         to.set(w.x, w.y + EYE, w.z);
         q.setFromEuler(new THREE.Euler(w.pitch, w.yaw, 0, 'YXZ'));
       } else {
@@ -2633,7 +3638,9 @@ export class Game {
       // (on a demonstration drive the head turns as the driver looks over the shoulder – not in a jerk)
       const want = this.demo?.active ? this.demo.look * 0.8 : 0;
       this.demoHead += Math.max(-dt * 5, Math.min(dt * 5, want - this.demoHead));
-      this.tmpQ.setFromEuler(new THREE.Euler(c.lookPitch, c.lookYaw + this.demoHead, 0, 'YXZ'));
+      // (a rider looks a little down the road: the instruments, the bar and the mirrors in view)
+      const gaze = this.model instanceof PlayerBike ? this.model.gaze : this.aircraft ? 0.17 : 0;
+      this.tmpQ.setFromEuler(new THREE.Euler(c.lookPitch - gaze, c.lookYaw + this.demoHead, 0, 'YXZ'));
       cam.quaternion.copy(car.quaternion).multiply(this.tmpQ);
       if (this.model instanceof PlayerBike) {
         // the rider leans with the motorcycle: the eye swings round the line where the tyres touch the road

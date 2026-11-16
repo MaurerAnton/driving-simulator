@@ -156,3 +156,32 @@ test('a tour may begin and end on a car park that tours do not otherwise lead th
   const plan2 = planTour(g, start, start, 3000, { seed: 4, budgetMs: 120 });
   assert.ok(plan2 && !plan2.ways.some((w) => w >> 1 === other));
 });
+
+test('wishes: a road left out is never driven; the kind of street wished for gets most of the tour', () => {
+  const town = makeTown({ cols: 6, rows: 6 });
+  const g = routeGraphOf(town.lanes);
+  const start = town.street(2, 2, 3, 2) * 2;
+  // the streets of the middle row (z = 200) are left out: the tour goes round them
+  const middle = new Set<number>();
+  for (let i = 0; i < 5; i++) middle.add(town.street(i, 2, i + 1, 2));
+  middle.delete(town.street(2, 2, 3, 2));
+  const plan = planTour(g, start, start, 2600, { seed: 3, budgetMs: 150, avoid: (w) => middle.has(w >> 1) });
+  assert.ok(plan, 'a tour all the same');
+  assert.ok(!plan.ways.some((w) => middle.has(w >> 1)), 'none of the streets left out is driven');
+  // the streets of the east of the town wished for – or those of the west: the tour goes where it is wished
+  const east = (e: number): boolean => Math.min(g.x1[e * 2], g.x1[e * 2 + 1]) >= 300;
+  const west = (e: number): boolean => Math.max(g.x1[e * 2], g.x1[e * 2 + 1]) <= 200;
+  const liked = planTour(g, start, start, 2600, { seed: 3, budgetMs: 150, like: (e) => (east(e) ? 2.5 : 0.3) });
+  const plain = planTour(g, start, start, 2600, { seed: 3, budgetMs: 150, like: (e) => (west(e) ? 2.5 : 0.3) });
+  assert.ok(liked && plain);
+  const share = (p: NonNullable<typeof liked>): number => {
+    let inEast = 0;
+    let all = 0;
+    for (const w of p.ways) {
+      all += g.len[w];
+      if (east(w >> 1)) inEast += g.len[w];
+    }
+    return inEast / all;
+  };
+  assert.ok(share(liked) > share(plain) + 0.4, `wished east: ${(share(liked) * 100).toFixed(0)} % in the east; wished west: ${(share(plain) * 100).toFixed(0)} %`);
+});
