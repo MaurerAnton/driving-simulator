@@ -23,6 +23,13 @@ export const VIOLATION_REFS: Record<string, string> = {
   pedestrian: '§ 1 Abs. 2, § 3 Abs. 2a StVO',
   cyclistCutOff: '§ 9 Abs. 3 StVO',
   doorCheck: '§ 14 Abs. 1 StVO',
+  // the tram: the regulation for trams (BOStrab) – § 50 the speeds, § 54 operation: doors closed before
+  // departing (Abs. 1), opened only at stops and only once stopped (Abs. 2)
+  tramCurve: '§ 50 BOStrab',
+  tramStopMissed: '§ 54 Abs. 2 BOStrab',
+  tramStopPlace: '§ 54 Abs. 2 BOStrab',
+  tramDoorsMoving: '§ 54 Abs. 1 BOStrab',
+  tramDoorsEarly: '§ 54 Abs. 1 BOStrab',
   classSpeed: '§ 3 Abs. 3, § 18 Abs. 5 StVO',
   motorwayBan: '§ 18 Abs. 1 StVO',
   doorTraffic: '§ 14 Abs. 1 StVO',
@@ -67,6 +74,7 @@ export const VIOLATION_REFS: Record<string, string> = {
 
 /** Where the regulations can be read: the official collection of federal law (gesetze-im-internet.de). */
 const STVO_URL = 'https://www.gesetze-im-internet.de/stvo_2013/';
+const BOSTRAB_URL = 'https://www.gesetze-im-internet.de/strabbo_1987/';
 const FEV_URL = 'https://www.gesetze-im-internet.de/fev_2010/';
 
 export interface CitationPart {
@@ -87,7 +95,9 @@ export function citationParts(ref: string): CitationPart[] {
   let last = 0;
   for (const m of ref.matchAll(re)) {
     if (m.index > last) parts.push({ text: ref.slice(last, m.index) });
-    parts.push({ text: m[0], url: m[1] ? `${STVO_URL}__${m[1]}.html` : `${m[3] === 'FeV' ? FEV_URL : STVO_URL}anlage_${m[2]}.html` });
+    // (a paragraph belongs to the law named after it: the StVO, or the tram regulation BOStrab)
+    const law = m[1] ? (/\b(StVO|FeV|BOStrab)\b/.exec(ref.slice(m.index))?.[1] ?? 'StVO') : '';
+    parts.push({ text: m[0], url: m[1] ? `${law === 'BOStrab' ? BOSTRAB_URL : STVO_URL}__${m[1]}.html` : `${m[3] === 'FeV' ? FEV_URL : STVO_URL}anlage_${m[2]}.html` });
     last = m.index + m[0].length;
   }
   if (last < ref.length) parts.push({ text: ref.slice(last) });

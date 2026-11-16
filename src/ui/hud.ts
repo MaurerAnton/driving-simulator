@@ -5,7 +5,7 @@ import { LESSONS } from '../game/nav.ts';
 import { VEHICLES, VEHICLE_KINDS } from '../game/vehicles.ts';
 import { RELEASES, VERSION } from '../game/releases.ts';
 import type { Settings } from '../game/settings.ts';
-import { ENGINE_POWERS, saveSettings } from '../game/settings.ts';
+import { ENGINE_POWERS, GRAPHICS_PRESETS, VIEW_DISTANCES, saveSettings } from '../game/settings.ts';
 import type { Input } from '../input/input.ts';
 import type { Violation } from '../sim/rules.ts';
 import { SIG } from '../sim/signals.ts';
@@ -40,6 +40,10 @@ export interface HudState {
   /** what tapping the tip does on a touch screen: a key code ('' = nothing) */
   tipAction: string;
   showDash: boolean;
+  /** on foot beside the vehicle: no dashboard strip, no reminder of the driving keys */
+  onFoot?: boolean;
+  /** no reminder of the driving keys (the tram) */
+  noKeyHints?: boolean;
   indicator: number;
   hazard: boolean;
   blinkOn: boolean;
@@ -363,15 +367,18 @@ export class Hud {
       c.onclick = () => this.onStart({ mode, spawn, address });
       cards.append(c);
     };
-    card(this.t('free'), this.t('freeDesc'), 'free');
-    card(this.t('demo'), this.t('demoDesc'), 'demo');
-    card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
+    card(this.t('free'), this.t(def.kind === 'tram' ? 'freeTramDesc' : 'freeDesc'), 'free');
+    // (the drives the car does by itself, and the tours, are on the roads)
+    if (def.kind !== 'tram') {
+      card(this.t('demo'), this.t('demoDesc'), 'demo');
+      card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
+    }
     // the lessons of the chosen vehicle: the practice yard first, the test last
     const rank = (kind: string): number => (kind === 'yard' ? 0 : kind === 'exam' ? 2 : 1);
     const kind = def.kind;
-    const lessons = LESSONS.filter((l) => (l.vehicle ? l.vehicle === kind : !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
+    const lessons = LESSONS.filter((l) => (l.vehicle ? l.vehicle === kind : kind !== 'tram' && !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
     // (the lessons on the road were written for the car: what is different with this vehicle is said first)
-    const note = def.caps ? `${this.t('lesson.capNote', { vehicle: this.t(def.name), rural: def.caps.rural, motorway: def.caps.motorway })} ` : def.noMotorway ? `${this.t('lesson.noMotorwayNote')} ` : '';
+    const note = def.caps ? `${this.t('lesson.capNote', { vehicle: this.t(def.name), rural: def.caps.rural, motorway: def.caps.motorway })} ` : def.noMotorway ? `${this.t('lesson.slowNote', { vehicle: this.t(def.name), max: def.governed })} ` : '';
     for (const l of lessons) card(lessonTitle(l.id, this.lang), l.id === 'exam' ? this.t('examDesc') : `${l.kind === 'route' ? note : ''}${lessonIntro(l.id, this.lang)}`, l.id);
     p.append(cards);
 
@@ -504,7 +511,36 @@ export class Hud {
     // the picture
     select(this.t('startView'), s.view, [['chase', this.t('viewChase')], ['cockpit', this.t('viewCockpit')]], (v) => (s.view = v as Settings['view']));
     range(this.t('cabinOpacity'), (s.cabinOpacity - 0.2) / 0.8, (v) => (s.cabinOpacity = 0.2 + 0.8 * v));
-    select(this.t('quality'), s.quality, [['low', this.t('qLow')], ['medium', this.t('qMedium')], ['high', this.t('qHigh')]], (v) => (s.quality = v as Settings['quality']));
+    // Graphics: a preset – and, apart from it, the resolutions; the parts of the preset one by one below
+    select(this.t('quality'), s.quality, [['low', this.t('qLow')], ['medium', this.t('qMedium')], ['high', this.t('qHigh')], ['ultra', this.t('qUltra')], ['custom', this.t('qCustom')]], (v) => {
+      s.quality = v as Settings['quality'];
+      if (v !== 'custom') s.graphics = { ...GRAPHICS_PRESETS[v as Exclude<Settings['quality'], 'custom'>] };
+      // (the advanced settings below show the preset's values)
+      queueMicrotask(() => this.showSettings(back));
+    });
+    const pct = (list: number[]): Array<[string, string]> => list.map((n) => [String(n), `${Math.round(n * 100)} %`]);
+    select(this.t('uiScale'), String(s.uiScale), pct([0.75, 0.85, 1, 1.15, 1.3, 1.5]), (v) => (s.uiScale = Number(v)));
+    select(this.t('pixelCap'), String(s.pixelCap), [['1', this.t('pixelStandard')], ['1.5', this.t('pixelSharp')], ['3', this.t('pixelNative')]], (v) => (s.pixelCap = Number(v)));
+    select(this.t('render3d'), String(s.render3d), pct([0.5, 0.6, 0.7, 0.8, 0.9, 1]), (v) => (s.render3d = Number(v)));
+    {
+      // the advanced graphics settings, folded away; changing one makes the preset "custom"
+      const box = el('details', 'advanced');
+      box.append(el('summary', '', this.t('gfxAdvanced')));
+      const at = p.childElementCount;
+      const g = s.graphics;
+      const custom = (f: () => void) => (): void => {
+        f();
+        s.quality = 'custom';
+      };
+      select(this.t('gfxShadows'), g.shadows, [['off', this.t('shadowsOff')], ['near', this.t('shadowsNear')], ['far', this.t('shadowsFar')]], (v) => custom(() => (g.shadows = v as typeof g.shadows))());
+      select(this.t('gfxView'), String(g.viewDistance), VIEW_DISTANCES.map((d): [string, string] => [String(d), `${d} m`]), (v) => custom(() => (g.viewDistance = Number(v)))());
+      select(this.t('gfxTrees'), String(g.propDensity), pct([0, 0.35, 0.6, 0.8, 1]), (v) => custom(() => (g.propDensity = Number(v)))());
+      check(this.t('gfxFacades'), g.facades, (v) => custom(() => (g.facades = v))());
+      check(this.t('gfxPropShadows'), g.propShadows, (v) => custom(() => (g.propShadows = v))());
+      // (the rows were added to the panel: into the folded box with them)
+      while (p.childElementCount > at) box.append(p.children[at]);
+      p.append(box);
+    }
     select(this.t('mirrors'), s.mirrors, [['off', this.t('mOff')], ['alternate', this.t('mAlt')], ['full', this.t('mFull')]], (v) => (s.mirrors = v as Settings['mirrors']));
     range(this.t('traffic'), s.traffic, (v) => (s.traffic = v));
     range(this.t('volume'), s.volume, (v) => (s.volume = v));
@@ -513,6 +549,7 @@ export class Hud {
     check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
     check(this.t('showFps'), s.showFps, (v) => (s.showFps = v));
     check(this.t('startOutside'), s.startOutside, (v) => (s.startOutside = v));
+    check(this.t('mapOnScreen'), s.mapOnScreen, (v) => (s.mapOnScreen = v));
     check(this.t('hudRules'), s.hudRules, (v) => (s.hudRules = v));
     check(this.t('hudGear'), s.hudGear, (v) => (s.hudGear = v));
     check(this.t('voice'), s.voice, (v) => (s.voice = v));
@@ -1075,7 +1112,7 @@ export class Hud {
       }
       // dashboard strip: outside views (the cockpit has real instruments) – and on a
       // phone, where the instruments are too small to read
-      const showDash = s.showDash || this.mode === 'touch';
+      const showDash = !s.onFoot && (s.showDash || this.mode === 'touch');
       this.dash.style.display = showDash ? '' : 'none';
       // (the key reminder keeps clear of the strip)
       this.hud.classList.toggle('dashon', showDash);
@@ -1108,7 +1145,7 @@ export class Hud {
         on('KeyX', s.hazard);
       } else {
         // key reminder: while standing or crawling, out of the way once the car is rolling
-        const want = this.settings.keyHints && Math.abs(s.speedKmh) < 12;
+        const want = this.settings.keyHints && !s.onFoot && !s.noKeyHints && Math.abs(s.speedKmh) < 12;
         this.keysBox.classList.toggle('show', want);
         const key = `${this.lang}:${this.gearbox ?? this.settings.transmission}`;
         if (want && key !== this.keysFor) {
@@ -1119,22 +1156,37 @@ export class Hud {
     }
     if (now - this.lastMap > 0.12) {
       this.lastMap = now;
-      this.drawMap(s);
+      // (the map on the vehicle's own screen instead of in the corner: see `screen`)
+      const screen = this.screen;
+      this.root.querySelector<HTMLElement>('.hud .map')?.classList.toggle('onscreen', !!screen);
+      if (screen) {
+        this.drawMap(s, screen.canvas);
+        screen.drawn();
+      } else this.drawMap(s, this.mapCanvas);
     }
   }
 
-  private drawMap(s: HudState): void {
-    const c = this.mapCanvas;
+  /**
+   * The vehicle's screen the map is drawn on instead of the corner of the
+   * picture (the car's centre display, seen from the driver's seat) – null:
+   * the map is in the corner.  `drawn` is told after each picture.
+   */
+  screen: { canvas: HTMLCanvasElement; drawn: () => void } | null = null;
+
+  private drawMap(s: HudState, c: HTMLCanvasElement): void {
     const g = c.getContext('2d');
     if (!g) return;
     const W = c.width;
-    const scale = 0.42; // px per metre
-    const range = W / 2 / scale + 20;
+    const Hh = c.height;
+    // (as many pixels per metre on a wide screen as in the round map of 220 px)
+    const scale = 0.42 * (Hh / 220);
+    const range = Math.max(W, Hh) / 2 / scale + 20;
+    const cy = Hh / 2 + 28 * (Hh / 220);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = '#1c2630';
-    g.fillRect(0, 0, W, W);
+    g.fillRect(0, 0, W, Hh);
     // heading up: rotate so that the car's forward (-sin yaw, -cos yaw) points to -y
-    g.translate(W / 2, W / 2 + 28);
+    g.translate(W / 2, cy);
     g.rotate(s.yaw);
     g.scale(scale, scale);
     g.translate(-s.x, -s.z);
@@ -1171,7 +1223,8 @@ export class Hud {
     }
     // the car
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.translate(W / 2, W / 2 + 28);
+    g.translate(W / 2, cy);
+    g.scale(Hh / 220, Hh / 220);
     g.fillStyle = '#ffcc00';
     g.strokeStyle = '#111';
     g.lineWidth = 2;

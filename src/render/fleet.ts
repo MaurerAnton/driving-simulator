@@ -11,6 +11,7 @@
  */
 import * as THREE from 'three';
 import { BUS, TRACTOR } from '../sim/vehicle/fleet.ts';
+import type { VehicleSpec } from '../sim/vehicle/index.ts';
 import { CAR_TRAILER } from '../sim/trailer.ts';
 import type { CarVisualState } from './car.ts';
 import { InstrumentPanel } from './instruments.ts';
@@ -124,19 +125,25 @@ export class PlayerBus implements VehicleModel {
   private readonly lamps = new Lamps();
   private readonly shell = new Shell(BUS_PAINT);
   private readonly panelTex = new InstrumentPanel();
+  private readonly spec: VehicleSpec;
 
-  constructor() {
-    const s = BUS;
+  /** `spec`: the bus (12 m, class D) or the minibus (class D1) – its length, height and doors follow from it. */
+  constructor(spec: VehicleSpec = BUS) {
+    const s = spec;
+    this.spec = spec;
     const root = this.root;
     root.name = 'bus';
     const hw = (s.width ?? 2.55) / 2 - 0.01;
-    const zf = -5.65;
-    const zr = 6.35;
     const axle = s.wheelbase / 2;
-    const y0 = 0.32;
-    const sill = 1.18;
-    const top = 2.62;
-    const y1 = 3.0;
+    const long = (s.length ?? 12) > 9;
+    // overhangs: 2.7 m at the front of the big bus, 1.2 m of the minibus
+    const zf = -(axle + (long ? 2.7 : 1.2));
+    const zr = zf + (s.length ?? 12);
+    const y0 = long ? 0.32 : 0.36;
+    const sill = long ? 1.18 : 1.1;
+    const top = long ? 2.62 : 2.32;
+    const y1 = long ? 3.0 : 2.7;
+    this.eye.set(-0.62, long ? 2.02 : 1.75, zf + (long ? 0.9 : 1.15));
     const sh = this.shell;
     // --- front: below and above the big windscreen, pillars at its sides
     sh.wall('z-', -hw, hw, y0, 1.0, zf);
@@ -159,7 +166,7 @@ export class PlayerBus implements VehicleModel {
       }
       sh.wall(f, zf, zr, top, y1, x);
       // windows between pillars – on the right the doors take their place (front and middle)
-      const doors = side > 0 ? [[zf + 0.25, zf + 1.45], [-0.65, 0.65]] : [];
+      const doors = side > 0 ? (long ? [[zf + 0.25, zf + 1.45], [-0.65, 0.65]] : [[zf + 1.6, zf + 2.6]]) : [];
       let z0 = zf + 0.1;
       for (let i = 0; z0 < zr - 1.7; i++) {
         const z1 = Math.min(z0 + 1.55, zr - 1.7);
@@ -184,16 +191,16 @@ export class PlayerBus implements VehicleModel {
     sh.wall('y-', -hw, hw, zf, zr, y0);
     root.add(sh.group);
     // roof equipment, bumpers, the destination display
-    root.add(box(-hw + 0.25, hw - 0.25, y1, y1 + 0.32, -1.2, 2.4, FRAME));
+    if (long) root.add(box(-hw + 0.25, hw - 0.25, y1, y1 + 0.32, -1.2, 2.4, FRAME));
     root.add(box(-hw, hw, 0.28, 0.55, zf - 0.06, zf + 0.05, DARK));
     root.add(box(-hw, hw, 0.28, 0.55, zr - 0.05, zr + 0.06, DARK));
     const sign = lettering(BRAND, 1.9, 0.24);
-    sign.position.set(0, 2.74, zf - 0.012);
+    sign.position.set(0, top + 0.12, zf - 0.012);
     sign.rotation.y = Math.PI;
     root.add(sign);
     for (const side of [-1, 1]) {
-      const plate = lettering(BRAND, 4.2, 0.42);
-      plate.position.set(side * (hw + 0.008), 0.95, 1.6);
+      const plate = lettering(BRAND, long ? 4.2 : 2.6, long ? 0.42 : 0.3);
+      plate.position.set(side * (hw + 0.008), 0.95, long ? 1.6 : zf + 4.4);
       plate.rotation.y = (side * Math.PI) / 2;
       root.add(plate);
     }
@@ -228,8 +235,8 @@ export class PlayerBus implements VehicleModel {
     // --- inside: the floor, rows of seats, the driver's place
     const inside = new THREE.Group();
     const fit = sh.fittings;
-    for (let z = -2.4; z < zr - 0.8; z += 0.85) {
-      if (z > -1.1 && z < 1.1) continue; // the space at the middle door
+    for (let z = zf + 3.2; z < zr - 0.8; z += 0.85) {
+      if (long && z > -1.1 && z < 1.1) continue; // the space at the middle door
       for (const side of [-1, 1]) {
         inside.add(box(side * 0.55 - 0.42, side * 0.55 + 0.42, 0.75, 0.88, z, z + 0.45, fit, false));
         inside.add(box(side * 0.55 - 0.42, side * 0.55 + 0.42, 0.88, 1.5, z + 0.4, z + 0.48, fit, false));
@@ -239,8 +246,8 @@ export class PlayerBus implements VehicleModel {
     inside.add(box(-hw + 0.04, 0.3, 0.75, 1.32, zf + 0.04, zf + 0.55, fit, false)); // dashboard
     dial(inside, this.panelTex.texture, new THREE.Vector3(ex, 1.36, zf + 0.62), 0.5, 1.15);
     this.steering = steeringWheel(inside, new THREE.Vector3(ex, 1.38, zf + 0.82), 1.05, 0.26, fit);
-    inside.add(box(ex - 0.28, ex + 0.28, 0.95, 1.12, -4.55, -4.0, fit, false)); // seat
-    inside.add(box(ex - 0.28, ex + 0.28, 1.12, 2.0, -4.1, -3.96, fit, false));
+    inside.add(box(ex - 0.28, ex + 0.28, 0.95, 1.12, zf + 1.1, zf + 1.65, fit, false)); // seat
+    inside.add(box(ex - 0.28, ex + 0.28, 1.12, 2.0, zf + 1.55, zf + 1.69, fit, false));
     root.add(inside);
     // --- mirrors on arms in front of the windscreen
     for (const side of [-1, 1]) {
@@ -257,7 +264,8 @@ export class PlayerBus implements VehicleModel {
   update(s: CarVisualState, _dt: number, now: number): void {
     for (let i = 0; i < 4; i++) {
       const w = this.wheels[i];
-      w.position.y = BUS.wheelRadius + (s.wheelY[i] ?? 0);
+      // (wheelY is the height of the wheel's centre above the ground under the bus)
+      w.position.y = s.wheelY[i] ?? this.spec.wheelRadius;
       w.rotation.set(-(s.wheelSpin[i] ?? 0), i < 2 ? -(s.wheelSteer[i] ?? 0) : 0, 0, 'YXZ');
     }
     this.steering.rotation.z = -s.steerWheel;
@@ -371,8 +379,9 @@ export class PlayerTractor implements VehicleModel {
   update(s: CarVisualState, _dt: number, now: number): void {
     for (let i = 0; i < 4; i++) {
       const w = this.wheels[i];
-      // (the physics' wheels are all of one size: the drawn ones keep their own height above the ground)
-      w.position.y = this.radii[i] + (s.wheelY[i] ?? 0);
+      // (the physics' wheels are all of one size, and wheelY is where their centres are: the drawn ones,
+      // of two sizes, move up and down with them and keep touching the ground)
+      w.position.y = (s.wheelY[i] ?? TRACTOR.wheelRadius) - TRACTOR.wheelRadius + this.radii[i];
       // the big wheels turn more slowly for the same speed
       const spin = (s.wheelSpin[i] ?? 0) * (TRACTOR.wheelRadius / this.radii[i]);
       w.rotation.set(-spin, i < 2 ? -(s.wheelSteer[i] ?? 0) : 0, 0, 'YXZ');
@@ -550,5 +559,81 @@ export class CarTrailerModel {
     this.group.rotation.set(pitch, yaw, 0, 'YXZ');
     for (const w of this.wheels) w.rotation.x = -wheelSpin;
     if (s) this.lamps.update(s);
+  }
+}
+
+// --------------------------------------------------------------------------------- the tram's cab
+/**
+ * The driver's cab at the front of the player's tram – only its inside: the
+ * tram itself is drawn with the others (render/trams.ts), and from within
+ * its walls are not seen.  Around the middle of the first car (on the rails),
+ * the front towards −z: the desk with the controller and the instruments, the
+ * seat, the walls of the cab below and above the windows.
+ */
+export class TramCab implements VehicleModel {
+  readonly root = new THREE.Group();
+  readonly eye = new THREE.Vector3(0, 2.15, -3.35);
+  readonly mirrors: Mirror[] = [];
+  private readonly shell = new Shell(FRAME);
+  private readonly panelTex = new InstrumentPanel();
+  /** the controller's handle: forwards for power, back for the brake */
+  private readonly handle = new THREE.Group();
+
+  constructor() {
+    const root = this.root;
+    root.name = 'tram cab';
+    const sh = this.shell;
+    const hw = 1.17;
+    const zf = -4.62;
+    const zb = -2.1;
+    const floor = 0.95;
+    const sill = 1.35;
+    const top = 2.7;
+    const roof = 3.2;
+    // (only the lining: the paint outside is the tram's own)
+    const lining = (facing: Facing, a0: number, a1: number, b0: number, b1: number, at: number): void => {
+      sh.group.add(panel(facing, a0, a1, b0, b1, at, sh.lining));
+    };
+    lining('z-', -hw, hw, floor, sill - 0.1, zf);
+    lining('z-', -hw, hw, top + 0.1, roof, zf);
+    for (const side of [-1, 1]) {
+      const f: Facing = side > 0 ? 'x+' : 'x-';
+      lining(f, zf, zb, floor, sill, side * hw);
+      lining(f, zf, zb, top, roof, side * hw);
+      // the pillars beside the windscreen
+      lining('z-', side * hw, side * (hw - 0.12), sill - 0.1, top + 0.1, zf);
+    }
+    lining('y+', -hw, hw, zf, zb, roof);
+    lining('y-', -hw, hw, zf, zb, floor);
+    // the wall behind the driver, with the door to the passengers
+    lining('z+', -hw, -0.4, floor, roof, zb);
+    lining('z+', 0.4, hw, floor, roof, zb);
+    lining('z+', -0.4, 0.4, 2.2, roof, zb);
+    root.add(sh.group);
+    const fit = sh.fittings;
+    // the desk across the cab, the instruments on it, the controller on its left
+    root.add(box(-0.95, 0.95, floor, 1.62, zf + 0.05, zf + 0.62, fit, false));
+    dial(root, this.panelTex.texture, new THREE.Vector3(0.18, 1.7, zf + 0.5), 0.42, 0.7);
+    this.handle.position.set(-0.55, 1.62, zf + 0.42);
+    const stick = box(-0.025, 0.025, 0, 0.2, -0.025, 0.025, DARK, false);
+    const knob = box(-0.05, 0.05, 0.2, 0.26, -0.04, 0.04, fit, false);
+    this.handle.add(stick, knob);
+    root.add(this.handle);
+    // the seat
+    root.add(box(-0.28, 0.28, floor + 0.55, floor + 0.68, zf + 1.05, zf + 1.6, fit, false));
+    root.add(box(-0.28, 0.28, floor + 0.68, floor + 1.45, zf + 1.52, zf + 1.66, fit, false));
+  }
+
+  setCabinOpacity(opacity: number): void {
+    this.shell.setOpacity(opacity);
+  }
+
+  /** The controller's position: −1 full brake … 1 full power. */
+  setLever(lever: number): void {
+    this.handle.rotation.x = -lever * 0.55;
+  }
+
+  update(s: CarVisualState, _dt: number, now: number): void {
+    this.panelTex.update(s, now);
   }
 }

@@ -5,7 +5,30 @@ import { vehicleKind } from './vehicles.ts';
 import type { VehicleKind } from './vehicles.ts';
 
 export type Transmission = 'assist' | 'manual' | 'automatic';
-export type Quality = 'low' | 'medium' | 'high';
+/** a preset of the graphics – or 'custom': the advanced settings chosen one by one */
+export type Quality = 'low' | 'medium' | 'high' | 'ultra' | 'custom';
+
+/** What the graphics presets set – everything but the resolutions, which are settings of their own. */
+export interface Graphics {
+  /** shadows of buildings and vehicles: none, around the vehicle, far around */
+  shadows: 'off' | 'near' | 'far';
+  /** how far the map is drawn (m) */
+  viewDistance: number;
+  /** how many of the trees and roadside objects are drawn (0 … 1) */
+  propDensity: number;
+  /** buildings with windows, doors and roof tiles (false: plain walls and roofs) */
+  facades: boolean;
+  /** trees and signs cast shadows */
+  propShadows: boolean;
+}
+
+export const GRAPHICS_PRESETS: Record<Exclude<Quality, 'custom'>, Graphics> = {
+  low: { shadows: 'off', viewDistance: 700, propDensity: 0.35, facades: false, propShadows: false },
+  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false },
+  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true },
+  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true },
+};
+export const VIEW_DISTANCES = [500, 700, 1000, 1250, 1600, 2000, 2500, 3000];
 /** the camera a drive starts with: behind the car, or at the driver's eyes */
 export type View = 'chase' | 'cockpit';
 
@@ -41,6 +64,14 @@ export interface Settings {
   /** where the last drive began: a start point of the map, or an address */
   lastStart: { spawn: number; address: { label: string; street: string; x: number; z: number; exact: boolean } | null };
   quality: Quality;
+  /** the graphics as the preset (or the advanced settings) set them */
+  graphics: Graphics;
+  /** size of the interface – menus, HUD – (1 = as designed) */
+  uiScale: number;
+  /** most pixels per CSS pixel the picture is drawn with on a sharp screen (1, 1.5 or 3: as sharp as the screen) */
+  pixelCap: number;
+  /** share of those pixels the 3D picture is drawn with (0.5 … 1; less: softer and quicker) */
+  render3d: number;
   /** off | one mirror per frame | all mirrors every frame */
   mirrors: 'off' | 'alternate' | 'full';
   /** show the current speed limit and the next priority sign in the HUD */
@@ -75,6 +106,8 @@ export interface Settings {
   showFps: boolean;
   /** begin each drive on foot beside the vehicle: walk round it, get in */
   startOutside: boolean;
+  /** in the driver's seat: the map on the vehicle's own screen (where it has one) instead of the corner */
+  mapOnScreen: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -89,6 +122,10 @@ export const DEFAULT_SETTINGS: Settings = {
   cabinOpacity: 1,
   lastStart: { spawn: 0, address: null },
   quality: 'medium',
+  graphics: { ...GRAPHICS_PRESETS.medium },
+  uiScale: 1,
+  pixelCap: 1.5,
+  render3d: 1,
   mirrors: 'alternate',
   hudRules: true,
   hudGear: true,
@@ -104,6 +141,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keyHints: true,
   showFps: false,
   startOutside: false,
+  mapOnScreen: false,
 };
 
 const KEY = 'fahrsim-baunatal.settings.v2';
@@ -117,16 +155,34 @@ function fresh(): Settings {
 /** Defaults, overlaid with what was stored – whatever is missing or implausible keeps its default. */
 function merge(parsed: Partial<Settings>): Settings {
   const d = fresh();
-  const s: Settings = { ...d, ...parsed, wheel: { ...d.wheel, ...(parsed.wheel ?? {}) }, reality: { ...d.reality, ...(parsed.reality ?? {}) }, lastStart: { ...d.lastStart, ...(parsed.lastStart ?? {}) } };
+  const s: Settings = { ...d, ...parsed, graphics: { ...d.graphics, ...(parsed.graphics ?? {}) }, wheel: { ...d.wheel, ...(parsed.wheel ?? {}) }, reality: { ...d.reality, ...(parsed.reality ?? {}) }, lastStart: { ...d.lastStart, ...(parsed.lastStart ?? {}) } };
   if (!LANGS.some((l) => l.code === s.lang)) s.lang = d.lang;
   if (!(ENGINE_POWERS as readonly number[]).includes(s.power)) s.power = d.power;
   if (s.view !== 'chase' && s.view !== 'cockpit') s.view = d.view;
   if (!vehicleKind(s.vehicle)) s.vehicle = d.vehicle;
   if (!['assist', 'manual', 'automatic'].includes(s.transmission)) s.transmission = d.transmission;
-  if (!['low', 'medium', 'high'].includes(s.quality)) s.quality = d.quality;
+  if (!['low', 'medium', 'high', 'ultra', 'custom'].includes(s.quality)) s.quality = d.quality;
+  // (stored before there were advanced graphics settings: what the level gave then)
+  if (!parsed.graphics) {
+    s.graphics = { ...GRAPHICS_PRESETS[s.quality === 'custom' ? 'medium' : s.quality] };
+    if (parsed.quality === 'low') {
+      s.pixelCap = 1;
+      s.render3d = 0.7;
+    } else if (parsed.quality === 'high') s.pixelCap = 3;
+  }
+  const g = s.graphics;
+  if (!['off', 'near', 'far'].includes(g.shadows)) g.shadows = d.graphics.shadows;
+  if (!VIEW_DISTANCES.includes(g.viewDistance)) g.viewDistance = d.graphics.viewDistance;
+  if (!(g.propDensity >= 0 && g.propDensity <= 1)) g.propDensity = d.graphics.propDensity;
+  if (typeof g.facades !== 'boolean') g.facades = d.graphics.facades;
+  if (typeof g.propShadows !== 'boolean') g.propShadows = d.graphics.propShadows;
+  if (!(s.uiScale >= 0.7 && s.uiScale <= 1.6)) s.uiScale = d.uiScale;
+  if (![1, 1.5, 3].includes(s.pixelCap)) s.pixelCap = d.pixelCap;
+  if (!(s.render3d >= 0.5 && s.render3d <= 1)) s.render3d = d.render3d;
   if (!(s.cabinOpacity >= 0.2 && s.cabinOpacity <= 1)) s.cabinOpacity = d.cabinOpacity;
   if (typeof s.showFps !== 'boolean') s.showFps = d.showFps;
   if (typeof s.startOutside !== 'boolean') s.startOutside = d.startOutside;
+  if (typeof s.mapOnScreen !== 'boolean') s.mapOnScreen = d.mapOnScreen;
   if (!Number.isInteger(s.lastStart.spawn) || s.lastStart.spawn < 0) s.lastStart.spawn = 0;
   const a = s.lastStart.address;
   if (a && !(typeof a.label === 'string' && Number.isFinite(a.x) && Number.isFinite(a.z))) s.lastStart.address = null;

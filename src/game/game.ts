@@ -17,6 +17,7 @@ import { SIG, SignalSystem } from '../sim/signals.ts';
 import { Traffic } from '../sim/traffic.ts';
 import type { PlayerState } from '../sim/traffic.ts';
 import { Vehicle } from '../sim/vehicle/index.ts';
+import { LIGHT_TRUCK, MINIBUS } from '../sim/vehicle/fleet.ts';
 import type { DriverInput } from '../sim/vehicle/index.ts';
 import { SignalRenderer, TrafficRenderer } from '../render/actors.ts';
 import { PlayerCar } from '../render/car.ts';
@@ -35,7 +36,7 @@ import { RealityPanel } from '../ui/reality.ts';
 import { LaneGraph, TURN, lanePoint } from '../world/lanes.ts';
 import type { Lane } from '../world/lanes.ts';
 import { newPolySample, projectOnPolyline } from '../core/geom.ts';
-import { CLS, CTRL, SURF_ROLLING } from '../world/types.ts';
+import { CLS, CTRL, RAIL, SURF_ROLLING } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { Edge, Node as Junction } from '../world/world.ts';
@@ -48,7 +49,7 @@ import type { RouteGraph } from '../world/routegraph.ts';
 import { NetIndex } from '../world/netindex.ts';
 import { netPolyline } from '../world/netfile.ts';
 import type { LessonDef } from './nav.ts';
-import { loadSettings, playedBefore, saveSettings } from './settings.ts';
+import { GRAPHICS_PRESETS, loadSettings, playedBefore, saveSettings } from './settings.ts';
 import { newsDue } from './releases.ts';
 import { FaultLog } from './faultlog.ts';
 import { DrivenPath } from './track.ts';
@@ -58,7 +59,9 @@ import { RailTraffic } from '../sim/rail.ts';
 import type { RailObstacle } from '../sim/rail.ts';
 import { RailActors } from '../render/trams.ts';
 import { PlayerTruck } from '../render/truck.ts';
-import { CarTrailerModel, PlayerBike, PlayerBus, PlayerTractor } from '../render/fleet.ts';
+import { CarTrailerModel, PlayerBike, PlayerBus, PlayerTractor, TramCab } from '../render/fleet.ts';
+import { TramDriver, tramStart } from '../sim/tramdrive.ts';
+import type { TramEvent } from '../sim/tramdrive.ts';
 import type { VehicleModel } from '../render/fleet.ts';
 import { VEHICLES, trailerOf, vehicleKind } from './vehicles.ts';
 import type { ModelKind, VehicleDef } from './vehicles.ts';
@@ -79,6 +82,8 @@ const PHYS_DT = 1 / 240;
 
 /** the outlines of the vehicles for collisions with the scenery: circles along the axis (m from the model origin; - = front) */
 
+/** stops in the tram lesson */
+const TRAM_STOPS = 5;
 /** the lean of the motorcycle, for the rider's eyes */
 const BIKE_ROLL = new THREE.Quaternion();
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
@@ -111,6 +116,8 @@ export class Game {
   private readonly models = new Map<ModelKind, VehicleModel>();
   /** the box trailer behind a car (class BE) */
   private carTrailer: CarTrailerModel | null = null;
+  /** the car's centre display, for the HUD to draw the map on */
+  private readonly carScreen = { canvas: this.car.mapCanvas, drawn: (): void => void (this.car.mapTexture.needsUpdate = true) };
   /** what the vehicle's lamps showed in the last picture (for the trailer's) */
   private lastVisual: CarVisualState | null = null;
   /** the truck with the trailer of the class CE (its yard tasks, the coupling) */
@@ -370,7 +377,11 @@ export class Game {
     this.hud.attachInput(this.input);
     // test overrides (not saved): ?quality=low|medium|high&mirrors=off|alternate|full&traffic=0..1
     const qq = q.get('quality');
-    if (qq === 'low' || qq === 'medium' || qq === 'high') this.settings.quality = qq;
+    if (qq === 'low' || qq === 'medium' || qq === 'high' || qq === 'ultra') {
+      this.settings.quality = qq;
+      this.settings.graphics = { ...GRAPHICS_PRESETS[qq] };
+      if (qq === 'low') this.settings.render3d = 0.7;
+    }
     const qm = q.get('mirrors');
     if (qm === 'off' || qm === 'alternate' || qm === 'full') this.settings.mirrors = qm;
     if (q.get('traffic')) this.settings.traffic = Number(q.get('traffic'));
@@ -586,18 +597,19 @@ export class Game {
     const s = this.settings;
     const app = this.app;
     this.applyLanguage();
-    const q = s.quality;
-    // Low: for weak devices – a softer picture (70 % of the pixels per side), no shadows, a short view.
-    // Medium: sharp, shadows around the car.  High: every pixel of the screen, shadows of buildings
-    // and trees far around, the longest view, all trees.
-    app.pixelRatioCap = q === 'low' ? 1 : q === 'medium' ? 1.5 : 3;
-    app.renderScale = q === 'low' ? 0.7 : 1;
-    app.setShadows(q === 'low' ? 0 : q === 'medium' ? 1536 : 3072, q === 'high' ? 120 : 55);
-    app.tiles.viewRadius = q === 'low' ? 700 : q === 'medium' ? 1250 : 2000;
+    // The graphics: what the preset (or the advanced settings) chose – and, apart from it, the
+    // resolutions: how sharp on a sharp screen, which share of it the 3D picture takes, how big the interface is.
+    const gx = s.graphics;
+    app.pixelRatioCap = s.pixelCap;
+    app.renderScale = s.render3d;
+    app.setShadows(gx.shadows === 'off' ? 0 : gx.shadows === 'near' ? 1536 : 3072, gx.shadows === 'far' ? 120 : 55);
+    app.tiles.viewRadius = gx.viewDistance;
+    app.tiles.setFacades(gx.facades);
     app.sky.fog.near = app.tiles.viewRadius * 0.3;
     app.sky.fog.far = app.tiles.viewRadius * 1.05;
-    this.props.density = q === 'low' ? 0.35 : q === 'medium' ? 0.8 : 1;
-    this.props.setShadows(q === 'high');
+    this.props.density = gx.propDensity;
+    this.props.setShadows(gx.propShadows);
+    this.ui.style.setProperty('zoom', String(s.uiScale));
     app.resize();
     for (const m of this.car.mirrors) m.setEnabled(s.mirrors !== 'off');
     this.car.setCabinOpacity(s.cabinOpacity);
@@ -653,7 +665,7 @@ export class Game {
   private showModel(on: boolean): void {
     this.car.root.visible = on && this.def.model === 'car';
     for (const [kind, model] of this.models) if (model !== this.car) model.root.visible = on && kind === this.def.model;
-    if (this.carTrailer) this.carTrailer.group.visible = on && this.def.kind === 'carTrailer';
+    if (this.carTrailer) this.carTrailer.group.visible = on && !!this.def.trailer && this.def.model !== 'truck';
     if (this.truck) {
       this.truck.trailer.visible = on && this.def.kind === 'truck';
     }
@@ -968,8 +980,9 @@ export class Game {
    */
   private startTrip(stops: SpawnJson[], self: boolean, tour: TourPreview | null): void {
     if (this.lesson || (stops.length === 0 && !tour) || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
-    // (on foot beside the vehicle: back into the seat first)
+    // (on foot beside the vehicle: back into the seat first; a tram is driven by hand only)
     if (this.walker) this.leaveWalk();
+    if (this.tram) return;
     if (this.state === 'map') {
       this.mapFrom = 'drive';
       this.closeMap();
@@ -1181,6 +1194,12 @@ export class Game {
     this.def = VEHICLES[this.lesson?.vehicle ?? this.settings.vehicle] ?? VEHICLES.car;
     // (a tractor may not go on the motorway: its lesson is driven with the car)
     if (this.def.noMotorway && this.lesson?.id === 'motorway') this.def = VEHICLES.car;
+    // the tram: at the stop nearest to the place chosen (on the tracks of Kassel and Baunatal)
+    this.tram = null;
+    this.tramAt = null;
+    // (the tracks are read a moment after the map: the stop to start at is found when they are there – tryPlace)
+    this.tramWait = this.def.kind === 'tram' ? this.time : -1;
+    if (this.def.kind === 'tram') this.hud.canTeleport = false;
     // (ways for the truck with its trailer avoid turns that double back within a few metres)
     this.lanes.longVehicle = this.def.long;
     this.lanes.noMotorway = this.def.noMotorway;
@@ -1189,14 +1208,17 @@ export class Game {
     this.vehicle = new Vehicle(spec, this.ground);
     if (!this.models.has(this.def.model)) {
       // the model of a vehicle is made when it is first driven
-      const m: VehicleModel = this.def.model === 'truck' ? (this.truck = new PlayerTruck()) : this.def.model === 'bus' ? new PlayerBus() : this.def.model === 'tractor' ? new PlayerTractor() : new PlayerBike();
+      const mk = this.def.model;
+      const m: VehicleModel =
+        mk === 'truck' ? (this.truck = new PlayerTruck()) : mk === 'truckLight' ? new PlayerTruck(LIGHT_TRUCK) : mk === 'bus' ? new PlayerBus() : mk === 'minibus' ? new PlayerBus(MINIBUS) : mk === 'tractor' ? new PlayerTractor() : mk === 'tram' ? new TramCab() : new PlayerBike();
       this.models.set(this.def.model, m);
       this.app.scene.add(m.root);
       if (this.truck && m === this.truck) this.app.scene.add(this.truck.trailer);
       for (const mirror of m.mirrors) mirror.setEnabled(this.settings.mirrors !== 'off');
       m.setCabinOpacity(this.settings.cabinOpacity);
     }
-    if (this.def.kind === 'carTrailer' && !this.carTrailer) {
+    // (the box trailer behind a car, a 7.5-tonner or a bus; the truck of class CE has its own)
+    if (this.def.trailer && this.def.model !== 'truck' && !this.carTrailer) {
       this.carTrailer = new CarTrailerModel();
       this.app.scene.add(this.carTrailer.group);
     }
@@ -1242,7 +1264,7 @@ export class Game {
     this.hud.showLoading(tr('loadingTiles', this.settings.lang));
     const lang = this.settings.lang;
     const caps = this.def.caps;
-    const note = this.lesson?.kind === 'route' && (caps || this.def.noMotorway) ? `${caps ? tr('lesson.capNote', lang, { vehicle: tr(this.def.name, lang), rural: caps.rural, motorway: caps.motorway }) : tr('lesson.noMotorwayNote', lang)} ` : '';
+    const note = this.lesson?.kind === 'route' && (caps || this.def.noMotorway) ? `${caps ? tr('lesson.capNote', lang, { vehicle: tr(this.def.name, lang), rural: caps.rural, motorway: caps.motorway }) : tr('lesson.slowNote', lang, { vehicle: tr(this.def.name, lang), max: this.def.governed })} ` : '';
     this.pendingIntro = this.lesson && !skipIntro ? { title: lessonTitle(this.lesson.id, lang), text: note + lessonIntro(this.lesson.id, lang) } : null;
   }
 
@@ -1250,6 +1272,31 @@ export class Game {
 
   /** Called every frame while waiting for the terrain under the start point. */
   private tryPlace(): void {
+    if (this.tramWait >= 0) {
+      // the tram: at the stop nearest to the place chosen – once the tracks are read
+      if (this.rail.net.paths.length === 0) {
+        if (this.time - this.tramWait > 40) {
+          this.tramWait = -1;
+          this.hud.message(tr('tramNoTracks', this.settings.lang));
+          this.toMenu();
+        }
+        return;
+      }
+      this.tramWait = -1;
+      const at = tramStart(this.rail, this.spawn!.x, this.spawn!.z, [RAIL.TRAM, RAIL.LIGHT]);
+      if (at) {
+        const smp = { x: 0, y: 0, z: 0, tx: 0, tz: 0, cap: 0 };
+        this.rail.net.sample(at.path, at.s, smp);
+        this.tramAt = at;
+        this.spawn = { ...this.spawn!, x: at.x, z: at.z, yaw: Math.atan2(-smp.tx * at.dir, -smp.tz * at.dir), rough: false };
+        this.spawnStreet = '';
+      } else {
+        // (a map without tram tracks)
+        this.hud.message(tr('tramNoTracks', this.settings.lang));
+        this.toMenu();
+        return;
+      }
+    }
     let sp = this.spawn!;
     // (the roads around the place: without them there is no lane to stand in, and nothing to drive on)
     if (!this.app.map.ready(sp.x, sp.z, 1500)) return;
@@ -1277,7 +1324,19 @@ export class Game {
     this.trailer?.coupleBehind(this.vehicle);
     this.lastGood = { x: place.x, y, z: place.z, yaw: place.yaw, t: 0 };
     // (on foot first – not on the yard of the class CE tasks, not when the car is to drive by itself)
-    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker;
+    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker && this.def.kind !== 'tram';
+    if (this.tramAt) {
+      // the player's tram, its front at the stop's mark (the other way round if it does not fit behind it there)
+      const at = this.tramAt;
+      this.tramAt = null;
+      const rv = this.rail.spawnAt(at.path, at.s, at.dir, 0) ?? this.rail.spawnAt(at.path, at.s, at.dir > 0 ? -1 : 1, 0);
+      if (rv) {
+        this.tram = new TramDriver(this.rail, rv, this.app.world, this.signals);
+        this.placeTramProxy();
+        // (the handbrake is the tram's emergency brake: not on when the drive begins at the stop)
+        this.input.c.handbrake = 0;
+      }
+    }
     this.camSnap = true;
     this.showModel(true);
     if (!this.keepClock) {
@@ -1345,7 +1404,7 @@ export class Game {
       passed: !failed,
       log: this.rules.log.slice(),
       points: this.rules.points,
-      distanceKm: (this.vehicle.odometer - this.startOdo) / 1000,
+      distanceKm: this.tram ? this.tram.odometer / 1000 : (this.vehicle.odometer - this.startOdo) / 1000,
       minutes: (this.time - this.startTime) / 60,
     });
   }
@@ -1384,7 +1443,14 @@ export class Game {
       else if (this.state === 'reality') this.closeReality();
       else if (this.state === 'map') this.closeMap();
     } else if (a === 'door' && this.state === 'drive') {
-      if (this.walker) this.getIn();
+      if (this.tram) {
+        // the tram's doors
+        const ev = this.tramEvents;
+        ev.length = 0;
+        this.tram.toggleDoors(ev);
+        this.audio.click('door');
+        this.noteTram(ev);
+      } else if (this.walker) this.getIn();
       else this.getOut();
     } else if (a === 'view' && this.state === 'drive' && !this.walker) {
       // the driver's seat → behind the car → the free camera → …
@@ -1400,7 +1466,7 @@ export class Game {
         this.settings.view = this.cameraMode;
         saveSettings(this.settings);
       }
-    } else if (a === 'reset' && this.state === 'drive' && !this.walker) {
+    } else if (a === 'reset' && this.state === 'drive' && !this.walker && !this.tram) {
       this.resetToRoad();
     } else if (a === 'help') {
       if (this.state === 'drive') {
@@ -1512,6 +1578,10 @@ export class Game {
     if (this.debugLook) {
       c.lookYaw = this.debugLook[0];
       c.lookPitch = this.debugLook[1];
+    }
+    if (this.tram) {
+      this.stepTram(dt);
+      return;
     }
     const d = this.driver;
     d.steer = c.steer;
@@ -1888,6 +1958,81 @@ export class Game {
     }
   }
 
+  // ------------------------------------------------- the tram
+  /** the player's tram (null: a road vehicle), and the stop it is to start at */
+  private tram: TramDriver | null = null;
+  private tramAt: { path: number; s: number; dir: 1 | -1; x: number; z: number } | null = null;
+  /** since when the tram waits for the tracks to be read (−1: it does not) */
+  private tramWait = -1;
+  private readonly tramEvents: TramEvent[] = [];
+  /** the names of the stops (the street they are in), by piece of track and mark */
+  private readonly stopNames = new Map<string, string>();
+
+  /** The game's vehicle stands where the tram's first car is: the camera, the map, the traffic keep to it. */
+  private placeTramProxy(): void {
+    const c = (this.tram as TramDriver).v.cars[0];
+    this.vehicle.teleport(c.x, c.y, c.z, c.yaw);
+    this.vehicle.getModelPosition(this.mpos);
+  }
+
+  private noteTram(events: readonly TramEvent[]): void {
+    for (const e of events) this.rules.noteAt(e.fault, e.severity, this.mpos[0], this.mpos[2], e.data ?? {}, 8);
+  }
+
+  /** A stop's name: the street it is in. */
+  private stopName(path: number, mark: number): string {
+    const key = `${path}:${Math.round(mark)}`;
+    let name = this.stopNames.get(key);
+    if (name === undefined) {
+      const smp = { x: 0, y: 0, z: 0, tx: 0, tz: 0, cap: 0 };
+      this.rail.net.sample(path, mark, smp);
+      name = this.app.world.nearestRoad(smp.x, smp.z, 60, 0, this.hit) && this.hit.edge ? this.hit.edge.name : '';
+      this.stopNames.set(key, name);
+    }
+    return name || tr('tramStop', this.settings.lang);
+  }
+
+  /** A step of the tram: the controller, the switch asked for, the tram on its track, the traffic around it. */
+  private stepTram(dt: number): void {
+    const tram = this.tram as TramDriver;
+    const c = this.input.c;
+    tram.lever = Math.max(-1, Math.min(1, c.throttle - c.brake));
+    tram.emergency = c.handbrake > 0.5;
+    // the indicator asks for the way at the next switch
+    tram.wish = c.indicator < 0 ? 1 : c.indicator > 0 ? -1 : 0;
+    const ev = this.tramEvents;
+    ev.length = 0;
+    tram.step(dt, ev);
+    this.placeTramProxy();
+    this.rules.time += dt;
+    this.signals.update(dt);
+    // the other trams and trains (the player's is among them and is left to its driver)
+    const others = this.railOthers;
+    others.length = 0;
+    for (const car of this.traffic.cars) others.push({ x: car.x, z: car.z, r: 1.3 });
+    // (the others appear around the player's tram and keep clear of it like of any other)
+    const front = tram.v.cars[0];
+    this.rail.update(dt, { x: front.x, y: front.y, z: front.z, yaw: front.yaw, length: tram.v.consist.carLen, width: tram.v.consist.width }, others);
+    // the road traffic keeps clear of every car of the tram
+    const boxes = this.railBoxes;
+    boxes.length = 0;
+    for (const rv of this.rail.vehicles) for (const rc of rv.cars) boxes.push({ x: rc.x, y: rc.y, z: rc.z, yaw: rc.yaw, speed: rv.speed, length: rv.consist.carLen, width: rv.consist.width, own: rv === tram.v });
+    this.traffic.obstacles = boxes;
+    this.traffic.update(dt, { x: front.x, y: front.y, z: front.z, yaw: front.yaw, speed: tram.speed, length: tram.v.consist.carLen, width: tram.v.consist.width });
+    for (const e of this.traffic.events) {
+      if (e.type === 'collision') this.rules.noteAt('crash', 'fail', front.x, front.z, { speed: Math.round(tram.speed * 3.6) }, 6);
+      else if (e.type === 'cyclistEndangered') this.rules.noteAt(e.hit ? 'cyclistHit' : 'cyclistCutOff', e.hit ? 'fail' : 'major', front.x, front.z, {}, 8);
+    }
+    this.noteTram(ev);
+    // the lesson: a line with its stops
+    if (this.lesson?.kind === 'tram') {
+      const n = Math.min(tram.served, TRAM_STOPS);
+      this.lessonLine = tr('tramProgress', this.settings.lang, { n, max: TRAM_STOPS });
+      if (tram.served >= TRAM_STOPS && tram.speed < 0.1 && !tram.doorsOpen) this.finish();
+    }
+    if (this.failT > 0 && this.time > this.failT) this.finish();
+  }
+
   /** the junction whose lights were last said to be out of order, and for how long the car has stood at a lit green arrow */
   private toldDark: Junction | null = null;
   private atArrow = 0;
@@ -2132,7 +2277,7 @@ export class Game {
       model.root.updateMatrixWorld(true);
       const t = this.trailer;
       if (t && this.truck && this.def.kind === 'truck') this.truck.setTrailer(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, t.coupled);
-      if (t && this.carTrailer && this.def.kind === 'carTrailer') this.carTrailer.place(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, this.lastVisual);
+      if (t && this.carTrailer && this.def.model !== 'truck') this.carTrailer.place(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, this.lastVisual);
       // a motorcycle leans into the bend: as far as it must for the speed and the curve
       if (model instanceof PlayerBike) model.setLean(Math.atan(Math.max(-8, Math.min(8, v.accLat)) / 9.81));
       tiles.update(this.mpos[0], this.mpos[2]);
@@ -2172,7 +2317,11 @@ export class Game {
         const far = Math.min(450, app.tiles.viewRadius * 0.4);
         // (each mirror in the frame of what it is fixed to: the motorcycle's turn with the handlebar and lean with it)
         if (mode === 'full' || this.frames < 4) for (const m of mirrors) m.render(app.renderer, app.scene, (m.mesh.parent ?? model.root).matrixWorld, this.eyeWorld, far);
-        else mirrors[this.mirrorTurn++ % mirrors.length].render(app.renderer, app.scene, model.root.matrixWorld, this.eyeWorld, far);
+        else if (mirrors.length > 0) {
+          // (one mirror a picture – a cab without mirrors, the tram's, has none to turn)
+          const m = mirrors[this.mirrorTurn++ % mirrors.length];
+          m.render(app.renderer, app.scene, (m.mesh.parent ?? model.root).matrixWorld, this.eyeWorld, far);
+        }
       }
       app.render(model.root.position);
     } else {
@@ -2231,7 +2380,10 @@ export class Game {
     const v = this.vehicle;
     const c = this.input.c;
     const s = this.visual;
-    const kmh = v.speed * 3.6;
+    const kmh = (this.tram ? this.tram.speed : v.speed) * 3.6;
+    // (a tram is not steered: no steering bar on the screen – the indicators choose the way at a switch)
+    this.ui.classList.toggle('rail', !!this.tram);
+    if (this.tram && this.model instanceof TramCab) this.model.setLever(this.tram.emergency ? -1.2 : this.tram.lever);
     s.speedKmh = Math.abs(kmh);
     s.rpm = v.rpm;
     s.gear = v.spec.transmission === 'automatic' ? (c.gear === 1 ? v.gear : c.gear) : v.gear;
@@ -2263,6 +2415,10 @@ export class Game {
     s.reversing = v.gear === -1;
     this.lastVisual = s;
     this.model.update(s, dt, this.time);
+    // the map on the car's centre display, in the driver's seat (the other vehicles have no such screen)
+    const onScreen = this.settings.mapOnScreen && this.cameraMode === 'cockpit' && !this.walker && this.doorT < 0 && this.model === this.car;
+    this.car.setMapOnScreen(onScreen);
+    this.hud.screen = onScreen ? this.carScreen : null;
 
     // sound
     let skid = 0;
@@ -2275,7 +2431,7 @@ export class Game {
     this.audio.update({
       rpm: v.rpm,
       load: v.engineLoad,
-      engineRunning: v.engineRunning,
+      engineRunning: v.engineRunning && !this.tram,
       starter: c.starter,
       speed: v.speed,
       skid,
@@ -2341,7 +2497,11 @@ export class Game {
       tip,
       tipAction,
       // (the truck's instruments stand far away at the foot of its windscreen: the strip stays)
+      // (on foot there is nothing to read off a dashboard)
       showDash: this.cameraMode !== 'cockpit' || this.def.dash,
+      onFoot: !!this.walker,
+      // (the reminder of the keys is the car's: not for the tram – its lesson says how it is driven)
+      noKeyHints: !!this.tram,
       indicator: c.indicator,
       hazard: c.hazard,
       blinkOn: s.blinkOn,
@@ -2367,6 +2527,33 @@ export class Game {
       hs.navText = ctx.roadName || tr('free', lang);
       hs.navSub = tr(touch ? 'navSubTouch' : 'navSubKeys', lang);
       hs.navArrow = 0;
+    }
+    const tram = this.tram;
+    if (tram) {
+      // the tram: the next stop, the controller, the switch asked for, the doors
+      const A = tram.ahead;
+      hs.limit = tram.limit;
+      hs.zone = 0;
+      hs.junction = A.signalIn < 120 && A.signal >= 0 ? { dist: A.signalIn, role: 0, ctrl: CTRL.SIGNALS, signal: A.signal, arrow: -2, dark: false } : null;
+      hs.gear = tram.emergency ? '!' : tram.lever > 0.02 ? `+${Math.round(tram.lever * 100)}` : tram.lever < -0.02 ? `−${Math.round(-tram.lever * 100)}` : '0';
+      hs.navText = A.stop < 800 ? tr('tramNextStop', lang, { name: this.stopName(A.stopPath, A.stopMark), d: Math.max(0, Math.round(A.stop)) }) : tr('tramNoStop', lang);
+      const control = tram.emergency ? tr('tramEmergency', lang) : tram.lever > 0.02 ? tr('tramPower', lang, { p: Math.round(tram.lever * 100) }) : tram.lever < -0.02 ? tr('tramBrake', lang, { p: Math.round(-tram.lever * 100) }) : tr('tramCoast', lang);
+      const way = tr(tram.wish > 0 ? 'tramWayLeft' : tram.wish < 0 ? 'tramWayRight' : 'tramWayStraight', lang);
+      const parts = [control, way, tr(tram.doorsOpen ? 'tramDoorsOpen' : 'tramDoorsClosed', lang)];
+      if (this.lesson?.kind === 'tram') parts.unshift(this.lessonLine);
+      hs.navSub = parts.join(' · ');
+      hs.navArrow = 0;
+      hs.navActive = false;
+      hs.tip = '';
+      hs.tipAction = '';
+      if (tram.doorsOpen && tram.passengers > 0) hs.tip = tr('tramPassengers', lang, { n: tram.passengers });
+      else if (tram.doorsOpen) {
+        hs.tip = tr(touch ? 'tramCloseDoorsTouch' : 'tramCloseDoors', lang);
+        hs.tipAction = 'KeyG';
+      } else if (tram.atUnservedStop) {
+        hs.tip = tr(touch ? 'tramOpenDoorsTouch' : 'tramOpenDoors', lang);
+        hs.tipAction = 'KeyG';
+      } else if (A.switchIn < 60 && tram.speed > 0.5) hs.tip = tr('tramSwitchAhead', lang, { d: Math.round(A.switchIn) });
     }
     const w = this.walker;
     if (w) {

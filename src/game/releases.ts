@@ -22,6 +22,11 @@ export interface Release {
 
 export const RELEASES: readonly Release[] = [
   {
+    version: '1.1.0',
+    date: '2026-11-16',
+    items: ['news.1_1_0.tram', 'news.1_1_0.classes', 'news.1_1_0.graphics', 'news.1_1_0.screen', 'news.1_1_0.wheels', 'news.1_1_0.onFoot'],
+  },
+  {
     version: '1.0.0',
     date: '2026-11-16',
     intro: 'news.1_0_0.intro',

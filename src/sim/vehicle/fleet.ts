@@ -158,3 +158,84 @@ export const MOTORCYCLE_AUTOMATIC: VehicleSpec = {
   // (a coupling sized for the small engine: at idle it takes less than half of what the engine makes, or it would stall)
   auto: { up: [4200, 8800], down: [2600, 4500], kickdownRpm: 7500, lockOmega: 160, converter: 0.001 },
 };
+
+/** A light truck of 7.5 t with a box body (class C1). */
+export const LIGHT_TRUCK: VehicleSpec = {
+  ...TRUCK,
+  name: 'Lkw 7,5 t mit Kofferaufbau, 130 kW, automatisiertes Getriebe',
+  mass: 5800,
+  inertia: [26000, 25000, 6500],
+  wheelbase: 3.9,
+  track: 1.9,
+  cgHeight: 1.1,
+  cgToFront: 2.15,
+  wheelRadius: 0.42,
+  wheelInertia: 9,
+  springRate: [105000, 170000],
+  damperBump: [6200, 9500],
+  damperRebound: [11000, 16500],
+  antiRoll: [80000, 60000],
+  torqueCurve: TRUCK.torqueCurve.map(([rpm, t]): [number, number] => [rpm, Math.round(t * 0.66)]),
+  brakeTorque: 26000,
+  handbrakeTorque: 24000,
+  maxWheelAngle: 0.74,
+  dragArea: 5.0,
+  length: 7.4,
+  width: 2.4,
+  bodyPoints: corners(1.2, 0.55, 3.3, -3.35, 4.05),
+};
+
+/** A minibus for up to 16 passengers (class D1): 5 t, 7.4 m. */
+export const MINIBUS: VehicleSpec = {
+  ...BUS,
+  name: 'Kleinbus 7,4 m, 120 kW, Automatik',
+  mass: 4800,
+  inertia: [21000, 20000, 4500],
+  wheelbase: 4.3,
+  track: 1.75,
+  cgHeight: 1.0,
+  cgToFront: 2.4,
+  wheelRadius: 0.38,
+  wheelInertia: 6,
+  springRate: [80000, 120000],
+  damperBump: [4800, 7000],
+  damperRebound: [8400, 12200],
+  antiRoll: [45000, 35000],
+  torqueCurve: TRUCK.torqueCurve.map(([rpm, t]): [number, number] => [rpm, Math.round(t * 0.5)]),
+  brakeTorque: 17000,
+  handbrakeTorque: 16000,
+  maxWheelAngle: 0.7,
+  dragArea: 4.6,
+  length: 7.4,
+  width: 2.2,
+  bodyPoints: corners(1.08, 0.35, 2.75, -3.35, 4.05),
+};
+
+/** A tractor built for 60 km/h (class T; the 40 km/h tractor is class L). */
+export const TRACTOR_FAST: VehicleSpec = { ...TRACTOR, name: 'Traktor 150 kW, 60 km/h', finalDrive: TRACTOR.finalDrive * (40 / 60), torqueCurve: TRACTOR.torqueCurve.map(([rpm, t]): [number, number] => [rpm, Math.round(t * 1.3)]) };
+
+/** The smaller motorcycles: a moped built for 45 km/h (AM), a 125 (A1), one of 35 kW (A2). */
+function smaller(name: string, k: number, finalDrive: number): VehicleSpec {
+  // (a smaller engine: less torque – and less friction and inertia inside it, or that would eat its torque)
+  const [f0, f1] = MOTORCYCLE.engineFriction;
+  return {
+    ...MOTORCYCLE,
+    name,
+    torqueCurve: MOTORCYCLE.torqueCurve.map(([rpm, t]): [number, number] => [rpm, Math.round(t * k * 10) / 10]),
+    engineFriction: [f0 * k, f1 * k],
+    engineInertia: MOTORCYCLE.engineInertia * Math.max(0.3, k),
+    clutchTorque: MOTORCYCLE.clutchTorque * Math.max(0.3, k),
+    mass: MOTORCYCLE.mass - (1 - k) * 120,
+    finalDrive,
+  };
+}
+/** … each with a manual gearbox and an automatic one whose coupling is sized for its engine (or it would hold it down) */
+function variants(name: string, k: number, finalDrive: number): { manual: VehicleSpec; auto: VehicleSpec } {
+  const manual = smaller(name, k, finalDrive);
+  const base = MOTORCYCLE_AUTOMATIC.auto as NonNullable<VehicleSpec['auto']>;
+  return { manual, auto: { ...manual, name: `${name}, Automatik`, transmission: 'automatic', auto: { ...base, converter: base.converter * k } } };
+}
+// (geared for its 45 km/h: at the rev limit in top gear it runs 46)
+export const MOPED = variants('Moped 50 cm³, 45 km/h', 0.12, 24);
+export const MOTORCYCLE_125 = variants('Leichtkraftrad 125 cm³, 11 kW', 0.3, 7.2);
+export const MOTORCYCLE_35KW = variants('Motorrad 35 kW', 0.75, 5.8);

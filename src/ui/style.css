@@ -493,3 +493,14 @@ kbd { direction: ltr; unicode-bidi: isolate; }
 .panel.news ul { margin: 4px 0 14px; padding-inline-start: 20px; }
 .panel.news li { margin: 4px 0; line-height: 1.4; }
 .panel .version { margin: 10px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+/* the map is on the vehicle's own screen (driver's seat): not in the corner as well */
+.hud .map.onscreen { display: none; }
+
+/* ---------- the advanced graphics settings, folded away ---------- */
+.panel details.advanced { margin: 6px 0 10px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.panel details.advanced > summary { cursor: pointer; padding: 6px 0; color: var(--muted); }
+.panel details.advanced[open] > summary { color: var(--text); }
+
+/* the tram follows its rails: no steering bar (the indicator buttons choose the way at a switch) */
+#ui.rail .touch .steer { display: none; }

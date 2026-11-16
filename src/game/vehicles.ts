@@ -12,16 +12,34 @@
  *  - a tractor built for 40 km/h may not use the motorway (§ 18 Abs. 1 StVO).
  */
 import type { TrailerSpec } from '../sim/trailer.ts';
-import { CAR_TRAILER, TANDEM_TRAILER, trailerOutline } from '../sim/trailer.ts';
-import { BUS, MOTORCYCLE, MOTORCYCLE_AUTOCLUTCH, MOTORCYCLE_AUTOMATIC, TRACTOR } from '../sim/vehicle/fleet.ts';
+import { BUS_TRAILER, CAR_TRAILER, LIGHT_TRUCK_TRAILER, MINIBUS_TRAILER, TANDEM_TRAILER, trailerOutline } from '../sim/trailer.ts';
+import { BUS, LIGHT_TRUCK, MINIBUS, MOPED, MOTORCYCLE, MOTORCYCLE_125, MOTORCYCLE_35KW, MOTORCYCLE_AUTOCLUTCH, MOTORCYCLE_AUTOMATIC, TRACTOR, TRACTOR_FAST } from '../sim/vehicle/fleet.ts';
 import { COMPACT_CAR, COMPACT_CAR_AUTOCLUTCH, COMPACT_CAR_AUTOMATIC, TRUCK, withPower } from '../sim/vehicle/index.ts';
 import type { VehicleSpec } from '../sim/vehicle/index.ts';
 import { COMPACT_DIMS } from '../render/carBody.ts';
 
-export type VehicleKind = 'car' | 'carTrailer' | 'motorcycle' | 'truckSolo' | 'truck' | 'bus' | 'tractor';
-export const VEHICLE_KINDS: readonly VehicleKind[] = ['car', 'carTrailer', 'motorcycle', 'truckSolo', 'truck', 'bus', 'tractor'];
+export type VehicleKind =
+  | 'car'
+  | 'carTrailer'
+  | 'moped'
+  | 'motorcycle125'
+  | 'motorcycle35'
+  | 'motorcycle'
+  | 'lightTruck'
+  | 'lightTruckTrailer'
+  | 'truckSolo'
+  | 'truck'
+  | 'minibus'
+  | 'minibusTrailer'
+  | 'bus'
+  | 'busTrailer'
+  | 'tractorSlow'
+  | 'tractor'
+  | 'tram';
+/** in the order of the licence classes: B, BE, AM, A1, A2, A, C1, C1E, C, CE, D1, D1E, D, DE, L, T – and the tram */
+export const VEHICLE_KINDS: readonly VehicleKind[] = ['car', 'carTrailer', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'minibus', 'minibusTrailer', 'bus', 'busTrailer', 'tractorSlow', 'tractor', 'tram'];
 
-export type ModelKind = 'car' | 'truck' | 'bus' | 'tractor' | 'motorcycle';
+export type ModelKind = 'car' | 'truck' | 'truckLight' | 'bus' | 'minibus' | 'tractor' | 'motorcycle' | 'tram';
 
 export interface VehicleDef {
   kind: VehicleKind;
@@ -98,6 +116,96 @@ const truck: Omit<VehicleDef, 'kind' | 'licence' | 'name' | 'trailer' | 'caps' |
   dash: true,
 };
 
+/** what the motorcycles of every class have in common */
+const MOTO_DEF: Omit<VehicleDef, 'spec'> & { spec: VehicleDef['spec'] } = {
+  ...car,
+  kind: 'motorcycle',
+  licence: 'A',
+  name: 'vehMotorcycle',
+  model: 'motorcycle',
+  spec: (t) => (t === 'automatic' ? MOTORCYCLE_AUTOMATIC : t === 'assist' ? MOTORCYCLE_AUTOCLUTCH : MOTORCYCLE),
+  trailer: null,
+  caps: null,
+  capFault: 'speed',
+  outline: { front: 1.07, rear: 1.08, hw: 0.42 },
+  axles: [0.725, -0.725],
+  track: 0.05,
+  door: 0,
+  doorSide: 0,
+  circles: [-0.55, 0.55],
+  radius: 0.45,
+  zoom: 5,
+  zoomMax: 14,
+  dash: true,
+};
+
+/** a 7.5 t truck (class C1) */
+const LIGHT_TRUCK_DEF: VehicleDef = {
+  ...truck,
+  kind: 'lightTruck',
+  licence: 'C1',
+  name: 'vehLightTruck',
+  model: 'truckLight',
+  spec: () => LIGHT_TRUCK,
+  trailer: null,
+  caps: { rural: 80, motorway: 80 },
+  capFault: 'classSpeed',
+  outline: { front: 3.35, rear: 4.05, hw: 1.2 },
+  axles: [1.95, -1.95],
+  track: 0.95,
+  door: 2.05,
+  circles: [-2.3, -0.6, 1.1, 2.8],
+  radius: 1.2,
+  zoom: 13,
+  zoomMax: 30,
+};
+
+/** a minibus (class D1): its door is at the front on the right */
+const MINIBUS_DEF: VehicleDef = {
+  ...truck,
+  kind: 'minibus',
+  licence: 'D1',
+  name: 'vehMinibus',
+  model: 'minibus',
+  spec: () => MINIBUS,
+  trailer: null,
+  caps: { rural: 80, motorway: 100 },
+  capFault: 'classSpeed',
+  outline: { front: 3.35, rear: 4.05, hw: 1.1 },
+  axles: [2.15, -2.15],
+  track: 0.875,
+  door: 1.25,
+  doorSide: 1,
+  circles: [-2.3, -0.6, 1.1, 2.8],
+  radius: 1.1,
+  zoom: 12,
+  zoomMax: 28,
+  governed: 100,
+};
+
+const BUS_DEF: VehicleDef = {
+  ...truck,
+  kind: 'bus',
+  licence: 'D',
+  name: 'vehBus',
+  model: 'bus',
+  spec: () => BUS,
+  trailer: null,
+  caps: { rural: 80, motorway: 100 },
+  capFault: 'classSpeed',
+  outline: { front: 5.65, rear: 6.35, hw: 1.28 },
+  axles: [2.95, -2.95],
+  track: 1.05,
+  // (the driver of a city bus gets in by the front door, on the right)
+  door: 4.85,
+  doorSide: 1,
+  circles: [-4.6, -2.3, 0, 2.3, 4.6],
+  radius: 1.3,
+  zoom: 18,
+  zoomMax: 40,
+  governed: 100,
+};
+
 export const VEHICLES: Record<VehicleKind, VehicleDef> = {
   car: { ...car, kind: 'car', licence: 'B', name: 'vehCar', trailer: null, caps: null, capFault: 'speed' },
   carTrailer: {
@@ -112,56 +220,38 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     zoomMax: 26,
     long: true,
   },
-  motorcycle: {
-    ...car,
-    kind: 'motorcycle',
-    licence: 'A',
-    name: 'vehMotorcycle',
-    model: 'motorcycle',
-    spec: (t) => (t === 'automatic' ? MOTORCYCLE_AUTOMATIC : t === 'assist' ? MOTORCYCLE_AUTOCLUTCH : MOTORCYCLE),
-    trailer: null,
-    caps: null,
-    capFault: 'speed',
-    outline: { front: 1.07, rear: 1.08, hw: 0.42 },
-    axles: [0.725, -0.725],
-    track: 0.05,
-    door: 0,
-    doorSide: 0,
-    circles: [-0.55, 0.55],
-    radius: 0.45,
-    zoom: 5,
-    zoomMax: 14,
-    dash: true,
-  },
+  motorcycle: { ...MOTO_DEF },
   truckSolo: { ...truck, kind: 'truckSolo', licence: 'C', name: 'vehTruckSolo', trailer: null, caps: { rural: 60, motorway: 80 }, capFault: 'classSpeed', zoom: 14, zoomMax: 32 },
   truck: { ...truck, kind: 'truck', licence: 'CE', name: 'vehTruck', trailer: TANDEM_TRAILER, caps: { rural: 60, motorway: 80 }, capFault: 'truckSpeed', zoom: 21, zoomMax: 45 },
-  bus: {
-    ...truck,
-    kind: 'bus',
-    licence: 'D',
-    name: 'vehBus',
-    model: 'bus',
-    spec: () => BUS,
-    trailer: null,
-    caps: { rural: 80, motorway: 100 },
-    capFault: 'classSpeed',
-    outline: { front: 5.65, rear: 6.35, hw: 1.28 },
-    axles: [2.95, -2.95],
-    track: 1.05,
-    // (the driver of a city bus gets in by the front door, on the right)
-    door: 4.85,
-    doorSide: 1,
-    circles: [-4.6, -2.3, 0, 2.3, 4.6],
-    radius: 1.3,
-    zoom: 18,
-    zoomMax: 40,
-    governed: 100,
-  },
+  bus: BUS_DEF,
   tractor: {
     ...car,
     kind: 'tractor',
     licence: 'T',
     name: 'vehTractor',
+    model: 'tractor',
+    spec: () => TRACTOR_FAST,
+    trailer: null,
+    caps: null,
+    capFault: 'speed',
+    outline: { front: 2.4, rear: 2.1, hw: 1.15 },
+    axles: [1.325, -1.325],
+    track: 0.95,
+    door: -0.2,
+    circles: [-1.4, 0, 1.3],
+    radius: 1.15,
+    zoom: 8,
+    zoomMax: 20,
+    governed: 60,
+    heavy: true,
+    noMotorway: true,
+    dash: true,
+  },
+  tractorSlow: {
+    ...car,
+    kind: 'tractorSlow',
+    licence: 'L',
+    name: 'vehTractorSlow',
     model: 'tractor',
     spec: () => TRACTOR,
     trailer: null,
@@ -178,6 +268,68 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     governed: 40,
     heavy: true,
     noMotorway: true,
+    dash: true,
+  },
+  moped: {
+    ...MOTO_DEF,
+    kind: 'moped',
+    licence: 'AM',
+    name: 'vehMoped',
+    spec: (t) => (t === 'automatic' ? MOPED.auto : t === 'assist' ? { ...MOPED.manual, autoClutch: true } : MOPED.manual),
+    governed: 45,
+    noMotorway: true,
+  },
+  motorcycle125: {
+    ...MOTO_DEF,
+    kind: 'motorcycle125',
+    licence: 'A1',
+    name: 'vehMotorcycle125',
+    spec: (t) => (t === 'automatic' ? MOTORCYCLE_125.auto : t === 'assist' ? { ...MOTORCYCLE_125.manual, autoClutch: true } : MOTORCYCLE_125.manual),
+  },
+  motorcycle35: {
+    ...MOTO_DEF,
+    kind: 'motorcycle35',
+    licence: 'A2',
+    name: 'vehMotorcycle35',
+    spec: (t) => (t === 'automatic' ? MOTORCYCLE_35KW.auto : t === 'assist' ? { ...MOTORCYCLE_35KW.manual, autoClutch: true } : MOTORCYCLE_35KW.manual),
+  },
+  lightTruck: { ...LIGHT_TRUCK_DEF },
+  lightTruckTrailer: {
+    ...LIGHT_TRUCK_DEF,
+    kind: 'lightTruckTrailer',
+    licence: 'C1E',
+    name: 'vehLightTruckTrailer',
+    trailer: LIGHT_TRUCK_TRAILER,
+    caps: { rural: 60, motorway: 80 },
+    zoom: 16,
+    zoomMax: 36,
+  },
+  minibus: { ...MINIBUS_DEF },
+  minibusTrailer: { ...MINIBUS_DEF, kind: 'minibusTrailer', licence: 'D1E', name: 'vehMinibusTrailer', trailer: MINIBUS_TRAILER, caps: { rural: 80, motorway: 80 }, zoom: 15, zoomMax: 34 },
+  busTrailer: { ...BUS_DEF, kind: 'busTrailer', licence: 'DE', name: 'vehBusTrailer', trailer: BUS_TRAILER, caps: { rural: 80, motorway: 80 }, zoom: 22, zoomMax: 48 },
+  // The tram runs on the tracks (sim/tramdrive.ts), not on the road physics: what is given here is
+  // what the rest of the game needs of a vehicle – where the driver sits, what the camera keeps to –
+  // measured from the middle of its first car.
+  tram: {
+    ...BUS_DEF,
+    kind: 'tram',
+    licence: 'BOStrab',
+    name: 'vehTram',
+    model: 'tram',
+    spec: () => BUS,
+    caps: null,
+    capFault: 'speed',
+    outline: { front: 4.7, rear: 4.7, hw: 1.2 },
+    door: 0,
+    doorSide: 0,
+    circles: [-3, 0, 3],
+    radius: 1.25,
+    zoom: 22,
+    zoomMax: 50,
+    governed: 70,
+    heavy: true,
+    noMotorway: true,
+    long: true,
     dash: true,
   },
 };

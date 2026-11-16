@@ -55,9 +55,22 @@ export class TileManager {
   private readonly paintMat = makeGroundMaterial(true);
   private readonly structMat = makeStructMaterial();
   private readonly bldgMat = makeBuildingMaterial();
+  private readonly plainMat = makeBuildingMaterial(true);
+  /** buildings with windows, doors and roof tiles (false: plain walls and roofs) */
+  private facades = true;
   private readonly listeners: TileListener[] = [];
   /** tiles are kept within this distance (metres) of the viewer */
   viewRadius = 1400;
+
+  /** Buildings with their windows, doors and roof tiles – or plain (graphics setting). */
+  setFacades(on: boolean): void {
+    if (on === this.facades) return;
+    this.facades = on;
+    const mat = on ? this.bldgMat : this.plainMat;
+    this.group.traverse((o) => {
+      if (o.name === 'bldg' && (o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = mat;
+    });
+  }
   maxConcurrent = 3;
   private wantCount = 0;
 
@@ -304,7 +317,7 @@ export class TileManager {
       struct.castShadow = true;
       struct.receiveShadow = true;
     }
-    const bldg = mesh('bldg', this.bldgMat, (g) => {
+    const bldg = mesh('bldg', this.facades ? this.bldgMat : this.plainMat, (g) => {
       g.setAttribute('astyle', new THREE.BufferAttribute(a8('bldg') as Uint8Array, 4));
       g.setAttribute('auvd', new THREE.BufferAttribute(data.get('bldg_a16') as Int16Array, 4));
     });

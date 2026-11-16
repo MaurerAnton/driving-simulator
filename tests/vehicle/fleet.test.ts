@@ -13,7 +13,8 @@ import test from 'node:test';
 import { VEHICLES, VEHICLE_KINDS } from '../../src/game/vehicles.ts';
 import { DT, PlaneGround, input, makeCar } from './harness.ts';
 
-for (const kind of VEHICLE_KINDS) {
+// (the tram runs on its tracks: tests/game/tram.test.ts)
+for (const kind of VEHICLE_KINDS.filter((k) => k !== 'tram')) {
   const def = VEHICLES[kind];
   test(`${kind}: pulls away, stops, pulls away again – and keeps to its top speed`, () => {
     const spec = def.spec('automatic', 150);
@@ -23,14 +24,16 @@ for (const kind of VEHICLE_KINDS) {
       for (let i = 0; i < secs / DT; i++) v.step(DT, input({ throttle, brake, gear: 1 }));
     };
     go(6, 0.6, 0);
-    assert.ok(v.speed * 3.6 > 20, `under way (${(v.speed * 3.6).toFixed(0)} km/h)`);
+    // (a moped built for 45 km/h takes its time)
+    const brisk = def.governed > 0 && def.governed < 50 ? 10 : 20;
+    assert.ok(v.speed * 3.6 > brisk, `under way (${(v.speed * 3.6).toFixed(0)} km/h)`);
     go(6, 0, 0.6);
     assert.ok(Math.abs(v.speed) < 0.1, `stopped (${v.speed.toFixed(2)} m/s)`);
     go(3, 0, 0.3);
     assert.ok(Math.abs(v.speed) < 0.1, 'held by the brake, not crept away');
     assert.equal(v.engineRunning, true, 'the engine still runs after the stop');
     go(4, 0.5, 0);
-    assert.ok(v.speed * 3.6 > 10, `and pulls away again (${(v.speed * 3.6).toFixed(0)} km/h)`);
+    assert.ok(v.speed * 3.6 > brisk / 2 - 2, `and pulls away again (${(v.speed * 3.6).toFixed(0)} km/h)`);
     if (def.governed > 0 && def.governed < 60) {
       go(40, 1, 0);
       assert.ok(v.speed * 3.6 < def.governed + 2, `not faster than it is built for (${(v.speed * 3.6).toFixed(1)} km/h)`);

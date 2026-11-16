@@ -1,8 +1,8 @@
 # Fahrsim Baunatal
 
 **Freier 3D-Fahrschulsimulator für Nordhessen – deutsche Verkehrsregeln im echten Straßennetz üben,
-mit einem Fahrzeug jeder Führerscheinklasse: Pkw, Pkw mit Anhänger, Motorrad, Lkw, Lkw mit Anhänger, Bus
-und Traktor.**
+mit einem Fahrzeug jeder Führerscheinklasse – vom Mofa bis zum Bus mit Anhänger – und mit der
+Straßenbahn.**
 Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software unter **AGPL-3.0-only**.
 
 ▶ **Spielen:** <https://maureranton.github.io/driving-simulator/>
@@ -38,13 +38,23 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   Schaltgetriebe; **Motorleistung wählbar** (60 bis 200 PS, voreingestellt 75 PS). Ein Tempobegrenzer nimmt
   bei Tastatur und Touch das Gas am Tempolimit zurück, und die Tastaturlenkung richtet sich nach der
   Querbeschleunigung – auch bei Autobahntempo bleibt das Auto ruhig.
-- **Ein Fahrzeug für jede Klasse:** Pkw (B), Pkw mit Tandem-Kastenanhänger (BE), Motorrad (A), Lkw (C),
-  Lkw mit Anhänger (CE), Linienbus (D) und Traktor (T) – jedes mit eigener Fahrphysik, eigenem Modell mit
-  Cockpit und Spiegeln und den Regeln seiner Klasse: Der Regelwächter kennt die Höchstgeschwindigkeiten
-  außerorts und auf der Autobahn (Pkw mit Anhänger 80/80, Lkw 60/80, Bus 80/100 km/h; § 3 Abs. 3,
+- **Ein Fahrzeug für jede Klasse:** Pkw (B), Pkw mit Tandem-Kastenanhänger (BE), Mofa/Moped (AM),
+  125er (A1), Motorrad bis 35 kW (A2), Motorrad (A), Lkw 7,5 t (C1) und mit Anhänger (C1E), Lkw (C), Lkw
+  mit Anhänger (CE), Kleinbus (D1) und mit Anhänger (D1E), Linienbus (D) und mit Gepäckanhänger (DE),
+  Traktor bis 40 km/h (L) und bis 60 km/h (T) – jedes mit eigener Fahrphysik, eigenem Modell mit Cockpit
+  und Spiegeln und den Regeln seiner Klasse: Der Regelwächter kennt die Höchstgeschwindigkeiten außerorts
+  und auf der Autobahn (mit Anhänger 80 bzw. 60/80, Lkw über 7,5 t 60/80, Busse 80/100 km/h; § 3 Abs. 3,
   § 18 Abs. 5 StVO), Schrittgeschwindigkeit beim Rechtsabbiegen innerorts über 3,5 t (§ 9 Abs. 6 StVO) und
-  das Autobahnverbot für den Traktor, der bauartbedingt 40 km/h fährt (§ 18 Abs. 1 StVO). Lkw und Bus sind
-  abgeregelt (90 bzw. 100 km/h). Die Wege der Navigation führen den Traktor um die Autobahn herum.
+  das Autobahnverbot für Fahrzeuge, die bauartbedingt nicht schneller als 60 km/h fahren – Moped und
+  Traktoren (§ 18 Abs. 1 StVO). Lkw und Busse sind abgeregelt. Die Wege der Navigation führen langsame
+  Fahrzeuge um die Autobahn herum.
+- **Straßenbahn:** auf den Gleisen von Kassel und Baunatal (106 km, rund 135 Haltestellen), vom Halt am
+  gewählten Ort aus. Ein Fahrschalter für Fahren und Bremsen (die Pedale), die Notbremse mit
+  Schienenbremse (die Handbremse), die Klingel (die Hupe); an der Weiche wählt der Blinker den Weg. An der
+  Haltestelle: an der Haltemarke halten, Türen öffnen (`G`), Fahrgäste steigen aus und ein, Türen
+  schließen – dann weiter. Der Fahrlehrer achtet auf das Tempo in Kurven und auf der Straße, auf jede
+  Haltestelle, auf die Türen und auf rote Ampeln, wo das Gleis eine Kreuzung quert. Eine Fahrstunde mit
+  fünf Haltestellen und die freie Fahrt.
 - **Lkw mit Anhänger (Klasse CE):** ein 12-Tonner mit Tandemanhänger (15,7 m, 15,5 t) und alles, was die
   praktische Prüfung verlangt – siehe [unten](#lkw-mit-anhänger-klasse-ce).
 - **Zu Fuß ums Fahrzeug:** Aussteigen (`G`, aus dem Pausenmenü oder per Fingertipp, wenn das Fahrzeug mit
@@ -107,8 +117,11 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   aus dem Pausenmenü. Oder einer von gut 400 Startpunkten in 115 Orten.
 - Tastatur, Gamepad, **Lenkrad mit Pedalen und H-Schaltung** (Gamepad-API) und **Touchscreen** – auf dem
   Smartphone ist alles ohne Tastatur erreichbar. **Einstellungen**, Startpunkt, Fehlerprotokoll und
-  gefahrene Strecke bleiben im Browser gespeichert. **Einstellungen:** Grafik (drei Stufen: Auflösung,
-  Schatten, Sichtweite), Spiegel, Verkehrsdichte, Lautstärke, Getriebe und Motorleistung, Tempobegrenzer,
+  gefahrene Strecke bleiben im Browser gespeichert. **Einstellungen:** Grafik – Voreinstellungen (niedrig
+  bis sehr hoch), die die Auflösung nicht ändern; davon getrennt Größe der Oberfläche, Bildschirm- und
+  3D-Auflösung; in den erweiterten Einstellungen einzeln Schatten, Sichtweite, Bäume und Objekte am Rand,
+  Gebäude mit oder ohne Fenster, Schatten von Bäumen und Schildern –, die Karte auf dem Bildschirm des
+  Autos (Fahrersicht), Spiegel, Verkehrsdichte, Lautstärke, Getriebe und Motorleistung, Tempobegrenzer,
   Kamera beim Start, durchscheinender Innenraum, Bildschirmsteuerung und ihre Deckkraft, Tastenhilfe,
   Regel-Hilfe, Ganganzeige, gesprochene Ansagen, Start neben dem Fahrzeug – und die **Bildrate** (Bilder
   pro Sekunde, oben rechts).
@@ -337,8 +350,8 @@ muss man zum Spielen und Entwickeln nicht.
 ### Tests
 
 ```bash
-npm test             # 160 Tests: Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
-                     # Klassen (14), Realansicht (15), Adresssuche, Hinweise, Fehlerprotokoll, Karte (16), Straßenbahnen (9),
+npm test             # 182 Tests: Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
+                     # Klassen (32), Straßenbahn fahren (4), Realansicht (15), Adresssuche, Hinweise, Fehlerprotokoll, Karte (16), Straßenbahnen (9),
                      # Klasse CE (16), Sprachen (10), Rundfahrten (7), Radfahrer (11), Ampeln mit Pfeil und ausgefallene
                      # Ampeln (9), zu Fuß (6), „Was ist neu“ (3), freie Fahrstreifen (5), Straßennetz in Stücken,
                      # Kachelformat, Kreuzungsflächen (12)
@@ -402,7 +415,7 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 160 Tests (Fahrdynamik aller Fahrzeuge, Anhänger, Aufgaben der Klasse CE,
+- **Automatisch geprüft:** 182 Tests (Fahrdynamik aller Fahrzeuge, Straßenbahn, Anhänger, Aufgaben der Klasse CE,
   Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
   Umgebungsverkehrs, eine Kontrolle der gebauten Karte (ein wagenbreiter Kreis fährt jeden Fahrstreifen
   ab: nichts steht darin) und ein „virtueller Fahrschüler“, der alle Fahrstunden und die Prüfungsfahrt
@@ -424,6 +437,10 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   auf der Fahrbahn; sie kommen nur dort, wo Verkehr eingeschaltet ist.
 - **Darstellung:** Gebäude haben echte Form und Höhe, aber keine Fototexturen; Fahrzeuge und Cockpit sind
   vollständig prozedural erzeugt.
+- **Straßenbahn:** Ampeln gelten dort, wo das Gleis eine Kreuzung mit Ampel quert; eigene
+  Straßenbahnsignale (BOStrab) und Fahrpläne gibt es nicht. Die Haltestellen heißen nach der Straße, an der
+  sie liegen; die Fahrgäste werden gezählt, nicht gezeichnet. Die Fehler der Straßenbahn verweisen auf die
+  BOStrab (§ 50 Geschwindigkeiten, § 54 Türen und Haltestellen).
 - **Fahrzeuge:** Das Motorrad fährt auf demselben Vierrad-Modell wie alles andere, nur schmal und mit tiefem
   Schwerpunkt – es kippt nicht und muss nicht balanciert werden; dass es sich in die Kurve legt, ist
   gezeichnet. Der Bus fährt ohne Fahrgäste und hält nicht an Haltestellen, der Traktor ohne Anbaugeräte;
@@ -479,7 +496,7 @@ Einzelheiten: [NOTICE.md](NOTICE.md).
 **Fahrsim Baunatal** is a free (AGPL-3.0-only) browser-based 3D driving-school simulator set in the real
 north of the German state of Hesse – Kassel, Baunatal and five districts around them. It is meant to help
 learner drivers understand and practise German traffic rules (StVO) – with a vehicle of every licence
-class: car, car with trailer, motorcycle, truck, truck with trailer, bus and tractor.
+class, from the moped to the bus with a trailer, and with the tram.
 
 - The real road network of northern Hesse – the city of Kassel and the districts of Kassel, Schwalm-Eder,
   Werra-Meißner, Waldeck-Frankenberg and Hersfeld-Rotenburg: about 6,900 km², 115 towns and
@@ -499,11 +516,16 @@ class: car, car with trailer, motorcycle, truck, truck with trailer, bus and tra
   right order, reversing round a corner to the left, reversing to a loading ramp with an offset to the
   right, and a test drive; the rule monitor knows the truck rules (60 km/h outside built-up areas, 80 km/h
   on motorways, right turns in town at walking pace).
-- **A vehicle for every licence class:** car (B), car with a tandem box trailer (BE), motorcycle (A),
-  truck (C), truck with trailer (CE), city bus (D) and tractor (T) – each with its own physics, model with
-  cockpit and mirrors, and the rules of its class: speed caps outside built-up areas and on motorways (car
-  with trailer 80/80, trucks 60/80, bus 80/100 km/h), walking pace when turning right in town above 3.5 t,
-  no motorway for the 40 km/h tractor (routes lead round it).
+- **A vehicle for every licence class:** car (B) and with a trailer (BE), moped (AM), 125 (A1), motorcycle
+  up to 35 kW (A2) and motorcycle (A), truck 7.5 t (C1) and with a trailer (C1E), truck (C) and with a
+  trailer (CE), minibus (D1) and with a trailer (D1E), city bus (D) and with a trailer (DE), tractor up to
+  40 km/h (L) and up to 60 km/h (T) – each with its own physics, model with cockpit and mirrors, and the
+  rules of its class: speed caps outside built-up areas and on motorways, walking pace when turning right
+  in town above 3.5 t, no motorway for vehicles built for 60 km/h or less (routes lead round it).
+- **A tram** on the tracks of Kassel and Baunatal: one controller for power and brake, the way at a switch
+  chosen with the indicator, the doors at the stops while passengers get off and on; the instructor
+  watches the speed in curves and on the street, every stop, the doors and red lights where the track
+  crosses a junction. A lesson with five stops, and free driving.
 - **On foot:** get out (`G`, the pause menu, or a tap when the vehicle stands with the engine off and the
   parking brake on), walk round the vehicle and check it before driving off – tyres, lights front and
   back, with a trailer the coupling; rings on the ground show where –, then get in at the driver's door. A
@@ -520,7 +542,9 @@ class: car, car with trailer, motorcycle, truck, truck with trailer, bus and tra
   driving … – some 50 kinds of fault, counted in points (minor 1, serious 3, fail 10; a test is failed at
   10) – and a **mistake log** that keeps the faults of all drives and links each one to the official text
   of the paragraph. An optional rule help shows the speed limit and the right of way at the next junction.
-- Spoken directions (optional) with the lane to get into; settings for graphics (three levels), mirrors,
+- Spoken directions (optional) with the lane to get into; graphics presets that leave the resolutions
+  alone, separate interface size, display and 3D resolution, advanced options (shadows, view distance,
+  trees, plain buildings without windows); the map on the car's own screen in the driver's seat; mirrors,
   traffic density, volume, gearbox and engine power, the camera, the on-screen controls, the frames per
   second and more; **"What's new"** in the game for every version, in every language.
 - Lessons, a simulated driving test, ambient traffic and pedestrians – and **trams and trains** that run on
@@ -556,7 +580,7 @@ class: car, car with trailer, motorcycle, truck, truck with trailer, bus and tra
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 160 unit tests (vehicle dynamics of every vehicle, the trailer, the class-CE
+Verified automatically by 182 unit tests (vehicle dynamics of every vehicle, the tram, the trailer, the class-CE
 tasks, cyclists, traffic lights, on foot, trams, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
 a check of the built map (a car-wide circle is driven along every lane: nothing stands in one) and a
 "virtual learner driver" – the driver of the demonstration drives – that completes every lesson and the

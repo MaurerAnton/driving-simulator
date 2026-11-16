@@ -25,7 +25,7 @@ export interface Report {
 const KEEP = [
   'StVO', '§', 'Baunatal', 'Fahrsim', 'Panoramax', 'KartaView', 'Mapillary', 'OpenStreetMap', 'ODbL', 'AGPL-3.0-only', 'three.js', 'MIT', 'Wikimedia Commons', 'CC BY-SA 4.0',
   'EXIF', 'XMP', 'GeoJSON', 'JSON', 'CSV', 'JPEG', 'PNG', 'WebP', 'WebGL 2', '▲', '▼', '⋯', 'DGM1', 'LoD2', 'UrhG', 'Marktplatz 5', 'A 49', 'Logitech', 'Thrustmaster', 'Fanatec',
-  'RT', 'LT', 'RB/LB', 'X/B', 'Anlieger frei', 'P·R·N·D', '360°', 'IP', 'Kassel', 'CE', 'BE',
+  'RT', 'LT', 'RB/LB', 'X/B', 'Anlieger frei', 'P·R·N·D', '360°', 'IP', 'Kassel', 'CE', 'BE', 'C1E', 'D1E', 'C1', 'D1', 'A1', 'A2', 'AM', 'DE',
 ];
 
 /** Longest text (in characters) that still fits where these keys are shown. */
@@ -111,7 +111,11 @@ export function checkDict(code: string, dict: unknown, ref: Dict = en): Report {
     if (/\[\[|\]\]|\{|\}/.test(v.replace(/\[\[\w+\]\]/g, '').replace(/\{\w+\}/g, ''))) r.errors.push(`${k}: stray brackets or braces`);
     for (const name of KEEP) if (source.includes(name) && !v.includes(name)) r.errors.push(`${k}: "${name}" must stay as it is`);
     // numbers of two and more digits (sign numbers, speeds) must all be there
-    for (const n of source.replace(/\[\[\w+\]\]|\{\w+\}/g, '').match(/\d[\d.]*\d/g) ?? []) if (!v.includes(n)) r.errors.push(`${k}: the number ${n} is missing`);
+    // (written the language's way: 7,5 where English writes 7.5)
+    for (const n of source.replace(/\[\[\w+\]\]|\{\w+\}/g, '').match(/\d[\d.]*\d/g) ?? []) {
+      const ways = [n, n.replace(/\./g, ','), n.replace(/\./g, '٫'), n.replace(/\./g, '')];
+      if (!ways.some((w) => v.includes(w))) r.errors.push(`${k}: the number ${n} is missing`);
+    }
     for (const [re, max] of MAX) {
       if (re.test(k)) {
         if ([...v].length > max) r.errors.push(`${k}: ${[...v].length} characters, at most ${max} fit ("${v}")`);

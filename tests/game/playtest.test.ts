@@ -71,7 +71,11 @@ test('every citation of the StVO leads to the text of its paragraph', () => {
     assert.equal(parts.map((p) => p.text).join(''), ref, `${id}: nothing of the citation is lost`);
     if (/§|Anlage/.test(ref)) assert.ok(parts.some((p) => p.url), `${id}: "${ref}" has no link`);
     // (the StVO, or – for the tasks of the truck test – the annex of the driving-licence regulation)
-    for (const p of parts) if (p.url) assert.match(p.url, /^https:\/\/www\.gesetze-im-internet\.de\/(stvo_2013\/(__\d+[a-z]?|anlage_\d)|fev_2010\/anlage_\d)\.html$/);
+    for (const p of parts) if (p.url) assert.match(p.url, /^https:\/\/www\.gesetze-im-internet\.de\/(stvo_2013\/(__\d+[a-z]?|anlage_\d)|fev_2010\/anlage_\d|strabbo_1987\/__\d+)\.html$/);
+  }
+  // (the tram's rules link to the tram regulation)
+  assert.equal(citationParts('§ 54 Abs. 2 BOStrab')[0].url, 'https://www.gesetze-im-internet.de/strabbo_1987/__54.html');
+  {
   }
 });
 

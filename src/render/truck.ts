@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { TANDEM_TRAILER } from '../sim/trailer.ts';
 import { TRUCK, TRUCK_HITCH } from '../sim/vehicle/index.ts';
+import type { VehicleSpec } from '../sim/vehicle/index.ts';
 import type { CarVisualState } from './car.ts';
 import { InstrumentPanel } from './instruments.ts';
 import { Mirror } from './mirrors.ts';
@@ -117,6 +118,8 @@ export class PlayerTruck {
   readonly trailer = new THREE.Group();
   /** the driver's eyes (truck coordinates) */
   readonly eye = new THREE.Vector3(-0.62, 2.42, -2.55);
+  /** the truck it is the picture of (the 12-tonner of class C/CE, or the 7.5-tonner of C1) */
+  private readonly spec: VehicleSpec;
   readonly mirrors: Mirror[] = [];
   private readonly wheels: THREE.Group[] = [];
   private readonly trailerWheels: THREE.Group[] = [];
@@ -131,14 +134,16 @@ export class PlayerTruck {
   private readonly fittings = new THREE.MeshLambertMaterial({ color: 0x30343a });
   private readonly off = new THREE.MeshLambertMaterial({ color: 0x3a2d2a });
 
-  constructor() {
-    const s = TRUCK;
+  constructor(spec: VehicleSpec = TRUCK) {
+    const s = spec;
+    this.spec = spec;
     const root = this.root;
     root.name = 'truck';
     const axle = s.wheelbase / 2;
     const hw = (s.width ?? 2.5) / 2;
     const front = -(axle + 1.4);
     const rear = axle + 2.1;
+    this.eye.z = front + 1.2;
 
     // ---- chassis and bumper
     root.add(box(-0.45, 0.45, 0.62, 0.98, front + 0.3, rear - 0.1, FRAME));
@@ -322,7 +327,8 @@ export class PlayerTruck {
   update(s: CarVisualState, _dt: number, now: number): void {
     for (let i = 0; i < 4; i++) {
       const w = this.wheels[i];
-      w.position.y = TRUCK.wheelRadius + (s.wheelY[i] ?? 0);
+      // (wheelY is the height of the wheel's centre above the ground under the truck – not an offset from rest)
+      w.position.y = s.wheelY[i] ?? this.spec.wheelRadius;
       w.rotation.set(-(s.wheelSpin[i] ?? 0), i < 2 ? -(s.wheelSteer[i] ?? 0) : 0, 0, 'YXZ');
     }
     this.steering.rotation.z = -s.steerWheel;

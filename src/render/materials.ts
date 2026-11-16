@@ -233,8 +233,22 @@ vec3 fsFacade(float style, vec3 base, vec4 uvd, vec3 wp, float dist, out float g
 `;
 
 /** Buildings: procedural windows, doors and roof tiles from wall-space coordinates. */
-export function makeBuildingMaterial(): THREE.Material {
+export function makeBuildingMaterial(plain = false): THREE.Material {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  if (plain) {
+    // Plain buildings (graphics setting): walls and roofs in their colours, without the windows, doors
+    // and roof tiles the facade shader works out for every pixel – much less work for the graphics chip.
+    m.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec4 astyle;\nflat varying vec3 vFsBase;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFsBase = astyle.yzw / 255.0;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nflat varying vec3 vFsBase;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = pow(vFsBase, vec3(2.2));');
+    };
+    m.customProgramCacheKey = () => 'fs-bldg-plain';
+    return m;
+  }
   m.onBeforeCompile = (shader) => {
     injectWorldPos(shader, false, `flat varying vec4 vFsStyle;\nvarying vec4 vFsUvd;\n${FACADE_GLSL}`);
     shader.vertexShader = shader.vertexShader

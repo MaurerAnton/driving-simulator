@@ -844,6 +844,11 @@ export class PlayerCar {
   /** driver's eye point in car coordinates (seat position) */
   readonly eye = new THREE.Vector3(-0.36, 1.2, 0.2);
   readonly mirrors: Mirror[] = [];
+  /** the centre display: its picture of a map, or the live map (setMapOnScreen) drawn into `mapCanvas` */
+  private screen!: THREE.Mesh;
+  private screenStill!: THREE.Texture;
+  readonly mapCanvas = Object.assign(document.createElement('canvas'), { width: 512, height: 288 });
+  readonly mapTexture = new THREE.CanvasTexture(this.mapCanvas);
   private readonly panel = new InstrumentPanel();
   private readonly steering = new THREE.Group();
   private readonly lever = new THREE.Group();
@@ -979,8 +984,11 @@ export class PlayerCar {
     part(bezel, mats.black, 0, display);
     part(box(0.07, 0.07, 0.03, 0, -0.07, -0.028), mats.hard, 0, display);
     // (navigation is drawn on it by the HUD layer later)
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.244, 0.134), new THREE.MeshBasicMaterial({ map: screenTexture(), toneMapped: false }));
+    this.screenStill = screenTexture();
+    this.mapTexture.colorSpace = THREE.SRGBColorSpace;
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.244, 0.134), new THREE.MeshBasicMaterial({ map: this.screenStill, toneMapped: false }));
     screen.name = 'screen';
+    this.screen = screen;
     screen.position.z = 0.0012;
     display.add(screen);
     this.cockpit.add(display);
@@ -1188,6 +1196,16 @@ export class PlayerCar {
    * wheel, stalks, levers) form a second layer of the same kind so that they
    * stand out against the dashboard behind them.
    */
+  /** The live map on the centre display (true), or its still picture. */
+  setMapOnScreen(on: boolean): void {
+    const m = this.screen.material as THREE.MeshBasicMaterial;
+    const want = on ? this.mapTexture : this.screenStill;
+    if (m.map !== want) {
+      m.map = want;
+      m.needsUpdate = true;
+    }
+  }
+
   setCabinOpacity(opacity: number): void {
     const o = Number.isFinite(opacity) ? Math.min(1, Math.max(0.05, opacity)) : 1;
     const on = o < 0.995;

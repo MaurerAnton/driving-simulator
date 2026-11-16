@@ -708,8 +708,9 @@ export class LaneGraph {
         // rural road) it is a last resort.
         const uturn = c.from.to.ctrl === CTRL.MAP_END ? 900 : 150;
         let turnCost = c.turn === TURN.LEFT ? 6 : c.turn === TURN.RIGHT ? 3 : c.turn === TURN.UTURN ? uturn : 0;
-        // a long vehicle does not get round a hairpin at a junction: like turning round, a last resort
-        if (this.longVehicle && c.turn !== TURN.STRAIGHT && c.turn !== TURN.UTURN && hairpin(c)) turnCost += 400;
+        // a long vehicle does not get round a hairpin at a junction: like turning round, a last resort –
+        // and for everybody else it is an awkward way to go where there is another
+        if (c.turn !== TURN.STRAIGHT && c.turn !== TURN.UTURN && hairpin(c)) turnCost += this.longVehicle ? 400 : 120;
         // two left turns a few metres apart = turning round through a gap in the median
         if (c.turn === TURN.LEFT && lane.len < 15 && prev.get(lane.id)?.turn === TURN.LEFT) turnCost += 150;
         // "Anlieger frei" and car-park shortcuts are not through routes

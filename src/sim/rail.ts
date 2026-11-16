@@ -88,6 +88,8 @@ export interface RailVehicle {
   trail: Trail;
   /** something is on the track ahead (for a bell, for tests) */
   blocked: boolean;
+  /** driven by the player (sim/tramdrive.ts): not by the logic here, and it stays when the others go */
+  player?: boolean;
 }
 
 /** Something a rail vehicle must not run into: a circle on the ground. */
@@ -416,7 +418,7 @@ export class RailTraffic {
     // come and go with the player
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
       const c = this.vehicles[i].cars[0];
-      if (Math.hypot(c.x - player.x, c.z - player.z) > this.far) this.vehicles.splice(i, 1);
+      if (!this.vehicles[i].player && Math.hypot(c.x - player.x, c.z - player.z) > this.far) this.vehicles.splice(i, 1);
     }
     this.spawnT -= dt;
     if (this.spawnT <= 0 && this.vehicles.length < this.target) {
@@ -425,6 +427,7 @@ export class RailTraffic {
     }
 
     for (const v of this.vehicles) {
+      if (v.player) continue;
       const obstacles = this.obstacles;
       obstacles.length = 0;
       // the player's car: two circles along its length
@@ -563,8 +566,18 @@ export class RailTraffic {
     }
 
     // ---- move the front end, leaving the trail the cars follow
-    let move = v.speed * dt;
+    const move = v.speed * dt;
     v.noStop = Math.max(0, v.noStop - move);
+    this.advance(v, move);
+    this.place(v);
+  }
+
+  /**
+   * Move the front end of a vehicle `move` metres on along its way (the
+   * pieces in its plan), leaving the trail its cars follow.  False if the
+   * way ended before (it then stands at the end).
+   */
+  advance(v: RailVehicle, move: number): boolean {
     while (move > 0) {
       const p = this.net.paths[v.path];
       const room = v.dir > 0 ? p.len - v.s : v.s;
@@ -581,14 +594,14 @@ export class RailTraffic {
         const next = v.plan.shift();
         if (!next) {
           v.speed = 0;
-          break;
+          return false;
         }
         v.path = next.path;
         v.dir = next.dir;
         v.s = v.dir > 0 ? 0 : this.net.paths[v.path].len;
       }
     }
-    this.place(v);
+    return true;
   }
 
   /** The rear end becomes the front end. */
@@ -613,7 +626,7 @@ export class RailTraffic {
   }
 
   /** Put the cars on the trail behind the front end. */
-  private place(v: RailVehicle): void {
+  place(v: RailVehicle): void {
     const c = v.consist;
     const t = v.trail;
     const at = (dist: number, out: { x: number; y: number; z: number }): void => {

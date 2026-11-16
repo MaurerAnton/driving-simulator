@@ -72,6 +72,12 @@ export const CAR_TRAILER: TrailerSpec = {
   hitch: { behindRearAxle: 0.95, height: 0.45 },
 };
 
+/** The same box trailer behind a 7.5 t truck (class C1E): coupled higher, further behind the axle. */
+export const LIGHT_TRUCK_TRAILER: TrailerSpec = { ...CAR_TRAILER, mass: 2600, brake: 5.8, hitch: { behindRearAxle: 2.25, height: 0.75 } };
+/** … and behind a bus or a minibus, for the luggage (classes D1E, DE). */
+export const BUS_TRAILER: TrailerSpec = { ...CAR_TRAILER, mass: 1800, hitch: { behindRearAxle: 3.6, height: 0.55 } };
+export const MINIBUS_TRAILER: TrailerSpec = { ...CAR_TRAILER, mass: 1500, hitch: { behindRearAxle: 2.0, height: 0.5 } };
+
 /** The outline of a trailer in the plan, from the middle of its axle group: ahead to its front, behind to its rear, half its width, ahead to the coupling. */
 export function trailerOutline(t: TrailerSpec): { front: number; rear: number; hw: number; hitch: number } {
   return { front: t.hitchToAxle - t.bodyFront, rear: t.length - t.hitchToAxle, hw: t.width / 2, hitch: t.hitchToAxle };
