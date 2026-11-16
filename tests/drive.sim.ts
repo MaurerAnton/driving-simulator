@@ -246,7 +246,10 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
           driver.halt = HALT && targetIdx === VIA.length - 1 ? { x: VIA[targetIdx][0], z: VIA[targetIdx][1] } : null;
           if (index) {
             // (a map in pieces: the way there over the roads of the whole map, as the game plans it – the place may lie far beyond what is loaded)
-            const to = index.nearest(VIA[targetIdx][0], VIA[targetIdx][1], 150);
+            const main = (e: number): boolean => index.main[e * 2] === 1 || index.main[e * 2 + 1] === 1;
+            const to = index.nearest(VIA[targetIdx][0], VIA[targetIdx][1], 200, main) ?? index.nearest(VIA[targetIdx][0], VIA[targetIdx][1], 150);
+            // (as in the game: the place to halt at lies on the road, not at the house beside it)
+            if (driver.halt && to) driver.halt = { x: to.x, z: to.z };
             const ways = to ? (to.edge === lane.edge.id ? [] : quickestToEdge(index.graph, wayOf(lane), to.edge)) : null;
             if (ways) {
               nav.net = index.graph;

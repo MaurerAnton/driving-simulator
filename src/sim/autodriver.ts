@@ -339,9 +339,29 @@ export class AutoDriver {
       if (tight) return;
       const bx = smp.tx;
       const bz = smp.tz;
+      // … and a little further on: a bend is steered into where it begins, not where it comes into view
+      // (steering at a point 10 m ahead, the car turned in 10 m early and cut a sharp bend by a metre)
+      sample(Math.min(la * 1.6, la + 14));
+      const fx2 = smp.tx;
+      const fz2 = smp.tz;
       sample(0);
-      const bend = Math.acos(Math.max(-1, Math.min(1, bx * smp.tx + bz * smp.tz)));
-      sample(bend > 0.06 ? Math.max(3.5, Math.min(la, Math.sqrt((2.4 * la) / bend))) : la);
+      const t0x = smp.tx;
+      const t0z = smp.tz;
+      const bend = Math.acos(Math.max(-1, Math.min(1, bx * t0x + bz * t0z)));
+      const far = Math.acos(Math.max(-1, Math.min(1, fx2 * t0x + fz2 * t0z)));
+      const turnAhead = Math.max(bend, far);
+      const d = turnAhead > 0.06 ? Math.max(3.5, speed * 0.55, Math.min(la, Math.sqrt((2.4 * la) / turnAhead))) : la;
+      sample(d);
+      // What is left of the cut – about d times the turn up to the point, by 8 – is made up for by
+      // putting the point that far to the outside: in a bend to the left the inside is where the
+      // others come the other way.
+      const turned = Math.acos(Math.max(-1, Math.min(1, smp.tx * t0x + smp.tz * t0z)));
+      const out = Math.min(TRUCK ? 0.25 : 0.4, (d * turned) / 8);
+      if (out > 0.03) {
+        const side = t0x * smp.tz - t0z * smp.tx < 0 ? 1 : -1;
+        smp.x += -smp.tz * out * side;
+        smp.z += smp.tx * out * side;
+      }
     };
     const me = this.me;
     me.v = speed;
@@ -401,6 +421,19 @@ export class AutoDriver {
       distToLine = lane.stopAt - laneS;
       const node = lane.to;
       const arm = lane.armTo;
+      // A light or a stop sign at the end of the lane counts whether the way goes on behind it or not:
+      // the last road of a way may end at a red light, and the place to halt at may lie behind its line.
+      if (node.arms.length > 2 && !next) {
+        if (obey && arm.sg >= 0 && node.sc >= 0) {
+          const st = signals.get(node.sc, arm.sg);
+          if (st === SIG.RED || st === SIG.RED_AMBER) mustStop = true;
+          if (st === SIG.AMBER && (speed * speed) / (2 * Math.max(distToLine, 0.5)) < 3) mustStop = distToLine > 0;
+          if (mustStop) remark = 'red';
+        } else if (obey && arm.role === ROLE.STOP && this.stoppedFor < 1) {
+          mustStop = true;
+          remark = 'stop';
+        }
+      }
       if (next && node.arms.length > 2) {
         turn = next.turn === TURN.LEFT ? -1 : next.turn === TURN.RIGHT ? 1 : 0;
         // roundabout: indicate right only when leaving

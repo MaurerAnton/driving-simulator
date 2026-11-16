@@ -413,13 +413,14 @@ export class BigMap {
     self.onclick = () => start(true);
     go.append(auto, self);
     if (ready) {
-      const clear = el('button', 'btn ghost', this.t('demoClear'));
+      // (not among the buttons that start the drive: these stay in view and should not take half the panel)
+      const clear = el('button', 'btn ghost bm-clear', this.t('demoClear'));
       clear.type = 'button';
       clear.onclick = () => {
         this.stops.length = 0;
         changed();
       };
-      go.append(clear);
+      box.append(clear);
     }
     box.append(go);
   }

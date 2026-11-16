@@ -121,7 +121,11 @@ html, body {
 .bm-plan li button { flex: none; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: none; color: var(--text); cursor: pointer; }
 .bm-plan .bm-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 /* the buttons that start the drive: at the foot of the panel, also when its contents are longer than the screen is high */
-.bm-plan .bm-go { position: sticky; bottom: -12px; margin: 0 -12px -12px; padding: 8px 12px 12px; background: var(--panel-solid); border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; }
+.bm-plan .bm-go { position: sticky; bottom: -12px; margin: 0 -12px -12px; padding: 8px 12px 12px; background: var(--panel-solid); border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; flex-wrap: nowrap; }
+.bm-plan .bm-go .btn { flex: 1 1 0; min-width: 0; padding-inline: 8px; }
+.bm-plan .bm-clear { justify-self: start; min-height: 34px; padding: 6px 12px; font-size: 13px; }
+/* on a low screen the panel keeps to what is needed: the explanation at its top goes */
+@media (max-height: 700px) { .bm-plan > small { display: none; } }
 .bm-plan .btn { padding: 9px 14px; font-size: 14px; min-height: 40px; }
 .bm-plan .btn:disabled { opacity: 0.45; cursor: default; }
 .bm-plan .addr { position: relative; }
