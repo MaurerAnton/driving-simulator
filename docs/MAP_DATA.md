@@ -13,9 +13,12 @@ beschreibt, woher die Daten kommen, was daraus abgeleitet wird und wie man die K
 | Verkehrszeichen-Grafiken | Wikimedia Commons, Vektorfassungen der amtlichen Zeichen (StVO / VzKat) | gemeinfrei als amtliche Werke (§ 5 Abs. 1 UrhG) |
 | Luftbilder unter der Karte (nur auf Wunsch, live) | Digitale Orthophotos **DOP20** (20 cm), HVBG, als WMS | wie Gelände und Gebäude: Nutzung ohne Einschränkung (§ 24 HVGG) |
 
-Die Karte umfasst das Gebiet, für das Gelände und Gebäude geladen wurden (siehe unten): zurzeit die
-kreisfreie Stadt **Kassel**, **Baunatal** und den größten Teil des Landkreises Kassel – 1 087 km², in
-Kacheln von 500 m. Sie endet an der Grenze des Gebiets; ein Rechteck ist sie nicht.
+Die Karte umfasst das Gebiet, für das Gelände und Gebäude geladen wurden (siehe unten): **Nordhessen** –
+die kreisfreie Stadt Kassel und die Landkreise Kassel, Schwalm-Eder, Werra-Meißner, Waldeck-Frankenberg und
+Hersfeld-Rotenburg, rund 6 900 km² in 29 268 Kacheln von 500 m, zusammen knapp 900 MB. Sie endet an der
+Grenze des Gebiets (im Norden und Osten ist das die Landesgrenze); ein Rechteck ist sie nicht. Mehr passt
+nicht: Mit dem Landkreis Fulda wäre das Gigabyte überschritten, das eine Seite auf GitHub Pages groß sein
+darf.
 
 ### Warum keine Street-View- oder Satellitenbilder kommerzieller Anbieter?
 
@@ -84,21 +87,29 @@ findet, trägt sie am besten in OpenStreetMap ein – nach dem nächsten Kartenl
 ## Die Karte liegt nicht im Repository
 
 Die Karte ist knapp ein Gigabyte groß. Im Git-Verlauf würde jeder Neubau dieses Gigabyte für immer
-hinzufügen; sie liegt deshalb als Datei `map.tar` an einem **Release** des Projekts. Welches Release zum
-Stand des Codes gehört, steht in der Datei [`map.release`](../map.release).
+hinzufügen; sie liegt deshalb als tar-Archiv an einem **Release** des Projekts – in Stücken von 100 MB
+(`map.tar.00`, `map.tar.01`, …), weil eine Datei von einem Gigabyte beim Hochladen nicht immer in einem
+Zug ankommt. Welches Release zum Stand des Codes gehört, steht in der Datei
+[`map.release`](../map.release).
 
 ```bash
-npm run map:fetch     # lädt die Karte des in map.release genannten Release nach public/map (curl, tar)
+npm run map:fetch     # lädt die Stücke des in map.release genannten Release und entpackt sie nach public/map (curl, tar)
 ```
 
 Dasselbe macht der Arbeitsablauf, der die Seite veröffentlicht (`.github/workflows/pages.yml`). Wer die
 Karte selbst gebaut hat, packt und veröffentlicht sie so:
 
 ```bash
-npm run map:pack                                             # → data/work/map.tar
-gh release create karte-JJJJ-MM-TT data/work/map.tar --title "Karte JJJJ-MM-TT" --notes "…"
+npm run map:pack                                             # → data/work/map.tar.00, .01, …
+gh release create karte-JJJJ-MM-TT --draft --title "Karte JJJJ-MM-TT" --notes "…"
+for f in data/work/map.tar.*; do gh release upload karte-JJJJ-MM-TT "$f"; done   # bricht ein Stück ab: dieses noch einmal (--clobber)
+gh release edit karte-JJJJ-MM-TT --draft=false
 echo karte-JJJJ-MM-TT > map.release                          # und diese Änderung einchecken
 ```
+
+Eine Karte in einer Datei (`map.tar`) wird von `npm run map:fetch` genauso gelesen. Eine Webseite kann die
+Dateien eines Release nicht selbst laden (der Server schickt dafür keine Freigabe mit, „CORS“) – die Karte
+muss deshalb mit der Seite ausgeliefert werden, und die darf bei GitHub Pages höchstens 1 GB groß sein.
 
 ## Karte neu bauen
 

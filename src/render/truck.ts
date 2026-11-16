@@ -15,26 +15,26 @@ import type { CarVisualState } from './car.ts';
 import { InstrumentPanel } from './instruments.ts';
 import { Mirror } from './mirrors.ts';
 
-const WHITE = new THREE.MeshLambertMaterial({ color: 0xeef0ee });
-const CAB = new THREE.MeshLambertMaterial({ color: 0x1f5fa8 });
-const DARK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
-const FRAME = new THREE.MeshLambertMaterial({ color: 0x33373c });
-const TYRE = new THREE.MeshLambertMaterial({ color: 0x141516 });
-const RIM = new THREE.MeshLambertMaterial({ color: 0xb4b8bc });
+export const WHITE = new THREE.MeshLambertMaterial({ color: 0xeef0ee });
+export const CAB = new THREE.MeshLambertMaterial({ color: 0x1f5fa8 });
+export const DARK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 });
+export const FRAME = new THREE.MeshLambertMaterial({ color: 0x33373c });
+export const TYRE = new THREE.MeshLambertMaterial({ color: 0x141516 });
+export const RIM = new THREE.MeshLambertMaterial({ color: 0xb4b8bc });
 /** window glass: tinted, seen through from both sides */
-const GLASS = new THREE.MeshPhongMaterial({ color: 0x0c1418, shininess: 120, specular: 0x8fa4b4, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false });
-const LAMP = new THREE.MeshBasicMaterial({ color: 0xfff3cf });
-const TAIL = new THREE.MeshBasicMaterial({ color: 0xb01410 });
-const AMBER = new THREE.MeshBasicMaterial({ color: 0xff9a1a });
+export const GLASS = new THREE.MeshPhongMaterial({ color: 0x0c1418, shininess: 120, specular: 0x8fa4b4, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false });
+export const LAMP = new THREE.MeshBasicMaterial({ color: 0xfff3cf });
+export const TAIL = new THREE.MeshBasicMaterial({ color: 0xb01410 });
+export const AMBER = new THREE.MeshBasicMaterial({ color: 0xff9a1a });
 
-type Facing = 'x+' | 'x-' | 'y+' | 'y-' | 'z+' | 'z-';
+export type Facing = 'x+' | 'x-' | 'y+' | 'y-' | 'z+' | 'z-';
 
 /**
  * A flat rectangle looking along an axis.  `a` runs across it (x, or z for a
  * panel facing x), `b` up it (y, or z for a panel facing up or down), `at`
  * is where it stands on the axis it faces.
  */
-function panel(facing: Facing, a0: number, a1: number, b0: number, b1: number, at: number, material: THREE.Material): THREE.Mesh {
+export function panel(facing: Facing, a0: number, a1: number, b0: number, b1: number, at: number, material: THREE.Material): THREE.Mesh {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(a1 - a0), Math.abs(b1 - b0)), material);
   const a = (a0 + a1) / 2;
   const b = (b0 + b1) / 2;
@@ -52,7 +52,7 @@ function panel(facing: Facing, a0: number, a1: number, b0: number, b1: number, a
 }
 
 /** A box from x0…x1, y0…y1, z0…z1. */
-function box(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, material: THREE.Material, shadow = true): THREE.Mesh {
+export function box(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, material: THREE.Material, shadow = true): THREE.Mesh {
   const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), material);
   m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
   m.castShadow = shadow;
@@ -60,7 +60,7 @@ function box(x0: number, x1: number, y0: number, y1: number, z0: number, z1: num
 }
 
 /** A wheel (or a twin wheel) lying on the x axis, its middle at the origin. */
-function wheel(radius: number, width: number): THREE.Group {
+export function wheel(radius: number, width: number): THREE.Group {
   const g = new THREE.Group();
   const tyre = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, width, 20), TYRE);
   tyre.rotation.z = Math.PI / 2;
@@ -72,7 +72,7 @@ function wheel(radius: number, width: number): THREE.Group {
 }
 
 /** Large lettering on a plate: dark on white, readable from the chase camera. */
-function lettering(text: string, width: number, height: number): THREE.Mesh {
+export function lettering(text: string, width: number, height: number): THREE.Mesh {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
   canvas.height = Math.round((1024 * height) / width);
@@ -109,7 +109,7 @@ function letterBox(group: THREE.Group, text: string, hw: number, yMid: number, z
   group.add(rear);
 }
 
-const BRAND = 'maureranton.com';
+export const BRAND = 'maureranton.com';
 
 export class PlayerTruck {
   readonly root = new THREE.Group();
@@ -346,4 +346,4 @@ export class PlayerTruck {
   }
 }
 
-const LAMP_STOP = new THREE.MeshBasicMaterial({ color: 0xff3a2a });
+export const LAMP_STOP = new THREE.MeshBasicMaterial({ color: 0xff3a2a });

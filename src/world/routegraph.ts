@@ -10,7 +10,7 @@
  * it are lists of ways, which the navigation turns back into lanes and the
  * paths through the junctions (`connectorsAlong` in game/nav.ts).
  */
-import { ACCESS, CTRL, EF } from './types.ts';
+import { ACCESS, CLS, CTRL, EF } from './types.ts';
 import { TURN } from './lanes.ts';
 import type { LaneGraph, Lane } from './lanes.ts';
 
@@ -249,6 +249,9 @@ export function quickestToEdge(g: RouteGraph, start: number, edge: number): numb
   return (a ?? b)?.ways ?? null;
 }
 
+/** What the ways are planned for: a vehicle that may not use the motorway (a tractor) is led round it. */
+export const routeFor = { noMotorway: false };
+
 function quickestTimed(g: RouteGraph, start: number, goal: number): { ways: number[]; secs: number } | null {
   if (start === goal) return { ways: [], secs: 0 };
   const dist = new Float64Array(g.n).fill(Infinity);
@@ -269,6 +272,7 @@ function quickestTimed(g: RouteGraph, start: number, goal: number): { ways: numb
     for (let k = g.first[w]; k < g.first[w + 1]; k++) {
       const t = g.to[k];
       if (t !== goal && (g.kind[t] & RG.NO_ENTRY) !== 0) continue;
+      if (routeFor.noMotorway && t !== goal && g.cls[t] <= CLS.MOTORWAY_LINK) continue;
       const through = t !== goal && (g.kind[t] & RG.ACCESS_ONLY) !== 0 ? 240 : 0;
       const nd = d + g.across[k] / 6 + g.secs[t] + turnSeconds(g, w, k) + through;
       if (nd < dist[t]) {

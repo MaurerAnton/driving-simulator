@@ -7,6 +7,7 @@ import { CLS, CTRL, EF, ROLE } from '../world/types.ts';
 import type { Edge, World } from '../world/world.ts';
 import { quickest, quickestToEdge, wayOf } from '../world/routegraph.ts';
 import type { RouteGraph } from '../world/routegraph.ts';
+import type { VehicleKind } from './vehicles.ts';
 
 export interface NavHint {
   /** i18n key of the manoeuvre: navLeft, navRight, navStraight, navUturn, navRoundabout, navFollow, navMotorway, routeDone */
@@ -156,6 +157,9 @@ export class Navigator {
     this.hint.done = false;
     this.routeLanes = [from, ...path.map((c) => c.to)];
   }
+
+  /** how long the car must be off the way before a new one is looked for (s): longer after each search that found none */
+  private retry = 1.5;
 
   /**
    * Follow a list of ways of the whole map's network (`net` must be set),
@@ -352,15 +356,20 @@ export class Navigator {
       const end = r.length > 0 ? r[r.length - 1].to : this.from;
       const waiting = this.ways !== null && this.expanded < this.ways.length && end !== null && lane.edge === end.edge && lane.dir === end.dir;
       if (!waiting) this.offRoute += dt;
-      if (this.offRoute > 1.5) {
+      if (this.offRoute > this.retry) {
         this.offRoute = 0;
+        const before = this.route;
         if (this.ways) this.rejoinWays(lane);
         else if (this.fixed) this.rejoin(lane);
         else this.plan(lane);
+        // (No way from here: asked again, but not every second – the search runs through the
+        // roads of the whole map, and whoever is off the way stays so for a while.)
+        this.retry = this.route === before ? Math.min(20, this.retry * 2.5) : 1.5;
       }
       return h;
     }
     this.offRoute = 0;
+    this.retry = 1.5;
     this.idx = found;
     // Einordnen: the route continues from a particular lane of this carriageway
     const want = r[found].from;
@@ -419,8 +428,9 @@ export interface LessonDef {
   /** 'yard': tasks on the practice yard only (class CE) */
   kind: 'free' | 'basics' | 'route' | 'exam' | 'yard';
   targets: TargetType[];
-  /** only for this vehicle (default: both) */
-  vehicle?: 'car' | 'truck';
+  /** only for this vehicle (default: all but those in `notFor`) */
+  vehicle?: VehicleKind;
+  notFor?: VehicleKind[];
   /** tasks on the practice yard, done one after the other before the drive (see game/ce.ts) */
   tasks?: Array<'couple' | 'corner' | 'ramp'>;
 }
@@ -432,8 +442,9 @@ export const LESSONS: LessonDef[] = [
   { id: 'signals', kind: 'route', targets: ['signals', 'signals', 'home'] },
   { id: 'roundabout', kind: 'route', targets: ['roundabout', 'roundabout', 'home'] },
   { id: 'rural', kind: 'route', targets: ['rural', 'home'] },
-  { id: 'motorway', kind: 'route', targets: ['motorway', 'home'] },
-  { id: 'exam', kind: 'exam', targets: ['rbl', 'signals', 'roundabout', 'priority', 'rural', 'home'], vehicle: 'car' },
+  { id: 'motorway', kind: 'route', targets: ['motorway', 'home'], notFor: ['tractor'] },
+  // (the test drive on the road, for every class but CE – that one has its own, with the yard tasks)
+  { id: 'exam', kind: 'exam', targets: ['rbl', 'signals', 'roundabout', 'priority', 'rural', 'home'], notFor: ['truck'] },
   // class CE: truck with trailer (Anlage 7 FeV: coupling, two basic manoeuvres, the drive)
   { id: 'ceCouple', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['couple'] },
   { id: 'ceCorner', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['corner'] },

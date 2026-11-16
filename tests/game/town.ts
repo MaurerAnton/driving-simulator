@@ -32,6 +32,18 @@ export interface TownOptions {
   missing?: Array<[number, number, number, number]>;
   /** a cul-de-sac of this length (m) leading east from the last junction of the first row */
   deadEnd?: number;
+  /** pavements of this width (m) on both sides of every street */
+  pavement?: number;
+  /**
+   * Junctions (column, row) with traffic lights: the streets along the rows
+   * are the main direction (group 0, with the right of way when the lights
+   * are out), those along the columns the side direction (group 1, give way).
+   */
+  lights?: Array<[number, number]>;
+  /** … without signs under the lights: with the lights out, right before left counts there */
+  lightsUnsigned?: boolean;
+  /** the signal controllers (by their number: the order of `lights`) that are out of order */
+  lightsOut?: (controller: number) => boolean;
 }
 
 export function makeTown(opt: TownOptions = {}): Town {
@@ -76,6 +88,7 @@ export function makeTown(opt: TownOptions = {}): Town {
       f: EF.URBAN,
       ca: 0,
       cb: 0,
+      ...(opt.pavement ? { sl: opt.pavement, sr: opt.pavement } : {}),
     });
   };
   for (let j = 0; j < rows; j++) {
@@ -101,20 +114,50 @@ export function makeTown(opt: TownOptions = {}): Town {
     node.arms = arms.map((a) => ({ e: a.e, r: arms.length > 2 ? ROLE.RBL : ROLE.NONE }));
     node.t = arms.length > 2 ? CTRL.RBL : CTRL.NONE;
   });
+  // traffic lights, with the programme the map build gives a crossing of two streets
+  const signals: WorldJson['signals'] = [];
+  for (const [i, j] of opt.lights ?? []) {
+    const node = nodes[at(i, j)];
+    node.t = CTRL.SIGNALS;
+    node.sc = signals.length;
+    for (const arm of node.arms) {
+      const e = edges[arm.e];
+      const other = nodes[e.a === at(i, j) ? e.b : e.a];
+      const main = Math.abs(other.z - node.z) < 1;
+      arm.g = main ? 0 : 1;
+      if (!opt.lightsUnsigned) arm.r = main ? ROLE.PRIORITY : ROLE.YIELD;
+    }
+    signals.push({
+      x: node.x,
+      z: node.z,
+      groups: 2,
+      phases: [
+        { d: 28, s: 'GR' },
+        { d: 3, s: 'AR' },
+        { d: 1, s: 'RR' },
+        { d: 1, s: 'RY' },
+        { d: 18, s: 'RG' },
+        { d: 3, s: 'RA' },
+        { d: 1, s: 'RR' },
+        { d: 1, s: 'YR' },
+      ],
+      off: 0,
+    });
+  }
   const json: WorldJson = {
     version: 1,
     meta: { name: 'Test town', generated: '', minX: -200, maxX: cols * block + 400, minZ: -200, maxZ: rows * block + 200, tileSize: 500, originE: 0, originN: 0, attribution: [] },
     nodes,
     edges,
     banned: [],
-    signals: [],
+    signals,
     crossings: [],
     places: [],
     spawns: [],
     tiles: [],
   };
   computeAllCuts(json);
-  const world = new World(json);
+  const world = new World(json, { lightsOut: opt.lightsOut });
   return {
     json,
     world,

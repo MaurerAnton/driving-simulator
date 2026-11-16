@@ -25,7 +25,7 @@ export interface Report {
 const KEEP = [
   'StVO', '§', 'Baunatal', 'Fahrsim', 'Panoramax', 'KartaView', 'Mapillary', 'OpenStreetMap', 'ODbL', 'AGPL-3.0-only', 'three.js', 'MIT', 'Wikimedia Commons', 'CC BY-SA 4.0',
   'EXIF', 'XMP', 'GeoJSON', 'JSON', 'CSV', 'JPEG', 'PNG', 'WebP', 'WebGL 2', '▲', '▼', '⋯', 'DGM1', 'LoD2', 'UrhG', 'Marktplatz 5', 'A 49', 'Logitech', 'Thrustmaster', 'Fanatec',
-  'RT', 'LT', 'RB/LB', 'X/B', 'Anlieger frei', 'P·R·N·D', '360°', 'IP', 'Kassel', 'CE',
+  'RT', 'LT', 'RB/LB', 'X/B', 'Anlieger frei', 'P·R·N·D', '360°', 'IP', 'Kassel', 'CE', 'BE',
 ];
 
 /** Longest text (in characters) that still fits where these keys are shown. */

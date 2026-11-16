@@ -3,8 +3,12 @@
 import * as THREE from 'three';
 import { Sky } from '../render/sky.ts';
 import { TileManager } from '../render/tiles.ts';
+import { lightsOutBy } from '../sim/signals.ts';
 import { MapLoader } from '../world/loader.ts';
 import type { World } from '../world/world.ts';
+
+/** the share of the traffic lights that are out of order on any one day */
+const LIGHTS_OUT = 0.06;
 
 export class App {
   readonly canvas: HTMLCanvasElement;
@@ -42,6 +46,11 @@ export class App {
     const base = this.baseUrl;
     // (every file but the index is asked for with the version of the map the index names: see MapLoader.version)
     let version = '';
+    // Some traffic lights are out of order – other ones every day.  (?lightsout=0.5 for more of them, 0 for none.)
+    const asked = Number(new URLSearchParams(location.search).get('lightsout') ?? NaN);
+    const share = Number.isFinite(asked) ? Math.max(0, Math.min(1, asked)) : LIGHTS_OUT;
+    const today = new Date();
+    const day = today.getFullYear() * 372 + today.getMonth() * 31 + today.getDate();
     this.map = await MapLoader.open({
       async bytes(path: string): Promise<ArrayBuffer | null> {
         const res = await fetch(base + path + (version ? `?v=${version}` : ''), path === 'map.json' ? { cache: 'no-cache' } : undefined);
@@ -54,7 +63,7 @@ export class App {
         if (head[0] === 0x1f && head[1] === 0x8b) return await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
         return buf;
       },
-    });
+    }, { lightsOut: lightsOutBy(day, share) });
     // (a breath for the page between the big steps, so that the loading screen is drawn)
     await new Promise((r) => setTimeout(r));
     version = this.map.version;

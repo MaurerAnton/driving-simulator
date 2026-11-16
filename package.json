@@ -1,7 +1,7 @@
 {
   "name": "fahrsim-baunatal",
-  "version": "0.1.0",
-  "description": "Freier 3D-Fahrschulsimulator für Baunatal – deutsche Verkehrsregeln lernen (AGPL-3.0-only).",
+  "version": "1.0.0",
+  "description": "Freier 3D-Fahrschulsimulator für Nordhessen – deutsche Verkehrsregeln lernen, mit einem Fahrzeug jeder Führerscheinklasse (AGPL-3.0-only).",
   "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
@@ -27,7 +27,7 @@
     "map:graph": "node --max-old-space-size=6144 --expose-gc tools/build-graph.ts",
     "map:check": "node --max-old-space-size=3072 tools/check-lanes.ts",
     "map:fetch": "node tools/fetch-map.ts",
-    "map:pack": "tar -cf data/work/map.tar -C public map"
+    "map:pack": "rm -f data/work/map.tar.* && tar -cf - -C public map | split -b 100M -d -a 2 - data/work/map.tar."
   },
   "dependencies": {
     "three": "^0.187.0"

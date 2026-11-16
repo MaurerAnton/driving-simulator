@@ -322,6 +322,7 @@ export class BigMap {
       loading: this.t('realityLoading'),
       none: this.t('addressNone'),
       load: () => this.host.loadAddresses(),
+      near: () => this.host.car(),
       pick: (hit) => {
         const spot = this.host.spotOf(hit);
         if (!spot) return;

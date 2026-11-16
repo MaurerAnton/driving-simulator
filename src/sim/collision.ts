@@ -154,6 +154,37 @@ export class SceneryCollider {
     return false;
   }
 
+  /** Does a circle of radius `r` at (x, z), on the ground at height y, touch anything?  (Somebody on foot.) */
+  circleBlocked(x: number, y: number, z: number, r: number): boolean {
+    const ix0 = Math.floor((x - r) / CELL);
+    const ix1 = Math.floor((x + r) / CELL);
+    const iz0 = Math.floor((z - r) / CELL);
+    const iz1 = Math.floor((z + r) / CELL);
+    for (let ix = ix0; ix <= ix1; ix++) {
+      for (let iz = iz0; iz <= iz1; iz++) {
+        const list = this.grid.get(SceneryCollider.key(ix, iz));
+        if (!list) continue;
+        for (const p of list) {
+          if (!Number.isNaN(p.y) && Math.abs(y - p.y) > 2.6) continue;
+          let px = p.x1;
+          let pz = p.z1;
+          if (p.kind === 0) {
+            const dx = p.x2 - p.x1;
+            const dz = p.z2 - p.z1;
+            const l2 = dx * dx + dz * dz;
+            let t = l2 > 1e-9 ? ((x - p.x1) * dx + (z - p.z1) * dz) / l2 : 0;
+            t = t < 0 ? 0 : t > 1 ? 1 : t;
+            px = p.x1 + dx * t;
+            pz = p.z1 + dz * t;
+          }
+          const rad = r + (p.kind === 1 ? p.r : 0);
+          if ((x - px) * (x - px) + (z - pz) * (z - pz) < rad * rad) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /**
    * Push the car out of anything it penetrates and take the velocity into
    * the obstacle away.  Returns the largest impact speed (m/s) of this call.

@@ -9,10 +9,14 @@ import { SceneryCollider } from '../sim/collision.ts';
 import { WorldGround } from '../sim/ground.ts';
 import { RuleMonitor } from '../sim/rules.ts';
 import type { PlayerSnapshot } from '../sim/rules.ts';
-import { SignalSystem } from '../sim/signals.ts';
+import { markArrows } from '../sim/arrows.ts';
+import { COMPACT_DIMS } from '../render/carBody.ts';
+import { CheckMarkers, EYE, OnFoot } from './onfoot.ts';
+import type { CheckId, WalkUnit, WalkVehicle } from './onfoot.ts';
+import { SIG, SignalSystem } from '../sim/signals.ts';
 import { Traffic } from '../sim/traffic.ts';
 import type { PlayerState } from '../sim/traffic.ts';
-import { COMPACT_CAR, COMPACT_CAR_AUTOCLUTCH, COMPACT_CAR_AUTOMATIC, TRUCK, Vehicle, withPower } from '../sim/vehicle/index.ts';
+import { Vehicle } from '../sim/vehicle/index.ts';
 import type { DriverInput } from '../sim/vehicle/index.ts';
 import { SignalRenderer, TrafficRenderer } from '../render/actors.ts';
 import { PlayerCar } from '../render/car.ts';
@@ -34,17 +38,18 @@ import { newPolySample, projectOnPolyline } from '../core/geom.ts';
 import { CLS, CTRL, SURF_ROLLING } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
-import type { Edge } from '../world/world.ts';
+import type { Edge, Node as Junction } from '../world/world.ts';
 import { App } from './app.ts';
 import { LESSONS, Navigator, findTarget } from './nav.ts';
 import { planTour } from './tour.ts';
 import type { TourPlan } from './tour.ts';
-import { quickest, quickestToEdge, routeGraphOf, wayOf } from '../world/routegraph.ts';
+import { quickest, quickestToEdge, routeFor, routeGraphOf, wayOf } from '../world/routegraph.ts';
 import type { RouteGraph } from '../world/routegraph.ts';
 import { NetIndex } from '../world/netindex.ts';
 import { netPolyline } from '../world/netfile.ts';
 import type { LessonDef } from './nav.ts';
-import { loadSettings, saveSettings } from './settings.ts';
+import { loadSettings, playedBefore, saveSettings } from './settings.ts';
+import { newsDue } from './releases.ts';
 import { FaultLog } from './faultlog.ts';
 import { DrivenPath } from './track.ts';
 import { BigMap } from '../ui/bigmap.ts';
@@ -53,9 +58,13 @@ import { RailTraffic } from '../sim/rail.ts';
 import type { RailObstacle } from '../sim/rail.ts';
 import { RailActors } from '../render/trams.ts';
 import { PlayerTruck } from '../render/truck.ts';
+import { CarTrailerModel, PlayerBike, PlayerBus, PlayerTractor } from '../render/fleet.ts';
+import type { VehicleModel } from '../render/fleet.ts';
+import { VEHICLES, trailerOf, vehicleKind } from './vehicles.ts';
+import type { ModelKind, VehicleDef } from './vehicles.ts';
 import { YardScene } from '../render/yard.ts';
-import { TANDEM_TRAILER, Trailer } from '../sim/trailer.ts';
-import { COUPLING_STEPS, MAX_CORRECTIONS, TRAILER_OUTLINE, TRUCK_OUTLINE, YardFrame, offArea } from './ce.ts';
+import { Trailer } from '../sim/trailer.ts';
+import { COUPLING_STEPS, MAX_CORRECTIONS, TRAILER_AXLES, TRAILER_OUTLINE, TRUCK_AXLES, TRUCK_OUTLINE, YardFrame, offArea } from './ce.ts';
 import type { CouplingStepId, TaskId } from './ce.ts';
 import { YardTask } from './yardtask.ts';
 import { AutoDriver } from '../sim/autodriver.ts';
@@ -69,8 +78,13 @@ type CameraMode = 'cockpit' | 'chase' | 'free' | 'dev';
 const PHYS_DT = 1 / 240;
 
 /** the outlines of the vehicles for collisions with the scenery: circles along the axis (m from the model origin; - = front) */
-const CAR_CIRCLES: readonly number[] = [-1.28, -0.05, 1.18];
-const TRUCK_CIRCLES: readonly number[] = [-2.5, -0.6, 1.3, 3.2];
+
+/** the lean of the motorcycle, for the rider's eyes */
+const BIKE_ROLL = new THREE.Quaternion();
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+/** what is checked round the vehicle, by the key of its name */
+const CHECK_TEXT: Record<CheckId, string> = { tyres: 'checkTyres', front: 'checkFront', rear: 'checkRear', coupling: 'checkCoupling' };
+
 
 export class Game {
   readonly app: App;
@@ -92,7 +106,17 @@ export class Game {
   /** the truck of the class-CE lessons with its trailer (built when it is first driven) */
   private truck: PlayerTruck | null = null;
   private trailer: Trailer | null = null;
-  private isTruck = false;
+  /** the vehicle driven now (by its licence class), and the models of the vehicles made so far */
+  private def: VehicleDef = VEHICLES.car;
+  private readonly models = new Map<ModelKind, VehicleModel>();
+  /** the box trailer behind a car (class BE) */
+  private carTrailer: CarTrailerModel | null = null;
+  /** what the vehicle's lamps showed in the last picture (for the trailer's) */
+  private lastVisual: CarVisualState | null = null;
+  /** the truck with the trailer of the class CE (its yard tasks, the coupling) */
+  private get isTruck(): boolean {
+    return this.def.model === 'truck';
+  }
   /** the practice yard of the truck lessons, and the task that is being done on it */
   private readonly yardScene = new YardScene();
   private yardFrame: YardFrame | null = null;
@@ -119,6 +143,8 @@ export class Game {
     remark: string;
     takeT: number;
     lost: number;
+    /** when a way may be looked for again (after a search that found none) */
+    searchAt: number;
     stuck: number;
     /** a tour: the ways to drive (world/routegraph.ts), the way they begin behind, and what it comes to */
     tour: { ways: number[]; from: number; metres: number; fresh: number; odo: number; set: boolean } | null;
@@ -155,6 +181,8 @@ export class Game {
   private time = 0;
   private acc = 0;
   private frames = 0;
+  private fpsFrames = 0;
+  private fpsSince = 0;
   private mirrorTurn = 0;
   private spawn: SpawnJson | null = null;
   private lesson: LessonDef | null = null;
@@ -236,17 +264,21 @@ export class Game {
     const world = app.world;
     await new Promise((r) => setTimeout(r));
     this.lanes = new LaneGraph(world);
-    this.signals = new SignalSystem(world.signals);
+    this.signals = new SignalSystem(world.signals, world.lightsOut);
+    // (the green arrows of what is there already – a map in one piece; the pieces of a map in pieces get theirs as they come)
+    markArrows(world, this.lanes, this.signals, world.allNodes);
     this.traffic = new Traffic(world, this.lanes, this.signals);
     this.rules = new RuleMonitor(world, this.lanes, this.signals, this.traffic);
     this.nav = new Navigator(this.lanes);
     this.ground = new WorldGround(world, app.tiles);
     this.signs = new SignRenderer(new URL('signs/', document.baseURI).href, app.renderer.capabilities.getMaxAnisotropy());
     await this.signs.init();
-    this.signalHeads = new SignalRenderer(world);
+    this.signalHeads = new SignalRenderer(world, this.signals);
     this.collider.add({ key: 'signals', rings: null, ringCounts: null, segments: null, discs: this.signalHeads.poles });
     app.tiles.onTile((tile, loaded) => this.onTile(tile, loaded));
-    app.scene.add(this.car.root, this.actors.group, this.railActors.group, this.signalHeads.group, this.yardScene.group);
+    app.scene.add(this.car.root, this.actors.group, this.railActors.group, this.signalHeads.group, this.yardScene.group, this.markers.group);
+    this.fadeEl.className = 'fade';
+    this.ui.append(this.fadeEl);
     this.yardFrame = world.json.yard ? new YardFrame(world.json.yard) : null;
     this.rail = new RailTraffic(world.json.rails ?? []);
     // The road network may come in pieces around the car: lanes, traffic and signals follow it.
@@ -271,6 +303,11 @@ export class Game {
     this.hud.onStart = (req) => this.begin(req.mode, req.spawn, false, req.address);
     this.hud.onResume = () => this.resume();
     this.hud.onReality = () => this.openReality();
+    this.hud.onGetOut = () => {
+      if (Math.abs(this.vehicle.speed) > 0.3 || this.walker || this.demo?.active || this.task) return;
+      this.resume();
+      this.getOut();
+    };
     this.hud.onPause = () => this.pause();
     this.hud.loadAddresses = () => this.loadAddresses();
     this.hud.onTeleport = (hit) => this.teleportTo(hit);
@@ -289,6 +326,7 @@ export class Game {
     this.hud.onQuit = () => this.toMenu();
     this.hud.faultLog = this.faultLog;
     this.hud.onMap = () => this.openMap();
+    this.hud.where = () => (this.vehicle ? { x: this.mpos[0], z: this.mpos[2] } : null);
     this.hud.onDemo = () => {
       this.openMap();
       this.bigMap.plan();
@@ -338,7 +376,10 @@ export class Game {
     if (q.get('traffic')) this.settings.traffic = Number(q.get('traffic'));
     // ?vehicle=truck|car chooses the vehicle for this visit
     const qv = q.get('vehicle');
-    if (qv === 'truck' || qv === 'car') this.settings.vehicle = qv;
+    const kind = vehicleKind(qv);
+    if (kind) this.settings.vehicle = kind;
+    // ?onfoot=1: this visit's drives begin beside the vehicle (the setting itself is not changed)
+    if (q.get('onfoot') === '1') this.settings.startOutside = true;
     this.applySettings();
 
     // developer / test shortcuts: ?start=<mode>&spawn=<n>&view=chase&auto=<throttle>&cam=x,y,z,yaw,pitch&look=yaw,pitch
@@ -393,7 +434,7 @@ export class Game {
     const start = q.get('start');
     const addr = q.get('addr');
     if (start && addr) {
-      void this.loadAddresses().then((ix) => this.begin(start, Number(q.get('spawn') ?? 0), true, ix?.search(addr, 1)[0]));
+      void this.loadAddresses().then((ix) => this.begin(start, Number(q.get('spawn') ?? 0), true, ix?.search(addr, 1, app.world.json.spawns[Number(q.get('spawn') ?? 0)] ?? null)[0]));
     } else if (start) this.begin(start, Number(q.get('spawn') ?? 0), true);
     else this.toMenu();
   }
@@ -560,9 +601,10 @@ export class Game {
     app.resize();
     for (const m of this.car.mirrors) m.setEnabled(s.mirrors !== 'off');
     this.car.setCabinOpacity(s.cabinOpacity);
-    if (this.truck) {
-      for (const m of this.truck.mirrors) m.setEnabled(s.mirrors !== 'off');
-      this.truck.setCabinOpacity(s.cabinOpacity);
+    for (const model of this.models.values()) {
+      if (model === this.car) continue;
+      for (const m of model.mirrors) m.setEnabled(s.mirrors !== 'off');
+      model.setCabinOpacity(s.cabinOpacity);
     }
     this.audio.setVolume(s.volume);
     if (this.traffic) this.traffic.targetCount = Math.round(s.traffic * 34);
@@ -580,14 +622,20 @@ export class Game {
     this.demo = null;
     this.endTasks();
     this.car.root.visible = false;
+    for (const model of this.models.values()) model.root.visible = false;
+    if (this.carTrailer) this.carTrailer.group.visible = false;
     if (this.truck) {
-      this.truck.root.visible = false;
       this.truck.trailer.visible = false;
     }
     this.input.enabled = false;
     this.hud.setHudVisible(false);
     this.audio.suspend();
     this.hud.showMenu(this.app.world.json.spawns);
+    // once after an update: what is new (to whoever played an earlier version)
+    if (this.showNewsOnce) {
+      this.showNewsOnce = false;
+      this.hud.showNews(() => this.hud.showMenu(this.app.world.json.spawns));
+    }
     if (!this.spawn) {
       // show the town behind the menu
       const sp = this.app.world.json.spawns[0];
@@ -598,15 +646,16 @@ export class Game {
   private readonly menuFocus = new THREE.Vector3();
 
   /** The vehicle the player sits in: the car or the truck. */
-  private get model(): PlayerCar | PlayerTruck {
-    return this.isTruck && this.truck ? this.truck : this.car;
+  private get model(): VehicleModel {
+    return this.models.get(this.def.model) ?? this.car;
   }
 
   private showModel(on: boolean): void {
-    this.car.root.visible = on && !this.isTruck;
+    this.car.root.visible = on && this.def.model === 'car';
+    for (const [kind, model] of this.models) if (model !== this.car) model.root.visible = on && kind === this.def.model;
+    if (this.carTrailer) this.carTrailer.group.visible = on && this.def.kind === 'carTrailer';
     if (this.truck) {
-      this.truck.root.visible = on && this.isTruck;
-      this.truck.trailer.visible = on && this.isTruck;
+      this.truck.trailer.visible = on && this.def.kind === 'truck';
     }
   }
 
@@ -919,6 +968,8 @@ export class Game {
    */
   private startTrip(stops: SpawnJson[], self: boolean, tour: TourPreview | null): void {
     if (this.lesson || (stops.length === 0 && !tour) || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
+    // (on foot beside the vehicle: back into the seat first)
+    if (this.walker) this.leaveWalk();
     if (this.state === 'map') {
       this.mapFrom = 'drive';
       this.closeMap();
@@ -929,7 +980,7 @@ export class Game {
       if (this.vehicle.spec.transmission !== 'automatic') {
         const old = this.vehicle;
         old.getModelPosition(this.mpos);
-        const spec = withPower(COMPACT_CAR_AUTOMATIC, this.settings.power);
+        const spec = this.def.spec('automatic', this.settings.power);
         const v = new Vehicle(spec, this.ground);
         v.teleport(this.mpos[0], this.mpos[1] + 0.02, this.mpos[2], old.yaw);
         v.odometer = old.odometer;
@@ -949,8 +1000,9 @@ export class Game {
       c.hazard = false;
       driver = new AutoDriver(this.app.world, this.signals, this.rules, this.traffic, {
         spec: v.spec,
-        front: this.isTruck ? TRUCK_OUTLINE.front : (v.spec.length ?? 4.28) / 2,
-        truck: this.isTruck,
+        front: this.def.outline.front,
+        truck: this.def.heavy,
+        caps: this.def.caps,
       });
     }
     this.nav.clear();
@@ -964,6 +1016,7 @@ export class Game {
       remark: '',
       takeT: 0,
       lost: 0,
+      searchAt: 0,
       stuck: 0,
       tour: tour ? { ways: tour.plan.ways, from: tour.from, metres: tour.plan.metres, fresh: tour.plan.fresh, odo: this.vehicle.odometer, set: false } : null,
     };
@@ -1050,6 +1103,8 @@ export class Game {
       const g = this.routeGraphNow();
       // (the roads of the whole map are still being read: a moment)
       if (!g) return;
+      // (a search that finds no way runs through the roads of the whole map: not every picture, then)
+      if (this.time < demo.searchAt) return;
       {
         this.nav.net = g;
         const here = wayOf(lane);
@@ -1069,9 +1124,10 @@ export class Game {
         }
       }
       if (!found) {
-        // no way there from here (yet): try again shortly, then give up
+        // no way there from here (yet): try again shortly – three times –, then give up
         this.nav.clear();
-        demo.lost += dt;
+        demo.searchAt = this.time + 1;
+        demo.lost += 1.2;
         if (demo.lost > 3) this.endDemo('lost');
         return;
       }
@@ -1112,6 +1168,9 @@ export class Game {
     this.spawn = (address ? this.spawnAt(address) : null) ?? world.json.spawns[Math.max(0, Math.min(world.json.spawns.length - 1, spawnIdx))] ?? { name: '', x: 0, z: 0, yaw: 0, kind: 'street' };
     this.lesson = LESSONS.find((l) => l.id === mode) ?? null;
     this.demo = null;
+    if (this.walker) this.leaveWalk();
+    this.doorT = -1;
+    this.fadeEl.classList.remove('on');
     // ("demo" and "tour" are free drives that begin with the map open, for planning)
     this.planDemo = mode === 'demo' || mode === 'tour';
     this.hud.canTeleport = !this.lesson;
@@ -1119,30 +1178,42 @@ export class Game {
     this.keepClock = false;
     this.path.breakLine();
     // the car, or the truck with its trailer (class CE)
-    this.isTruck = this.lesson?.vehicle ? this.lesson.vehicle === 'truck' : this.settings.vehicle === 'truck';
-    const base = this.settings.transmission === 'automatic' ? COMPACT_CAR_AUTOMATIC : this.settings.transmission === 'assist' ? COMPACT_CAR_AUTOCLUTCH : COMPACT_CAR;
-    const spec = this.isTruck ? TRUCK : withPower(base, this.settings.power);
+    this.def = VEHICLES[this.lesson?.vehicle ?? this.settings.vehicle] ?? VEHICLES.car;
+    // (a tractor may not go on the motorway: its lesson is driven with the car)
+    if (this.def.noMotorway && this.lesson?.id === 'motorway') this.def = VEHICLES.car;
+    // (ways for the truck with its trailer avoid turns that double back within a few metres)
+    this.lanes.longVehicle = this.def.long;
+    this.lanes.noMotorway = this.def.noMotorway;
+    routeFor.noMotorway = this.def.noMotorway;
+    const spec = this.def.spec(this.settings.transmission, this.settings.power);
     this.vehicle = new Vehicle(spec, this.ground);
-    if (this.isTruck && !this.truck) {
-      this.truck = new PlayerTruck();
-      this.app.scene.add(this.truck.root, this.truck.trailer);
-      for (const m of this.truck.mirrors) m.setEnabled(this.settings.mirrors !== 'off');
-      this.truck.setCabinOpacity(this.settings.cabinOpacity);
+    if (!this.models.has(this.def.model)) {
+      // the model of a vehicle is made when it is first driven
+      const m: VehicleModel = this.def.model === 'truck' ? (this.truck = new PlayerTruck()) : this.def.model === 'bus' ? new PlayerBus() : this.def.model === 'tractor' ? new PlayerTractor() : new PlayerBike();
+      this.models.set(this.def.model, m);
+      this.app.scene.add(m.root);
+      if (this.truck && m === this.truck) this.app.scene.add(this.truck.trailer);
+      for (const mirror of m.mirrors) mirror.setEnabled(this.settings.mirrors !== 'off');
+      m.setCabinOpacity(this.settings.cabinOpacity);
     }
-    this.trailer = this.isTruck ? new Trailer(TANDEM_TRAILER, this.ground) : null;
-    this.hud.gearbox = this.isTruck ? 'automatic' : null;
+    if (this.def.kind === 'carTrailer' && !this.carTrailer) {
+      this.carTrailer = new CarTrailerModel();
+      this.app.scene.add(this.carTrailer.group);
+    }
+    this.trailer = this.def.trailer ? new Trailer(this.def.trailer, this.ground) : null;
+    this.hud.gearbox = spec.transmission === 'automatic' && this.def.model !== 'car' && this.def.model !== 'motorcycle' ? 'automatic' : null;
     this.endTasks();
     // the camera stands further back for 16 m of vehicle
-    this.input.c.lookZoom = this.isTruck ? 21 : 7;
-    this.input.zoomMax = this.isTruck ? 45 : 18;
-    this.collider.setShape(this.isTruck ? TRUCK_CIRCLES : CAR_CIRCLES, this.isTruck ? 1.25 : 0.93);
-    this.rules.truck = this.isTruck;
+    this.input.c.lookZoom = this.def.zoom;
+    this.input.zoomMax = this.def.zoomMax;
+    this.collider.setShape(this.def.circles, this.def.radius);
+    this.rules.setVehicle(this.def.caps, this.def.capFault, this.def.heavy, this.def.noMotorway);
     this.taskFailed = false;
     this.roadSpawn = this.spawn;
     this.tasksLeft = this.isTruck && this.yardFrame && this.lesson?.tasks ? [...this.lesson.tasks] : [];
     this.taskCount = this.tasksLeft.length;
     if (this.tasksLeft.length > 0) this.nextTask();
-    else if (this.isTruck && !address) this.spawn = this.truckSpot(this.spawn);
+    else if (this.def.long && !address) this.spawn = this.truckSpot(this.spawn);
     this.input.setSteering(spec.wheelbase, spec.maxWheelAngle);
     this.input.setAutomatic(spec.transmission === 'automatic');
     const c = this.input.c;
@@ -1152,7 +1223,8 @@ export class Game {
     c.hazard = false;
     // the basics lesson starts with a cold car; everything else is ready to go
     const cold = this.lesson?.kind === 'basics';
-    c.seatbelt = !cold;
+    // (on a motorcycle there is no belt: the helmet is on)
+    c.seatbelt = !cold || this.def.model === 'motorcycle';
     this.vehicle.resetDrivetrain(!cold);
     this.rules.reset();
     this.hud.clearNotices();
@@ -1169,7 +1241,8 @@ export class Game {
     this.showModel(false);
     this.hud.showLoading(tr('loadingTiles', this.settings.lang));
     const lang = this.settings.lang;
-    const note = this.isTruck && this.lesson?.kind === 'route' ? `${tr('lesson.truckNote', lang)} ` : '';
+    const caps = this.def.caps;
+    const note = this.lesson?.kind === 'route' && (caps || this.def.noMotorway) ? `${caps ? tr('lesson.capNote', lang, { vehicle: tr(this.def.name, lang), rural: caps.rural, motorway: caps.motorway }) : tr('lesson.noMotorwayNote', lang)} ` : '';
     this.pendingIntro = this.lesson && !skipIntro ? { title: lessonTitle(this.lesson.id, lang), text: note + lessonIntro(this.lesson.id, lang) } : null;
   }
 
@@ -1203,6 +1276,8 @@ export class Game {
     this.vehicle.teleport(place.x, y + 0.02, place.z, place.yaw);
     this.trailer?.coupleBehind(this.vehicle);
     this.lastGood = { x: place.x, y, z: place.z, yaw: place.yaw, t: 0 };
+    // (on foot first – not on the yard of the class CE tasks, not when the car is to drive by itself)
+    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker;
     this.camSnap = true;
     this.showModel(true);
     if (!this.keepClock) {
@@ -1230,7 +1305,18 @@ export class Game {
     this.audio.start();
     this.state = 'drive';
     this.app.canvas.focus();
+    // the drive begins on foot beside the vehicle (once, when it is first placed)
+    if (this.walkPending) {
+      this.walkPending = false;
+      this.startOnFoot();
+    }
   }
+
+  /** "What's new" is to be shown when the menu first comes up */
+  private showNewsOnce = newsDue(playedBefore());
+
+  /** the vehicle has just been placed for a drive that begins on foot */
+  private walkPending = false;
 
   private pause(): void {
     if (this.state !== 'drive') return;
@@ -1297,7 +1383,10 @@ export class Game {
       else if (this.state === 'pause') this.resume();
       else if (this.state === 'reality') this.closeReality();
       else if (this.state === 'map') this.closeMap();
-    } else if (a === 'view' && this.state === 'drive') {
+    } else if (a === 'door' && this.state === 'drive') {
+      if (this.walker) this.getIn();
+      else this.getOut();
+    } else if (a === 'view' && this.state === 'drive' && !this.walker) {
       // the driver's seat → behind the car → the free camera → …
       this.cameraMode = this.cameraMode === 'cockpit' ? 'chase' : this.cameraMode === 'chase' ? 'free' : 'cockpit';
       this.input.resetLook(this.cameraMode === 'chase', this.cameraMode === 'free');
@@ -1311,7 +1400,7 @@ export class Game {
         this.settings.view = this.cameraMode;
         saveSettings(this.settings);
       }
-    } else if (a === 'reset' && this.state === 'drive') {
+    } else if (a === 'reset' && this.state === 'drive' && !this.walker) {
       this.resetToRoad();
     } else if (a === 'help') {
       if (this.state === 'drive') {
@@ -1350,6 +1439,9 @@ export class Game {
     const v = this.vehicle;
     v.teleport(spot.x, spot.y + 0.05, spot.z, spot.yaw);
     if (this.trailer?.coupled) this.trailer.coupleBehind(v);
+    // (the instructor – and with him the driver of a demonstration drive – forgets where the car was:
+    // else the driver would act once more on the lane it has just been taken from)
+    this.rules.placed();
     this.demo?.driver?.reset();
     this.lastGood = { x: spot.x, y: spot.y, z: spot.z, yaw: spot.yaw, t: this.time };
     this.resetAt = { x: spot.x, z: spot.z, t: this.time };
@@ -1430,6 +1522,18 @@ export class Game {
     d.gear = c.gear;
     d.ignition = c.ignition;
     d.starter = c.starter;
+    // a look back over the left shoulder: that is what is asked for before the door is opened
+    if (c.lookYaw > 0.9) this.lookedBackAt = this.time;
+    this.stepDoor(dt);
+    if (this.walker) {
+      // nobody in the seat: the vehicle stands as it was left (the keys W S A D walk)
+      c.steer = d.steer = this.parkedSteer;
+      c.throttle = d.throttle = 0;
+      c.brake = d.brake = 0;
+      c.clutch = d.clutch = 0;
+      d.starter = false;
+      this.stepWalk(dt);
+    }
     // Speed limiter: a key or a pedal on the screen is all or nothing, which makes it hard to hold
     // 30 or 50 km/h.  With the limiter the throttle eases off just below the current limit – the
     // driver still has to brake when the limit drops.
@@ -1438,7 +1542,9 @@ export class Game {
       d.throttle = Math.min(d.throttle, Math.max(0, (lim - 0.5 - v.speed * 3.6) / 4));
     }
     // a truck is governed at 90 km/h
-    if (this.isTruck && v.speed * 3.6 > 85) d.throttle = Math.min(d.throttle, Math.max(0, (89.5 - v.speed * 3.6) / 4));
+    // a truck is governed at 90 km/h, a bus at 100, a tractor runs 40 by construction
+    const gov = this.def.governed;
+    if (gov > 0 && v.speed * 3.6 > gov - 5) d.throttle = Math.min(d.throttle, Math.max(0, (gov - 0.5 - v.speed * 3.6) / 4));
     const demo = this.demo;
     if (demo?.active && demo.driver) {
       // Whoever touches a pedal or the steering takes the car over (held for a moment: a wheel
@@ -1508,8 +1614,11 @@ export class Game {
 
     v.getModelPosition(this.mpos);
     // (the traffic wants the middle of the vehicle's length; a truck is measured from the middle of its wheelbase)
-    const mid = this.isTruck ? (TRUCK_OUTLINE.rear - TRUCK_OUTLINE.front) / 2 : 0;
+    const mid = (this.def.outline.rear - this.def.outline.front) / 2;
     const player: PlayerState = { x: this.mpos[0] + Math.sin(v.yaw) * mid, y: this.mpos[1], z: this.mpos[2] + Math.cos(v.yaw) * mid, yaw: v.yaw, speed: v.speed, length: v.spec.length ?? 4.28, width: v.spec.width ?? 1.79 };
+    // (the lane the vehicle was on in the last step, and where its middle was along it: the cyclists are sent along by it)
+    player.lane = this.rules.context.onRoad ? this.currentLane() : null;
+    player.s = this.laneFront() - player.length / 2;
     this.signals.update(dt);
     // trams and trains: they keep clear of the cars, the cars of them
     const others = this.railOthers;
@@ -1522,9 +1631,11 @@ export class Game {
     if (this.trailer) {
       // the trailer is in the way of the traffic like the truck itself
       const t = this.trailer;
-      const off = (TRAILER_OUTLINE.front - TRAILER_OUTLINE.rear) / 2;
-      boxes.push({ x: t.x - Math.sin(t.yaw) * off, y: t.y, z: t.z - Math.cos(t.yaw) * off, yaw: t.yaw, speed: t.coupled ? t.speed : 0, length: TRAILER_OUTLINE.front + TRAILER_OUTLINE.rear, width: TRAILER_OUTLINE.hw * 2 });
+      const o = trailerOf(this.def) ?? TRAILER_OUTLINE;
+      const off = (o.front - o.rear) / 2;
+      boxes.push({ x: t.x - Math.sin(t.yaw) * off, y: t.y, z: t.z - Math.cos(t.yaw) * off, yaw: t.yaw, speed: t.coupled ? t.speed : 0, length: o.front + o.rear, width: o.hw * 2, own: t.coupled });
     }
+    if (this.walker) boxes.push({ x: this.walker.x, y: this.walker.y, z: this.walker.z, yaw: this.walker.yaw, speed: 0, length: 0.6, width: 0.6 });
     this.traffic.obstacles = boxes;
     this.traffic.update(dt, player);
     // run into a tram (or hit by one): pushed clear – it does not give way
@@ -1547,7 +1658,7 @@ export class Game {
         const vn = v.vel[0] * (dx / l) + v.vel[2] * (dz / l);
         if (vn < 0) v.applyImpulse(v.pos[0], v.pos[1], v.pos[2], -(dx / l) * vn * v.spec.mass * 1.2, 0, -(dz / l) * vn * v.spec.mass * 1.2);
         this.audio.click('crash');
-      }
+      } else if (ev.type === 'cyclistEndangered' && ev.hit) this.audio.click('bump');
     }
     // on its side or roof: that is the end of this drive – count it as a crash and start again on the road
     if (v.upright < 0.35) {
@@ -1579,9 +1690,10 @@ export class Game {
       stalled,
       hitScenery: impact,
       length: v.spec.length ?? 4.28,
-      front: this.isTruck ? TRUCK_OUTLINE.front : undefined,
+      front: this.def.outline.front,
     };
     this.rules.update(dt, snap, this.traffic.events);
+    this.signalTips(dt);
     this.rememberGoodSpot(player);
     if (this.task) this.updateTask(dt);
     else if (this.demo) this.updateDemo(dt, player);
@@ -1603,6 +1715,213 @@ export class Game {
 
   private currentLane(): Lane | null {
     return (this.rules as unknown as { lane: Lane | null }).lane;
+  }
+
+  // ------------------------------------------------- on foot: round the vehicle, out and in
+  /** somebody on foot beside the vehicle (null: in the driver's seat) */
+  private walker: OnFoot | null = null;
+  private readonly markers = new CheckMarkers();
+  private readonly fadeEl = document.createElement('div');
+  /** the drive began on foot: the check round the vehicle counts */
+  private walkStart = false;
+  /** getting in or out: seconds into it, which way, and the camera at its start */
+  private doorT = -1;
+  private doorWay: 'in' | 'out' = 'in';
+  private readonly doorFrom = { pos: new THREE.Vector3(), quat: new THREE.Quaternion() };
+  /** when the driver last looked back over the left shoulder (before opening the door) */
+  private lookedBackAt = -100;
+  /** the steering wheel as it was left */
+  private parkedSteer = 0;
+  private walkSince = 0;
+
+  /** The vehicle as somebody on foot meets it: its parts in the plan, the driver's door, the coupling. */
+  private walkVehicle(): WalkVehicle {
+    const v = this.vehicle;
+    v.getModelPosition(this.mpos);
+    const units: WalkUnit[] = [];
+    let hitch: WalkVehicle['hitch'] = null;
+    const d = this.def;
+    units.push({ x: this.mpos[0], z: this.mpos[2], yaw: v.yaw, ...d.outline, axles: d.axles, track: d.track });
+    const t = this.trailer;
+    const o = trailerOf(d);
+    if (t?.coupled && o && d.trailer) {
+      const axles = d.trailer.axleSpread > 0 ? [d.trailer.axleSpread / 2, -d.trailer.axleSpread / 2] : [0];
+      units.push({ x: t.x, z: t.z, yaw: t.yaw, front: o.front, rear: o.rear, hw: o.hw, axles, track: d.trailer.track / 2 });
+      hitch = { x: t.hitchX, y: t.hitchY, z: t.hitchZ };
+    }
+    return { units, y: this.mpos[1], door: d.door, doorSide: d.doorSide || -1, hitch };
+  }
+
+  /**
+   * Out of the vehicle (it stands): the door is opened into the road only
+   * after a look back (§ 14 Abs. 1 StVO), the vehicle is left secured –
+   * engine off, parking brake on (§ 14 Abs. 2 StVO).
+   */
+  private getOut(): void {
+    const v = this.vehicle;
+    const c = this.input.c;
+    const lang = this.settings.lang;
+    if (this.walker || this.doorT >= 0 || this.demo?.active || this.task) return;
+    if (Math.abs(v.speed) > 0.3) {
+      this.tipText = tr('stopFirst', lang);
+      this.tipUntil = this.time + 3;
+      return;
+    }
+    v.getModelPosition(this.mpos);
+    const x = this.mpos[0];
+    const z = this.mpos[2];
+    // (a motorcycle has no parking brake to set: the engine off is enough)
+    if ((c.handbrake < 0.5 && this.def.doorSide !== 0) || v.engineRunning) this.rules.noteAt('notSecured', 'minor', x, z);
+    // what comes from behind on the side where the door opens: within four seconds of it (a motorcycle has no door)
+    const side = this.def.doorSide;
+    const s = Math.sin(v.yaw);
+    const co = Math.cos(v.yaw);
+    let coming = false;
+    const movers: Array<{ x: number; z: number; v: number; yaw: number }> = [...this.traffic.cars.map((k) => ({ x: k.x, z: k.z, v: k.v, yaw: k.yaw })), ...this.traffic.cyclists.list.map((k) => ({ x: k.x, z: k.z, v: k.v, yaw: k.yaw }))];
+    for (const m of movers) {
+      const dx = m.x - x;
+      const dz = m.z - z;
+      const ahead = -dx * s - dz * co;
+      const right = dx * co - dz * s;
+      const along = Math.cos(m.yaw - v.yaw);
+      if (right * side > 0.4 && right * side < 4.5 && ahead < 3 && ahead > -60 && along > 0.5 && m.v > 1 && (0.5 - ahead) / m.v < 4) coming = true;
+    }
+    // (only a door on the left opens into the road: the front door of a bus opens towards the kerb,
+    // a motorcycle has none)
+    const looked = this.time - this.lookedBackAt < 5;
+    if (side < 0 && coming) this.rules.noteAt('doorTraffic', 'major', x, z);
+    else if (side < 0 && !looked) this.rules.noteAt('doorCheck', 'hint', x, z);
+    // (whatever was done: the vehicle does not roll away)
+    c.handbrake = 1;
+    c.seatbelt = false;
+    this.parkedSteer = c.steer;
+    this.walkStart = false;
+    this.startDoor('out');
+  }
+
+  /** In again: from beside the driver's door. */
+  private getIn(): void {
+    const w = this.walker;
+    const lang = this.settings.lang;
+    if (!w || this.doorT >= 0) return;
+    if (!w.atDoor) {
+      this.tipText = tr('toDoor', lang);
+      this.tipUntil = this.time + 3;
+      return;
+    }
+    // a drive that began on foot: was the vehicle looked at?
+    if (this.walkStart && !w.allChecked) this.rules.noteAt('preCheck', 'hint', this.mpos[0], this.mpos[2], { missing: new Intl.ListFormat(localeOf(lang), { style: 'long', type: 'conjunction' }).format(w.missing().map((id) => tr(CHECK_TEXT[id], lang))) }, 30);
+    this.startDoor('in');
+  }
+
+  /** Begin on foot beside the vehicle (the start "beside the vehicle"): engine off, belt off. */
+  private startOnFoot(): void {
+    const c = this.input.c;
+    c.handbrake = 1;
+    c.seatbelt = false;
+    this.vehicle.resetDrivetrain(false);
+    this.parkedSteer = 0;
+    this.walkStart = true;
+    this.enterWalk();
+  }
+
+  private enterWalk(): void {
+    const w = new OnFoot(this.walkVehicle());
+    w.y = this.footGround(w.x, w.z, this.mpos[1] + 1);
+    this.walker = w;
+    this.walkSince = this.time;
+    this.input.resetLook(false, true);
+    this.markers.show(w.spots, (x, z) => this.footGround(x, z, this.mpos[1] + 1));
+  }
+
+  private leaveWalk(): void {
+    this.walker = null;
+    if (this.def.model === 'motorcycle') this.input.c.seatbelt = true;
+    this.markers.hide();
+    this.cameraMode = 'cockpit';
+    this.input.resetLook(false, false);
+  }
+
+  private startDoor(way: 'in' | 'out'): void {
+    this.doorWay = way;
+    this.doorT = 0;
+    this.doorFrom.pos.copy(this.app.camera.position);
+    this.doorFrom.quat.copy(this.app.camera.quaternion);
+    this.audio.click('door');
+    this.fadeEl.classList.add('on');
+  }
+
+  /** Getting in or out: the picture goes dark while the door is opened, the seat taken or left, the door closed. */
+  private stepDoor(dt: number): void {
+    if (this.doorT < 0) return;
+    const before = this.doorT;
+    this.doorT += dt;
+    if (before < 0.35 && this.doorT >= 0.35) {
+      if (this.doorWay === 'out') this.enterWalk();
+      else this.leaveWalk();
+    }
+    if (before < 0.6 && this.doorT >= 0.6) {
+      this.audio.click('doorShut');
+      this.fadeEl.classList.remove('on');
+    }
+    if (this.doorT >= 1) this.doorT = -1;
+  }
+
+  /** The height to stand on: the road or pavement there, else the ground. */
+  private footGround(x: number, z: number, yRef: number): number {
+    return this.app.world.surfaceAt(x, z, yRef, this.hit) ? this.hit.y : this.app.tiles.heightAt(x, z);
+  }
+
+  private stepWalk(dt: number): void {
+    const w = this.walker;
+    if (!w) return;
+    const look = this.input.takeCam();
+    const r = w.update(dt, this.input.walkInput(), look, (x, z, yRef) => this.footGround(x, z, yRef), (x, y, z, rad) => this.collider.circleBlocked(x, y, z, rad));
+    if (r.step) this.audio.click('step');
+    if (r.checked) {
+      this.audio.click('tick');
+      this.markers.update(w.spots);
+      if (w.allChecked) {
+        this.tipText = tr('checkDone', this.settings.lang);
+        this.tipUntil = this.time + 5;
+      }
+    }
+  }
+
+  /** the junction whose lights were last said to be out of order, and for how long the car has stood at a lit green arrow */
+  private toldDark: Junction | null = null;
+  private atArrow = 0;
+
+  /**
+   * What the instructor says about lights that are not the usual three
+   * lamps – with the rule help on, and not in the test: the lights of the
+   * junction ahead are out of order (the signs count), and the green arrow
+   * beside a red light is lit (whoever turns right may go).
+   */
+  private signalTips(dt: number): void {
+    const j = this.rules.context.junction;
+    if (!j || !this.settings.hudRules || this.rules.strict || this.demo?.active || this.time < this.tipUntil) {
+      this.atArrow = 0;
+      return;
+    }
+    const lang = this.settings.lang;
+    if (j.dark && j.dist < 70) {
+      const node = this.currentLane()?.to ?? null;
+      if (node && node !== this.toldDark) {
+        this.toldDark = node;
+        this.tipText = tr(j.ctrl === CTRL.RBL ? 'tipLightsOutRbl' : 'tipLightsOut', lang);
+        this.tipUntil = this.time + 6;
+      }
+    }
+    // standing at the line on red while the arrow is lit: say so after a moment (once per stop)
+    if (j.arrow === SIG.GREEN && j.signal !== SIG.GREEN && j.dist < 8 && Math.abs(this.vehicle.speed) < 0.3) {
+      const before = this.atArrow;
+      this.atArrow += dt;
+      if (before < 1.2 && this.atArrow >= 1.2) {
+        this.tipText = tr('tipArrow', lang);
+        this.tipUntil = this.time + 5;
+      }
+    } else this.atArrow = 0;
   }
 
   private laneFront(): number {
@@ -1709,6 +2028,13 @@ export class Game {
     this.last = now;
     this.time += dt;
     this.frames++;
+    // pictures a second, for whoever asked for the display (twice a second, from the clock of the pictures)
+    this.fpsFrames++;
+    if (now - this.fpsSince >= 500) {
+      this.hud.setFps(this.fpsSince > 0 && this.state === 'drive' ? (this.fpsFrames * 1000) / (now - this.fpsSince) : -1);
+      this.fpsSince = now;
+      this.fpsFrames = 0;
+    }
     const app = this.app;
     const tiles = app.tiles;
 
@@ -1718,7 +2044,7 @@ export class Game {
     if (this.signalsDirty && this.time - this.signalsBuilt > 0.6) {
       this.signalsDirty = false;
       this.signalsBuilt = this.time;
-      this.signalHeads.rebuild(app.world);
+      this.signalHeads.rebuild(app.world, this.signals);
       this.collider.remove('signals');
       this.collider.add({ key: 'signals', rings: null, ringCounts: null, segments: null, discs: this.signalHeads.poles });
     }
@@ -1804,10 +2130,11 @@ export class Game {
       model.root.position.set(this.mpos[0], this.mpos[1], this.mpos[2]);
       model.root.quaternion.set(v.quat[0], v.quat[1], v.quat[2], v.quat[3]);
       model.root.updateMatrixWorld(true);
-      if (this.truck && this.trailer && this.isTruck) {
-        const t = this.trailer;
-        this.truck.setTrailer(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, t.coupled);
-      }
+      const t = this.trailer;
+      if (t && this.truck && this.def.kind === 'truck') this.truck.setTrailer(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, t.coupled);
+      if (t && this.carTrailer && this.def.kind === 'carTrailer') this.carTrailer.place(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, this.lastVisual);
+      // a motorcycle leans into the bend: as far as it must for the speed and the curve
+      if (model instanceof PlayerBike) model.setLean(Math.atan(Math.max(-8, Math.min(8, v.accLat)) / 9.81));
       tiles.update(this.mpos[0], this.mpos[2]);
       this.props.update(this.mpos[0], this.mpos[2]);
       this.updateVisuals(dt);
@@ -1829,7 +2156,7 @@ export class Game {
     }
     this.signs.flush();
     this.signalHeads.update(this.signals);
-    this.actors.update(this.traffic.cars, this.traffic.peds, this.time);
+    this.actors.update(this.traffic.cars, this.traffic.peds, this.time, this.traffic.cyclists.list);
     this.railActors.update(this.rail.vehicles);
 
     if (this.state === 'reality') {
@@ -1840,10 +2167,11 @@ export class Game {
     } else if (haveCar) {
       this.updateCamera(dt);
       const mode = this.settings.mirrors;
-      if (this.cameraMode === 'cockpit' && mode !== 'off') {
+      if (this.cameraMode === 'cockpit' && mode !== 'off' && !this.walker) {
         const mirrors = model.mirrors;
         const far = Math.min(450, app.tiles.viewRadius * 0.4);
-        if (mode === 'full' || this.frames < 4) for (const m of mirrors) m.render(app.renderer, app.scene, model.root.matrixWorld, this.eyeWorld, far);
+        // (each mirror in the frame of what it is fixed to: the motorcycle's turn with the handlebar and lean with it)
+        if (mode === 'full' || this.frames < 4) for (const m of mirrors) m.render(app.renderer, app.scene, (m.mesh.parent ?? model.root).matrixWorld, this.eyeWorld, far);
         else mirrors[this.mirrorTurn++ % mirrors.length].render(app.renderer, app.scene, model.root.matrixWorld, this.eyeWorld, far);
       }
       app.render(model.root.position);
@@ -1933,6 +2261,7 @@ export class Game {
     s.handbrakeLever = c.handbrake;
     s.braking = this.driver.brake > 0.03;
     s.reversing = v.gear === -1;
+    this.lastVisual = s;
     this.model.update(s, dt, this.time);
 
     // sound
@@ -2012,7 +2341,7 @@ export class Game {
       tip,
       tipAction,
       // (the truck's instruments stand far away at the foot of its windscreen: the strip stays)
-      showDash: this.cameraMode !== 'cockpit' || this.isTruck,
+      showDash: this.cameraMode !== 'cockpit' || this.def.dash,
       indicator: c.indicator,
       hazard: c.hazard,
       blinkOn: s.blinkOn,
@@ -2038,6 +2367,25 @@ export class Game {
       hs.navText = ctx.roadName || tr('free', lang);
       hs.navSub = tr(touch ? 'navSubTouch' : 'navSubKeys', lang);
       hs.navArrow = 0;
+    }
+    const w = this.walker;
+    if (w) {
+      // on foot: what there is to check round the vehicle, and how far that is done
+      hs.navText = tr(w.allChecked ? 'checkDone' : 'walkTitle', lang);
+      hs.navSub = w.progress().map((p) => `${tr(CHECK_TEXT[p.id], lang)} ${p.done >= p.of ? '✓' : p.of > 1 ? `${p.done}/${p.of}` : '·'}`).join('  ');
+      hs.navArrow = 0;
+      hs.navActive = false;
+      hs.tip = '';
+      hs.tipAction = '';
+      if (w.atDoor) {
+        hs.tip = tr(touch ? 'getInTouch' : 'getIn', lang);
+        hs.tipAction = 'KeyG';
+      } else if (w.tooFar) hs.tip = tr('tooFar', lang);
+      else if (this.time - this.walkSince < 10) hs.tip = tr(touch ? 'walkHelpTouch' : 'walkHelp', lang);
+    } else if (this.doorT < 0 && !demo?.active && !this.task && (!hs.tip || hs.tipAction === 'Enter') && Math.abs(kmh) < 1 && !v.engineRunning && c.handbrake > 0.5 && v.odometer - this.startOdo > 30) {
+      // standing, engine off, parking brake on: getting out is offered
+      hs.tip = tr(touch ? 'getOutHintTouch' : 'getOutHint', lang);
+      hs.tipAction = 'KeyG';
     }
     this.hud.update(hs, this.time);
   }
@@ -2065,6 +2413,31 @@ export class Game {
     const lean = this.tmpV.set(-v.accLat * 0.004, 0, v.accLong * 0.005);
     lean.clampLength(0, 0.06);
     this.eyeWorld.copy(this.model.eye).add(lean).applyMatrix4(car.matrixWorld);
+    const w = this.walker;
+    if (w || this.doorT >= 0) {
+      // on foot: the eyes of somebody standing beside the vehicle – and on the way in or out, from one to the other
+      cam.near = 0.06;
+      cam.fov = 62;
+      const to = this.tmpV;
+      const q = this.tmpQ;
+      if (w) {
+        to.set(w.x, w.y + EYE, w.z);
+        q.setFromEuler(new THREE.Euler(w.pitch, w.yaw, 0, 'YXZ'));
+      } else {
+        to.copy(this.eyeWorld);
+        q.copy(car.quaternion);
+      }
+      if (this.doorT >= 0) {
+        const k = Math.min(1, this.doorT / 0.6);
+        cam.position.copy(this.doorFrom.pos).lerp(to, k);
+        cam.quaternion.copy(this.doorFrom.quat).slerp(q, k);
+      } else {
+        cam.position.copy(to);
+        cam.quaternion.copy(q);
+      }
+      cam.updateProjectionMatrix();
+      return;
+    }
     if (this.cameraMode === 'cockpit') {
       cam.near = 0.06;
       cam.fov = 60;
@@ -2075,6 +2448,13 @@ export class Game {
       this.demoHead += Math.max(-dt * 5, Math.min(dt * 5, want - this.demoHead));
       this.tmpQ.setFromEuler(new THREE.Euler(c.lookPitch, c.lookYaw + this.demoHead, 0, 'YXZ'));
       cam.quaternion.copy(car.quaternion).multiply(this.tmpQ);
+      if (this.model instanceof PlayerBike) {
+        // the rider leans with the motorcycle: the eye swings round the line where the tyres touch the road
+        BIKE_ROLL.setFromAxisAngle(AXIS_Z, -this.model.leaning);
+        this.eyeWorld.copy(this.model.eye).applyQuaternion(BIKE_ROLL).applyMatrix4(car.matrixWorld);
+        cam.position.copy(this.eyeWorld);
+        cam.quaternion.copy(car.quaternion).multiply(BIKE_ROLL).multiply(this.tmpQ);
+      }
     } else if (this.cameraMode === 'chase') {
       cam.near = 0.3;
       cam.fov = 55;
@@ -2084,7 +2464,7 @@ export class Game {
       // higher up, so that the trailer does not hide the road and its end can be watched.)
       // (While reversing on the yard it looks down steeply on the trailer's axles: what matters is
       // where the trailer's end goes, and that lies behind.)
-      const long = this.isTruck;
+      const long = this.def.long;
       const reversing = !!this.task?.run.judge;
       const lift = Math.min(1.5, Math.max(0.03, (reversing ? 1.05 : long ? 0.42 : 0.2) - c.lookPitch));
       const reach = c.lookZoom * Math.cos(lift);
@@ -2106,7 +2486,7 @@ export class Game {
       cam.fov = 55;
       const fc = this.fc;
       const t = this.input.takeCam();
-      const long = this.isTruck;
+      const long = this.def.long;
       if (!fc.ready) {
         // from where the camera is now, looking the way it looks
         fc.ready = true;

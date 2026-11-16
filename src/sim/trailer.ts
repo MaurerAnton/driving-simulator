@@ -34,6 +34,8 @@ export interface TrailerSpec {
   /** deceleration its brakes give at full pedal (m/s²) */
   brake: number;
   rollingResistance: number;
+  /** where the coupling sits on the towing vehicle: metres behind its rear axle, and above the ground (default: the truck's) */
+  hitch?: { behindRearAxle: number; height: number };
 }
 
 /** 7.9 m from the coupling to the rear end, 2.5 m wide, 6 t as driven (10 t gross). */
@@ -50,6 +52,30 @@ export const TANDEM_TRAILER: TrailerSpec = {
   brake: 6.2,
   rollingResistance: 0.008,
 };
+
+/**
+ * A tandem box trailer behind a car (class BE): 4.85 m from the coupling to
+ * the rear end, 2.05 m wide, 1.4 t as driven, with an overrun brake.
+ */
+export const CAR_TRAILER: TrailerSpec = {
+  mass: 1400,
+  hitchToAxle: 3.1,
+  bodyFront: 1.15,
+  length: 4.85,
+  width: 2.05,
+  height: 2.1,
+  axleSpread: 0.8,
+  track: 1.75,
+  wheelRadius: 0.3,
+  brake: 5.5,
+  rollingResistance: 0.012,
+  hitch: { behindRearAxle: 0.95, height: 0.45 },
+};
+
+/** The outline of a trailer in the plan, from the middle of its axle group: ahead to its front, behind to its rear, half its width, ahead to the coupling. */
+export function trailerOutline(t: TrailerSpec): { front: number; rear: number; hw: number; hitch: number } {
+  return { front: t.hitchToAxle - t.bodyFront, rear: t.length - t.hitchToAxle, hw: t.width / 2, hitch: t.hitchToAxle };
+}
 
 const G = 9.81;
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
@@ -86,6 +112,18 @@ export class Trailer {
     this.ground = ground;
   }
 
+  /** how high the coupling is above the ground */
+  get hitchHeight(): number {
+    return (this.spec.hitch ?? TRUCK_HITCH).height;
+  }
+
+  /** Where the coupling of the towing vehicle is right now (world). */
+  hitchPoint(v: Vehicle, out: number[]): void {
+    const h = this.spec.hitch ?? TRUCK_HITCH;
+    const mo = v.modelOrigin;
+    v.toWorld(mo[0], mo[1] + h.height, mo[2] + v.spec.wheelbase / 2 + h.behindRearAxle, out);
+  }
+
   /** Where the coupling of the truck is right now (world). */
   static truckHitch(truck: Vehicle, out: number[]): void {
     const mo = truck.modelOrigin;
@@ -106,7 +144,7 @@ export class Trailer {
 
   /** Hang it on the truck, in line behind it. */
   coupleBehind(truck: Vehicle): void {
-    Trailer.truckHitch(truck, this.hit);
+    this.hitchPoint(truck, this.hit);
     const L = this.spec.hitchToAxle;
     this.yaw = truck.yaw;
     this.x = this.hit[0] + Math.sin(truck.yaw) * L;
@@ -138,7 +176,7 @@ export class Trailer {
    * a trailer that stands alone.
    */
   offsetFrom(truck: Vehicle): { dist: number; angle: number } {
-    Trailer.truckHitch(truck, this.hit);
+    this.hitchPoint(truck, this.hit);
     const d = Math.hypot(this.hit[0] - this.hitchX, this.hit[2] - this.hitchZ);
     let a = truck.yaw - this.yaw;
     a -= Math.PI * 2 * Math.round(a / (Math.PI * 2));
@@ -155,10 +193,10 @@ export class Trailer {
     if (hitchY === undefined) {
       // standing alone it rests on its support leg: level with the ground under the drawbar
       this.ground.sample(this.hitchX, this.hitchZ, this.y + 1, this.sample);
-      hitchY = this.sample.y + TRUCK_HITCH.height;
+      hitchY = this.sample.y + this.hitchHeight;
     }
     this.hitchY = hitchY;
-    this.pitch = Math.atan2(hitchY - TRUCK_HITCH.height - this.y, L);
+    this.pitch = Math.atan2(hitchY - this.hitchHeight - this.y, L);
   }
 
   /**
@@ -170,7 +208,7 @@ export class Trailer {
     if (!this.coupled) return;
     const s = this.spec;
     const L = s.hitchToAxle;
-    Trailer.truckHitch(truck, this.hit);
+    this.hitchPoint(truck, this.hit);
     const hx = this.hit[0];
     const hz = this.hit[2];
     // The axle group cannot move sideways.  So it moves along the line to the coupling: the

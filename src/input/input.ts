@@ -32,7 +32,8 @@ export interface Controls {
   device: 'keyboard' | 'gamepad' | 'wheel' | 'touch';
 }
 
-export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality';
+/** door: get out of the vehicle, or in again (on foot beside it) */
+export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door';
 
 /** Lateral acceleration (m/s²) the steering keys may ask for: brisk in town, gentle on the motorway. */
 const keyLateral = (v: number): number => 2.4 + 3.4 / (1 + (v / 15) * (v / 15));
@@ -236,6 +237,31 @@ export class Input {
   }
 
   /** What was asked of the free camera since the last call (see `cam`); the object is reused. */
+  /**
+   * On foot: forwards (-1 … 1), turning (+ = to the left) and running, from
+   * whatever is in use – the keys W S A D (Shift to run), the pedals and the
+   * steering bar on the screen, a gamepad's stick and triggers.  (Not from
+   * the controls of the vehicle: its steering wheel stays where it is when
+   * nobody holds it.)
+   */
+  walkInput(): { fwd: number; turn: number; run: boolean } {
+    let fwd = (this.key('KeyW', 'ArrowUp') ? 1 : 0) - (this.key('KeyS', 'ArrowDown') ? 1 : 0);
+    let turn = (this.key('KeyA', 'ArrowLeft') ? 1 : 0) - (this.key('KeyD', 'ArrowRight') ? 1 : 0);
+    let run = this.key('ShiftLeft', 'ShiftRight');
+    if (this.key('AltLeft', 'AltRight')) fwd = turn = 0;
+    if (this.touch.active) {
+      fwd += this.touch.throttle - this.touch.brake;
+      turn -= this.touch.steer;
+    }
+    const pad = this.readPad();
+    if (pad) {
+      fwd += pad.throttle - pad.brake;
+      if (Math.abs(pad.steer) > 0.12) turn -= pad.steer;
+      run ||= pad.throttle > 0.95;
+    }
+    return { fwd: clamp(fwd, -1, 1), turn: clamp(turn, -1, 1), run };
+  }
+
   takeCam(): Readonly<{ yaw: number; pitch: number; right: number; fwd: number; dolly: number; keyRight: number; keyFwd: number; keyUp: number; fast: boolean; reset: boolean }> {
     const c = this.cam;
     const o = this.camOut;
@@ -404,6 +430,9 @@ export class Input {
           break;
         case 'KeyV':
           this.fire('view');
+          break;
+        case 'KeyG':
+          this.fire('door');
           break;
         case 'KeyM':
           this.fire('map');

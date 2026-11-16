@@ -14,6 +14,8 @@ import type { Connector, Lane } from '../world/lanes.ts';
 import { CLS, CTRL, EF, ROLE, XING } from '../world/types.ts';
 import type { CrossingJson } from '../world/types.ts';
 import type { Edge, World } from '../world/world.ts';
+import { CYCLE_LENGTH, CYCLE_WIDTH, Cyclists } from './cyclists.ts';
+import type { CycleEvent } from './cyclists.ts';
 import { SIG } from './signals.ts';
 import type { SignalSystem } from './signals.ts';
 
@@ -108,6 +110,11 @@ export interface PlayerState {
   speed: number;
   length: number;
   width: number;
+  /** the lane the vehicle is on and how far along it its middle is (if the caller knows: the cyclists are sent along by it) */
+  lane?: Lane | null;
+  s?: number;
+  /** among the obstacles: a part of the player's vehicle (its trailer) */
+  own?: boolean;
 }
 
 export type TrafficEvent =
@@ -118,7 +125,9 @@ export type TrafficEvent =
    */
   | { type: 'forcedBrake'; car: TrafficCar; decel: number; cutIn: boolean }
   | { type: 'collision'; car: TrafficCar; speed: number }
-  | { type: 'pedestrianEndangered'; ped: Pedestrian };
+  | { type: 'pedestrianEndangered'; ped: Pedestrian }
+  /** a cyclist had to brake hard because the player's vehicle came into their way – or was knocked over by it */
+  | CycleEvent;
 
 const COLORS = [0xd9dadc, 0x1c1d20, 0x8d9197, 0x3a3f46, 0xa01c1c, 0x1f3f7a, 0xf0efe8, 0x55606a, 0x7a2f2a, 0x2c5a3a, 0xb8b08c, 0x394a66, 0xc4c7ca, 0x101113];
 
@@ -131,6 +140,8 @@ export class Traffic {
   readonly signals: SignalSystem;
   readonly cars: TrafficCar[] = [];
   readonly peds: Pedestrian[] = [];
+  /** people on bicycles (src/sim/cyclists.ts) */
+  readonly cyclists: Cyclists;
   /** cars currently on each lane / connector, unsorted */
   private readonly onLane = new Map<number, TrafficCar[]>();
   private readonly onConn = new Map<number, TrafficCar[]>();
@@ -148,6 +159,8 @@ export class Traffic {
     this.world = world;
     this.graph = graph;
     this.signals = signals;
+    this.cyclists = new Cyclists(world, graph, signals);
+    this.cyclists.lanesAt = (x, z) => this.spawnGrid.get(Traffic.cellKey(x, z));
     this.addRoads(world.allEdges);
   }
 
@@ -262,6 +275,9 @@ export class Traffic {
    * player's car (set by the game every frame: the cars of trams and trains).
    */
   obstacles: readonly PlayerState[] = [];
+  /** the obstacles and the cyclists, as the cars see them (made anew in every step) */
+  private readonly blocks: PlayerState[] = [];
+  private readonly cycleBoxes: PlayerState[] = [];
 
   private spawn(player: PlayerState): void {
     for (let attempt = 0; attempt < 10; attempt++) {
@@ -328,6 +344,7 @@ export class Traffic {
   }
 
   clear(): void {
+    this.cyclists.clear();
     this.cars.length = 0;
     this.peds.length = 0;
     this.onLane.clear();
@@ -367,7 +384,7 @@ export class Traffic {
     const p = this.aim(me);
     const lead = this.leader(p, horizon) as { gap: number; v: number; loose: boolean };
     lead.loose = false;
-    for (const o of this.obstacles) {
+    for (const o of this.blocks) {
       if (Math.abs(o.x - p.x) > horizon + 30 || Math.abs(o.z - p.z) > horizon + 30) continue;
       const gap = this.playerAhead(p, o, horizon);
       if (gap >= lead.gap) continue;
@@ -522,6 +539,27 @@ export class Traffic {
       } else if (-d < length + 6 + Math.max(0, o.v - v) * 3.5) return false;
     }
     return true;
+  }
+
+  /**
+   * Is there room at the beginning of `lane` for a vehicle that needs `need`
+   * metres – or does the traffic stand there, so that whoever drove into the
+   * junction before it would have to wait in it?  Cars that are moving make
+   * room; those still in the junction on their way into the lane will need it.
+   */
+  roomBehind(lane: Lane, need: number): boolean {
+    // (a lane shorter than the vehicle is no place to wait in anyway: it leads on)
+    if (lane.len < need) return true;
+    let free = lane.len;
+    let standing = false;
+    for (const o of this.onLane.get(lane.id) ?? []) {
+      if (o.v > 2.5) continue;
+      standing = true;
+      free = Math.min(free, o.s - o.length / 2);
+    }
+    if (!standing) return true;
+    for (const c of lane.in) for (const o of this.onConn.get(c.id) ?? []) free -= o.length + 2;
+    return free >= need;
   }
 
   /** Is nobody inside the junction on a path that meets `c`? */
@@ -784,6 +822,20 @@ export class Traffic {
   // --- main update -----------------------------------------------------------------
   update(dt: number, player: PlayerState): void {
     this.events.length = 0;
+    // what is in the cars' way besides each other: what the game names, and the people on bicycles
+    const blocks = this.blocks;
+    blocks.length = 0;
+    for (const o of this.obstacles) blocks.push(o);
+    let n = 0;
+    for (const c of this.cyclists.list) {
+      const b = (this.cycleBoxes[n++] ??= { x: 0, y: 0, z: 0, yaw: 0, speed: 0, length: CYCLE_LENGTH, width: CYCLE_WIDTH });
+      b.x = c.x;
+      b.y = c.y;
+      b.z = c.z;
+      b.yaw = c.yaw;
+      b.speed = c.v;
+      blocks.push(b);
+    }
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && this.cars.length < this.targetCount) {
       this.spawn(player);
@@ -799,6 +851,9 @@ export class Traffic {
       this.drive(car, dt, player);
     }
     this.updatePedestrians(dt, player);
+    // people on bicycles: a few where there is traffic at all
+    this.cyclists.target = this.targetCount > 0 ? Math.max(1, Math.min(4, Math.round(this.targetCount / 12))) : 0;
+    this.cyclists.update(dt, player, this.obstacles, this.cars, this.events);
   }
 
   private drive(car: TrafficCar, dt: number, player: PlayerState): void {
@@ -851,7 +906,7 @@ export class Traffic {
     }
 
     // --- whatever else is on the road: trams and trains crossing or running in the street ---
-    for (const o of this.obstacles) {
+    for (const o of this.blocks) {
       if (Math.abs(o.x - car.x) > 110 || Math.abs(o.z - car.z) > 110) continue;
       const gap = this.playerAhead(car, o, clamp(car.v * 3.5 + 12, 14, 80));
       if (gap === Infinity) continue;
@@ -883,12 +938,14 @@ export class Traffic {
         let reason = 0;
         if (arm.sg >= 0 && node.sc >= 0) {
           const st = this.signals.get(node.sc, arm.sg);
-          if (st === SIG.RED || st === SIG.RED_AMBER) mustStop = true;
-          else if (st === SIG.AMBER) {
+          // the green arrow beside the light: whoever turns right may go while it is lit
+          const arrow = next.turn === TURN.RIGHT ? this.signals.arrow(arm) : -1;
+          if (arrow === SIG.GREEN) mustStop = false;
+          else if (st === SIG.AMBER || arrow === SIG.AMBER) {
             // stop if that is comfortably possible
             const need = (car.v * car.v) / (2 * Math.max(distToLine, 0.5));
             mustStop = distToLine > 0 && need < 3.2;
-          }
+          } else if (st === SIG.RED || st === SIG.RED_AMBER) mustStop = true;
           reason = 1;
         }
         if (!mustStop && distToLine > -1.5) {
@@ -915,6 +972,8 @@ export class Traffic {
         }
         // whoever has the right of way: never drive into a car that is crossing our path
         if (!mustStop && distToLine > -1.5 && distToLine < 32 && this.boxBlocked(next)) mustStop = true;
+        // whoever turns right lets the cyclists beside and behind ride on first (§ 9 Abs. 3 StVO)
+        if (!mustStop && next.turn === TURN.RIGHT && distToLine > -1.5 && distToLine < 20 && this.cyclists.blocksRightTurn(lane, car.s, car.length / 2)) mustStop = true;
         if (mustStop && distToLine > -1.5) stopDist = Math.max(0, distToLine);
         void reason;
       }
@@ -1073,6 +1132,8 @@ export class Traffic {
       // someone turns up at a crossing near the player now and then
       for (const c of this.world.crossings) {
         if (c.k !== XING.ZEBRA && c.k !== XING.SIGNAL) continue;
+        // (a light that is out of order: nobody is sent across there – they would wait for a green that never comes)
+        if (c.k === XING.SIGNAL && c.sc !== undefined && this.signals.isDark(c.sc)) continue;
         if (this.peds.some((p) => p.crossing === c)) continue;
         const e = this.world.edges[c.e];
         samplePolyline(e.pl, c.s, tmp);

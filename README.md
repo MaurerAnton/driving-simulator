@@ -1,7 +1,8 @@
 # Fahrsim Baunatal
 
-**Freier 3D-Fahrschulsimulator für Baunatal, Kassel und Umgebung – deutsche Verkehrsregeln im echten
-Straßennetz üben, im Pkw oder im Lkw mit Anhänger.**
+**Freier 3D-Fahrschulsimulator für Nordhessen – deutsche Verkehrsregeln im echten Straßennetz üben,
+mit einem Fahrzeug jeder Führerscheinklasse: Pkw, Pkw mit Anhänger, Motorrad, Lkw, Lkw mit Anhänger, Bus
+und Traktor.**
 Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software unter **AGPL-3.0-only**.
 
 ▶ **Spielen:** <https://maureranton.github.io/driving-simulator/>
@@ -19,13 +20,14 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 
 ## Was drin ist
 
-- **Kassel und sein Umland in echt:** 1 087 km² – Baunatal mit seinen Stadtteilen, ganz Kassel und der
-  größte Teil des Landkreises von Wolfhagen bis Kaufungen und von Hofgeismar bis Guxhagen – mit allen
-  Straßen und Wegen (rund 6 700 km, fast die Hälfte davon Feld- und Waldwege), der A 7, A 44 und A 49,
-  Kreisverkehren, dem VW-Werk: aus OpenStreetMap. Gelände aus dem amtlichen 1-m-Höhenmodell, rund
-  400 000 Gebäude und Gebäudeteile mit ihren echten Höhen und Dachformen aus dem amtlichen
-  3D-Gebäudemodell (LoD2) des Landes Hessen. Geladen wird immer nur die Umgebung des Fahrzeugs; die ganze
-  Karte liegt bei gut 200 MB.
+- **Nordhessen in echt:** die Stadt Kassel und die Landkreise Kassel, Schwalm-Eder, Werra-Meißner,
+  Waldeck-Frankenberg und Hersfeld-Rotenburg – rund 6 900 km² von Bad Karlshafen bis Bad Hersfeld und von
+  Willingen bis Eschwege, 115 Städte und Gemeinden – mit allen Straßen und Wegen (41 500 km, davon
+  16 300 km Straßen und 25 200 km Feld- und Waldwege), den Autobahnen A 4, A 5, A 7, A 44 und A 49,
+  Kreisverkehren, dem VW-Werk: aus OpenStreetMap. Gelände aus dem amtlichen 1-m-Höhenmodell, gut eine
+  Million Gebäude mit ihren echten Höhen und Dachformen aus dem amtlichen 3D-Gebäudemodell (LoD2) des
+  Landes Hessen. Geladen wird immer nur die Umgebung des Fahrzeugs; die ganze Karte hat knapp 900 MB – so
+  viel, wie auf GitHub Pages Platz hat.
 - **Verkehrsregelung am richtigen Ort:** Ampeln, Zebrastreifen, Stopp- und Vorfahrt-gewähren-Schilder,
   Tempolimits, Tempo-30-Zonen, verkehrsberuhigte Bereiche, Einbahnstraßen, Abbiegeverbote und Ortstafeln aus
   den OSM-Daten. Wo OSM nichts sagt, gilt die deutsche Regel – und so stehen dort auch die Schilder
@@ -36,8 +38,21 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   Schaltgetriebe; **Motorleistung wählbar** (60 bis 200 PS, voreingestellt 75 PS). Ein Tempobegrenzer nimmt
   bei Tastatur und Touch das Gas am Tempolimit zurück, und die Tastaturlenkung richtet sich nach der
   Querbeschleunigung – auch bei Autobahntempo bleibt das Auto ruhig.
+- **Ein Fahrzeug für jede Klasse:** Pkw (B), Pkw mit Tandem-Kastenanhänger (BE), Motorrad (A), Lkw (C),
+  Lkw mit Anhänger (CE), Linienbus (D) und Traktor (T) – jedes mit eigener Fahrphysik, eigenem Modell mit
+  Cockpit und Spiegeln und den Regeln seiner Klasse: Der Regelwächter kennt die Höchstgeschwindigkeiten
+  außerorts und auf der Autobahn (Pkw mit Anhänger 80/80, Lkw 60/80, Bus 80/100 km/h; § 3 Abs. 3,
+  § 18 Abs. 5 StVO), Schrittgeschwindigkeit beim Rechtsabbiegen innerorts über 3,5 t (§ 9 Abs. 6 StVO) und
+  das Autobahnverbot für den Traktor, der bauartbedingt 40 km/h fährt (§ 18 Abs. 1 StVO). Lkw und Bus sind
+  abgeregelt (90 bzw. 100 km/h). Die Wege der Navigation führen den Traktor um die Autobahn herum.
 - **Lkw mit Anhänger (Klasse CE):** ein 12-Tonner mit Tandemanhänger (15,7 m, 15,5 t) und alles, was die
   praktische Prüfung verlangt – siehe [unten](#lkw-mit-anhänger-klasse-ce).
+- **Zu Fuß ums Fahrzeug:** Aussteigen (`G`, aus dem Pausenmenü oder per Fingertipp, wenn das Fahrzeug mit
+  abgestelltem Motor und angezogener Handbremse steht), um das Fahrzeug herumgehen und vor der Fahrt
+  kontrollieren – Reifen, Licht vorn und hinten, beim Zug die Kupplung; Ringe am Boden zeigen, wo –, dann an
+  der Fahrertür einsteigen. Auf Wunsch beginnt jede Fahrt neben dem Fahrzeug (Einstellungen). Der Fahrlehrer
+  achtet darauf, dass vor dem Öffnen der Tür nach hinten gesehen (§ 14 Abs. 1 StVO) und das Fahrzeug
+  gesichert wird – Motor aus, Handbremse an (§ 14 Abs. 2 StVO).
 - **Drei Ansichten:** von außen hinter dem Fahrzeug (Voreinstellung; die Kamera lässt sich mit Maus oder
   Finger rund um das Fahrzeug drehen und im Abstand verstellen, `U` blickt nach hinten), aus dem **Cockpit**
   mit Lenkrad, Schalthebel, Pedalen, Kombiinstrument und **drei funktionierenden Spiegeln**, die optisch
@@ -46,23 +61,39 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   den Einstellungen durchscheinend machen.
 - **Fahrlehrer im Beifahrersitz:** Der Regelwächter erkennt u. a. zu schnelles Fahren, Rotlicht,
   überfahrene Stoppschilder, missachtete Vorfahrt (Schilder, **rechts vor links**, Kreisverkehr, § 10),
-  Fehler beim Abbiegen und Blinken, Zebrastreifen, falsche Fahrtrichtung, Fahren auf dem Gehweg,
-  zu geringen Abstand – jeweils mit Erklärung und Fundstelle in der StVO.
+  Fehler beim Abbiegen und Blinken, Zebrastreifen, Radfahrer beim Abbiegen, falsche Fahrtrichtung, Fahren
+  auf dem Gehweg, zu geringen Abstand – rund 50 Fehlerarten, jeweils mit Erklärung und Fundstelle in der
+  StVO. Seine Hinweise erscheinen im Feld des Straßennamens. Jeder Fehler zählt Punkte (leichter Fehler 1,
+  schwerer 3, „nicht bestanden“ 10); in der Prüfungsfahrt zählen auch Hinweise, und ab 10 Punkten ist sie
+  nicht bestanden. Am Ende jeder Fahrstunde – und auf Wunsch der freien Fahrt – steht eine Auswertung.
+- **Regel-Hilfe** (abschaltbar): das Tempolimit, die Zone und die Vorfahrt an der nächsten Kreuzung als
+  Schild – oder die Ampel, auch mit grünem Pfeil, auch ausgefallen. Dazu Lampen für Handbremse und Gurt
+  (wer gegen die Handbremse anfährt, hört einen Warnton).
 - **Fehlerprotokoll:** Jeder Fehler dieser und früherer Fahrten mit Datum, Straße und Erklärung; die
   Fundstelle führt mit einem Klick zum amtlichen Wortlaut des Paragrafen (gesetze-im-internet.de).
-- **Fahrstunden und Prüfungsfahrt:** Grundlagen (Anfahren, Schalten, Anhalten), rechts vor links,
-  Vorfahrtschilder, Ampeln, Kreisverkehr, Überland, Autobahn – und eine Prüfungsfahrt mit Auswertung.
+- **Fahrstunden und Prüfungsfahrt:** Grundlagen (Anfahren, Schalten, Anhalten; mit dem Pkw), rechts vor
+  links, Vorfahrtschilder, Ampeln, Kreisverkehr, Überland, Autobahn (nicht mit dem Traktor) – und eine
+  Prüfungsfahrt mit Auswertung, mit jedem Fahrzeug (Klasse CE: eine eigene, siehe unten).
+- **Ampeln:** feste Programme mit der deutschen Phasenfolge; wo das Rechtsabbiegen niemanden kreuzt (etwa
+  von der Hauptstraße in eine einmündende Seitenstraße), hängt ein **grüner Pfeil** neben dem Licht – bei
+  Rot darf, wer rechts abbiegt, fahren. Jeden Tag sind rund 6 % der Ampeln **ausgefallen** und blinken
+  gelb: dann gelten die Schilder darunter oder rechts vor links.
 - **Fahrt planen – Vorführfahrt oder Zielführung:** Ziele auf der Karte antippen oder als Adresse eingeben.
   Dann fährt das Auto selbst und regelgerecht dorthin – so sieht man, wie der Weg zu fahren ist: wo
   geblinkt und über die Schulter gesehen wird, wo rechts vor links gilt, wie schnell und mit welchem
   Abstand; eine Zeile erklärt mit, was der Fahrer gerade tut, und wer lenkt oder bremst, übernimmt selbst.
-  Oder man fährt selbst und lässt sich den Weg ansagen. Mehr dazu [unten](#fahrt-planen).
+  Oder man fährt selbst und lässt sich den Weg ansagen – auf dem Bildschirm und gesprochen (Einstellung
+  „Ansagen“), mit dem Fahrstreifen, in den man sich vor der Kreuzung einordnet. Mehr dazu [unten](#fahrt-planen).
 - **Rundfahrt durch die Straßen:** Länge in Kilometern wählen – der Simulator plant eine Strecke dieser
   Länge, die durch möglichst viele verschiedene Straßen führt und möglichst keine zweimal: vom Standort
   zurück zum Standort oder zu einem Ziel. Zum Selbstfahren oder als Vorführfahrt.
 - **Verkehr:** Fahrzeuge, die Ampeln, Vorfahrt und Abstand beachten, Fußgänger an Überwegen – und
   **Straßenbahnen und Züge**, die auf den echten Gleisen fahren, sobald welche in der Nähe sind, und an den
   Haltestellen halten.
+- **Radfahrer:** fahren innerorts auf dem Radweg neben der Fahrbahn geradeaus über die Kreuzungen. Wer
+  rechts abbiegt, muss sie durchlassen (§ 9 Abs. 3 StVO) – und ab und zu kommt genau dann einer: einer, den
+  man kurz vorher überholt hat, oder einer, der von hinten heranrollt, während man an der Linie wartet. Wer
+  den Schulterblick macht, sieht ihn; wer ihm den Weg abschneidet, bekommt einen schweren Fehler.
 - **Große Karte** (`M` oder die Pfeile an der kleinen Karte): eigener Standort, die schon gefahrene Strecke,
   Ortsnamen – und in der freien Fahrt lässt sich das Fahrzeug per Fingertipp an jede Stelle setzen. Auf
   Wunsch mit den **amtlichen Luftbildern** des Landes Hessen als Hintergrund.
@@ -71,12 +102,18 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   (auch 360°-Panoramen, wie sie Street-View-Downloader speichern), dazu die Koordinaten und Links, die
   dieselbe Stelle bei KartaView, Mapillary, Panoramax, Google Street View, Google Maps, Google Earth und
   OpenStreetMap öffnen. Mehr dazu [unten](#realansicht).
-- **Start an jeder Adresse:** Straße und Hausnummer eintippen (rund 50 000 Hausnummern in 2 800 Straßen aus
-  OpenStreetMap) – das Auto steht am Straßenrand vor dem Haus. In der freien Fahrt auch als Sprung aus dem
-  Pausenmenü.
+- **Start an jeder Adresse:** Straße und Hausnummer eintippen (rund 310 000 Hausnummern in 27 500 Straßen
+  aus OpenStreetMap) – das Fahrzeug steht am Straßenrand vor dem Haus. In der freien Fahrt auch als Sprung
+  aus dem Pausenmenü. Oder einer von gut 400 Startpunkten in 115 Orten.
 - Tastatur, Gamepad, **Lenkrad mit Pedalen und H-Schaltung** (Gamepad-API) und **Touchscreen** – auf dem
   Smartphone ist alles ohne Tastatur erreichbar. **Einstellungen**, Startpunkt, Fehlerprotokoll und
-  gefahrene Strecke bleiben im Browser gespeichert.
+  gefahrene Strecke bleiben im Browser gespeichert. **Einstellungen:** Grafik (drei Stufen: Auflösung,
+  Schatten, Sichtweite), Spiegel, Verkehrsdichte, Lautstärke, Getriebe und Motorleistung, Tempobegrenzer,
+  Kamera beim Start, durchscheinender Innenraum, Bildschirmsteuerung und ihre Deckkraft, Tastenhilfe,
+  Regel-Hilfe, Ganganzeige, gesprochene Ansagen, Start neben dem Fahrzeug – und die **Bildrate** (Bilder
+  pro Sekunde, oben rechts).
+- **Was ist neu:** Die Neuerungen jeder Version stehen im Spiel, in allen Sprachen – nach einem Update
+  einmal von selbst, sonst über „Was ist neu“ im Menü; darunter steht die Version.
 - **28 Sprachen**, vollständig übersetzt – darunter alle Sprachen, in denen man in Deutschland die
   Theorieprüfung ablegen kann. Siehe [Sprachen](#sprachen).
 
@@ -100,6 +137,9 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
 | `U` (halten) | nach hinten sehen |
 | Maus ziehen (oder `Alt` halten und Maus bewegen) · Mausrad | umsehen bzw. Kamera um das Fahrzeug drehen · Abstand der Kamera |
 | `B` · `L` `O` · `H` | Gurt · Abblend-/Fernlicht · Hupe |
+| `P` · `0` | Automatik: Parkstellung · Leerlauf |
+| `G` | aussteigen (im Stand) / an der Fahrertür einsteigen – zu Fuß: `W` `S` gehen, `A` `D` drehen, Maus umsehen, `Umschalt` rennen |
+| `F1` | Übersicht der Tasten |
 | `V` · `T` · `Esc` | Kamera (außen / Cockpit / frei) · Fahrzeug zurück auf die Straße · Pause |
 | freie Kamera: `Alt` + `W` `A` `S` `D` · `Alt` + `E` `Q` · rechte Maustaste ziehen | fliegen · höher / tiefer · verschieben (das Auto rollt solange von selbst weiter) |
 | `M` | große Karte |
@@ -212,8 +252,9 @@ Wiederholung) lehnt sich an die Prüfungsrichtlinie an. Dazu kommen die Fahrstun
 die freie Fahrt mit dem Lkw. Der Regelwächter kennt die
 Regeln für Lkw: 60 km/h außerorts und 80 km/h auf der Autobahn (§ 3 Abs. 3, § 18 Abs. 5 StVO),
 Schrittgeschwindigkeit beim Rechtsabbiegen innerorts (§ 9 Abs. 6 StVO). Die Grundfahraufgaben finden auf
-einem Übungsplatz statt, den das Spiel auf einem freien Feld bei Baunatal auslegt. Die Abfahrtkontrolle
-gehört nicht zur Klasse CE und ist nicht nachgebildet.
+einem Übungsplatz statt, den das Spiel auf einem freien Feld bei Baunatal auslegt. Vor der Fahrt kann man
+um den Zug herumgehen und ihn kontrollieren – Reifen, Licht, Kupplung (siehe „Zu Fuß ums Fahrzeug“); als
+eigene Aufgabe auf dem Übungsplatz ist die Abfahrtkontrolle nicht nachgebildet.
 
 ## Sprachen
 
@@ -284,27 +325,39 @@ Voraussetzung: [Node.js](https://nodejs.org) ≥ 24.
 git clone https://github.com/MaurerAnton/driving-simulator.git
 cd driving-simulator
 npm install
-npm run map:fetch  # die Karte (knapp 1 GB) vom Release des Projekts nach public/map – braucht curl und tar
+npm run map:fetch  # die Karte (knapp 900 MB) vom Release des Projekts nach public/map – braucht curl und tar
 npm run dev        # http://127.0.0.1:5173
 npm run build      # statische Seite in dist/
 ```
 
-Die Karte liegt nicht im Repository, sondern als Datei an einem Release (welches, steht in `map.release`):
+Die Karte liegt nicht im Repository, sondern in Stücken an einem Release (welches, steht in `map.release`):
 Jeder Neubau würde sonst ein Gigabyte zum Verlauf hinzufügen. Geodaten laden und die Karte selbst bauen
 muss man zum Spielen und Entwickeln nicht.
 
 ### Tests
 
 ```bash
-npm test             # 116 Tests: Fahrdynamik von Pkw (21) und Lkw mit Anhänger (6), Realansicht (15),
-                     # Adresssuche, Hinweise, Fehlerprotokoll, Karte (15), Straßenbahnen (9), Klasse CE (16), Sprachen (10),
-                     # Rundfahrten (7), freie Fahrstreifen (5), Straßennetz in Stücken, Kachelformat, Kreuzungsflächen (12)
+npm test             # 160 Tests: Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
+                     # Klassen (14), Realansicht (15), Adresssuche, Hinweise, Fehlerprotokoll, Karte (16), Straßenbahnen (9),
+                     # Klasse CE (16), Sprachen (10), Rundfahrten (7), Radfahrer (11), Ampeln mit Pfeil und ausgefallene
+                     # Ampeln (9), zu Fuß (6), „Was ist neu“ (3), freie Fahrstreifen (5), Straßennetz in Stücken,
+                     # Kachelformat, Kreuzungsflächen (12)
 npm run i18n:check   # Übersetzungen prüfen (Vollständigkeit, Platzhalter, Längen)
 npm run test:traffic # Verkehrssimulation im Dauerlauf auf der echten Karte
 npm run test:drive   # „virtueller Fahrschüler“ – der Fahrer der Vorführfahrten – fährt alle Fahrstunden regelkonform ab
 npm run test:drive:truck     # … mit Lkw und Anhänger, einschließlich der Prüfungsfahrt der Klasse CE
-npm run test:drive:traffic   # … im Umgebungsverkehr: Abstand, Vorfahrt, Fußgänger
+npm run test:drive:traffic   # … im Umgebungsverkehr: Abstand, Vorfahrt, Fußgänger, Radfahrer beim Rechtsabbiegen
 ```
+
+### Neue Version
+
+Jede Veröffentlichung bekommt eine eigene Versionsnummer (nach 1.0.0: 1.0.1 …), und was sie bringt, steht im
+Spiel unter „Was ist neu“ – in allen Sprachen:
+
+1. `version` in `package.json` erhöhen und oben in [`src/game/releases.ts`](src/game/releases.ts) einen Eintrag
+   mit den Schlüsseln seiner Neuerungen anlegen; die Texte `news.<version>.*` in `en.ts` schreiben und in alle
+   Sprachen übersetzen (`npm run i18n:check`). `npm test` prüft, dass Version und Neuerungen zusammenpassen.
+2. Committen, `git tag vX.Y.Z`, `git push origin main --tags`, `gh release create vX.Y.Z`.
 
 ## Karte neu erzeugen
 
@@ -349,26 +402,33 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 116 Tests (Fahrdynamik von Pkw und Lkw, Anhänger, Aufgaben der Klasse CE,
-  Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
+- **Automatisch geprüft:** 160 Tests (Fahrdynamik aller Fahrzeuge, Anhänger, Aufgaben der Klasse CE,
+  Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
   Umgebungsverkehrs, eine Kontrolle der gebauten Karte (ein wagenbreiter Kreis fährt jeden Fahrstreifen
   ab: nichts steht darin) und ein „virtueller Fahrschüler“, der alle Fahrstunden und die Prüfungsfahrt
   (zusammen rund 56 km) regelkonform abfährt, ohne dass der Regelwächter einen Fehler meldet – ebenso mit
   Lkw und Anhänger die Prüfungsfahrt der Klasse CE. Derselbe Fahrer fährt die Vorführfahrten.
 - **Vorführfahrt im Verkehr:** Der Fahrer hält Abstand, gewährt Vorfahrt, lässt Fußgänger gehen, wechselt
-  den Fahrstreifen nur in eine Lücke und sieht an großen Knotenpunkten selbst nach dem Querverkehr. Im
-  Testlauf mit Umgebungsverkehr (alle Fahrstunden, 56 km) blieb er ohne Unfall; unfehlbar ist er im dichten
-  Verkehr nicht – vereinzelt muss ein anderes Fahrzeug seinetwegen bremsen, oder er wartet lange. Ohne
-  Umgebungsverkehr (Verkehrsdichte 0 in den Einstellungen) fährt er die geprüften Strecken ohne
-  Beanstandung.
+  den Fahrstreifen nur in eine Lücke, hält Kreuzungen frei, wenn sich dahinter der Verkehr staut, und sieht
+  an großen Knotenpunkten selbst nach dem Querverkehr. Im Testlauf mit Umgebungsverkehr (fünf Fahrstunden,
+  21 km) blieb er ohne Unfall und ohne Beanstandung; unfehlbar ist er im dichten Verkehr nicht – vereinzelt
+  muss ein anderes Fahrzeug seinetwegen bremsen, oder er wartet lange. Wo eine Straßenecke enger ist als
+  der Wendekreis des Autos, kommt er der Mittellinie nahe. Ohne Umgebungsverkehr (Verkehrsdichte 0 in den
+  Einstellungen) fährt er die geprüften Strecken ohne Beanstandung.
 - **Ergänzte Regelung:** Was in OpenStreetMap nicht erfasst ist (etwa ein fehlendes Vorfahrtschild), wird
   nach den Grundregeln der StVO ergänzt und kann von der Wirklichkeit abweichen. Ampeln laufen mit
   plausiblen Festzeiten, nicht mit der echten Schaltung.
 - **Umgebungsverkehr:** beachtet Vorfahrt, Ampeln und Abstand, ist an großen Knotenpunkten aber nicht
   fehlerfrei – vereinzelt blockieren sich Fahrzeuge oder kommen sich zu nahe. Fußgänger gibt es nur an
-  Überwegen, Radfahrer noch nicht.
+  Überwegen. Radfahrer fahren nur innerorts an Straßen mit Gehweg, immer geradeaus oder nach rechts und nie
+  auf der Fahrbahn; sie kommen nur dort, wo Verkehr eingeschaltet ist.
 - **Darstellung:** Gebäude haben echte Form und Höhe, aber keine Fototexturen; Fahrzeuge und Cockpit sind
   vollständig prozedural erzeugt.
+- **Fahrzeuge:** Das Motorrad fährt auf demselben Vierrad-Modell wie alles andere, nur schmal und mit tiefem
+  Schwerpunkt – es kippt nicht und muss nicht balanciert werden; dass es sich in die Kurve legt, ist
+  gezeichnet. Der Bus fährt ohne Fahrgäste und hält nicht an Haltestellen, der Traktor ohne Anbaugeräte;
+  beide haben (noch) keine eigenen Fahrstunden. Beim Ein- und Aussteigen wird das Bild kurz dunkel – eine Tür, die aufgeht, ist nicht
+  gezeichnet.
 - **Lkw:** Der Anhänger folgt der Kupplung als geführtes Modell – er wirkt mit seiner Masse auf den Lkw,
   stößt aber selbst nicht an Gebäude oder Schilder und kippt nicht. Das Verbinden und Trennen prüft die
   Reihenfolge der Handgriffe, nicht die Handgriffe selbst. Sattelzüge gibt es nicht.
@@ -378,6 +438,10 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   Umkreis von gut 3 km. Der Start dauert deshalb nicht länger als mit einer Stadt allein; wer sich weit
   versetzt, sieht kurz den Ladehinweis. Die Karte endet am Rand des gebauten Gebiets, spätestens an der
   Landesgrenze: Für Niedersachsen, Nordrhein-Westfalen und Thüringen fehlen Gelände und Gebäude.
+- **Höhen der Straßen:** Sie stammen aus dem Geländemodell und werden geglättet. An einzelnen Stellen – rund
+  40 von 190 000 Straßenstücken, dazu einige hundert Feld- und Waldwege am Steilhang – ist eine Straße
+  steiler als in Wirklichkeit, etwa wo sie am Kartenrand das Gelände verlässt oder wo Brücke, Unterführung
+  und Stützmauer eng beieinanderliegen.
 - **Fahrstunden abseits der Städte:** Jede Fahrstunde sucht ihre Ziele in der Umgebung des Startpunkts
   (bis 2,6 km). In einem Dorf ohne Ampel oder Kreisverkehr entfällt der entsprechende Teil; zur Autobahn
   führt die Fahrstunde von überall, der Weg dorthin kann aber lang sein.
@@ -413,14 +477,18 @@ Einzelheiten: [NOTICE.md](NOTICE.md).
 ## English
 
 **Fahrsim Baunatal** is a free (AGPL-3.0-only) browser-based 3D driving-school simulator set in the real
-German towns of Baunatal and Kassel and the country around them. It is meant to help learner drivers understand and practise German
-traffic rules (StVO) – in a car or in a truck with a trailer.
+north of the German state of Hesse – Kassel, Baunatal and five districts around them. It is meant to help
+learner drivers understand and practise German traffic rules (StVO) – with a vehicle of every licence
+class: car, car with trailer, motorcycle, truck, truck with trailer, bus and tractor.
 
-- The real road network of 1,087 km² – the city of Kassel, Baunatal and most of the district around them
-  (about 6,700 km of roads and tracks, the A 7, A 44 and A 49 motorways) – with its traffic lights, signs,
-  speed limits, zones, one-way streets and roundabouts from OpenStreetMap; terrain from the official 1 m
-  elevation model and about 400,000 buildings and building parts with real heights and roof shapes from
-  the State of Hesse's open LoD2 model. Only the surroundings of the vehicle are ever loaded.
+- The real road network of northern Hesse – the city of Kassel and the districts of Kassel, Schwalm-Eder,
+  Werra-Meißner, Waldeck-Frankenberg and Hersfeld-Rotenburg: about 6,900 km², 115 towns and
+  municipalities, 41,500 km of roads and tracks, the A 4, A 5, A 7, A 44 and A 49 motorways – with its
+  traffic lights, signs, speed limits, zones, one-way streets and roundabouts from OpenStreetMap; terrain
+  from the official 1 m elevation model and over a million buildings with real heights and roof shapes
+  from the State of Hesse's open LoD2 model. Only the surroundings of the vehicle are ever loaded; the
+  whole map has just under 900 MB – as much as GitHub Pages holds. Start at one of some 400 start points
+  in 115 towns, or at any of about 310,000 addresses.
 - A physically based car: 6-DOF body, suspension, tyre model, engine, **clutch with biting point and
   stalling**, 6-speed H-gate gearbox, ABS, hill starts. Automatic by default, clutch assist or manual
   optional; engine power can be chosen (60 to 200 PS, 75 by default); a speed limiter eases the throttle
@@ -431,16 +499,36 @@ traffic rules (StVO) – in a car or in a truck with a trailer.
   right order, reversing round a corner to the left, reversing to a loading ramp with an offset to the
   right, and a test drive; the rule monitor knows the truck rules (60 km/h outside built-up areas, 80 km/h
   on motorways, right turns in town at walking pace).
+- **A vehicle for every licence class:** car (B), car with a tandem box trailer (BE), motorcycle (A),
+  truck (C), truck with trailer (CE), city bus (D) and tractor (T) – each with its own physics, model with
+  cockpit and mirrors, and the rules of its class: speed caps outside built-up areas and on motorways (car
+  with trailer 80/80, trucks 60/80, bus 80/100 km/h), walking pace when turning right in town above 3.5 t,
+  no motorway for the 40 km/h tractor (routes lead round it).
+- **On foot:** get out (`G`, the pause menu, or a tap when the vehicle stands with the engine off and the
+  parking brake on), walk round the vehicle and check it before driving off – tyres, lights front and
+  back, with a trailer the coupling; rings on the ground show where –, then get in at the driver's door. A
+  drive can begin beside the vehicle (settings). The instructor watches the look back before the door is
+  opened and that the vehicle is secured.
+- **Traffic lights** with a green arrow for turning right where that crosses nobody's way, and lights that
+  are out of order (about 6 % each day, flashing amber: the signs apply, or right before left).
 - Three views: from outside behind the vehicle (the default; drag with mouse or finger to circle the
   camera, wheel or pinch to zoom, `U` to look back), from the cockpit with steering wheel, shifter, pedals,
   instruments and **three working mirrors** (the interior can be made see-through in the settings) – and a
   **free camera** that is put anywhere with finger, mouse or keys and stays there while you drive on.
 - A rule monitor that explains every mistake with its legal basis: speeding, red lights, stop signs, right
-  of way (signs, *right before left*, roundabouts), indicating, pedestrian crossings, wrong-way driving …
-  – and a **mistake log** that keeps the faults of all drives and links each one to the official text of
-  the paragraph.
+  of way (signs, *right before left*, roundabouts), indicating, pedestrian crossings, cyclists, wrong-way
+  driving … – some 50 kinds of fault, counted in points (minor 1, serious 3, fail 10; a test is failed at
+  10) – and a **mistake log** that keeps the faults of all drives and links each one to the official text
+  of the paragraph. An optional rule help shows the speed limit and the right of way at the next junction.
+- Spoken directions (optional) with the lane to get into; settings for graphics (three levels), mirrors,
+  traffic density, volume, gearbox and engine power, the camera, the on-screen controls, the frames per
+  second and more; **"What's new"** in the game for every version, in every language.
 - Lessons, a simulated driving test, ambient traffic and pedestrians – and **trams and trains** that run on
   the real tracks whenever some are near, and stop at the stops.
+- **Cyclists** on the cycle track beside the carriageway, riding straight on across the junctions. Whoever
+  turns right has to let them pass – and now and then one comes exactly then: one you overtook a moment
+  ago, or one who rolls up from behind while you wait at the line. The shoulder check shows them; cutting
+  one off is a serious fault.
 - **Plan a drive:** choose destinations on the map or by address – anywhere on the map – and either the car
   drives there by itself, by the rules (a demonstration drive: watch where to indicate and look over the
   shoulder, where right before left applies, at what speed and distance, with a line saying what the
@@ -468,8 +556,8 @@ traffic rules (StVO) – in a car or in a truck with a trailer.
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 116 unit tests (vehicle dynamics of car and truck, the trailer, the class-CE
-tasks, trams, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
+Verified automatically by 160 unit tests (vehicle dynamics of every vehicle, the trailer, the class-CE
+tasks, cyclists, traffic lights, on foot, trams, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
 a check of the built map (a car-wide circle is driven along every lane: nothing stands in one) and a
 "virtual learner driver" – the driver of the demonstration drives – that completes every lesson and the
 driving test (about 56 km in total) without a single fault being reported, and with truck and trailer the
@@ -480,12 +568,13 @@ for it); rules
 missing in OpenStreetMap are filled in from the general StVO rules and may differ from reality; traffic-light
 timings are plausible fixed cycles; the ambient traffic is not perfect at large junctions, and neither is the
 demonstration driver among it; the trailer follows the coupling without colliding with scenery; trams keep
-no timetable and obey no signals; there are no cyclists yet; and only German rules and Hessian data are
+no timetable and obey no signals; cyclists ride only in town beside streets with a pavement; the
+motorcycle does not balance (it leans as drawn, not as simulated); and only German rules and Hessian data are
 supported – other countries would need their own data readers and rule sets.
 
 Play at <https://maureranton.github.io/driving-simulator/>, or run locally with
-`npm install && npm run map:fetch && npm run dev` (Node.js ≥ 24, curl, tar). The map – close to a gigabyte
-of tiles – is generated by the pipeline in `tools/` from open data only and is kept as a file of a release
+`npm install && npm run map:fetch && npm run dev` (Node.js ≥ 24, curl, tar). The map – just under 900 MB
+of tiles – is generated by the pipeline in `tools/` from open data only and is kept in parts at a release
 of this project rather than in the repository (`map.release` names the release; `npm run map:fetch` gets
 it); see [docs/MAP_DATA.md](docs/MAP_DATA.md). Only the surroundings are ever loaded: tiles within sight,
 the road network within about 3 km of the car. The simulator is no substitute for lessons with an

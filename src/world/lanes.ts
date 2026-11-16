@@ -7,7 +7,7 @@
  */
 import { angleOf, clamp, makePolyline, newPolySample, projectOnPolyline, samplePolyline, segSeg, wrapAngle } from '../core/geom.ts';
 import type { PolySample, Polyline3 } from '../core/geom.ts';
-import { ACCESS, CTRL, EF, ROLE } from './types.ts';
+import { ACCESS, CLS, CTRL, EF, ROLE } from './types.ts';
 import type { Arm, Edge, Node, World } from './world.ts';
 
 export const TURN = { STRAIGHT: 0, LEFT: 1, RIGHT: 2, UTURN: 3 } as const;
@@ -678,6 +678,11 @@ export class LaneGraph {
    * the connectors to take, or null.  `forTraffic` restricts the search to
    * ordinary public roads.
    */
+  /** ways are looked for for a truck with a trailer: turns that double back within a few metres are avoided */
+  longVehicle = false;
+  /** the vehicle may not use the motorway (a tractor): ways do not lead over it */
+  noMotorway = false;
+
   route(start: Lane, goal: Edge, forTraffic = false, goalDir = 0): Connector[] | null {
     const dist = new Map<number, number>();
     const prev = new Map<number, Connector>();
@@ -696,12 +701,15 @@ export class LaneGraph {
       for (const c of lane.out) {
         const next = c.to;
         if (next.edge !== goal && !LaneGraph.drivable(next.edge, forTraffic)) continue;
+        if (this.noMotorway && next.edge !== goal && next.edge.cls <= CLS.MOTORWAY_LINK) continue;
         const v = Math.min(next.limit, 36);
         // Turning round is for when there is no other way: it needs a turning
         // circle or a three-point turn, and where the map ends (often a fast
         // rural road) it is a last resort.
         const uturn = c.from.to.ctrl === CTRL.MAP_END ? 900 : 150;
         let turnCost = c.turn === TURN.LEFT ? 6 : c.turn === TURN.RIGHT ? 3 : c.turn === TURN.UTURN ? uturn : 0;
+        // a long vehicle does not get round a hairpin at a junction: like turning round, a last resort
+        if (this.longVehicle && c.turn !== TURN.STRAIGHT && c.turn !== TURN.UTURN && hairpin(c)) turnCost += 400;
         // two left turns a few metres apart = turning round through a gap in the median
         if (c.turn === TURN.LEFT && lane.len < 15 && prev.get(lane.id)?.turn === TURN.LEFT) turnCost += 150;
         // "Anlieger frei" and car-park shortcuts are not through routes
@@ -725,6 +733,22 @@ export class LaneGraph {
     }
     return path.reverse();
   }
+}
+
+/** Does the path through a junction double back (by more than 115°) on a radius under 7 m? */
+function hairpin(c: Connector): boolean {
+  const p = c.pl.pts;
+  const n = p.length / 3;
+  if (n < 2 || c.len > 22) return false;
+  const ax = p[3] - p[0];
+  const az = p[5] - p[2];
+  const bx = p[(n - 1) * 3] - p[(n - 2) * 3];
+  const bz = p[(n - 1) * 3 + 2] - p[(n - 2) * 3 + 2];
+  const la = Math.hypot(ax, az);
+  const lb = Math.hypot(bx, bz);
+  if (la < 1e-6 || lb < 1e-6) return false;
+  const turn = Math.acos(Math.max(-1, Math.min(1, (ax * bx + az * bz) / (la * lb))));
+  return turn > 2 && c.len / turn < 7;
 }
 
 /** Squared distance of a point from a segment. */

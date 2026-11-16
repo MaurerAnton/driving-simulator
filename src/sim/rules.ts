@@ -66,6 +66,10 @@ export interface RuleContext {
     ctrl: number;
     /** signal state (SIG) or -1 */
     signal: number;
+    /** the green arrow beside the light: SIG.GREEN or SIG.AMBER, -1 dark, -2 there is none */
+    arrow: number;
+    /** the lights of the junction are out of order: its signs count */
+    dark: boolean;
   };
   onRoad: boolean;
   wrongWay: boolean;
@@ -94,13 +98,41 @@ export class RuleMonitor {
   private laneS = 0;
   private prevLaneS = 0;
   private stoppedNearLine = false;
-  private entry: { node: Node; arm: Arm; lane: Lane; time: number; indicatorL: number; indicatorR: number; lookedL: boolean; lookedR: boolean; yaw: number; signalRed: boolean; nowL: boolean; nowR: boolean; vMax: number } | null = null;
+  private entry: { node: Node; arm: Arm; lane: Lane; time: number; indicatorL: number; indicatorR: number; lookedL: boolean; lookedR: boolean; yaw: number; signalRed: boolean; onArrow: boolean; nowL: boolean; nowR: boolean; vMax: number } | null = null;
   /**
    * The vehicle is a truck with a trailer: 60 km/h outside built-up areas
    * and 80 km/h on motorways (§ 3 Abs. 3 StVO), walking pace when turning
    * right in town (§ 9 Abs. 6 StVO).
    */
-  truck = false;
+  private caps: { rural: number; motorway: number } | null = null;
+  private capFault = 'truckSpeed';
+  /** over 3.5 t: right turns in town at walking pace (§ 9 Abs. 6 StVO) */
+  heavy = false;
+  /** not allowed on the motorway: a tractor built for 40 km/h (§ 18 Abs. 1 StVO) */
+  private noMotorway = false;
+
+  /**
+   * What the vehicle may do beyond what the signs say: at most `caps` km/h
+   * outside built-up areas and on the motorway (the fault `capFault` when it
+   * is faster), walking pace when turning right in town (`heavy`), no
+   * motorway at all.
+   */
+  setVehicle(caps: { rural: number; motorway: number } | null, capFault: string, heavy: boolean, noMotorway: boolean): void {
+    this.caps = caps;
+    this.capFault = capFault;
+    this.heavy = heavy;
+    this.noMotorway = noMotorway;
+  }
+
+  /** A truck with a trailer (class CE): 60 km/h outside town, 80 on the motorway, walking pace when turning right in town. */
+  set truck(on: boolean) {
+    this.setVehicle(on ? { rural: 60, motorway: 80 } : null, 'truckSpeed', on, false);
+  }
+
+  get truck(): boolean {
+    return this.heavy;
+  }
+
   /** On the practice yard there are no roads and no traffic: nothing here is judged. */
   yard = false;
   private lastX = 0;
@@ -148,6 +180,20 @@ export class RuleMonitor {
     this.speedOver = this.wrongSide = this.wrongWayT = this.sidewalkT = this.offRoadT = this.tailgateT = 0;
   }
 
+  /**
+   * The vehicle was put somewhere else (turned round at the end of a street,
+   * put back on the road, set down at a place on the map): where it was, and
+   * what it was in the middle of there, no longer counts.  The log stays.
+   */
+  placed(): void {
+    this.lane = null;
+    this.entry = null;
+    this.redLine = null;
+    this.oncoming = null;
+    this.lastEdge = null;
+    this.stoppedNearLine = false;
+  }
+
   /** The lane the monitor has the car on (kept while it crosses a junction), or null off the road. */
   get laneNow(): Lane | null {
     return this.lane;
@@ -167,6 +213,11 @@ export class RuleMonitor {
   }
 
   /** A fault found by somebody else (the judge of a manoeuvre): into the log like the others. */
+  /** A fault seen by the game rather than by the monitor (at a place: getting out, the check before the drive). */
+  noteAt(id: string, severity: Severity, x: number, z: number, data: Record<string, number | string> = {}, cooldown = 6): void {
+    this.report(id, severity, { x, z } as PlayerSnapshot, data, cooldown);
+  }
+
   note(id: string, severity: Severity, data: Record<string, number | string> = {}, cooldown = 3): void {
     const until = this.cooldown.get(id) ?? -1;
     if (this.time < until) return;
@@ -271,15 +322,17 @@ export class RuleMonitor {
       // car parks, driveways and tracks have no signed limit: nothing to show
       const unsigned = edge.cls >= CLS.SERVICE && edge.zone === 0;
       ctx.limit = edge.zone === 7 ? 7 : unsigned ? -1 : limit;
-      // what the signs allow, but never more than a truck with trailer may drive there
+      // what the signs allow, but never more than this vehicle may drive there
       let capped = false;
-      if (this.truck && edge.zone !== 7 && !unsigned) {
-        const cap = edge.cls <= CLS.MOTORWAY_LINK ? 80 : (edge.flags & EF.URBAN) !== 0 ? 0 : 60;
+      if (this.caps && edge.zone !== 7 && !unsigned) {
+        const cap = edge.cls <= CLS.MOTORWAY_LINK ? this.caps.motorway : (edge.flags & EF.URBAN) !== 0 ? 0 : this.caps.rural;
         if (cap > 0 && (ctx.limit === 0 || ctx.limit > cap)) {
           ctx.limit = cap;
           capped = true;
         }
       }
+      // a tractor on the motorway (or its slip road): not allowed at all
+      if (this.noMotorway && edge.cls <= CLS.MOTORWAY_LINK && hit.zone === 0) this.report('motorwayBan', 'major', p, {}, 120);
       ctx.zone = edge.zone;
       ctx.urban = (edge.flags & EF.URBAN) !== 0;
       ctx.roadName = edge.name || edge.ref;
@@ -315,7 +368,7 @@ export class RuleMonitor {
           this.speedOver += dt;
           if (this.speedOver > 1.6) {
             const sev: Severity = over > 25 ? 'fail' : over > 14 ? 'major' : 'minor';
-            this.report(edge.zone === 7 ? 'speedWalk' : capped ? 'truckSpeed' : 'speed', sev, p, { limit: lim, speed: Math.round(kmh) }, sev === 'minor' ? 18 : 10);
+            this.report(edge.zone === 7 ? 'speedWalk' : capped ? this.capFault : 'speed', sev, p, { limit: lim, speed: Math.round(kmh) }, sev === 'minor' ? 18 : 10);
           }
         } else this.speedOver = Math.max(0, this.speedOver - dt * 2);
       }
@@ -363,8 +416,13 @@ export class RuleMonitor {
       // within a few metres, the ground of the junction belongs to more than one of them, and the car
       // is not turning into each road whose ground it crosses)
       const onRoad = hit.s > edge.cutA + 0.5 && hit.s < edge.len - edge.cutB - 0.5;
-      if ((edge !== e.arm.edge && onRoad) || this.time - e.time > 25) {
+      if (edge !== e.arm.edge && onRoad) {
         this.judgeTurn(edge, p);
+        this.entry = null;
+      } else if (this.time - e.time > 25 && edge !== e.arm.edge) {
+        // (on other ground for a long while without having turned into a road: nothing to judge.
+        // Whoever still stands on the road they came on – waiting just past the line for the
+        // traffic to clear – has not turned at all yet, however long it takes.)
         this.entry = null;
       }
     }
@@ -376,6 +434,8 @@ export class RuleMonitor {
     for (const ev of events) {
       if (ev.type === 'collision') this.report('crash', 'fail', p, { speed: Math.round(ev.speed * 3.6) }, 6);
       else if (ev.type === 'pedestrianEndangered') this.report('pedestrian', 'fail', p, {}, 8);
+      // a cyclist who rode straight on had to brake for the car that turned – or was knocked over
+      else if (ev.type === 'cyclistEndangered') this.report(ev.hit ? 'cyclistHit' : 'cyclistCutOff', ev.hit ? 'fail' : 'major', p, {}, 8);
       else if (ev.type === 'forcedBrake') this.judgePriority(ev.car, p, ev.cutIn);
     }
     if (p.hitScenery > 1.2) this.report('crashObject', p.hitScenery > 4 ? 'fail' : 'major', p, { speed: Math.round(p.hitScenery * 3.6) }, 5);
@@ -446,6 +506,8 @@ export class RuleMonitor {
         role: arm.role,
         ctrl: node.ctrl,
         signal: arm.sg >= 0 && node.sc >= 0 ? this.signals.get(node.sc, arm.sg) : -1,
+        arrow: this.signals.arrows.has(arm) ? this.signals.arrow(arm) : -2,
+        dark: node.dark,
       };
     } else ctx.junction = null;
     if (!controlled) {
@@ -456,10 +518,15 @@ export class RuleMonitor {
 
     // crossing the stop / give-way line
     if (this.prevLaneS < lane.stopAt && front >= lane.stopAt && p.speed > 0.3) {
+      let onArrow = false;
       if (arm.sg >= 0 && node.sc >= 0) {
         const st = this.signals.get(node.sc, arm.sg);
         const age = this.signals.age(node.sc, arm.sg);
-        if (st === SIG.RED || st === SIG.RED_AMBER) {
+        if ((st === SIG.RED || st === SIG.RED_AMBER) && this.signals.arrow(arm) >= 0) {
+          // The green arrow beside the light is lit (or has just turned amber): whoever turns right
+          // may go.  Whether the car does turn right is seen when it leaves the junction (judgeTurn).
+          onArrow = true;
+        } else if (st === SIG.RED || st === SIG.RED_AMBER) {
           // judged in judgeRedLine(); a moment of grace right after the change to red
           this.redLine = {
             lane,
@@ -492,6 +559,7 @@ export class RuleMonitor {
         lookedR: this.lookR > 0.2,
         yaw: p.yaw,
         signalRed: false,
+        onArrow,
         vMax: Math.abs(p.speed),
       };
       // roundabout: no indicator when entering (§ 8 (1a) StVO)
@@ -551,6 +619,11 @@ export class RuleMonitor {
     // same classification as the lane graph (and therefore as the navigation hints)
     const conn = e.lane.out.find((c) => c.to.edge === exitEdge);
     if (conn) turn = conn.turn === TURN.UTURN ? TURN.LEFT : conn.turn;
+    // over the line on red with the green arrow lit – and then not turned right: the arrow was not for this car
+    if (e.onArrow && turn !== TURN.RIGHT) {
+      this.report('redLight', 'fail', p, {}, 8);
+      e.signalRed = true;
+    }
     // an oncoming car had to brake while we crossed: that is on us if we were the one turning left
     if (this.oncoming) {
       if (this.oncoming.node === node && this.time - this.oncoming.time < 25 && turn === TURN.LEFT) this.report('leftTurnOncoming', 'major', p, {}, 10);
@@ -573,7 +646,7 @@ export class RuleMonitor {
       if (e.indicatorR < 0.8) this.report(e.indicatorL > 0.8 ? 'wrongIndicator' : 'noIndicator', 'minor', p, { dir: 'right' }, 6);
       if (!e.lookedR) this.report('noShoulderCheck', 'hint', p, { dir: 'right' }, 6);
       // a truck turns right at walking pace in town: cyclists and pedestrians beside it are hard to see
-      if (this.truck && this.context.urban && e.vMax * 3.6 > 12) this.report('truckRightTurn', 'minor', p, { speed: Math.round(e.vMax * 3.6) }, 6);
+      if (this.heavy && this.context.urban && e.vMax * 3.6 > 12) this.report('truckRightTurn', 'minor', p, { speed: Math.round(e.vMax * 3.6) }, 6);
     } else if ((e.nowL && e.indicatorL > 2.5) || (e.nowR && e.indicatorR > 2.5)) {
       this.report('wrongIndicator', 'hint', p, { dir: 'none' }, 10);
     }

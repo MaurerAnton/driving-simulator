@@ -4,6 +4,7 @@
  *
  *   node tests/drive.sim.ts [lessonId ...]
  *   node tests/drive.sim.ts --truck [lessonId ...]     # the truck with its trailer (class CE)
+ *   node tests/drive.sim.ts --vehicle=bus [lessonId ...] # another vehicle (src/game/vehicles.ts: carTrailer, motorcycle, truckSolo, truck, bus, tractor)
  *   node tests/drive.sim.ts --traffic [lessonId ...]   # among the ambient traffic
  *
  * It follows the navigation of each lesson with the real vehicle model and
@@ -19,7 +20,7 @@ import { LESSONS, Navigator, findTarget } from '../src/game/nav.ts';
 import { WorldGround } from '../src/sim/ground.ts';
 import { AutoDriver } from '../src/sim/autodriver.ts';
 import { RuleMonitor } from '../src/sim/rules.ts';
-import { SIG, SignalSystem } from '../src/sim/signals.ts';
+import { SIG, SignalSystem, lightsOutBy } from '../src/sim/signals.ts';
 import { Traffic } from '../src/sim/traffic.ts';
 import { COMPACT_CAR_AUTOMATIC, TRUCK, Vehicle } from '../src/sim/vehicle/index.ts';
 import { TANDEM_TRAILER, Trailer } from '../src/sim/trailer.ts';
@@ -32,17 +33,20 @@ import { CLS, CTRL, EF, ROLE } from '../src/world/types.ts';
 import { newSurfaceHit } from '../src/world/world.ts';
 import { MapLoader } from '../src/world/loader.ts';
 import { NetIndex } from '../src/world/netindex.ts';
-import { quickestToEdge, wayOf } from '../src/world/routegraph.ts';
+import { quickestToEdge, routeFor, wayOf } from '../src/world/routegraph.ts';
 import { followMap } from '../src/sim/follow.ts';
 import type { MapFollowers } from '../src/sim/follow.ts';
 import { diskFiles } from '../tools/mapgen/mapfiles.ts';
 import { fitJunctionPlane } from '../tools/mapgen/elevation.ts';
 import type { PlaneArm } from '../tools/mapgen/elevation.ts';
+import { VEHICLES, vehicleKind } from '../src/game/vehicles.ts';
 
 // (MAP_DIR: another map folder than public/map)
 const root = new URL(`../${(process.env.MAP_DIR ?? 'public/map').replace(/\/$/, '')}/`, import.meta.url);
 // The map as the game loads it: in one piece, or the road network in chunks that follow the car.
-const map = await MapLoader.open(diskFiles(fileURLToPath(root)));
+// (DRIVE_LIGHTSOUT=0.06: that share of the traffic lights is out of order, as in the game)
+const LIGHTS_OUT = Number(process.env.DRIVE_LIGHTSOUT ?? 0);
+const map = await MapLoader.open(diskFiles(fileURLToPath(root)), { lightsOut: lightsOutBy(Number(process.env.DRIVE_DAY ?? 20261116), LIGHTS_OUT) });
 const world = map.world;
 const json = world.json;
 const graph = new LaneGraph(world);
@@ -163,10 +167,14 @@ const smp = newPolySample();
 const hit = newSurfaceHit();
 
 /** The truck with its trailer instead of the car: longer, slower in turns, 60 km/h outside town, 80 on the motorway. */
-const TRUCK_RUN = process.env.DRIVE_TRUCK === '1' || process.argv.includes('--truck');
-const SPEC = TRUCK_RUN ? TRUCK : COMPACT_CAR_AUTOMATIC;
+const KIND = vehicleKind(process.argv.find((a) => a.startsWith('--vehicle='))?.slice(10)) ?? (process.env.DRIVE_TRUCK === '1' || process.argv.includes('--truck') ? 'truck' : 'car');
+const DEF = VEHICLES[KIND];
+const TRUCK_RUN = DEF.long;
+const SPEC = DEF.spec('automatic', 150);
 /** from the model origin to the front bumper */
-const FRONT = TRUCK_RUN ? 3.75 : 2.14;
+const FRONT = DEF.outline.front;
+void TRUCK;
+void COMPACT_CAR_AUTOMATIC;
 const HALT = process.env.DRIVE_HALT === '1';
 /** DRIVE_TRAFFIC=1: among the ambient traffic, which the driver then has to mind (distance, right of way, pedestrians) */
 const WITH_TRAFFIC = process.env.DRIVE_TRAFFIC === '1' || process.argv.includes('--traffic');
@@ -182,14 +190,17 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
   }
   await map.loadAround(sp.x, sp.z);
   replane();
-  const signals = new SignalSystem(world.signals);
+  const signals = new SignalSystem(world.signals, world.lightsOut);
   const traffic = new Traffic(world, graph, signals);
   followers.traffic = traffic;
   followers.signals = signals;
   traffic.targetCount = WITH_TRAFFIC ? 24 : 0;
   const rules = new RuleMonitor(world, graph, signals, traffic);
   rules.strict = true;
-  rules.truck = TRUCK_RUN;
+  rules.setVehicle(DEF.caps, DEF.capFault, DEF.heavy, DEF.noMotorway);
+  graph.longVehicle = DEF.long;
+  graph.noMotorway = DEF.noMotorway;
+  routeFor.noMotorway = DEF.noMotorway;
   const nav = new Navigator(graph);
   const ground = new WorldGround(world, terrain);
   const v = new Vehicle(SPEC, ground);
@@ -199,14 +210,15 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
     const main = index ? null : mainNetwork(world, graph);
     sp = findRoadSpot(world, graph, sp.x, sp.z, '', 900, (l) => (index ? index.main[wayOf(l)] === 1 : (main as Set<number>).has(l.id)), wide, 20) ?? sp;
   }
-  const trailer = TRUCK_RUN ? new Trailer(TANDEM_TRAILER, ground) : null;
+  const trailer = DEF.trailer ? new Trailer(DEF.trailer, ground) : null;
+  void TANDEM_TRAILER;
   const ty = terrain.heightAt(sp.x, sp.z);
   const y0 = world.surfaceAt(sp.x, sp.z, ty + 3, hit) ? hit.y : ty;
   v.teleport(sp.x, y0 + 0.02, sp.z, sp.yaw);
   v.resetDrivetrain(true);
   trailer?.coupleBehind(v);
   let sharpest = 0;
-  const driver = new AutoDriver(world, signals, rules, WITH_TRAFFIC ? traffic : null, { spec: SPEC, front: FRONT, truck: TRUCK_RUN, obey });
+  const driver = new AutoDriver(world, signals, rules, WITH_TRAFFIC ? traffic : null, { spec: SPEC, front: FRONT, truck: DEF.heavy, caps: DEF.caps, obey });
   let crashes = 0;
   let turned = 0;
   const mpos = new Float64Array(3);
@@ -221,6 +233,12 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
   let waited = 0;
   const maxT = Number(process.env.DRIVE_UNTIL ?? 60 * 40);
   let mapT = 0;
+  let statusT = 0;
+  let cyclistEvents = 0;
+  let cyclistsMet = 0;
+  let turnedAt = -1;
+  let turnedTwice = 0;
+  const staged = new Set<number>();
   while (t < maxT && !done) {
     v.getModelPosition(mpos);
     // the road network follows the car: what is missing around it is loaded, what lies far behind is dropped
@@ -272,6 +290,12 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
         }
       }
       const h = nav.update(DT, lane, laneS, mpos[0], mpos[2]);
+      // (DRIVE_NAV: where the drive stands, every two minutes)
+      if (process.env.DRIVE_NAV && t >= statusT) {
+        statusT = t + 120;
+        const onWay = (nav.route ?? []).some((c) => c.from.edge === lane.edge && c.from.dir === lane.dir);
+        console.log(`   t=${t.toFixed(0)} at (${mpos[0].toFixed(0)},${mpos[2].toFixed(0)}) ${(v.speed * 3.6).toFixed(0)} km/h on e${lane.edge.id} "${lane.edge.name || lane.edge.ref}" cls ${lane.edge.cls}${onWay ? '' : ' – OFF THE WAY'}, ${nav.route?.length ?? 0} paths known, ${(v.odometer / 1000).toFixed(1)} km`);
+      }
       rules.allowed = new Set(nav.routeLanes.map((l) => l.edge));
       if (h.done && !driver.halt) {
         targetIdx++;
@@ -286,22 +310,34 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
     indicator = cmd.indicator;
     look = cmd.look;
     const { steer, throttle, brake } = cmd;
+    let standing = false;
     if (cmd.turnRound) {
       // the end of a street the way leads back out of: as in the game, the car is turned round on the spot
-      const to = cmd.turnRound.to;
+      const nx = cmd.turnRound;
+      const to = nx.to;
       lanePoint(to, Math.min(3, to.len / 2), smp);
       const ty2 = world.surfaceAt(smp.x, smp.z, smp.y + 1.5, hit) ? hit.y : smp.y;
       v.teleport(smp.x, ty2 + 0.05, smp.z, Math.atan2(-smp.tx, -smp.tz));
       trailer?.coupleBehind(v);
       driver.reset();
       turned++;
-      continue;
+      // (turned round and asked to be turned round again at once: that would go on for ever – say where and stop)
+      if (t === turnedAt && ++turnedTwice > 2) {
+        console.log(`   TURNED ROUND AGAIN AND AGAIN at t=${t.toFixed(1)} (${mpos[0].toFixed(1)},${mpos[2].toFixed(1)}): from lane ${nx.from.id}/e${nx.from.edge.id} "${nx.from.edge.name}" len ${nx.from.len.toFixed(1)} to lane ${to.id}/e${to.edge.id} len ${to.len.toFixed(1)}; the monitor has the car on lane ${rules.laneNow?.id ?? '-'} at ${rules.laneFront.toFixed(1)}; ends: node ${nx.from.to.id} with ${nx.from.to.arms.length} arm(s), node ${to.to.id} with ${to.to.arms.length} arm(s); way: ${route.slice(0, 4).map((c) => `${c.from.id}→${c.to.id}(turn ${c.turn})`).join(' ')}`);
+        rules.log.push({ id: 'turnedForEver', severity: 'fail', time: t, x: mpos[0], z: mpos[2], data: {} });
+        break;
+      }
+      if (t !== turnedAt) turnedTwice = 0;
+      turnedAt = t;
+      // (as in the game: the instructor forgets where the car was, and the car stands for this step)
+      rules.placed();
+      standing = true;
     }
     if (cmd.arrived && driver.halt) {
       console.log(`   halted ${Math.hypot(mpos[0] - driver.halt.x, mpos[2] - driver.halt.z).toFixed(1)} m from the place asked for, at ${v.speed.toFixed(2)} m/s`);
       done = true;
     }
-    const input = { steer, throttle, brake, clutch: 0, handbrake: 0, gear: 1, ignition: true, starter: false };
+    const input = standing ? { steer: 0, throttle: 0, brake: 1, clutch: 0, handbrake: 0, gear: 1, ignition: true, starter: false } : { steer, throttle, brake, clutch: 0, handbrake: 0, gear: 1, ignition: true, starter: false };
     v.step(DT, input);
     if (trailer) {
       trailer.step(DT, v, input);
@@ -312,15 +348,21 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
     if (WITH_TRAFFIC) {
       // (the traffic wants the middle of the vehicle's length)
       const mid = (SPEC.length ?? 4.28) / 2 - FRONT;
-      traffic.update(DT, { x: mpos[0] + Math.sin(v.yaw) * mid, y: mpos[1], z: mpos[2] + Math.cos(v.yaw) * mid, yaw: v.yaw, speed: v.speed, length: SPEC.length ?? 4.28, width: SPEC.width ?? 1.79 });
-      for (const e of traffic.events) if (e.type === 'collision') crashes++;
+      // (with the lane it is on, as the game tells it: cyclists are sent along by that)
+      traffic.update(DT, { x: mpos[0] + Math.sin(v.yaw) * mid, y: mpos[1], z: mpos[2] + Math.cos(v.yaw) * mid, yaw: v.yaw, speed: v.speed, length: SPEC.length ?? 4.28, width: SPEC.width ?? 1.79, lane, s: laneS - (SPEC.length ?? 4.28) / 2 });
+      for (const e of traffic.events) {
+        if (e.type === 'collision') crashes++;
+        else if (e.type === 'cyclistEndangered') cyclistEvents++;
+      }
+      cyclistsMet = Math.max(cyclistsMet, traffic.cyclists.list.length);
+      for (const c of traffic.cyclists.list) if (c.staged) staged.add(c.id);
     }
     rules.update(DT, { x: mpos[0], y: mpos[1], z: mpos[2], yaw: v.yaw, speed: v.speed, indicator, hazard: false, lookYaw: look, seatbelt: true, handbrake: 0, stalled: false, hitScenery: 0, length: SPEC.length ?? 4.28, front: FRONT }, WITH_TRAFFIC ? traffic.events : []);
     if (traceHere(t, mpos[0], mpos[2]) && Math.abs(t * 2 - Math.round(t * 2)) < DT) {
       const armD = lane ? lane.armTo : null;
       console.log(`   arm role=${armD?.role} sg=${armD?.sg} sc=${lane?.to.sc} ctrl=${lane?.to.ctrl} sig=${armD && armD.sg >= 0 && lane!.to.sc >= 0 ? signals.get(lane!.to.sc, armD.sg) : '-'} dist=${distToLine.toFixed(1)} mustStop=${mustStop} cross=${crossStop} stopAt=${lane?.stopAt.toFixed(1)}`);
       const on = world.surfaceAt(mpos[0], mpos[2], mpos[1] + 0.6, hit);
-      console.log(`t=${t.toFixed(1)} pos=(${mpos[0].toFixed(1)},${mpos[2].toFixed(1)},${mpos[1].toFixed(2)}) v=${v.speed.toFixed(1)} yaw=${v.yaw.toFixed(2)} lane=${lane ? `${lane.id}/e${lane.edge.id} s=${laneS.toFixed(1)}/${lane.len.toFixed(1)}` : '-'} surf=${on ? (hit.node ? `node${hit.node.id}` : `e${hit.edge!.id} z${hit.zone} off=${hit.off.toFixed(1)}`) : 'NONE'} next=${next ? `c${next.id} turn${next.turn} len=${next.len.toFixed(1)}→e${next.to.edge.id}` : '-'} tgt=(${tx.toFixed(1)},${tz.toFixed(1)}) steer=${steer.toFixed(2)} thr=${throttle.toFixed(2)} brk=${brake.toFixed(2)} lim=${limit.toFixed(1)}`);
+      console.log(`t=${t.toFixed(1)} pos=(${mpos[0].toFixed(1)},${mpos[2].toFixed(1)},${mpos[1].toFixed(2)}) v=${v.speed.toFixed(1)} yaw=${v.yaw.toFixed(2)} lane=${lane ? `${lane.id}/e${lane.edge.id} s=${laneS.toFixed(1)}/${lane.len.toFixed(1)}` : '-'} surf=${on ? (hit.node ? `node${hit.node.id}` : `e${hit.edge!.id} z${hit.zone} off=${hit.off.toFixed(1)}`) : 'NONE'} next=${next ? `c${next.id} turn${next.turn} len=${next.len.toFixed(1)}→e${next.to.edge.id}` : '-'} tgt=(${tx.toFixed(1)},${tz.toFixed(1)}) steer=${steer.toFixed(2)} thr=${throttle.toFixed(2)} brk=${brake.toFixed(2)} lim=${limit.toFixed(1)} ind=${indicator} look=${look.toFixed(1)}`);
     }
     if (WITH_TRAFFIC && traceHere(t, mpos[0], mpos[2]) && Math.abs(t * 2 - Math.round(t * 2)) < DT) {
       // who is around: the cars within 30 m, with where they are on their way
@@ -338,7 +380,7 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
     if (waited > 240) break;
   }
   if (trailer) console.log(`   trailer: sharpest angle to the truck ${((sharpest * 180) / Math.PI).toFixed(0)}°`);
-  if (WITH_TRAFFIC) console.log(`   among ${traffic.cars.length} cars: ${crashes} collision(s)`);
+  if (WITH_TRAFFIC) console.log(`   among ${traffic.cars.length} cars: ${crashes} collision(s); cyclists: up to ${cyclistsMet} around, ${staged.size} sent along for a right turn, ${cyclistEvents} cut off or hit`);
   if (turned) console.log(`   turned round at the end of a street ${turned} time(s)`);
   const findings = rules.log.map((f) => `${f.severity}:${f.id}@(${f.x.toFixed(0)},${f.z.toFixed(0)}) t=${f.time.toFixed(0)}s ${JSON.stringify(f.data)}`);
   let where = '';
@@ -351,7 +393,11 @@ async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ k
 }
 
 const ids = process.argv.slice(2).filter((a) => !a.startsWith('-'));
-const list = ids.length ? ids : ['rbl', 'priority', 'signals', 'roundabout', 'rural', 'motorway', 'exam'];
+const list = (ids.length ? ids : ['rbl', 'priority', 'signals', 'roundabout', 'rural', 'motorway', 'exam']).filter((id) => {
+  const l = LESSONS.find((x) => x.id === id);
+  // (not what the vehicle may not do: a tractor on the motorway)
+  return !l || !(l.notFor ?? []).includes(KIND);
+});
 let serious = 0;
 for (const id of list) {
   const t0 = Date.now();

@@ -75,7 +75,10 @@ export interface Arm {
   /** index in node.arms (counter-clockwise order) */
   idx: number;
   role: number;
+  /** the group of the signal controller that rules this approach – -1: none, or its lights are out of order */
   sg: number;
+  /** the group of the light that stands at this approach (it stands there when it is out of order, too); -1: none */
+  lamp: number;
   /** stop/yield line distance from the node */
   stopS: number;
   cut: number;
@@ -127,7 +130,14 @@ export interface Node {
   gz: number;
   ctrl: number;
   arms: Arm[];
+  /** its signal controller, or -1 */
   sc: number;
+  /**
+   * The traffic lights of this junction are out of order: they flash amber.
+   * It is ruled by its signs then – or by right before left –, and `ctrl`
+   * says so; the heads still stand there (`Arm.lamp`).
+   */
+  dark: boolean;
   fr: number[];
   tc: number;
   osm: number;
@@ -457,6 +467,11 @@ export function packEdgePoints(p: readonly number[]): number[] {
   return q;
 }
 
+export interface WorldOptions {
+  /** the signal controllers (by their number) whose lights are out of order */
+  lightsOut?: (controller: number) => boolean;
+}
+
 export class World {
   readonly meta: WorldJson['meta'];
   /** by their number in the whole map – with gaps where the map is not loaded: go through `allNodes` / `allEdges` */
@@ -478,10 +493,17 @@ export class World {
   private readonly nodeGrid = new Grid2<Node>(40);
 
   /**
+   * Which signal controllers are out of order (their lights flash amber):
+   * asked when a junction is put together.  See `Node.dark`.
+   */
+  readonly lightsOut: (controller: number) => boolean;
+
+  /**
    * A map in one piece (all its nodes and edges in `json`) – or, with none
    * in it, an empty one that pieces are added to (`add`).
    */
-  constructor(json: WorldJson) {
+  constructor(json: WorldJson, opts: WorldOptions = {}) {
+    this.lightsOut = opts.lightsOut ?? (() => false);
     this.json = json;
     this.meta = json.meta;
     if (json.nodes.length === 0 && json.edges.length === 0) return;
@@ -511,7 +533,7 @@ export class World {
   }
 
   private stubNode(id: number, p: number[], at: number): Node {
-    const node: Node = { id, x: p[at], y: p[at + 1], z: p[at + 2], gx: 0, gz: 0, ctrl: CTRL.NONE, arms: [], sc: -1, fr: [], tc: 0, osm: 0, shape: null, stub: true };
+    const node: Node = { id, x: p[at], y: p[at + 1], z: p[at + 2], gx: 0, gz: 0, ctrl: CTRL.NONE, arms: [], sc: -1, dark: false, fr: [], tc: 0, osm: 0, shape: null, stub: true };
     this.nodes[id] = node;
     this.allNodes.add(node);
     return node;
@@ -525,6 +547,7 @@ export class World {
       idx: 0,
       role: ROLE.NONE,
       sg: -1,
+      lamp: -1,
       stopS: out ? edge.cutA : edge.cutB,
       cut: out ? edge.cutA : edge.cutB,
       dx: 1,
@@ -598,7 +621,7 @@ export class World {
   private completeNode(id: number, nj: NodeJson): Node {
     let node = this.nodes[id];
     if (!node) {
-      node = { id, x: nj.x, y: nj.y, z: nj.z, gx: 0, gz: 0, ctrl: nj.t, arms: [], sc: -1, fr: [], tc: 0, osm: 0, shape: null, stub: true };
+      node = { id, x: nj.x, y: nj.y, z: nj.z, gx: 0, gz: 0, ctrl: nj.t, arms: [], sc: -1, dark: false, fr: [], tc: 0, osm: 0, shape: null, stub: true };
       this.nodes[id] = node;
       this.allNodes.add(node);
     }
@@ -609,6 +632,7 @@ export class World {
     node.gz = nj.gz ?? 0;
     node.ctrl = nj.t;
     node.sc = nj.sc ?? -1;
+    node.dark = nj.t === CTRL.SIGNALS && node.sc >= 0 && this.lightsOut(node.sc);
     node.fr = nj.fr ?? [];
     node.tc = nj.tc ?? 0;
     node.osm = nj.o ?? 0;
@@ -626,11 +650,15 @@ export class World {
       const arm = out ? edge.armA : edge.armB;
       arm.idx = k;
       arm.role = aj.r;
-      arm.sg = aj.g ?? -1;
+      arm.lamp = aj.g ?? -1;
+      arm.sg = node.dark ? -1 : arm.lamp;
       arm.stopS = Math.max(aj.sl ?? 0, arm.cut);
       arms.push(arm);
     }
     node.arms = arms;
+    // Lights out of order: what the signs say counts (the map build gave every approach its role
+    // before it put up the lights) – and where there are no signs, right before left.
+    if (node.dark) node.ctrl = arms.some((a) => (a.edge.flags & EF.ROUNDABOUT) !== 0) ? CTRL.ROUNDABOUT : arms.some((a) => a.isApproach && a.role === ROLE.RBL) ? CTRL.RBL : CTRL.SIGNS;
     for (const arm of arms) computeArmDirection(arm);
     node.shape = buildJunctionShape(node);
     if (node.shape) this.nodeGrid.insertBox(node.shape.minX, node.shape.minZ, node.shape.maxX, node.shape.maxZ, node);

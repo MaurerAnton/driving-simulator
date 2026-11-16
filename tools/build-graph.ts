@@ -145,7 +145,18 @@ interface Municipality {
   rings: number[][];
   box: Rect;
 }
-const norm = (s: string): string => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]/g, '');
+// (the land survey writes "Rotenburg a. d. Fulda", OpenStreetMap "Rotenburg an der Fulda": the little words do not count)
+const norm = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter((w) => w !== '' && !['a', 'am', 'an', 'd', 'der', 'i', 'im', 'in', 'v', 'vor', 'b', 'bei'].includes(w))
+    .join('');
 const lod2Dir = resolve(root, 'data/work/lod2');
 const lod2Names = new Set((existsSync(lod2Dir) ? readdirSync(lod2Dir) : []).filter((d) => !d.startsWith('.')).map(norm));
 const boxOf = (rings: number[][]): Rect => {

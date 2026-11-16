@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /** User settings, persisted in localStorage. */
 import { LANGS, pickLang } from '../i18n/index.ts';
+import { vehicleKind } from './vehicles.ts';
+import type { VehicleKind } from './vehicles.ts';
 
 export type Transmission = 'assist' | 'manual' | 'automatic';
 export type Quality = 'low' | 'medium' | 'high';
@@ -27,7 +29,7 @@ export interface Settings {
   /** language code, one of LANGS in src/i18n */
   lang: string;
   /** a car (class B) or the truck with trailer (class CE) */
-  vehicle: 'car' | 'truck';
+  vehicle: VehicleKind;
   transmission: Transmission;
   /** engine power in PS, one of ENGINE_POWERS */
   power: number;
@@ -69,6 +71,10 @@ export interface Settings {
   touchOpacity: number;
   /** short reminder of the keys while standing or crawling (keyboard only) */
   keyHints: boolean;
+  /** show how many pictures a second are drawn (FPS) in a corner of the screen */
+  showFps: boolean;
+  /** begin each drive on foot beside the vehicle: walk round it, get in */
+  startOutside: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -96,6 +102,8 @@ export const DEFAULT_SETTINGS: Settings = {
   touchControls: 'auto',
   touchOpacity: 0.55,
   keyHints: true,
+  showFps: false,
+  startOutside: false,
 };
 
 const KEY = 'fahrsim-baunatal.settings.v2';
@@ -113,14 +121,25 @@ function merge(parsed: Partial<Settings>): Settings {
   if (!LANGS.some((l) => l.code === s.lang)) s.lang = d.lang;
   if (!(ENGINE_POWERS as readonly number[]).includes(s.power)) s.power = d.power;
   if (s.view !== 'chase' && s.view !== 'cockpit') s.view = d.view;
-  if (s.vehicle !== 'car' && s.vehicle !== 'truck') s.vehicle = d.vehicle;
+  if (!vehicleKind(s.vehicle)) s.vehicle = d.vehicle;
   if (!['assist', 'manual', 'automatic'].includes(s.transmission)) s.transmission = d.transmission;
   if (!['low', 'medium', 'high'].includes(s.quality)) s.quality = d.quality;
   if (!(s.cabinOpacity >= 0.2 && s.cabinOpacity <= 1)) s.cabinOpacity = d.cabinOpacity;
+  if (typeof s.showFps !== 'boolean') s.showFps = d.showFps;
+  if (typeof s.startOutside !== 'boolean') s.startOutside = d.startOutside;
   if (!Number.isInteger(s.lastStart.spawn) || s.lastStart.spawn < 0) s.lastStart.spawn = 0;
   const a = s.lastStart.address;
   if (a && !(typeof a.label === 'string' && Number.isFinite(a.x) && Number.isFinite(a.z))) s.lastStart.address = null;
   return s;
+}
+
+/** Are there settings of an earlier visit (has this browser played before)? */
+export function playedBefore(): boolean {
+  try {
+    return localStorage.getItem(KEY) !== null || localStorage.getItem(OLD_KEY) !== null;
+  } catch {
+    return false;
+  }
 }
 
 export function loadSettings(): Settings {

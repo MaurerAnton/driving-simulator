@@ -105,7 +105,11 @@ export class AddressIndex {
    * Best matches first; with a house number the houses of the matching
    * streets, without one the streets themselves.
    */
-  search(query: string, limit = 8): AddressHit[] {
+  /**
+   * `near`: where the one who asks is – of streets that match equally well
+   * (every town has its Marktplatz) the nearest comes first.
+   */
+  search(query: string, limit = 8, near: { x: number; z: number } | null = null): AddressHit[] {
     const full = normaliseAddress(query);
     const place = (s: Street): string => (s.town ? `, ${s.town}` : '');
     // a road known by its number ("A 49", "L 3219"): that is no house number
@@ -150,7 +154,8 @@ export class AddressIndex {
       if (house && s.houses.some((h) => h.key === house)) score += 3;
       scored.push({ s, score: score - s.flat.length * 0.01 });
     }
-    scored.sort((a, b) => b.score - a.score || a.s.name.localeCompare(b.s.name, 'de') || a.s.town.localeCompare(b.s.town, 'de'));
+    const far = (s: Street): number => (near ? Math.hypot(s.x - near.x, s.z - near.z) : 0);
+    scored.sort((a, b) => b.score - a.score || far(a.s) - far(b.s) || a.s.name.localeCompare(b.s.name, 'de') || a.s.town.localeCompare(b.s.town, 'de'));
     const out: AddressHit[] = [];
     for (const { s } of scored) {
       if (out.length >= limit) break;

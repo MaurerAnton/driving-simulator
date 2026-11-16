@@ -18,7 +18,7 @@ import { unpackNet } from './netfile.ts';
 import type { NetData } from './netfile.ts';
 import type { MapIndexJson, RailJson, WorldChunkJson, WorldJson } from './types.ts';
 import { World } from './world.ts';
-import type { WorldChange } from './world.ts';
+import type { WorldChange, WorldOptions } from './world.ts';
 
 /** How the files of a map folder are read. */
 export interface MapFiles {
@@ -95,19 +95,19 @@ export class MapLoader {
     this.version = (world.json.meta.generated ?? '').replace(/\D/g, '').slice(0, 14);
   }
 
-  static async open(files: MapFiles): Promise<MapLoader> {
+  static async open(files: MapFiles, opts: WorldOptions = {}): Promise<MapLoader> {
     const index = await readJson<MapIndexJson>(files, 'map.json');
     if (index) {
       const json: WorldJson = { version: index.version, meta: index.meta, nodes: [], edges: [], banned: [], signals: [], crossings: [], places: index.places, spawns: index.spawns, tiles: [] };
       if (index.yard) json.yard = index.yard;
       const tileSet = GridSet.from(index.tiles);
-      return new MapLoader(files, new World(json), { x0: -GRID_OFFSET, z0: -GRID_OFFSET, size: TILE, has: (ix, iz) => tileSet.has(ix, iz) }, GridSet.from(index.chunks));
+      return new MapLoader(files, new World(json, opts), { x0: -GRID_OFFSET, z0: -GRID_OFFSET, size: TILE, has: (ix, iz) => tileSet.has(ix, iz) }, GridSet.from(index.chunks));
     }
     const json = await readJson<WorldJson>(files, 'world.json');
     // (the map is not part of the repository: `npm run map:fetch` gets it, see docs/MAP_DATA.md)
     if (!json) throw new Error('The map is missing (public/map/map.json). Fetch it with: npm run map:fetch');
     const have = new Set(json.tiles);
-    return new MapLoader(files, new World(json), { x0: json.meta.minX, z0: json.meta.minZ, size: json.meta.tileSize, has: (ix, iz) => have.has(`${ix}_${iz}`) }, null);
+    return new MapLoader(files, new World(json, opts), { x0: json.meta.minX, z0: json.meta.minZ, size: json.meta.tileSize, has: (ix, iz) => have.has(`${ix}_${iz}`) }, null);
   }
 
   listen(l: MapListener): void {

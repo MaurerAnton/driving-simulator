@@ -42,6 +42,20 @@ test('street names are compared the way people type them', () => {
   assert.notEqual(normaliseAddress('Kirchweg'), normaliseAddress('Kirchstraße'));
 });
 
+test('of streets that match equally well, the nearest comes first', () => {
+  const ix = new AddressIndex({
+    version: 1,
+    streets: [
+      { n: 'Marktplatz', c: 'Adorf', x: 9000, z: 0, h: ['5', 9000, 10] },
+      { n: 'Marktplatz', c: 'Bedorf', x: 100, z: 0, h: ['5', 100, 10] },
+      { n: 'Marktplatz', c: 'Cedorf', x: -4000, z: 0, h: ['5', -4000, 10] },
+    ],
+  });
+  assert.deepEqual(ix.search('marktplatz 5').map((h) => h.label), ['Marktplatz 5, Adorf', 'Marktplatz 5, Bedorf', 'Marktplatz 5, Cedorf'], 'without a place: by name');
+  assert.deepEqual(ix.search('marktplatz 5', 8, { x: 0, z: 0 }).map((h) => h.label), ['Marktplatz 5, Bedorf', 'Marktplatz 5, Cedorf', 'Marktplatz 5, Adorf']);
+  assert.equal(ix.search('marktplatz 5 adorf', 8, { x: 0, z: 0 })[0].label, 'Marktplatz 5, Adorf', 'a town that is named counts more than what is near');
+});
+
 test('search: street, house number, town – in any order', () => {
   const ix = new AddressIndex({
     version: 1,
@@ -83,9 +97,11 @@ test('search: street, house number, town – in any order', () => {
 test('the address list of the map', { skip }, () => {
   assert.ok(real.streetCount > 400, `${real.streetCount} streets`);
   assert.ok(real.size > 5000, `${real.size} house numbers`);
-  const hit = real.search('Marktplatz 5')[0];
+  // (every town has its Marktplatz: asked from the first start point, it is the one of that town)
+  const hit = real.search('Marktplatz 5', 8, home)[0];
   assert.equal(hit.label, 'Marktplatz 5, Baunatal');
   assert.equal(hit.exact, true);
+  assert.equal(real.search('Marktplatz 5 Baunatal')[0].label, 'Marktplatz 5, Baunatal');
   assert.ok(real.search('altenritter str').some((h) => h.street === 'Altenritter Straße'));
 });
 

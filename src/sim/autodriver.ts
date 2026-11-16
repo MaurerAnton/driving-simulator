@@ -33,10 +33,12 @@ export interface AutoDriverOptions {
   truck?: boolean;
   /** false: lights and stop signs are ignored (to check that the rule monitor notices) */
   obey?: boolean;
+  /** at most this outside built-up areas and on the motorway (km/h) – by default a truck's 60 and 80 */
+  caps?: { rural: number; motorway: number } | null;
 }
 
 /** Why the driver does what it is doing – for telling a learner who watches. */
-export type AutoRemark = '' | 'red' | 'stop' | 'yield' | 'zebra' | 'follow' | 'turn' | 'lane' | 'rbl' | 'roundabout' | 'ringExit' | 'halt' | 'deadEnd';
+export type AutoRemark = '' | 'red' | 'stop' | 'yield' | 'zebra' | 'follow' | 'turn' | 'lane' | 'rbl' | 'roundabout' | 'ringExit' | 'halt' | 'deadEnd' | 'cyclist' | 'arrow' | 'lightsOut';
 
 export interface AutoCommand {
   /** -1 … 1, positive = to the right */
@@ -97,7 +99,7 @@ export class AutoDriver {
     this.signals = signals;
     this.rules = rules;
     this.traffic = traffic;
-    this.opts = { truck: false, obey: true, ...opts };
+    this.opts = { truck: false, obey: true, ...opts, caps: opts.caps !== undefined ? opts.caps : opts.truck ? { rural: 60, motorway: 80 } : null };
     // speed in a turn at a junction (a truck turns right at walking pace in town, § 9 Abs. 6 StVO)
     this.turnSpeed = this.opts.truck ? 2.7 : 4.5;
     // the deceleration the driver plans with when stopping at a line (15 t take longer)
@@ -185,6 +187,7 @@ export class AutoDriver {
   step(dt: number, v: Vehicle, mpos: ArrayLike<number>, route: readonly Connector[]): AutoCommand {
     const { world, signals, rules, traffic } = this;
     const { spec, front: FRONT, truck: TRUCK, obey } = this.opts;
+    const caps = this.opts.caps;
     const TURN_SPEED = this.turnSpeed;
     const DECEL = this.decel;
     const hit = this.hit;
@@ -252,7 +255,7 @@ export class AutoDriver {
     /** how fast a lane may be driven: its limit, walking pace in a traffic-calmed area, slowly on yards and car parks */
     const allowed = (l: Lane): number => {
       let a = Number.isFinite(l.limit) ? l.limit : 36;
-      if (TRUCK) a = Math.min(a, l.edge.cls <= CLS.MOTORWAY_LINK ? 80 / 3.6 : (l.edge.flags & EF.URBAN) !== 0 ? a : 60 / 3.6);
+      if (caps) a = Math.min(a, l.edge.cls <= CLS.MOTORWAY_LINK ? caps.motorway / 3.6 : (l.edge.flags & EF.URBAN) !== 0 ? a : caps.rural / 3.6);
       if (l.edge.zone === 7) a = 1.7;
       if (l.edge.cls >= 13) a = Math.min(a, 6);
       return a;
@@ -274,7 +277,9 @@ export class AutoDriver {
         const a2 = l2.armTo;
         const dStop = d + c.len + l2.stopAt;
         // (amber: stop if that is still possible with normal braking – otherwise on, without dithering)
-        const sg2 = a2.sg >= 0 && l2.to.sc >= 0 ? signals.get(l2.to.sc, a2.sg) : SIG.GREEN;
+        // (the green arrow beside it lets the car go on if it turns right there)
+        const on2 = route.find((r) => r.from === l2);
+        const sg2 = a2.sg < 0 || l2.to.sc < 0 || (on2 && on2.turn === TURN.RIGHT && signals.arrow(a2) === SIG.GREEN) ? SIG.GREEN : signals.get(l2.to.sc, a2.sg);
         const red = sg2 === SIG.RED || sg2 === SIG.RED_AMBER || (sg2 === SIG.AMBER && (speed * speed) / (2 * Math.max(dStop - 2.5, 0.5)) < 3);
         // (a line the front of the car has only just reached still counts: the car is not in the junction yet)
         if (obey && dStop > -0.6 && l2.to.arms.length > 2 && (red || a2.role === ROLE.STOP)) {
@@ -442,11 +447,20 @@ export class AutoDriver {
           turn = ring && !(next.to.edge.flags & EF.ROUNDABOUT) ? 1 : 0;
           if (distToLine < 40) remark = ring ? (turn ? 'ringExit' : remark) : 'roundabout';
         } else if (node.ctrl === CTRL.RBL && distToLine < 40) remark = 'rbl';
+        // the lights are out of order: the signs decide (said here; "stop" and "give way" follow where they apply)
+        if (node.dark && distToLine < 50) remark = 'lightsOut';
         if (obey && arm.sg >= 0 && node.sc >= 0) {
           const st = signals.get(node.sc, arm.sg);
-          if (st === SIG.RED || st === SIG.RED_AMBER) mustStop = true;
-          if (st === SIG.AMBER && (speed * speed) / (2 * Math.max(distToLine, 0.5)) < 3) mustStop = distToLine > 0;
-          if (mustStop) remark = 'red';
+          // the green arrow beside the light: turning right is allowed while it is lit, whatever the main light shows
+          const arrow = next.turn === TURN.RIGHT ? signals.arrow(arm) : -1;
+          if (arrow === SIG.GREEN) {
+            if (st !== SIG.GREEN && distToLine < 40) remark = 'arrow';
+          } else {
+            if (st === SIG.RED || st === SIG.RED_AMBER) mustStop = true;
+            if ((st === SIG.AMBER || arrow === SIG.AMBER) && (speed * speed) / (2 * Math.max(distToLine, 0.5)) < 3) mustStop = distToLine > 0;
+            else if (arrow === SIG.AMBER) mustStop = false;
+            if (mustStop) remark = 'red';
+          }
         } else if (obey && arm.role === ROLE.STOP && this.stoppedFor < 1) {
           mustStop = true;
           remark = 'stop';
@@ -492,6 +506,18 @@ export class AutoDriver {
           mustStop = true;
           yielding = true;
           remark = 'yield';
+        } else if (node.arms.length > 2 && !traffic.roomBehind(next.to, this.me.length + 2.5)) {
+          // The junction is kept clear: where the traffic stands behind it, nobody drives into it –
+          // not with the right of way and not on green (§ 11 Abs. 1 StVO).  Whoever waits in the
+          // junction is in the way of those who cross.
+          mustStop = true;
+          yielding = true;
+          remark = 'follow';
+        } else if (next.turn === TURN.RIGHT && traffic.cyclists.blocksRightTurn(lane, laneS - FRONT, this.me.length / 2 + 0.5)) {
+          // Turning right: the cyclists who ride straight on – beside the car, coming up behind it –
+          // go first (§ 9 Abs. 3 StVO).  Seen by the look over the shoulder, waited for at the line.
+          mustStop = true;
+          remark = 'cyclist';
         }
       }
       if (yielding && speed < 0.5) this.yieldWait += dt;

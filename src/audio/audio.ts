@@ -145,7 +145,7 @@ export class GameAudio {
   }
 
   /** Short percussive sounds. */
-  click(kind: 'tick' | 'tock' | 'crash' | 'grind' | 'chime' | 'bump'): void {
+  click(kind: 'tick' | 'tock' | 'crash' | 'grind' | 'chime' | 'bump' | 'door' | 'doorShut' | 'step'): void {
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -182,6 +182,23 @@ export class GameAudio {
       f.frequency.value = 220;
       dur = 0.12;
       g.gain.setValueAtTime(0.7, t);
+    } else if (kind === 'door') {
+      // the latch of a door that opens
+      f.type = 'bandpass';
+      f.frequency.value = 1150;
+      f.Q.value = 3;
+      dur = 0.07;
+      g.gain.setValueAtTime(0.5, t);
+    } else if (kind === 'doorShut') {
+      f.type = 'lowpass';
+      f.frequency.value = 320;
+      dur = 0.2;
+      g.gain.setValueAtTime(1.0, t);
+    } else if (kind === 'step') {
+      f.type = 'lowpass';
+      f.frequency.value = 600;
+      dur = 0.05;
+      g.gain.setValueAtTime(0.12, t);
     } else {
       f.type = 'bandpass';
       f.frequency.value = 1700;

@@ -2,6 +2,8 @@
 /** Menus and the in-game HUD (plain DOM, no framework). */
 import type { AddressHit, AddressIndex } from '../game/address.ts';
 import { LESSONS } from '../game/nav.ts';
+import { VEHICLES, VEHICLE_KINDS } from '../game/vehicles.ts';
+import { RELEASES, VERSION } from '../game/releases.ts';
 import type { Settings } from '../game/settings.ts';
 import { ENGINE_POWERS, saveSettings } from '../game/settings.ts';
 import type { Input } from '../input/input.ts';
@@ -27,7 +29,8 @@ export interface HudState {
   /** km/h; 0 = no limit; -1 = unknown */
   limit: number;
   zone: number;
-  junction: null | { dist: number; role: number; ctrl: number; signal: number };
+  /** the next junction (as the rule monitor tells it: RuleContext.junction) */
+  junction: null | { dist: number; role: number; ctrl: number; signal: number; arrow: number; dark: boolean };
   navText: string;
   navSub: string;
   navArrow: number;
@@ -126,6 +129,7 @@ export class Hud {
   private tipAction = '';
   private score!: HTMLElement;
   private mapCanvas!: HTMLCanvasElement;
+  private fpsBox!: HTMLElement;
   private keysBox!: HTMLElement;
   private keysFor = '';
   private input: Input | null = null;
@@ -144,6 +148,8 @@ export class Hud {
   onResume: () => void = () => {};
   onQuit: () => void = () => {};
   onReality: () => void = () => {};
+  /** get out of the vehicle (offered in the pause menu while it stands) */
+  onGetOut: (() => void) | null = null;
   /** the faults of this and of earlier drives (set by the game) */
   faultLog: FaultLog | null = null;
   /** open the full-screen map */
@@ -162,6 +168,8 @@ export class Hud {
   canFinish = false;
   onPause: () => void = () => {};
   onTeleport: (a: AddressHit) => void = () => {};
+  /** where the vehicle is (for the search for addresses: what lies near comes first) */
+  where: () => { x: number; z: number } | null = () => null;
   onSettingsChanged: () => void = () => {};
   routeLanes: Lane[] = [];
 
@@ -295,6 +303,8 @@ export class Hud {
       loading: this.t('realityLoading'),
       none: this.t('addressNone'),
       load: () => this.loadAddresses(),
+      // (every town has its Marktplatz: the one near the start point chosen comes first)
+      near: () => spawns[spawn] ?? null,
       pick: (hit) => {
         address = hit;
         atAddress.textContent = hit.label;
@@ -318,14 +328,15 @@ export class Hud {
       saveSettings(this.settings);
     };
     rowTr.append(el('label', '', this.t('transmission')), selTr);
-    // a car, or the truck with its trailer (class CE) – each with lessons of its own
-    const truck = this.settings.vehicle === 'truck';
+    // the vehicle of a licence class – the truck with its trailer (class CE) with lessons of its own
+    const def = VEHICLES[this.settings.vehicle] ?? VEHICLES.car;
+    const truck = def.model !== 'car' && def.model !== 'motorcycle';
     const rowVeh = el('div', 'row');
     const selVeh = el('select');
-    for (const [v, k] of [['car', 'vehCar'], ['truck', 'vehTruck']]) {
+    for (const v of VEHICLE_KINDS) {
       const op = el('option');
       op.value = v;
-      op.textContent = this.t(k);
+      op.textContent = this.t(VEHICLES[v].name);
       selVeh.append(op);
     }
     selVeh.value = this.settings.vehicle;
@@ -335,7 +346,7 @@ export class Hud {
       this.showMenu(spawns);
     };
     rowVeh.append(el('label', '', this.t('vehicle')), selVeh);
-    // (the truck has an automated gearbox, as nearly all of them today)
+    // (trucks, buses and tractors have automated gearboxes, as nearly all of them today)
     opts.append(rowSpawn, rowAddr, rowVeh);
     if (!truck) opts.append(rowTr);
     p.append(opts);
@@ -357,9 +368,10 @@ export class Hud {
     card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
     // the lessons of the chosen vehicle: the practice yard first, the test last
     const rank = (kind: string): number => (kind === 'yard' ? 0 : kind === 'exam' ? 2 : 1);
-    const lessons = LESSONS.filter((l) => (l.vehicle ?? this.settings.vehicle) === this.settings.vehicle && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
-    // (the lessons on the road were written for the car: what is different with the truck is said first)
-    const note = this.settings.vehicle === 'truck' ? `${this.t('lesson.truckNote')} ` : '';
+    const kind = def.kind;
+    const lessons = LESSONS.filter((l) => (l.vehicle ? l.vehicle === kind : !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
+    // (the lessons on the road were written for the car: what is different with this vehicle is said first)
+    const note = def.caps ? `${this.t('lesson.capNote', { vehicle: this.t(def.name), rural: def.caps.rural, motorway: def.caps.motorway })} ` : def.noMotorway ? `${this.t('lesson.noMotorwayNote')} ` : '';
     for (const l of lessons) card(lessonTitle(l.id, this.lang), l.id === 'exam' ? this.t('examDesc') : `${l.kind === 'route' ? note : ''}${lessonIntro(l.id, this.lang)}`, l.id);
     p.append(cards);
 
@@ -370,10 +382,13 @@ export class Hud {
     bc.onclick = () => this.showControls(() => this.showMenu(spawns));
     const ba = el('button', 'btn ghost', this.t('about'));
     ba.onclick = () => this.showAbout(() => this.showMenu(spawns));
+    const bn = el('button', 'btn ghost', this.t('news'));
+    bn.onclick = () => this.showNews(() => this.showMenu(spawns));
     const bl = el('button', 'btn ghost', this.t('logTitle'));
     bl.onclick = () => this.showLog(() => this.showMenu(spawns));
-    b.append(bs, bc, bl, ba);
+    b.append(bs, bc, bl, bn, ba);
     p.append(b);
+    p.append(el('p', 'version', this.t('newsVersion', { v: VERSION })));
     o.append(p);
     this.setOverlay(o);
   }
@@ -496,6 +511,8 @@ export class Hud {
     select(this.t('touchControls'), s.touchControls, [['auto', this.t('tcAuto')], ['on', this.t('tcOn')], ['off', this.t('tcOff')]], (v) => (s.touchControls = v as Settings['touchControls']));
     range(this.t('touchOpacity'), s.touchOpacity, (v) => (s.touchOpacity = Math.max(0.15, v)));
     check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
+    check(this.t('showFps'), s.showFps, (v) => (s.showFps = v));
+    check(this.t('startOutside'), s.startOutside, (v) => (s.startOutside = v));
     check(this.t('hudRules'), s.hudRules, (v) => (s.hudRules = v));
     check(this.t('hudGear'), s.hudGear, (v) => (s.hudGear = v));
     check(this.t('voice'), s.voice, (v) => (s.voice = v));
@@ -528,6 +545,7 @@ export class Hud {
       [[...k('KeyL'), ' / ', ...k('KeyO')], 'ctl.lights'],
       [k('KeyH'), 'ctl.horn'],
       [k('KeyV'), 'ctl.camera'],
+      [k('KeyG'), 'ctl.door'],
       [['Alt + ', ...k('KeyW', 'KeyA', 'KeyS', 'KeyD')], 'ctl.freeCam'],
       [k('KeyT'), 'ctl.reset'],
       [k('KeyF'), 'ctl.reality'],
@@ -566,6 +584,28 @@ export class Hud {
     const bb = el('button', 'btn', this.t('back'));
     bb.onclick = back;
     b.append(bb);
+    p.append(b);
+    o.append(p);
+    this.setOverlay(o);
+  }
+
+  /** What each version brought ("What's new"), newest first. */
+  showNews(back: () => void): void {
+    const o = el('div', 'overlay');
+    const p = el('div', 'panel news');
+    p.append(el('h1', '', this.t('news')));
+    const date = new Intl.DateTimeFormat(localeOf(this.lang), { day: 'numeric', month: 'long', year: 'numeric' });
+    for (const r of RELEASES) {
+      p.append(el('h2', '', `${this.t('newsVersion', { v: r.version })} · ${date.format(new Date(`${r.date}T12:00:00`))}`));
+      if (r.intro) p.append(el('p', '', this.t(r.intro)));
+      const list = el('ul');
+      for (const key of r.items) list.append(el('li', '', this.t(key)));
+      p.append(list);
+    }
+    const b = el('div', 'buttons');
+    const ok = el('button', 'btn', this.t('back'));
+    ok.onclick = () => back();
+    b.append(ok);
     p.append(b);
     o.append(p);
     this.setOverlay(o);
@@ -638,6 +678,12 @@ export class Hud {
       demo.onclick = () => this.onDemo();
       b.append(a, demo);
     }
+    if (this.onGetOut) {
+      const out = el('button', 'btn ghost', this.t('getOut'));
+      const go = this.onGetOut;
+      out.onclick = () => go();
+      b.append(out);
+    }
     const log = el('button', 'btn ghost', this.t('logTitle'));
     log.onclick = () => this.showLog(() => this.showPause());
     b.append(log, s, c);
@@ -664,6 +710,7 @@ export class Hud {
       loading: this.t('realityLoading'),
       none: this.t('addressNone'),
       load: () => this.loadAddresses(),
+      near: () => this.where(),
       pick: (hit) => this.onTeleport(hit),
     });
     p.append(picker.node);
@@ -862,7 +909,10 @@ export class Hud {
       this.choiceBox.classList.add('open');
     };
     side.append(this.navBox, this.choiceBtn, this.choiceBox);
-    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox);
+    // how many pictures a second (only if the settings ask for it): out of the way, in the upper right corner
+    this.fpsBox = el('div', 'fps');
+    this.fpsBox.hidden = true;
+    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox, this.fpsBox);
     return h;
   }
 
@@ -925,6 +975,15 @@ export class Hud {
     this.notices.clear();
   }
 
+  /** Pictures a second, measured by the game; a negative number hides the display. */
+  setFps(fps: number): void {
+    const show = fps >= 0 && this.settings.showFps;
+    if (this.fpsBox.hidden === show) this.fpsBox.hidden = !show;
+    if (!show) return;
+    const text = `${fps < 10 ? fps.toFixed(1) : Math.round(fps)} FPS`;
+    if (this.fpsBox.textContent !== text) this.fpsBox.textContent = text;
+  }
+
   update(s: HudState, now: number): void {
     if (now - this.lastDom > 0.09) {
       this.lastDom = now;
@@ -983,20 +1042,35 @@ export class Hud {
       let key = '';
       if (rules && s.junction && s.junction.dist < 120) {
         const j = s.junction;
-        if (j.signal >= 0) key = `sig${j.signal}`;
+        // (a light – with the state of the green arrow beside it, where there is one)
+        if (j.signal >= 0) key = j.arrow > -2 ? `sig${j.signal}a${j.arrow}` : `sig${j.signal}`;
         else if (j.ctrl === CTRL.ROUNDABOUT && j.role !== ROLE.PRIORITY) key = 'roundabout';
         else if (j.role === ROLE.STOP) key = 'stop';
         else if (j.role === ROLE.YIELD) key = 'yield';
         else if (j.role === ROLE.RBL) key = 'rbl';
         else if (j.role === ROLE.MINOR) key = 'minor';
         else if (j.role === ROLE.PRIORITY && j.ctrl === CTRL.SIGNS) key = 'priority';
+        // the lights are out of order: a flashing amber, and beside it the sign that counts
+        if (j.dark) key = `out:${key}`;
       }
       if (key !== this.lastPrio) {
         this.lastPrio = key;
         if (key.startsWith('sig')) {
-          const st = Number(key.slice(3));
+          const [main, arrow] = key.slice(3).split('a');
+          const st = Number(main);
           const lamp = (on: boolean, c: string): string => `<circle cx="30" cy="${c === '#ff2a1a' ? 16 : c === '#ffb000' ? 44 : 72}" r="11" fill="${on ? c : '#2a2a2a'}"/>`;
-          this.prio.innerHTML = `<svg viewBox="0 0 60 88"><rect x="8" y="1" width="44" height="86" rx="8" fill="#111" stroke="#666"/>${lamp(st === SIG.RED || st === SIG.RED_AMBER, '#ff2a1a')}${lamp(st === SIG.AMBER || st === SIG.RED_AMBER, '#ffb000')}${lamp(st === SIG.GREEN, '#1aff6a')}</svg>`;
+          const head = `<rect x="8" y="1" width="44" height="86" rx="8" fill="#111" stroke="#666"/>${lamp(st === SIG.RED || st === SIG.RED_AMBER, '#ff2a1a')}${lamp(st === SIG.AMBER || st === SIG.RED_AMBER, '#ffb000')}${lamp(st === SIG.GREEN, '#1aff6a')}`;
+          if (arrow === undefined) this.prio.innerHTML = `<svg viewBox="0 0 60 88">${head}</svg>`;
+          else {
+            // the green arrow: a second, smaller head on the right with an amber and a green arrow
+            const a = Number(arrow);
+            const point = (on: boolean, c: string, y: number): string => `<circle cx="80" cy="${y}" r="11" fill="#1c1c1c"/><path d="M71 ${y - 3}h9v-6l10 9-10 9v-6h-9z" fill="${on ? c : '#3a3a3a'}"/>`;
+            this.prio.innerHTML = `<svg viewBox="0 0 104 88">${head}<rect x="58" y="29" width="44" height="58" rx="8" fill="#111" stroke="#666"/>${point(a === SIG.AMBER, '#ffb000', 44)}${point(a === SIG.GREEN, '#1aff6a', 72)}</svg>`;
+          }
+        } else if (key.startsWith('out:')) {
+          const sign = ICON[key.slice(4)] ?? '';
+          const light = '<svg viewBox="0 0 60 88" style="width:26px;height:38px"><rect x="8" y="1" width="44" height="86" rx="8" fill="#111" stroke="#666"/><circle cx="30" cy="16" r="11" fill="#2a2a2a"/><circle cx="30" cy="44" r="11" fill="#ffb000"><animate attributeName="opacity" values="1;1;0.12;0.12" keyTimes="0;0.5;0.5;1" dur="1s" repeatCount="indefinite"/></circle><circle cx="30" cy="72" r="11" fill="#2a2a2a"/></svg>';
+          this.prio.innerHTML = light + sign.replace('<svg ', '<svg style="width:38px;height:38px" ');
         } else this.prio.innerHTML = key ? ICON[key] : '';
       }
       // dashboard strip: outside views (the cockpit has real instruments) – and on a

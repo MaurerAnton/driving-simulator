@@ -288,8 +288,11 @@ test('the lessons of the truck: three on the yard, then the test with all of the
     }
     for (const t of l.tasks ?? []) assert.ok(taskLayout(t), t);
   }
-  // the car keeps its own lessons; the routes are for both
-  assert.ok(LESSONS.some((l) => l.vehicle === 'car' && l.kind === 'exam'));
+  // the car keeps its first lesson; the routes are for all vehicles, the test drive on the road for all but the truck with
+  // its trailer (it has its own, with the yard), the motorway for all but the tractor
+  assert.ok(LESSONS.some((l) => l.vehicle === 'car' && l.kind === 'basics'));
+  assert.ok(LESSONS.some((l) => l.kind === 'exam' && !l.vehicle && (l.notFor ?? []).includes('truck')));
+  assert.ok(LESSONS.some((l) => l.id === 'motorway' && (l.notFor ?? []).includes('tractor')));
   assert.ok(LESSONS.some((l) => !l.vehicle && l.kind === 'route'));
 });
 

@@ -9,6 +9,8 @@ export interface AddressPickerOptions {
   /** fetches the address list the first time it is needed */
   load(): Promise<AddressIndex | null>;
   pick(hit: AddressHit): void;
+  /** where the one who asks is (a place of the map): what lies near comes first */
+  near?(): { x: number; z: number } | null;
 }
 
 export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; input: HTMLInputElement } {
@@ -80,7 +82,7 @@ export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; inp
       say(o.loading);
       return;
     }
-    const found = index.search(q, 8);
+    const found = index.search(q, 8, o.near?.() ?? null);
     if (found.length === 0) {
       say(o.none);
       return;
