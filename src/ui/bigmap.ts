@@ -10,13 +10,18 @@
 import type { DrivenPath } from '../game/track.ts';
 import { AERIAL_SOURCE, AerialCache, aerialLevel, aerialTileSize, aerialTiles } from '../reality/aerial.ts';
 import { formatUnit, tr } from '../i18n/index.ts';
+import type { NetIndex } from '../world/netindex.ts';
+import { CLASS_TIER } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
 import type { World } from '../world/world.ts';
 import type { AddressHit, AddressIndex } from '../game/address.ts';
+import type { TourPlan } from '../game/tour.ts';
 import { addressPicker } from './addresspicker.ts';
 
 export interface BigMapHost {
   world: World;
+  /** the roads of the whole map, where the road network itself is only loaded around the car (null: not read yet, or a map in one piece) */
+  net(): NetIndex | null;
   lang(): string;
   /** the car: position and yaw (0 = north, positive = to the left) */
   car(): { x: number; z: number; yaw: number };
@@ -30,14 +35,38 @@ export interface BigMapHost {
   loadAddresses(): Promise<AddressIndex | null>;
   /** the place on the road in front of an address, or null */
   spotOf(hit: AddressHit): SpawnJson | null;
-  /** a demonstration drive: the car drives by itself to these places, in this order */
-  startDemo(stops: SpawnJson[]): void;
+  /**
+   * A drive to these places, in this order – or along a tour that was planned
+   * (planTour).  `self`: the player drives and is shown the way; otherwise
+   * the car drives by itself.
+   */
+  startTrip(stops: SpawnJson[], self: boolean, tour: TourPreview | null): void;
+  /**
+   * A tour of about `metres` through as many different streets as possible,
+   * from where the car stands back to there – or on to `end`.  Null: none found.
+   */
+  planTour(metres: number, end: SpawnJson | null): TourPreview | null;
+  /** are the roads of the whole map known (for planning ways through it)? */
+  roadsKnown(): boolean;
+  /** is a drive to places or a tour under way? – and a way to end it */
+  tripActive(): boolean;
+  endTrip(): void;
   /** latitude and longitude of a point of the map */
   latLon(x: number, z: number): [number, number];
   /** aerial photographs under the roads: has the player switched them on? (they come from a server of the land survey) */
   aerial(): boolean;
   setAerial(on: boolean): void;
   close(): void;
+}
+
+/** A planned tour: what it comes to, and its line on the map (x, z, x, z, …). */
+export interface TourPreview {
+  plan: TourPlan;
+  line: Float32Array;
+  /** the way (world/routegraph.ts) it begins behind: the road the car stood on */
+  from: number;
+  /** where it ends (a round trip: where it started) */
+  end: SpawnJson;
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] => {
@@ -72,6 +101,13 @@ export class BigMap {
   /** the places of a demonstration drive being planned (kept while the map is closed) */
   private readonly stops: SpawnJson[] = [];
   private planBox!: HTMLElement;
+  /** the tour that was planned for the places as they are now, and the length asked for (km) */
+  private tour: TourPreview | null = null;
+  private tourKm = 10;
+  private tourNote = '';
+  private scaleBar!: HTMLElement;
+  private scaleText!: HTMLElement;
+  private credit!: HTMLElement;
   private frame = 0;
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private moved = 0;
@@ -162,19 +198,32 @@ export class BigMap {
     };
     aerialToggle.append(aerialBox, el('span', '', this.t('mapAerial')));
     aerialToggle.title = AERIAL_SOURCE.name;
-    bottom.append(aerialToggle, pathToggle, clear);
-    // a demonstration drive is planned here: places by a tap on the map or by their address
+    // the scale, and whose photographs these are
+    const scale = el('div', 'bm-scale');
+    this.scaleBar = el('i');
+    this.scaleText = el('span');
+    this.credit = el('small');
+    scale.append(this.scaleText, this.scaleBar, this.credit);
+    bottom.append(scale, aerialToggle, pathToggle, clear);
+    // a drive is planned here: places by a tap on the map or by their address, or a tour of the streets
     this.planBox = el('div', 'bm-plan');
     this.planBox.hidden = true;
     if (this.host.canTeleport()) {
-      bottom.prepend(button(this.t('demo'), this.t('demo'), () => {
+      scale.after(button(this.t('planTitle'), this.t('planTitle'), () => {
         this.planBox.hidden = !this.planBox.hidden;
         this.fillPlan();
       }, 'bm-demo'));
     }
     this.spotBar = el('div', 'bm-spot');
     this.spotBar.hidden = true;
-    o.append(this.canvas, top, this.planBox, this.spotBar, bottom);
+    // Everything on top of the map stands in one column – the title and the tools, the panel for
+    // planning (it takes what room is left, and scrolls), the chosen place, the switches – so that
+    // nothing lies over anything else, however small the screen is.
+    const ui = el('div', 'bm-ui');
+    const mid = el('div', 'bm-mid');
+    mid.append(this.planBox);
+    ui.append(top, mid, this.spotBar, bottom);
+    o.append(this.canvas, ui);
     parent.append(o);
     this.node = o;
 
@@ -230,7 +279,7 @@ export class BigMap {
     c.focus();
   }
 
-  /** Open the panel for planning a demonstration drive (the map must be open). */
+  /** Open the panel for planning a drive (the map must be open). */
   plan(): void {
     if (!this.node || !this.host.canTeleport()) return;
     this.planBox.hidden = false;
@@ -241,7 +290,33 @@ export class BigMap {
     const box = this.planBox;
     box.replaceChildren();
     if (box.hidden) return;
-    box.append(el('b', '', this.t('demo')), el('small', '', this.t('demoHint')));
+    const lang = this.host.lang();
+    const close = el('button', 'bm-x', '✕');
+    close.type = 'button';
+    close.setAttribute('aria-label', this.t('realityClose'));
+    close.onclick = () => {
+      box.hidden = true;
+    };
+    const head = el('div', 'bm-head');
+    head.append(el('b', '', this.t('planTitle')), close);
+    box.append(head, el('small', '', this.t('planHint')));
+    if (this.host.tripActive()) {
+      // a drive is under way: it can be ended here (starting another one ends it, too)
+      const end = el('button', 'btn ghost', this.t('tripEnd'));
+      end.type = 'button';
+      end.onclick = () => {
+        this.host.endTrip();
+        this.fillPlan();
+      };
+      box.append(end);
+    }
+    const changed = (): void => {
+      // (a tour belongs to the places it was planned for)
+      this.tour = null;
+      this.tourNote = '';
+      this.fillPlan();
+      this.redraw();
+    };
     const picker = addressPicker({
       placeholder: this.t('addressPlaceholder'),
       loading: this.t('realityLoading'),
@@ -255,8 +330,7 @@ export class BigMap {
         this.cz = spot.z;
         if (this.scale < 0.5) this.scale = 0.5;
         picker.input.value = '';
-        this.fillPlan();
-        this.redraw();
+        changed();
       },
     });
     box.append(picker.node);
@@ -272,35 +346,101 @@ export class BigMap {
         del.setAttribute('aria-label', `✕ ${i + 1}`);
         del.onclick = () => {
           this.stops.splice(i, 1);
-          this.fillPlan();
-          this.redraw();
+          changed();
         };
         li.append(del);
         list.append(li);
       });
       box.append(list);
     }
+
+    // --- a tour of the streets: as long as asked for, through as many different streets as possible ---
+    const tourBox = el('div', 'bm-tour');
+    tourBox.append(el('b', '', this.t('tourTitle')), el('small', '', this.t(this.stops.length > 0 ? 'tourHintTo' : 'tourHintRound')));
     const row = el('div', 'bm-row');
-    const go = el('button', 'btn', this.t('demoStart'));
-    go.type = 'button';
-    go.disabled = this.stops.length === 0;
-    go.onclick = () => {
-      const stops = [...this.stops];
-      this.stops.length = 0;
-      this.host.startDemo(stops);
+    const km = el('input');
+    km.type = 'number';
+    km.min = '1';
+    km.max = '300';
+    km.step = '1';
+    km.inputMode = 'numeric';
+    km.value = String(this.tourKm);
+    km.setAttribute('aria-label', this.t('tourLength'));
+    const kmLabel = el('label', 'bm-km');
+    kmLabel.append(el('span', '', this.t('tourLength')), km, el('span', '', 'km'));
+    const planIt = el('button', 'btn ghost', this.t('tourPlan'));
+    planIt.type = 'button';
+    planIt.onclick = () => {
+      this.tourKm = Math.max(1, Math.min(300, Math.round(Number(km.value) || 10)));
+      this.tour = this.host.planTour(this.tourKm * 1000, this.stops[this.stops.length - 1] ?? null);
+      // (the roads of the whole map are read in the background after the start: until then, a moment's patience)
+      this.tourNote = this.tour ? '' : this.host.roadsKnown() ? this.t('tourNone') : this.t('realityLoading');
+      if (this.tour) this.showAll(this.tour.line);
+      this.fillPlan();
+      this.redraw();
     };
-    row.append(go);
-    if (this.stops.length > 0) {
+    km.onchange = () => {
+      this.tourKm = Math.max(1, Math.min(300, Math.round(Number(km.value) || 10)));
+      if (this.tour) changed();
+    };
+    row.append(kmLabel, planIt);
+    tourBox.append(row);
+    if (this.tour) {
+      const t = this.tour.plan;
+      const f = (m: number): string => formatUnit(m / 1000, 'kilometer', lang, 1);
+      tourBox.append(el('small', 'bm-result', this.t('tourResult', { km: f(t.metres), fresh: f(t.fresh), again: f(t.again) })));
+    } else if (this.tourNote) tourBox.append(el('small', 'bm-result', this.tourNote));
+    box.append(tourBox);
+
+    // --- go: the car drives, or the player ---
+    // (what the panel is for stays in view however long the list above it grows)
+    const go = el('div', 'bm-row bm-go');
+    const ready = this.stops.length > 0 || this.tour !== null;
+    const start = (self: boolean): void => {
+      const stops = [...this.stops];
+      const tour = this.tour;
+      this.stops.length = 0;
+      this.tour = null;
+      this.host.startTrip(stops, self, tour);
+    };
+    const auto = el('button', 'btn', this.t('tripAuto'));
+    auto.type = 'button';
+    auto.disabled = !ready;
+    auto.onclick = () => start(false);
+    const self = el('button', 'btn ghost', this.t('tripSelf'));
+    self.type = 'button';
+    self.disabled = !ready;
+    self.onclick = () => start(true);
+    go.append(auto, self);
+    if (ready) {
       const clear = el('button', 'btn ghost', this.t('demoClear'));
       clear.type = 'button';
       clear.onclick = () => {
         this.stops.length = 0;
-        this.fillPlan();
-        this.redraw();
+        changed();
       };
-      row.append(clear);
+      go.append(clear);
     }
-    box.append(row);
+    box.append(go);
+  }
+
+  /** Move and zoom the map so that a line (x, z, x, z, …) is in view. */
+  private showAll(line: Float32Array): void {
+    if (line.length < 4) return;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let i = 0; i < line.length; i += 2) {
+      minX = Math.min(minX, line[i]);
+      maxX = Math.max(maxX, line[i]);
+      minZ = Math.min(minZ, line[i + 1]);
+      maxZ = Math.max(maxZ, line[i + 1]);
+    }
+    this.cx = (minX + maxX) / 2;
+    this.cz = (minZ + maxZ) / 2;
+    const r = this.canvas.getBoundingClientRect();
+    this.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.min(r.width / (maxX - minX + 200), r.height / (maxZ - minZ + 200)) * 0.8));
   }
 
   close(): void {
@@ -367,12 +507,14 @@ export class BigMap {
         const go = el('button', 'btn', this.t('mapTeleport'));
         go.type = 'button';
         go.onclick = () => this.host.teleport(spot);
-        // … or have the car drive there by itself
-        const add = el('button', 'btn ghost', this.t('demoAdd'));
+        // … or drive there (or have the car drive there by itself)
+        const add = el('button', 'btn ghost', this.t('planAdd'));
         add.type = 'button';
         add.onclick = () => {
           this.stops.push(spot);
           this.spot = null;
+          this.tour = null;
+          this.tourNote = '';
           bar.hidden = true;
           this.planBox.hidden = false;
           this.fillPlan();
@@ -452,25 +594,48 @@ export class BigMap {
     g.lineJoin = 'round';
     // over a photograph the roads are only hinted at
     g.globalAlpha = aerial ? 0.38 : 1;
-    for (const cls of CLASSES) {
-      if (s < cls.from) continue;
-      g.strokeStyle = cls.color;
-      // one path per width: roads of a class are drawn at their real width once that is more than the least
-      const byWidth = new Map<number, Path2D>();
+    // one path per class and width: roads of a class are drawn at their real width once that is more than the least
+    const paths: Array<Map<number, Path2D>> = CLASSES.map(() => new Map());
+    const pathFor = (tier: number, width: number): Path2D | null => {
+      const ci = CLASSES.findIndex((c) => tier >= c.min && tier <= c.max);
+      if (ci < 0 || s < CLASSES[ci].from) return null;
+      const w = Math.max(CLASSES[ci].px / s, Math.round(width));
+      let path = paths[ci].get(w);
+      if (!path) paths[ci].set(w, (path = new Path2D()));
+      return path;
+    };
+    const net = this.host.net();
+    if (net) {
+      // the roads of the whole map (most of them are not loaded): from the file that holds them all in a few points
+      const cls = net.net.edgeCls;
+      net.edgesInBox(
+        minX,
+        minZ,
+        maxX,
+        maxZ,
+        (e) => {
+          const tier = CLASS_TIER[cls[e]];
+          const path = pathFor(tier, tier >= 6 ? 11 : tier >= 4 ? 7.5 : tier >= 3 ? 6.5 : tier >= 2 ? 5.5 : 3.5);
+          if (path) net.trace(e, path);
+        },
+        s < CLASSES[1].from,
+      );
+    } else {
       world.edgesInBox(minX, minZ, maxX, maxZ, (e) => {
-        if (e.tier < cls.min || e.tier > cls.max) return;
-        const w = Math.max(cls.px / s, Math.round(e.width));
-        let path = byWidth.get(w);
-        if (!path) byWidth.set(w, (path = new Path2D()));
+        const path = pathFor(e.tier, e.width);
+        if (!path) return;
         const p = e.pl.pts;
         path.moveTo(p[0], p[2]);
         for (let i = 3; i < p.length; i += 3) path.lineTo(p[i], p[i + 2]);
       });
-      for (const [w, path] of byWidth) {
+    }
+    CLASSES.forEach((cls, ci) => {
+      g.strokeStyle = cls.color;
+      for (const [w, path] of paths[ci]) {
         g.lineWidth = w;
         g.stroke(path);
       }
-    }
+    });
 
     g.globalAlpha = 1;
 
@@ -491,6 +656,19 @@ export class BigMap {
         pen = true;
       }
       g.stroke();
+    }
+
+    // the tour that was planned
+    if (this.tour) {
+      const p = this.tour.line;
+      g.strokeStyle = '#ff8a3d';
+      g.lineWidth = Math.max(4 / s, 3.5);
+      g.globalAlpha = 0.85;
+      g.beginPath();
+      g.moveTo(p[0], p[1]);
+      for (let i = 2; i < p.length; i += 2) g.lineTo(p[i], p[i + 1]);
+      g.stroke();
+      g.globalAlpha = 1;
     }
 
     // from here on in screen pixels
@@ -576,35 +754,16 @@ export class BigMap {
     g.restore();
 
     // scale: a round number of metres that is about a fifth of the width
-    const want = W / 5 / s;
+    const want = Math.min(W / 5, 150) / s;
     const pow = 10 ** Math.floor(Math.log10(want));
     const metres = (want / pow >= 5 ? 5 : want / pow >= 2 ? 2 : 1) * pow;
-    const bar = metres * s;
-    const bx = 14;
-    const by = H - 62;
-    g.strokeStyle = '#fff';
-    g.lineWidth = 2;
-    g.beginPath();
-    g.moveTo(bx, by - 5);
-    g.lineTo(bx, by);
-    g.lineTo(bx + bar, by);
-    g.lineTo(bx + bar, by - 5);
-    g.stroke();
-    g.fillStyle = '#fff';
-    g.font = '600 12px system-ui, sans-serif';
-    g.textAlign = 'left';
-    g.textBaseline = 'bottom';
     const lang = this.host.lang();
-    g.fillText(metres >= 1000 ? formatUnit(metres / 1000, 'kilometer', lang) : formatUnit(metres, 'meter', lang), bx + 5, by - 4);
-    if (aerial) {
-      // whose pictures these are
-      g.font = '11px system-ui, sans-serif';
-      g.textBaseline = 'top';
-      g.lineWidth = 3;
-      g.strokeStyle = 'rgba(12, 18, 24, 0.85)';
-      g.strokeText(AERIAL_SOURCE.attribution, bx, by + 5);
-      g.fillText(AERIAL_SOURCE.attribution, bx, by + 5);
-    }
+    this.scaleBar.style.width = `${Math.round(metres * s)}px`;
+    const label = metres >= 1000 ? formatUnit(metres / 1000, 'kilometer', lang) : formatUnit(metres, 'meter', lang);
+    if (this.scaleText.textContent !== label) this.scaleText.textContent = label;
+    // whose pictures these are
+    const credit = aerial ? AERIAL_SOURCE.attribution : '';
+    if (this.credit.textContent !== credit) this.credit.textContent = credit;
   }
 }
 

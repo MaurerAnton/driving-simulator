@@ -22,7 +22,7 @@ import {
 } from '../core/geom.ts';
 import type { PolyProjection, PolySample, Polyline3 } from '../core/geom.ts';
 import { CLASS_TIER, CTRL, EF, KERB_H, ROLE, SURF } from './types.ts';
-import type { CrossingJson, SignalControllerJson, WorldJson } from './types.ts';
+import type { CrossingJson, EdgeJson, NodeJson, SignalControllerJson, WorldChunkJson, WorldJson } from './types.ts';
 
 export interface Edge {
   id: number;
@@ -63,6 +63,8 @@ export interface Edge {
   maxX: number;
   minZ: number;
   maxZ: number;
+  /** the crossings on this edge */
+  xings: CrossingJson[];
 }
 
 export interface Arm {
@@ -130,6 +132,20 @@ export interface Node {
   tc: number;
   osm: number;
   shape: JunctionShape | null;
+  /**
+   * Only the roads that are loaded are known of this junction – its own
+   * piece of the map is not (the network comes in chunks).  It has no area
+   * and nothing leads through it yet; it is where the loaded network ends.
+   */
+  stub: boolean;
+}
+
+/** What changed when a piece of the network was added or taken away. */
+export interface WorldChange {
+  /** roads that came (or went) */
+  edges: Edge[];
+  /** junctions that are whole now (or no longer) */
+  nodes: Node[];
 }
 
 export interface SurfaceHit {
@@ -404,135 +420,301 @@ export function buildJunctionShape(node: Node): JunctionShape | null {
   return { ring, corners, minX, maxX, minZ, maxZ };
 }
 
+/** The centre line of an edge from its packed form (EdgeJson.q): metres. */
+export function edgePoints(q: readonly number[]): number[] {
+  const p = new Array<number>(q.length);
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < q.length; i += 3) {
+    x += q[i];
+    y += q[i + 1];
+    z += q[i + 2];
+    p[i] = x / 100;
+    p[i + 1] = y / 100;
+    p[i + 2] = z / 100;
+  }
+  return p;
+}
+
+/** … and into it. */
+export function packEdgePoints(p: readonly number[]): number[] {
+  const q = new Array<number>(p.length);
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < p.length; i += 3) {
+    const cx = Math.round(p[i] * 100);
+    const cy = Math.round(p[i + 1] * 100);
+    const cz = Math.round(p[i + 2] * 100);
+    q[i] = cx - x;
+    q[i + 1] = cy - y;
+    q[i + 2] = cz - z;
+    x = cx;
+    y = cy;
+    z = cz;
+  }
+  return q;
+}
+
 export class World {
   readonly meta: WorldJson['meta'];
+  /** by their number in the whole map – with gaps where the map is not loaded: go through `allNodes` / `allEdges` */
   readonly nodes: Node[] = [];
   readonly edges: Edge[] = [];
+  /** every junction (stubs too) and every road that is loaded */
+  readonly allNodes = new Set<Node>();
+  readonly allEdges = new Set<Edge>();
   /** forbidden turns: from edge → [via node, to edge, …] (few edges have any) */
   private readonly banned = new Map<number, number[]>();
-  readonly signals: SignalControllerJson[];
-  readonly crossings: CrossingJson[];
+  /** signal controllers by their number (with gaps, like the nodes) */
+  readonly signals: SignalControllerJson[] = [];
+  /** the crossings of all loaded roads */
+  readonly crossings: CrossingJson[] = [];
+  /** what was read first: the description of the map (and, for a map in one piece, all of it) */
   readonly json: WorldJson;
   /** edge segments: value = edgeId * 4096 + segmentIndex */
   private readonly segGrid = new Grid2<number>(40);
   private readonly nodeGrid = new Grid2<Node>(40);
 
+  /**
+   * A map in one piece (all its nodes and edges in `json`) – or, with none
+   * in it, an empty one that pieces are added to (`add`).
+   */
   constructor(json: WorldJson) {
     this.json = json;
     this.meta = json.meta;
-    this.signals = json.signals;
-    this.crossings = json.crossings;
-    for (let i = 0; i < json.nodes.length; i++) {
-      const nj = json.nodes[i];
-      this.nodes.push({
-        id: i,
-        x: nj.x,
-        y: nj.y,
-        z: nj.z,
-        gx: nj.gx ?? 0,
-        gz: nj.gz ?? 0,
-        ctrl: nj.t,
-        arms: [],
-        sc: nj.sc ?? -1,
-        fr: nj.fr ?? [],
-        tc: nj.tc ?? 0,
-        osm: nj.o ?? 0,
-        shape: null,
-      });
+    if (json.nodes.length === 0 && json.edges.length === 0) return;
+    // the same as one big piece: crossings and forbidden turns go with their edges
+    const xings = new Map<number, CrossingJson[]>();
+    for (const c of json.crossings) {
+      const list = xings.get(c.e);
+      if (list) list.push(c);
+      else xings.set(c.e, [c]);
     }
-    for (let i = 0; i < json.edges.length; i++) {
-      const ej = json.edges[i];
-      const pl = makePolyline(Float64Array.from(ej.p));
-      const e: Edge = {
-        id: i,
-        a: this.nodes[ej.a],
-        b: this.nodes[ej.b],
-        cls: ej.c,
-        tier: CLASS_TIER[ej.c],
-        name: ej.n ?? '',
-        ref: ej.r ?? '',
-        pl,
-        len: pl.len,
-        lanesF: ej.lf,
-        lanesB: ej.lb,
-        laneW: ej.lw,
-        width: ej.w,
-        margin: ej.mg ?? 0,
-        maxF: ej.mf,
-        maxB: ej.mb,
-        zone: ej.z ?? 0,
-        surf: ej.s ?? SURF.ASPHALT,
-        swL: ej.sl ?? 0,
-        swR: ej.sr ?? 0,
-        flags: ej.f,
-        access: ej.ac ?? 0,
-        cutA: ej.ca,
-        cutB: ej.cb,
-        layer: ej.ly ?? 0,
-        turnF: ej.tf ?? '',
-        turnB: ej.tb ?? '',
-        osm: ej.o ?? 0,
-        armA: null as unknown as Arm,
-        armB: null as unknown as Arm,
-        blendA: 0,
-        blendB: 0,
-        minX: 0,
-        maxX: 0,
-        minZ: 0,
-        maxZ: 0,
-      };
-      this.edges.push(e);
-    }
-    // arms in stored (counter-clockwise) order
-    for (let i = 0; i < json.nodes.length; i++) {
-      const node = this.nodes[i];
-      const nj = json.nodes[i];
-      for (let k = 0; k < nj.arms.length; k++) {
-        const aj = nj.arms[k];
-        const edge = this.edges[aj.e];
-        // A loop edge (a === b) appears twice: first occurrence is the "out" end.
-        const out = edge.a === node && !(edge.b === node && edge.armA);
-        const arm: Arm = {
-          node,
-          edge,
-          out,
-          idx: k,
-          role: aj.r,
-          sg: aj.g ?? -1,
-          stopS: aj.sl ?? 0,
-          cut: out ? edge.cutA : edge.cutB,
-          dx: 1,
-          dz: 0,
-          ang: 0,
-          half: edge.width / 2,
-          swL: out ? edge.swL : edge.swR,
-          swR: out ? edge.swR : edge.swL,
-          isApproach: out ? edge.lanesB > 0 : edge.lanesF > 0,
-          isExit: out ? edge.lanesF > 0 : edge.lanesB > 0,
-        };
-        if (out) edge.armA = arm;
-        else edge.armB = arm;
-        if (arm.stopS < arm.cut) arm.stopS = arm.cut;
-        node.arms.push(arm);
-      }
-    }
-    for (const e of this.edges) this.finishEdge(e);
-    for (const node of this.nodes) {
-      for (const arm of node.arms) computeArmDirection(arm);
-      node.shape = buildJunctionShape(node);
-      if (node.shape) {
-        this.nodeGrid.insertBox(node.shape.minX, node.shape.minZ, node.shape.maxX, node.shape.maxZ, node);
-      }
-    }
+    const bans = new Map<number, number[]>();
     for (const b of json.banned) {
-      const list = this.banned.get(b[0]);
+      const list = bans.get(b[0]);
       if (list) list.push(b[1], b[2]);
-      else this.banned.set(b[0], [b[1], b[2]]);
+      else bans.set(b[0], [b[1], b[2]]);
     }
+    this.add({
+      v: 1,
+      nodes: json.nodes.map((n, i) => [i, n]),
+      edges: json.edges.map((e, i) => {
+        const x = xings.get(i);
+        const bn = bans.get(i);
+        return [i, x || bn ? { ...e, x: x ?? e.x, bn: bn ?? e.bn } : e];
+      }),
+      signals: json.signals.map((c, i) => [i, c]),
+    });
   }
 
-  /** (Re)compute cached geometry of an edge and index its segments. */
-  private finishEdge(e: Edge): void {
+  private stubNode(id: number, p: number[], at: number): Node {
+    const node: Node = { id, x: p[at], y: p[at + 1], z: p[at + 2], gx: 0, gz: 0, ctrl: CTRL.NONE, arms: [], sc: -1, fr: [], tc: 0, osm: 0, shape: null, stub: true };
+    this.nodes[id] = node;
+    this.allNodes.add(node);
+    return node;
+  }
+
+  private newArm(node: Node, edge: Edge, out: boolean): Arm {
+    return {
+      node,
+      edge,
+      out,
+      idx: 0,
+      role: ROLE.NONE,
+      sg: -1,
+      stopS: out ? edge.cutA : edge.cutB,
+      cut: out ? edge.cutA : edge.cutB,
+      dx: 1,
+      dz: 0,
+      ang: 0,
+      half: edge.width / 2,
+      swL: out ? edge.swL : edge.swR,
+      swR: out ? edge.swR : edge.swL,
+      isApproach: out ? edge.lanesB > 0 : edge.lanesF > 0,
+      isExit: out ? edge.lanesF > 0 : edge.lanesB > 0,
+    };
+  }
+
+  private addEdge(id: number, ej: EdgeJson): Edge {
+    const p = ej.q ? edgePoints(ej.q) : ej.p;
+    const pl = makePolyline(Float64Array.from(p));
+    const a = this.nodes[ej.a] ?? this.stubNode(ej.a, p, 0);
+    const b = this.nodes[ej.b] ?? this.stubNode(ej.b, p, p.length - 3);
+    const e: Edge = {
+      id,
+      a,
+      b,
+      cls: ej.c,
+      tier: CLASS_TIER[ej.c],
+      name: ej.n ?? '',
+      ref: ej.r ?? '',
+      pl,
+      len: pl.len,
+      lanesF: ej.lf,
+      lanesB: ej.lb,
+      laneW: ej.lw,
+      width: ej.w,
+      margin: ej.mg ?? 0,
+      maxF: ej.mf,
+      maxB: ej.mb,
+      zone: ej.z ?? 0,
+      surf: ej.s ?? SURF.ASPHALT,
+      swL: ej.sl ?? 0,
+      swR: ej.sr ?? 0,
+      flags: ej.f,
+      access: ej.ac ?? 0,
+      cutA: ej.ca,
+      cutB: ej.cb,
+      layer: ej.ly ?? 0,
+      turnF: ej.tf ?? '',
+      turnB: ej.tb ?? '',
+      osm: ej.o ?? 0,
+      armA: null as unknown as Arm,
+      armB: null as unknown as Arm,
+      blendA: 0,
+      blendB: 0,
+      minX: 0,
+      maxX: 0,
+      minZ: 0,
+      maxZ: 0,
+      xings: (ej.x ?? []).map((x) => ({ ...x, e: id })),
+    };
+    e.armA = this.newArm(a, e, true);
+    e.armB = this.newArm(b, e, false);
+    // (of a junction that is not loaded itself, the roads are kept in the order they came)
+    if (a.stub) a.arms.push(e.armA);
+    if (b.stub) b.arms.push(e.armB);
+    this.edges[id] = e;
+    this.allEdges.add(e);
+    this.indexEdge(e, true);
+    for (const x of e.xings) this.crossings.push(x);
+    if (ej.bn) this.banned.set(id, ej.bn);
+    return e;
+  }
+
+  private completeNode(id: number, nj: NodeJson): Node {
+    let node = this.nodes[id];
+    if (!node) {
+      node = { id, x: nj.x, y: nj.y, z: nj.z, gx: 0, gz: 0, ctrl: nj.t, arms: [], sc: -1, fr: [], tc: 0, osm: 0, shape: null, stub: true };
+      this.nodes[id] = node;
+      this.allNodes.add(node);
+    }
+    node.x = nj.x;
+    node.y = nj.y;
+    node.z = nj.z;
+    node.gx = nj.gx ?? 0;
+    node.gz = nj.gz ?? 0;
+    node.ctrl = nj.t;
+    node.sc = nj.sc ?? -1;
+    node.fr = nj.fr ?? [];
+    node.tc = nj.tc ?? 0;
+    node.osm = nj.o ?? 0;
+    node.stub = false;
+    // the arms in their stored (counter-clockwise) order
+    const arms: Arm[] = [];
+    const seen = new Set<Edge>();
+    for (let k = 0; k < nj.arms.length; k++) {
+      const aj = nj.arms[k];
+      const edge = this.edges[aj.e];
+      if (!edge) throw new Error(`junction ${id}: its road ${aj.e} is not part of the piece it came with`);
+      // A loop edge (a === b) appears twice: first occurrence is the "out" end.
+      const out = edge.a === node && !(edge.b === node && seen.has(edge));
+      seen.add(edge);
+      const arm = out ? edge.armA : edge.armB;
+      arm.idx = k;
+      arm.role = aj.r;
+      arm.sg = aj.g ?? -1;
+      arm.stopS = Math.max(aj.sl ?? 0, arm.cut);
+      arms.push(arm);
+    }
+    node.arms = arms;
+    for (const arm of arms) computeArmDirection(arm);
+    node.shape = buildJunctionShape(node);
+    if (node.shape) this.nodeGrid.insertBox(node.shape.minX, node.shape.minZ, node.shape.maxX, node.shape.maxZ, node);
+    return node;
+  }
+
+  /**
+   * Add a piece of the network: the junctions of a chunk and every road at
+   * them.  Roads that are there already (they came with the chunk beside)
+   * are kept; junctions known only as the far end of such a road become
+   * whole.  Returns the new roads and the junctions that are whole now –
+   * for whoever keeps something for each of them (the lanes, the signals).
+   */
+  add(chunk: WorldChunkJson): WorldChange {
+    const change: WorldChange = { edges: [], nodes: [] };
+    for (const [id, c] of chunk.signals) this.signals[id] = c;
+    for (const [id, ej] of chunk.edges) if (!this.edges[id]) change.edges.push(this.addEdge(id, ej));
+    for (const [id, nj] of chunk.nodes) {
+      const have = this.nodes[id];
+      if (have && !have.stub) continue;
+      change.nodes.push(this.completeNode(id, nj));
+    }
+    // (the far ends of the new roads: which way they leave, for whoever looks)
+    for (const e of change.edges) {
+      if (e.a.stub) computeArmDirection(e.armA);
+      if (e.b.stub) computeArmDirection(e.armB);
+    }
+    return change;
+  }
+
+  /**
+   * Take a piece of the network away again: these junctions (those of a
+   * chunk).  A road goes when the junctions at both its ends are gone; a
+   * junction with a road that stays is kept as the end of that road.
+   * Returns what went – to be told to whoever keeps something for it,
+   * BEFORE this is called if they need to look at it once more.
+   */
+  remove(nodeIds: Iterable<number>): WorldChange {
+    const change: WorldChange = { edges: [], nodes: [] };
+    const touched = new Set<Node>();
+    for (const id of nodeIds) {
+      const node = this.nodes[id];
+      if (!node || node.stub) continue;
+      if (node.shape) this.nodeGrid.removeBox(node.shape.minX, node.shape.minZ, node.shape.maxX, node.shape.maxZ, node);
+      node.shape = null;
+      node.stub = true;
+      change.nodes.push(node);
+      touched.add(node);
+    }
+    for (const node of touched) {
+      for (const arm of [...node.arms]) {
+        const e = arm.edge;
+        if (!this.edges[e.id] || !e.a.stub || !e.b.stub) continue;
+        // both ends are gone: the road goes
+        this.indexEdge(e, false);
+        delete this.edges[e.id];
+        this.allEdges.delete(e);
+        this.banned.delete(e.id);
+        for (const x of e.xings) {
+          const i = this.crossings.indexOf(x);
+          if (i >= 0) {
+            this.crossings[i] = this.crossings[this.crossings.length - 1];
+            this.crossings.pop();
+          }
+        }
+        for (const end of [e.armA, e.armB]) {
+          const i = end.node.arms.indexOf(end);
+          if (i >= 0) end.node.arms.splice(i, 1);
+          touched.add(end.node);
+        }
+        change.edges.push(e);
+      }
+    }
+    for (const node of touched) {
+      if (node.stub && node.arms.length === 0) {
+        delete this.nodes[node.id];
+        this.allNodes.delete(node);
+      }
+    }
+    return change;
+  }
+
+  /** Compute the cached geometry of an edge and index its segments (`on`), or take it out of the index again. */
+  private indexEdge(e: Edge, on: boolean): void {
     const usable = Math.max(0, e.len - e.cutA - e.cutB);
     e.blendA = Math.min(14, usable * 0.45);
     e.blendB = Math.min(14, usable * 0.45);
@@ -553,13 +735,12 @@ export class World {
       if (i < n - 1) {
         const x2 = pts[i * 3 + 3];
         const z2 = pts[i * 3 + 5];
-        this.segGrid.insertBox(
-          Math.min(x, x2) - pad,
-          Math.min(z, z2) - pad,
-          Math.max(x, x2) + pad,
-          Math.max(z, z2) + pad,
-          e.id * 4096 + i,
-        );
+        const x0 = Math.min(x, x2) - pad;
+        const z0 = Math.min(z, z2) - pad;
+        const x1 = Math.max(x, x2) + pad;
+        const z1 = Math.max(z, z2) + pad;
+        if (on) this.segGrid.insertBox(x0, z0, x1, z1, e.id * 4096 + i);
+        else this.segGrid.removeBox(x0, z0, x1, z1, e.id * 4096 + i);
       }
     }
     e.minX = minX - pad;
@@ -806,6 +987,23 @@ export class World {
     out.zone = best <= 0 ? 0 : 2;
     out.surf = bestEdge.surf;
     return true;
+  }
+
+  /** Visit the junctions whose area touches the given box (each once). */
+  nodesInBox(minX: number, minZ: number, maxX: number, maxZ: number, visit: (n: Node) => void): void {
+    const seen = new Set<number>();
+    this.nodeGrid.queryBox(minX, minZ, maxX, maxZ, (n) => {
+      if (seen.has(n.id)) return;
+      seen.add(n.id);
+      const sh = n.shape!;
+      if (sh.maxX < minX || sh.minX > maxX || sh.maxZ < minZ || sh.minZ > maxZ) return;
+      visit(n);
+    });
+  }
+
+  /** Visit the pieces of centre line near the given box: (edge, index of the segment) – a piece may come more than once. */
+  segmentsInBox(minX: number, minZ: number, maxX: number, maxZ: number, visit: (e: Edge, seg: number) => void): void {
+    this.segGrid.queryBox(minX, minZ, maxX, maxZ, (code) => visit(this.edges[(code / 4096) | 0], code % 4096));
   }
 
   /** Visit edges whose padded bounding box touches the given box. */

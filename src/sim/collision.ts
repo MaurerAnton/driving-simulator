@@ -24,6 +24,8 @@ export interface CollisionSource {
   /** building footprints: flat x,z rings and their vertex counts */
   rings: Float32Array | null;
   ringCounts: Uint16Array | null;
+  /** sides of the footprints that do not count (they would stand in a lane): one bit per side, in the order of `rings` */
+  ringSkip?: Uint8Array | null;
   /** x1,z1,x2,z2,y per segment */
   segments: Float32Array | null;
   /** x,y,z,radius per post / trunk */
@@ -71,8 +73,11 @@ export class SceneryCollider {
     const tile: Array<[number, Prim]> = [];
     if (src.rings && src.ringCounts) {
       let o = 0;
+      const skip = src.ringSkip ?? null;
       for (const n of src.ringCounts) {
         for (let i = 0; i < n; i++) {
+          const side = o / 2 + i;
+          if (skip && (skip[side >> 3] & (1 << (side & 7))) !== 0) continue;
           const j = (i + 1) % n;
           this.insert(tile, { kind: 0, x1: src.rings[o + i * 2], z1: src.rings[o + i * 2 + 1], x2: src.rings[o + j * 2], z2: src.rings[o + j * 2 + 1], r: 0, y: NaN });
         }
@@ -103,6 +108,50 @@ export class SceneryCollider {
       if (list.length === 0) this.grid.delete(k);
     }
     this.byTile.delete(key);
+  }
+
+  /**
+   * Would the vehicle touch anything standing at (x, z) on the ground at
+   * height y, heading `yaw`?  `margin` metres of air are asked for on top.
+   * For putting the vehicle somewhere: not into a wall or onto a post.
+   */
+  blocked(x: number, y: number, z: number, yaw: number, margin = 0.1): boolean {
+    const R = this.radius + margin;
+    const sin = Math.sin(yaw);
+    const cos = Math.cos(yaw);
+    for (let c = 0; c < this.offsets.length; c++) {
+      // (the model looks along -z: forward = (-sin yaw, -cos yaw), and offsets count backwards)
+      const cx = x + sin * this.offsets[c];
+      const cz = z + cos * this.offsets[c];
+      const ix0 = Math.floor((cx - R) / CELL);
+      const ix1 = Math.floor((cx + R) / CELL);
+      const iz0 = Math.floor((cz - R) / CELL);
+      const iz1 = Math.floor((cz + R) / CELL);
+      for (let ix = ix0; ix <= ix1; ix++) {
+        for (let iz = iz0; iz <= iz1; iz++) {
+          const list = this.grid.get(SceneryCollider.key(ix, iz));
+          if (!list) continue;
+          for (let i = 0; i < list.length; i++) {
+            const p = list[i];
+            if (!Number.isNaN(p.y) && Math.abs(y - p.y) > 2.6) continue;
+            let px = p.x1;
+            let pz = p.z1;
+            if (p.kind === 0) {
+              const dx = p.x2 - p.x1;
+              const dz = p.z2 - p.z1;
+              const l2 = dx * dx + dz * dz;
+              let t = l2 > 1e-9 ? ((cx - p.x1) * dx + (cz - p.z1) * dz) / l2 : 0;
+              t = t < 0 ? 0 : t > 1 ? 1 : t;
+              px = p.x1 + dx * t;
+              pz = p.z1 + dz * t;
+            }
+            const rad = R + (p.kind === 1 ? p.r : 0);
+            if ((cx - px) * (cx - px) + (cz - pz) * (cz - pz) < rad * rad) return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   /**

@@ -36,7 +36,7 @@ export interface AutoDriverOptions {
 }
 
 /** Why the driver does what it is doing – for telling a learner who watches. */
-export type AutoRemark = '' | 'red' | 'stop' | 'yield' | 'zebra' | 'follow' | 'turn' | 'lane' | 'rbl' | 'roundabout' | 'ringExit' | 'halt';
+export type AutoRemark = '' | 'red' | 'stop' | 'yield' | 'zebra' | 'follow' | 'turn' | 'lane' | 'rbl' | 'roundabout' | 'ringExit' | 'halt' | 'deadEnd';
 
 export interface AutoCommand {
   /** -1 … 1, positive = to the right */
@@ -52,6 +52,12 @@ export interface AutoCommand {
   waiting: boolean;
   /** standing at the place it was told to halt at */
   arrived: boolean;
+  /**
+   * Standing at the end of a street the way leads back out of: the path to
+   * turn round by.  Turning in the road takes going back and forth, which
+   * this driver does not do – whoever runs it puts the car onto `to`.
+   */
+  turnRound: Connector | null;
 }
 
 const smp = newPolySample();
@@ -65,7 +71,7 @@ export class AutoDriver {
   readonly opts: Required<AutoDriverOptions>;
   /** where to come to a halt (a place on a road of the route's last piece), or null: drive on */
   halt: { x: number; z: number } | null = null;
-  readonly cmd: AutoCommand = { steer: 0, throttle: 0, brake: 0, indicator: 0, look: 0, remark: '', waiting: false, arrived: false };
+  readonly cmd: AutoCommand = { steer: 0, throttle: 0, brake: 0, indicator: 0, look: 0, remark: '', waiting: false, arrived: false, turnRound: null };
   /** what the last step saw – for tracing */
   readonly seen = { next: null as Connector | null, tx: 0, tz: 0, limit: 0, distToLine: Infinity, mustStop: false, crossStop: false, turn: 0, gap: Infinity };
   private readonly turnSpeed: number;
@@ -78,8 +84,12 @@ export class AutoDriver {
   private lastNext: Connector | null = null;
   private haltLane: Lane | null = null;
   private readonly proj = { s: 0, off: 0, d2: 0, seg: 0 };
+  /** the way ahead as bendCap samples it: which way it runs, every few metres */
+  private readonly bendDir = new Float32Array(2 * 48);
+  private readonly bendSmp = newPolySample();
+  private bendTick = 0;
+  private bendLimit = Infinity;
   private readonly hit = newSurfaceHit();
-  private readonly crossings = new Map<number, CrossingJson[]>();
   private readonly me: SelfDriving = { lane: null, conn: null, s: 0, v: 0, next: null, length: 4.3, width: 1.8, x: 0, y: 0, z: 0, yaw: 0 };
 
   constructor(world: World, signals: SignalSystem, rules: RuleMonitor, traffic: Traffic | null, opts: AutoDriverOptions) {
@@ -92,17 +102,71 @@ export class AutoDriver {
     this.turnSpeed = this.opts.truck ? 2.7 : 4.5;
     // the deceleration the driver plans with when stopping at a line (15 t take longer)
     this.decel = this.opts.truck ? 1.3 : 2.2;
-    for (const c of world.crossings) {
-      let list = this.crossings.get(c.e);
-      if (!list) this.crossings.set(c.e, (list = []));
-      list.push(c);
-    }
     this.me.length = opts.spec.length ?? 4.28;
     this.me.width = opts.spec.width ?? 1.79;
   }
 
+  /**
+   * The speed the bends ahead allow right now: each is to be reached at the
+   * speed it can be driven at (with the sideways pull the steering keeps to),
+   * by braking gently from here.  The steering alone sees a bend a second
+   * ahead – enough in town, far too late for a hairpin behind a straight on a
+   * country road.  `from`: how far along the lane (or, in a junction, along
+   * the path through it) the car is.
+   */
+  private bendCap(lane: Lane | null, from: number, next: Connector | null, route: readonly Connector[], speed: number): number {
+    const STEP = 6;
+    /** the turn is measured over 2 × SPAN steps: a kink in the line of a road is a gentle bend, a hairpin is not */
+    const SPAN = 2;
+    const pull = this.opts.truck ? 1.5 : 2.2;
+    const ease = this.opts.truck ? 1.1 : 1.7;
+    const reach = Math.min(240, (speed * speed) / (2 * ease) + 45);
+    const n = Math.min(48, Math.ceil(reach / STEP) + 2 * SPAN + 1);
+    const dir = this.bendDir;
+    const smp = this.bendSmp;
+    // along the lane the car is on, the path through the junction behind it, the lane after that, …
+    let piece: Lane | Connector | null = lane ?? next;
+    let onLane = lane !== null;
+    let after: Connector | null = lane ? next : null;
+    let s = Math.max(0, from);
+    let count = 0;
+    while (count < n && piece) {
+      const len: number = piece.len;
+      if (s > len) {
+        s -= len;
+        if (onLane) {
+          const l = piece as Lane;
+          piece = after ?? route.find((r) => r.from === l) ?? (l.out.length === 1 ? l.out[0] : null);
+          after = null;
+        } else piece = (piece as Connector).to;
+        onLane = !onLane;
+        continue;
+      }
+      if (onLane) lanePoint(piece as Lane, s, smp);
+      else samplePolyline((piece as Connector).pl, s, smp);
+      dir[count * 2] = smp.tx;
+      dir[count * 2 + 1] = smp.tz;
+      count++;
+      s += STEP;
+    }
+    let cap = Infinity;
+    for (let i = SPAN; i + SPAN < count; i++) {
+      const a = (i - SPAN) * 2;
+      const b = (i + SPAN) * 2;
+      const turn = Math.acos(Math.max(-1, Math.min(1, dir[a] * dir[b] + dir[a + 1] * dir[b + 1])));
+      if (turn < 0.05) continue;
+      const bend = Math.sqrt((pull * 2 * SPAN * STEP) / turn);
+      // (the bend begins where the stretch it was measured over begins)
+      const d = Math.max(0, (i - SPAN) * STEP - 4);
+      cap = Math.min(cap, Math.sqrt(bend * bend + 2 * ease * d));
+    }
+    return cap;
+  }
+
   /** Forget what was under way (after the car was put somewhere else). */
   reset(): void {
+    this.bendTick = 0;
+    this.bendLimit = Infinity;
     this.stoppedFor = 0;
     this.yieldWait = 0;
     this.changeT = 0;
@@ -111,6 +175,7 @@ export class AutoDriver {
     this.lastNext = null;
     this.haltLane = null;
     this.cmd.arrived = false;
+    this.cmd.turnRound = null;
   }
 
   /**
@@ -211,7 +276,8 @@ export class AutoDriver {
         // (amber: stop if that is still possible with normal braking – otherwise on, without dithering)
         const sg2 = a2.sg >= 0 && l2.to.sc >= 0 ? signals.get(l2.to.sc, a2.sg) : SIG.GREEN;
         const red = sg2 === SIG.RED || sg2 === SIG.RED_AMBER || (sg2 === SIG.AMBER && (speed * speed) / (2 * Math.max(dStop - 2.5, 0.5)) < 3);
-        if (obey && dStop > 0 && l2.to.arms.length > 2 && (red || a2.role === ROLE.STOP)) {
+        // (a line the front of the car has only just reached still counts: the car is not in the junction yet)
+        if (obey && dStop > -0.6 && l2.to.arms.length > 2 && (red || a2.role === ROLE.STOP)) {
           const room = dStop - 2.5;
           // (A light right behind a junction: wait before it, do not creep up to the line – by the
           // time the car counts as being on that short lane, its front is at the line or past it.
@@ -236,8 +302,8 @@ export class AutoDriver {
     const onExitLane = lane !== null && laneS < Math.min(lane.stopAt, lane.len) - 0.5;
     /** crossings of lane `l`, whose start is `offset` metres ahead of the front bumper */
     const scanCrossings = (l: Lane, offset: number): void => {
-      const xs = this.crossings.get(l.edge.id);
-      if (!xs) return;
+      const xs = l.edge.xings;
+      if (xs.length === 0) return;
       for (const c of xs) {
         const pos = l.dir > 0 ? c.s - l.s0 : l.s0 - c.s;
         const d = offset + pos - c.w / 2;
@@ -288,10 +354,16 @@ export class AutoDriver {
     me.next = null;
     me.route = route;
     let halting = false;
+    /** at the place to halt at (not merely standing near it, behind somebody) */
+    let atHalt = false;
+    let turnRound: Connector | null = null;
+    /** how far along the path through the junction the car is (when it is not on a lane) */
+    let connS = 0;
     if (((inJunction && !onExitLane) || !lane) && next) {
       projectOnPolyline(next.pl, mpos[0], mpos[2], proj);
       const on = next;
       const at = proj.s;
+      connS = at;
       aim((d) => {
         const sj = at + d;
         if (sj <= on.len) samplePolyline(on.pl, sj, smp);
@@ -430,7 +502,23 @@ export class AutoDriver {
           limit = Math.min(limit, Math.sqrt(2 * (DECEL * 0.7) * dd));
           halting = dd < 45;
           if (halting) remark = 'halt';
-          if (dd < 0.6) crossStop = true;
+          if (dd < 0.6) {
+            crossStop = true;
+            atHalt = true;
+          }
+        }
+      }
+      // --- the end of the street, and the way leads back out of it: stop short of the end ---
+      if (next && next.from === lane && next.turn === TURN.UTURN && lane.to.arms.length === 1) {
+        const dd = Math.max(0, lane.len - 3.5 - centre);
+        limit = Math.min(limit, Math.sqrt(2 * (DECEL * 0.7) * dd));
+        if (dd < 45) {
+          halting = true;
+          remark = 'deadEnd';
+        }
+        if (dd < 0.6) {
+          crossStop = true;
+          turnRound = next;
         }
       }
       if ((distToLine > 45 && ahead > 45) || distToLine < -3) turn = 0;
@@ -507,7 +595,10 @@ export class AutoDriver {
     const steer = Math.max(-1, Math.min(1, (Math.atan(spec.wheelbase * curv) / spec.maxWheelAngle) * (fwd > 0 ? 1 : 3)));
     // keep the lateral acceleration comfortable
     const vCurve = Math.sqrt((TRUCK ? 1.5 : 2.2) / Math.max(Math.abs(curv), 0.002));
-    let target = Math.min(limit * 0.94, vCurve);
+    // … and the bends further ahead are come up to at the speed they can be driven at (looked at a few times a second)
+    if (this.bendTick++ % 6 === 0) this.bendLimit = lane || next ? this.bendCap(lane, lane ? laneS - FRONT : connS, next, route, speed) : Infinity;
+    const vBend = this.bendLimit;
+    let target = Math.min(limit * 0.94, vCurve, vBend);
     let brake = 0;
     if (mustStop && distToLine > -1) {
       const d = Math.max(0, distToLine - (TRUCK ? 1.8 : 1.2));
@@ -532,10 +623,14 @@ export class AutoDriver {
       // made to brake hard, and a learner sees how early one lifts off.
       // (A bend that asks for less speed than the car has is braked for as firmly as it takes, too:
       // the way off a motorway does not wait.)
-      const firm = mustStop || crossStop || halting || stopAhead || gap < 40 || vCurve < limit * 0.94 || err < -4;
+      const firm = mustStop || crossStop || halting || stopAhead || gap < 40 || vCurve < limit * 0.94 || vBend < v.speed - 3 || err < -4;
       const most = firm ? 0.8 : (TRUCK ? 1.6 : 2.1) / (TRUCK ? 6.5 : 9.5);
       brake = Math.max(brake, Math.min(most, -err * 0.3));
     }
+
+    // Standing where the way is not free – a red light behind the next joint in the road, somebody
+    // crossing: held on the brake.  (Left to itself, the car creeps on at walking pace, over the line.)
+    if (target < 0.05 && v.speed < 1.2) brake = Math.max(brake, 0.4);
 
     const cmd = this.cmd;
     cmd.steer = steer;
@@ -545,7 +640,8 @@ export class AutoDriver {
     cmd.look = look;
     cmd.remark = remark;
     cmd.waiting = mustStop || crossStop || (gap < 12 && target < 0.3);
-    cmd.arrived = halting && crossStop && Math.abs(v.speed) < 0.1;
+    cmd.arrived = atHalt && Math.abs(v.speed) < 0.1;
+    cmd.turnRound = turnRound && Math.abs(v.speed) < 0.1 ? turnRound : null;
     const seen = this.seen;
     seen.next = next;
     seen.tx = tx;

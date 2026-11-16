@@ -7,8 +7,6 @@
 import { angleOf, clamp } from '../../src/core/geom.ts';
 import { ACCESS, CLASS_LANE_WIDTH, CLASS_TIER, CLS, CTRL, EF, ROLE, SURF } from '../../src/world/types.ts';
 import type { EdgeJson, NodeJson } from '../../src/world/types.ts';
-import type { CoverMap } from './cover.ts';
-import type { Dgm } from './dgm.ts';
 import type { ONode, OWay, OsmData, Tags } from './osm.ts';
 
 const DRIVE_CLASS: Record<string, number> = {
@@ -446,9 +444,14 @@ function featureOf(n: ONode, wayDir: number): EdgeFeature | null {
   return { kind, s: 0, dir, tags: t, osm: n.id };
 }
 
-export function buildRoadGraph(osm: OsmData, dgm: Dgm, cover: CoverMap, bounds: { minX: number; maxX: number; minZ: number; maxZ: number }): RoadGraph {
-  const inWorld = (x: number, z: number): boolean =>
-    x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ && dgm.covered(x, z);
+/** Where the map is: there is terrain (`inWorld`), and where it is built up (a hint for roads that do not say). */
+export interface MapArea {
+  inWorld(x: number, z: number): boolean;
+  builtUp(x: number, z: number): boolean;
+}
+
+export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
+  const inWorld = (x: number, z: number): boolean => area.inWorld(x, z);
 
   // ---- 1. select ways, clip them to the terrain coverage --------------------
   interface Run {
@@ -471,7 +474,7 @@ export function buildRoadGraph(osm: OsmData, dgm: Dgm, cover: CoverMap, bounds: 
     let builtVotes = 0;
     for (const id of ids0) {
       const n = osm.nodes.get(id)!;
-      if (cover.builtUp(n.x, n.z)) builtVotes++;
+      if (area.builtUp(n.x, n.z)) builtVotes++;
     }
     const attrs = roadAttrs(way.tags, builtVotes * 2 > ids0.length);
     if (!attrs) continue;

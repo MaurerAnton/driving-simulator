@@ -13,6 +13,7 @@
  * in the map data, and worth looking at.
  */
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { LESSONS, Navigator, findTarget } from '../src/game/nav.ts';
 import { WorldGround } from '../src/sim/ground.ts';
@@ -28,19 +29,67 @@ import { LaneGraph, TURN, lanePoint } from '../src/world/lanes.ts';
 import type { Connector, Lane } from '../src/world/lanes.ts';
 import { tileKey, unpackTile } from '../src/world/tilefmt.ts';
 import { CLS, CTRL, EF, ROLE } from '../src/world/types.ts';
-import type { WorldJson } from '../src/world/types.ts';
-import { World, newSurfaceHit } from '../src/world/world.ts';
+import { newSurfaceHit } from '../src/world/world.ts';
+import { MapLoader } from '../src/world/loader.ts';
+import { NetIndex } from '../src/world/netindex.ts';
+import { quickestToEdge, wayOf } from '../src/world/routegraph.ts';
+import { followMap } from '../src/sim/follow.ts';
+import type { MapFollowers } from '../src/sim/follow.ts';
+import { diskFiles } from '../tools/mapgen/mapfiles.ts';
+import { fitJunctionPlane } from '../tools/mapgen/elevation.ts';
+import type { PlaneArm } from '../tools/mapgen/elevation.ts';
 
-const root = new URL('../public/map/', import.meta.url);
-const json = JSON.parse(readFileSync(new URL('world.json', root), 'utf8')) as WorldJson;
-const world = new World(json);
+// (MAP_DIR: another map folder than public/map)
+const root = new URL(`../${(process.env.MAP_DIR ?? 'public/map').replace(/\/$/, '')}/`, import.meta.url);
+// The map as the game loads it: in one piece, or the road network in chunks that follow the car.
+const map = await MapLoader.open(diskFiles(fileURLToPath(root)));
+const world = map.world;
+const json = world.json;
 const graph = new LaneGraph(world);
+const followers: MapFollowers = { lanes: graph };
+followMap(map, followers);
+
+/**
+ * DRIVE_PLANES=1: the planes of the junctions as the map build of today would
+ * fit them (tools/mapgen/elevation.ts), on a map that was built before – to
+ * see what a change of that fit does to the drives without building the map.
+ */
+const replaned = new WeakSet<object>();
+function replane(): void {
+  if (process.env.DRIVE_PLANES !== '1') return;
+  for (const n of world.allNodes) {
+    if (n.stub || replaned.has(n)) continue;
+    replaned.add(n);
+    const arms: PlaneArm[] = [];
+    for (const a of n.arms) {
+      const e = a.edge;
+      const p = e.pl.pts;
+      const cum = e.pl.cum;
+      const last = cum.length - 1;
+      const isA = e.a === n;
+      // ~10 m along the arm
+      let j = isA ? 0 : last;
+      while (isA ? j < last && cum[j] < 10 : j > 0 && e.len - cum[j] < 10) j += isA ? 1 : -1;
+      const dx = p[j * 3] - n.x;
+      const dz = p[j * 3 + 2] - n.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.5) continue;
+      arms.push({ ux: dx / d, uz: dz / d, m: (p[j * 3 + 1] - n.y) / d, w: e.tier + 1 });
+    }
+    const [gx, gz] = fitJunctionPlane(arms);
+    n.gx = gx;
+    n.gz = gz;
+  }
+}
+/** the roads of the whole map, for ways that lead beyond what is loaded (a map in pieces) */
+const netData = await map.net();
+const index = netData ? new NetIndex(netData) : null;
 
 /** Terrain straight from the tile files. */
 const tileCache = new Map<string, { h: Float32Array; n: number; cov: Uint8Array; cn: number } | null>();
 const terrain = {
   tile(x: number, z: number) {
-    const { minX, minZ, tileSize } = json.meta;
+    const { x0: minX, z0: minZ, size: tileSize } = map.tiles;
     const ix = Math.floor((x - minX) / tileSize);
     const iz = Math.floor((z - minZ) / tileSize);
     const key = tileKey(ix, iz);
@@ -91,13 +140,16 @@ const DT = 1 / 120;
  * Tracing for debugging a finding: DRIVE_DEBUG=<until s> [DRIVE_FROM=<from s>]
  * prints the driver's state twice a second in that time window,
  * DRIVE_NEAR=<x>,<z>,<radius m> whenever the car is near that point;
- * DRIVE_UNTIL=<s> ends the drive early; DRIVE_VIA="x,z;x,z" replaces the
+ * DRIVE_UNTIL=<s> ends the drive early; DRIVE_AT="x,z" starts on the road
+ * nearest to that place; DRIVE_VIA="x,z;x,z" replaces the
  * lesson's destinations by the roads nearest to these points (with
  * DRIVE_HALT=1 the car comes to a halt at the last one, as on a
  * demonstration drive of the game); DRIVE_NAV=1 prints every destination
  * with its route.
  */
 const NEAR = (process.env.DRIVE_NEAR ?? '').split(',').map(Number);
+/** DRIVE_AT="x,z": start on the road nearest to this place (to look at a spot far from the start points) */
+const AT = (process.env.DRIVE_AT ?? '').split(',').filter(Boolean).map(Number);
 /** DRIVE_VIA="x,z;x,z;…": destinations to drive to one after the other (nearest road to each point) */
 const VIA = (process.env.DRIVE_VIA ?? '')
   .split(';')
@@ -119,10 +171,21 @@ const HALT = process.env.DRIVE_HALT === '1';
 /** DRIVE_TRAFFIC=1: among the ambient traffic, which the driver then has to mind (distance, right of way, pedestrians) */
 const WITH_TRAFFIC = process.env.DRIVE_TRAFFIC === '1' || process.argv.includes('--traffic');
 
-function runLesson(id: string, spawnIdx: number, obey = true): { km: number; minutes: number; findings: string[]; done: boolean; where: string } {
+async function runLesson(id: string, spawnIdx: number, obey = true): Promise<{ km: number; minutes: number; findings: string[]; done: boolean; where: string }> {
   const lesson = LESSONS.find((l) => l.id === id)!;
+  let sp = json.spawns[spawnIdx];
+  if (AT.length === 2) {
+    // DRIVE_AT: from the road nearest to a place instead of the start point
+    await map.loadAround(AT[0], AT[1]);
+    replane();
+    sp = findRoadSpot(world, graph, AT[0], AT[1], '', 300, index ? (l) => index.main[wayOf(l)] === 1 : undefined) ?? sp;
+  }
+  await map.loadAround(sp.x, sp.z);
+  replane();
   const signals = new SignalSystem(world.signals);
   const traffic = new Traffic(world, graph, signals);
+  followers.traffic = traffic;
+  followers.signals = signals;
   traffic.targetCount = WITH_TRAFFIC ? 24 : 0;
   const rules = new RuleMonitor(world, graph, signals, traffic);
   rules.strict = true;
@@ -130,11 +193,11 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
   const nav = new Navigator(graph);
   const ground = new WorldGround(world, terrain);
   const v = new Vehicle(SPEC, ground);
-  let sp = json.spawns[spawnIdx];
   if (TRUCK_RUN) {
     // as in the game: the combination starts on a road wide enough for it, not in the car park
     const wide = (e: Lane['edge']): boolean => (e.cls === CLS.PRIMARY || e.cls === CLS.SECONDARY || e.cls === CLS.TERTIARY) && e.len - e.cutA - e.cutB > 60;
-    sp = findRoadSpot(world, graph, sp.x, sp.z, '', 900, mainNetwork(world, graph), wide, 20) ?? sp;
+    const main = index ? null : mainNetwork(world, graph);
+    sp = findRoadSpot(world, graph, sp.x, sp.z, '', 900, (l) => (index ? index.main[wayOf(l)] === 1 : (main as Set<number>).has(l.id)), wide, 20) ?? sp;
   }
   const trailer = TRUCK_RUN ? new Trailer(TANDEM_TRAILER, ground) : null;
   const ty = terrain.heightAt(sp.x, sp.z);
@@ -145,6 +208,7 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
   let sharpest = 0;
   const driver = new AutoDriver(world, signals, rules, WITH_TRAFFIC ? traffic : null, { spec: SPEC, front: FRONT, truck: TRUCK_RUN, obey });
   let crashes = 0;
+  let turned = 0;
   const mpos = new Float64Array(3);
   let targetIdx = 0;
   let home: Lane['edge'] | null = null;
@@ -156,14 +220,22 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
   let stuck = 0;
   let waited = 0;
   const maxT = Number(process.env.DRIVE_UNTIL ?? 60 * 40);
+  let mapT = 0;
   while (t < maxT && !done) {
     v.getModelPosition(mpos);
+    // the road network follows the car: what is missing around it is loaded, what lies far behind is dropped
+    if (map.pieces && t >= mapT) {
+      mapT = t + 0.5;
+      await map.loadAround(mpos[0], mpos[2]);
+      map.update(mpos[0], mpos[2], Infinity);
+      replane();
+    }
     const lane = rules.laneNow;
     const laneS = rules.laneFront;
     // --- navigation ---
     if (lane) {
       if (!home) home = lane.edge;
-      if (!nav.goal) {
+      if (!nav.busy) {
         let goal: Lane['edge'] | null = null;
         if (VIA.length > 0) {
           // debugging: drive past the given points instead of the lesson's destinations
@@ -171,8 +243,18 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
             done = true;
             continue;
           }
-          if (world.nearestRoad(VIA[targetIdx][0], VIA[targetIdx][1], 40, 0, hit)) goal = hit.edge;
           driver.halt = HALT && targetIdx === VIA.length - 1 ? { x: VIA[targetIdx][0], z: VIA[targetIdx][1] } : null;
+          if (index) {
+            // (a map in pieces: the way there over the roads of the whole map, as the game plans it – the place may lie far beyond what is loaded)
+            const to = index.nearest(VIA[targetIdx][0], VIA[targetIdx][1], 150);
+            const ways = to ? (to.edge === lane.edge.id ? [] : quickestToEdge(index.graph, wayOf(lane), to.edge)) : null;
+            if (ways) {
+              nav.net = index.graph;
+              nav.setWays(ways, lane, false);
+              if (process.env.DRIVE_NAV) console.log(`nav t=${t.toFixed(0)} target ${targetIdx}: ${ways.length} ways, ${(ways.reduce((a, w) => a + index.graph.len[w], 0) / 1000).toFixed(1)} km`);
+              continue;
+            }
+          } else if (world.nearestRoad(VIA[targetIdx][0], VIA[targetIdx][1], 40, 0, hit)) goal = hit.edge;
         } else goal = findTarget(world, graph, lesson.targets[targetIdx], mpos[0], mpos[2], lane, home, visited);
         if (!goal) {
           targetIdx++;
@@ -201,6 +283,17 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
     indicator = cmd.indicator;
     look = cmd.look;
     const { steer, throttle, brake } = cmd;
+    if (cmd.turnRound) {
+      // the end of a street the way leads back out of: as in the game, the car is turned round on the spot
+      const to = cmd.turnRound.to;
+      lanePoint(to, Math.min(3, to.len / 2), smp);
+      const ty2 = world.surfaceAt(smp.x, smp.z, smp.y + 1.5, hit) ? hit.y : smp.y;
+      v.teleport(smp.x, ty2 + 0.05, smp.z, Math.atan2(-smp.tx, -smp.tz));
+      trailer?.coupleBehind(v);
+      driver.reset();
+      turned++;
+      continue;
+    }
     if (cmd.arrived && driver.halt) {
       console.log(`   halted ${Math.hypot(mpos[0] - driver.halt.x, mpos[2] - driver.halt.z).toFixed(1)} m from the place asked for, at ${v.speed.toFixed(2)} m/s`);
       done = true;
@@ -243,6 +336,7 @@ function runLesson(id: string, spawnIdx: number, obey = true): { km: number; min
   }
   if (trailer) console.log(`   trailer: sharpest angle to the truck ${((sharpest * 180) / Math.PI).toFixed(0)}°`);
   if (WITH_TRAFFIC) console.log(`   among ${traffic.cars.length} cars: ${crashes} collision(s)`);
+  if (turned) console.log(`   turned round at the end of a street ${turned} time(s)`);
   const findings = rules.log.map((f) => `${f.severity}:${f.id}@(${f.x.toFixed(0)},${f.z.toFixed(0)}) t=${f.time.toFixed(0)}s ${JSON.stringify(f.data)}`);
   let where = '';
   if (!done) {
@@ -258,7 +352,7 @@ const list = ids.length ? ids : ['rbl', 'priority', 'signals', 'roundabout', 'ru
 let serious = 0;
 for (const id of list) {
   const t0 = Date.now();
-  const r = runLesson(id, 0);
+  const r = await runLesson(id, 0);
   console.log(`${id}: ${r.done ? 'completed' : 'NOT completed'}, ${r.km.toFixed(2)} km in ${r.minutes.toFixed(1)} sim-min (${((Date.now() - t0) / 1000).toFixed(0)} s wall), ${r.findings.length} findings${r.where}`);
   if (!r.done) serious++;
   for (const f of r.findings) {

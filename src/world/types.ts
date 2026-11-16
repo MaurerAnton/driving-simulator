@@ -182,6 +182,12 @@ export interface EdgeJson {
   r?: string; // ref
   /** centreline, [x, y, z] triples in world metres (cm precision) */
   p: number[];
+  /**
+   * the same in whole centimetres, each point as the step from the one before
+   * (the first from the origin) – what chunks of the network carry instead
+   * of `p`, which is then empty: it takes half the room
+   */
+  q?: number[];
   lf: number; // lanes forward (along a→b)
   lb: number; // lanes backward
   lw: number; // lane width
@@ -203,6 +209,20 @@ export interface EdgeJson {
   tf?: string; // turn:lanes forward (left→right, as in OSM)
   tb?: string; // turn:lanes backward
   o?: number; // OSM way id (provenance / debugging)
+  /** crossings on this edge (where the road network comes in chunks: there they travel with their edge) */
+  x?: EdgeCrossingJson[];
+  /** forbidden movements from this edge, in chunks: via node, to edge, via node, to edge, … */
+  bn?: number[];
+}
+
+/** A crossing as part of its edge's record (CrossingJson without the edge). */
+export interface EdgeCrossingJson {
+  s: number;
+  k: number;
+  w: number;
+  isl?: boolean;
+  sc?: number;
+  g?: number;
 }
 
 export interface ArmJson {
@@ -278,6 +298,14 @@ export interface SpawnJson {
   /** yaw in radians (0 = north, positive = left/counter-clockwise) */
   yaw: number;
   kind: 'parking' | 'street' | 'school';
+  /**
+   * The place was taken from the overview of the whole map (its roads were
+   * not loaded): it lies on a road only roughly, and is put into a lane once
+   * the roads there are loaded.
+   */
+  rough?: boolean;
+  /** the town or municipality it lies in: the list of start points is grouped by it */
+  g?: string;
 }
 
 export interface WorldJson {
@@ -309,4 +337,36 @@ export interface WorldJson {
   yard?: YardJson;
   /** tile keys ("ix_iz") that exist on disk */
   tiles: string[];
+}
+
+// ---------------------------------------------------------------------------
+// A map in pieces: the index (map.json), chunks of the road network (w/<cx>_<cz>.json.gz)
+// ---------------------------------------------------------------------------
+
+/**
+ * One chunk of the road network: the junctions that lie in a square of the
+ * chunk grid, and every road that begins or ends at one of them.  Nodes,
+ * edges and signal controllers keep their numbers of the whole map; a road
+ * between two chunks is in both.
+ */
+export interface WorldChunkJson {
+  v: 1;
+  nodes: Array<[number, NodeJson]>;
+  edges: Array<[number, EdgeJson]>;
+  signals: Array<[number, SignalControllerJson]>;
+}
+
+/** What the game loads first of a map in pieces. */
+export interface MapIndexJson {
+  version: 2;
+  meta: WorldJson['meta'];
+  places: PlaceJson[];
+  spawns: SpawnJson[];
+  yard?: YardJson;
+  /** which tiles (500 m) and which chunks of the road network (4 km) exist */
+  tiles: import('./grid.ts').GridBits;
+  chunks: import('./grid.ts').GridBits;
+  /** numbers of nodes and edges in the whole map */
+  nodes: number;
+  edges: number;
 }

@@ -13,7 +13,7 @@ import { LaneGraph, TURN, lanePoint } from '../world/lanes.ts';
 import type { Connector, Lane } from '../world/lanes.ts';
 import { CLS, CTRL, EF, ROLE, XING } from '../world/types.ts';
 import type { CrossingJson } from '../world/types.ts';
-import type { World } from '../world/world.ts';
+import type { Edge, World } from '../world/world.ts';
 import { SIG } from './signals.ts';
 import type { SignalSystem } from './signals.ts';
 
@@ -140,8 +140,6 @@ export class Traffic {
   private nextId = 1;
   private spawnTimer = 0;
   private pedTimer = 0;
-  /** crossings by edge for quick lookup */
-  private readonly crossingsByEdge = new Map<number, CrossingJson[]>();
   targetCount = 24;
   spawnRadius = 330;
   events: TrafficEvent[] = [];
@@ -150,28 +148,67 @@ export class Traffic {
     this.world = world;
     this.graph = graph;
     this.signals = signals;
-    for (const lane of graph.lanes) {
-      if (!LaneGraph.drivable(lane.edge, true) || lane.len < 25) continue;
-      if (lane.edge.flags & EF.ROUNDABOUT) continue;
-      // register the lane in every cell it passes through
-      const seen = new Set<number>();
-      for (let d = 0; d <= lane.len; d += 40) {
-        lanePoint(lane, d, tmp);
-        const key = Traffic.cellKey(tmp.x, tmp.z);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        let list = this.spawnGrid.get(key);
-        if (!list) this.spawnGrid.set(key, (list = []));
-        // main roads carry more traffic: list them more than once
-        const copies = lane.edge.tier >= 4 ? 4 : lane.edge.tier >= 3 ? 3 : 1;
-        for (let k = 0; k < copies; k++) list.push(lane);
+    this.addRoads(world.allEdges);
+  }
+
+  /** Roads that are part of the network now (it comes in pieces): cars may appear on their lanes. */
+  addRoads(edges: Iterable<Edge>): void {
+    for (const e of edges) {
+      const el = this.graph.edgeLanes[e.id];
+      if (!el) continue;
+      for (const lane of [...el.fwd, ...el.back]) {
+        for (const key of this.spawnCells(lane)) {
+          let list = this.spawnGrid.get(key);
+          if (!list) this.spawnGrid.set(key, (list = []));
+          // main roads carry more traffic: list them more than once
+          const copies = lane.edge.tier >= 4 ? 4 : lane.edge.tier >= 3 ? 3 : 1;
+          for (let k = 0; k < copies; k++) list.push(lane);
+        }
       }
     }
-    for (const c of world.crossings) {
-      let list = this.crossingsByEdge.get(c.e);
-      if (!list) this.crossingsByEdge.set(c.e, (list = []));
-      list.push(c);
+  }
+
+  /** Roads that are being taken out of the network: no car stays on them, none appears there. */
+  removeRoads(edges: Iterable<Edge>): void {
+    const gone = new Set<Edge>(edges);
+    if (gone.size === 0) return;
+    for (let i = this.cars.length - 1; i >= 0; i--) {
+      const car = this.cars[i];
+      const on = car.lane ? gone.has(car.lane.edge) : car.conn ? gone.has(car.conn.from.edge) || gone.has(car.conn.to.edge) : false;
+      if (on) {
+        this.detach(car);
+        this.cars.splice(i, 1);
+      }
     }
+    for (let i = this.peds.length - 1; i >= 0; i--) {
+      const e = this.world.edges[this.peds[i].crossing.e];
+      if (!e || gone.has(e)) this.peds.splice(i, 1);
+    }
+    for (const e of gone) {
+      const el = this.graph.edgeLanes[e.id];
+      if (!el) continue;
+      for (const lane of [...el.fwd, ...el.back]) {
+        for (const key of this.spawnCells(lane)) {
+          const list = this.spawnGrid.get(key);
+          if (!list) continue;
+          const kept = list.filter((l) => l !== lane);
+          if (kept.length) this.spawnGrid.set(key, kept);
+          else this.spawnGrid.delete(key);
+        }
+      }
+    }
+  }
+
+  /** The cells of the spawn grid a lane passes through – none if no car is to appear on it. */
+  private spawnCells(lane: Lane): Set<number> {
+    const seen = new Set<number>();
+    if (!LaneGraph.drivable(lane.edge, true) || lane.len < 25) return seen;
+    if (lane.edge.flags & EF.ROUNDABOUT) return seen;
+    for (let d = 0; d <= lane.len; d += 40) {
+      lanePoint(lane, d, tmp);
+      seen.add(Traffic.cellKey(tmp.x, tmp.z));
+    }
+    return seen;
   }
 
   // --- bookkeeping -------------------------------------------------------------
@@ -884,7 +921,7 @@ export class Traffic {
       if (yieldingNow && car.v < 0.5) car.yieldWait += dt;
       else if (!yieldingNow) car.yieldWait = 0;
       // signalised or zebra crossings on this lane
-      const xs = this.crossingsByEdge.get(lane.edge.id);
+      const xs = lane.edge.xings.length ? lane.edge.xings : undefined;
       if (xs) {
         for (const x of xs) {
           const pos = lane.dir > 0 ? x.s - lane.s0 : lane.s0 - x.s;

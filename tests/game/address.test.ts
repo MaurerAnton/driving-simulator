@@ -6,22 +6,28 @@
  *   node --test "tests/game/*.test.ts"
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { projectOnPolyline } from '../../src/core/geom.ts';
-import { AddressIndex, findRoadSpot, mainNetwork, normaliseAddress } from '../../src/game/address.ts';
+import { AddressIndex, findRoadSpot, normaliseAddress } from '../../src/game/address.ts';
 import type { AddressJson } from '../../src/game/address.ts';
 import { findTarget } from '../../src/game/nav.ts';
 import { LaneGraph } from '../../src/world/lanes.ts';
+import type { Lane } from '../../src/world/lanes.ts';
 import { CLS } from '../../src/world/types.ts';
-import type { WorldJson } from '../../src/world/types.ts';
-import { World } from '../../src/world/world.ts';
+import { haveMap, openRealMap } from '../realmap.ts';
 
-const root = new URL('../../public/map/', import.meta.url);
-const world = new World(JSON.parse(readFileSync(new URL('world.json', root), 'utf8')) as WorldJson);
-const graph = new LaneGraph(world);
-const main = mainNetwork(world, graph);
-const real = new AddressIndex(JSON.parse(readFileSync(new URL('addresses.json', root), 'utf8')) as AddressJson);
+// The real map (it is built or fetched, not part of the repository: without it these tests are skipped).
+// Its road network may come in pieces: the tests look at the town the first start point lies in.
+const opened = haveMap ? await openRealMap() : null;
+const skip = opened ? false : 'the map is not there (see docs/MAP_DATA.md)';
+const { map, world, lanes: graph } = opened ?? ({} as NonNullable<typeof opened>);
+const main = (l: Lane): boolean => (opened ? opened.usable(l) : false);
+const home = opened ? world.json.spawns[0] : { x: 0, z: 0 };
+if (opened) await map.loadAround(home.x, home.z, 5200);
+const addresses = opened ? ((await map.json<AddressJson>('addresses.json.gz')) ?? (await map.json<AddressJson>('addresses.json'))) : null;
+const real = new AddressIndex(addresses ?? { version: 1, streets: [] });
+/** how far a house lies from the start point the tests are held around */
+const fromHome = (x: number, z: number): number => Math.hypot(x - home.x, z - home.z);
 
 test('street names are compared the way people type them', () => {
   const same = (a: string, b: string): void => assert.equal(normaliseAddress(a), normaliseAddress(b), `${a} / ${b}`);
@@ -74,7 +80,7 @@ test('search: street, house number, town – in any order', () => {
   assert.equal(ix.search('str', 2).length, 2, 'the limit holds');
 });
 
-test('the address list of the map', () => {
+test('the address list of the map', { skip }, () => {
   assert.ok(real.streetCount > 400, `${real.streetCount} streets`);
   assert.ok(real.size > 5000, `${real.size} house numbers`);
   const hit = real.search('Marktplatz 5')[0];
@@ -83,8 +89,8 @@ test('the address list of the map', () => {
   assert.ok(real.search('altenritter str').some((h) => h.street === 'Altenritter Straße'));
 });
 
-test('every house can be driven up to: on the road, in lane, clear of junctions, house on the right', () => {
-  const json = JSON.parse(readFileSync(new URL('addresses.json', root), 'utf8')) as AddressJson;
+test('every house can be driven up to: on the road, in lane, clear of junctions, house on the right', { skip }, () => {
+  const json = addresses as AddressJson;
   const proj = { s: 0, off: 0, d2: 0, seg: 0 };
   let n = 0;
   let onRight = 0;
@@ -92,9 +98,10 @@ test('every house can be driven up to: on the road, in lane, clear of junctions,
   let k = 0;
   for (const s of json.streets) {
     for (let i = 0; i + 2 < s.h.length; i += 3) {
-      if (k++ % 17 !== 0) continue; // every 17th house: some 570 of them
       const hx = Number(s.h[i + 1]);
       const hz = Number(s.h[i + 2]);
+      // (of the houses of the town around the start point, every 11th)
+      if (fromHome(hx, hz) > 4000 || k++ % 11 !== 0) continue;
       const what = `${s.n} ${s.h[i]}, ${s.c}`;
       const spot = findRoadSpot(world, graph, hx, hz, s.n, 220, main);
       assert.ok(spot, `${what}: no road`);
@@ -130,17 +137,24 @@ test('every house can be driven up to: on the road, in lane, clear of junctions,
   assert.ok(onRight > twoWay * 0.9, `house on the right for ${onRight} of ${twoWay} (two-way streets)`);
 });
 
-test('the connected network: lessons can start at any address of the list', () => {
-  assert.ok(main.size > graph.lanes.length * 0.5, `${main.size} of ${graph.lanes.length} lanes are connected`);
-  assert.ok(main.size < graph.lanes.length, 'fragments at the rim and private roads are left out');
-  const json = JSON.parse(readFileSync(new URL('addresses.json', root), 'utf8')) as AddressJson;
+test('the connected network: lessons can start at any address of the list', { skip }, () => {
+  let all = 0;
+  let connected = 0;
+  for (const l of graph.lanes) {
+    if (!l) continue;
+    all++;
+    if (main(l)) connected++;
+  }
+  assert.ok(connected > all * 0.5, `${connected} of ${all} lanes are connected`);
+  assert.ok(connected < all, 'fragments at the rim and private roads are left out');
+  const json = addresses as AddressJson;
   const proj = { s: 0, off: 0, d2: 0, seg: 0 };
   let n = 0;
   let withTarget = 0;
   let k = 0;
   for (const s of json.streets) {
     for (let i = 0; i + 2 < s.h.length; i += 3) {
-      if (k++ % 41 !== 0) continue;
+      if (fromHome(Number(s.h[i + 1]), Number(s.h[i + 2])) > 2200 || k++ % 13 !== 0) continue;
       const spot = findRoadSpot(world, graph, Number(s.h[i + 1]), Number(s.h[i + 2]), s.n, 220, main);
       assert.ok(spot, `${s.n} ${s.h[i]}`);
       // the lane the car stands in
@@ -161,19 +175,20 @@ test('the connected network: lessons can start at any address of the list', () =
         }
       });
       assert.ok(lane && bd < 0.5, `${s.n} ${s.h[i]}: not in a lane (${bd.toFixed(2)} m off)`);
-      assert.ok(main.has((lane as { id: number }).id), `${s.n} ${s.h[i]}: put on a road that leads nowhere`);
+      assert.ok(main(lane as Lane), `${s.n} ${s.h[i]}: put on a road that leads nowhere`);
       n++;
       // a right-before-left junction to drive to, as the second lesson asks for
       if (findTarget(world, graph, 'rbl', spot.x, spot.z, lane, null, new Set())) withTarget++;
     }
   }
-  assert.ok(n > 150, `${n} addresses checked`);
+  assert.ok(n > 80, `${n} addresses checked`);
   assert.ok(withTarget >= n * 0.98, `a lesson destination from ${withTarget} of ${n} addresses`);
 });
 
-test('a road without houses: the motorway by its number', () => {
+test('a road without houses: the motorway by its number', { skip }, async () => {
   const hit = real.search('A 49')[0];
   assert.ok(hit, 'A 49 is in the list');
+  await map.loadAround(hit.x, hit.z, 1500);
   const spot = findRoadSpot(world, graph, hit.x, hit.z, hit.street, 220, main);
   assert.ok(spot);
   let onMotorway = false;

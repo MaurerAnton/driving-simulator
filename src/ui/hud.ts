@@ -98,6 +98,7 @@ export class Hud {
   private navBox!: HTMLElement;
   private choiceBox!: HTMLElement;
   private navLong = false;
+  private choiceBtn!: HTMLButtonElement;
   private choiceKey = '';
   private choicePick: (id: string) => void = () => {};
   private roundel!: HTMLElement;
@@ -258,11 +259,18 @@ export class Hud {
     const opts = el('div');
     const rowSpawn = el('div', 'row');
     const selSpawn = el('select');
+    // (a large map has hundreds of them: grouped by town, in the order the map lists them)
+    let group: HTMLOptGroupElement | null = null;
     spawns.forEach((s, i) => {
       const op = el('option');
       op.value = String(i);
       op.textContent = s.name;
-      selSpawn.append(op);
+      if (s.g && group?.label !== s.g) {
+        group = document.createElement('optgroup');
+        group.label = s.g;
+        selSpawn.append(group);
+      } else if (!s.g) group = null;
+      (group ?? selSpawn).append(op);
     });
     selSpawn.value = String(spawn);
     let address: AddressHit | undefined = last.address ?? undefined;
@@ -346,6 +354,7 @@ export class Hud {
     };
     card(this.t('free'), this.t('freeDesc'), 'free');
     card(this.t('demo'), this.t('demoDesc'), 'demo');
+    card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
     // the lessons of the chosen vehicle: the practice yard first, the test last
     const rank = (kind: string): number => (kind === 'yard' ? 0 : kind === 'exam' ? 2 : 1);
     const lessons = LESSONS.filter((l) => (l.vehicle ?? this.settings.vehicle) === this.settings.vehicle && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
@@ -519,6 +528,7 @@ export class Hud {
       [[...k('KeyL'), ' / ', ...k('KeyO')], 'ctl.lights'],
       [k('KeyH'), 'ctl.horn'],
       [k('KeyV'), 'ctl.camera'],
+      [['Alt + ', ...k('KeyW', 'KeyA', 'KeyS', 'KeyD')], 'ctl.freeCam'],
       [k('KeyT'), 'ctl.reset'],
       [k('KeyF'), 'ctl.reality'],
       [k('KeyM'), 'ctl.map'],
@@ -842,7 +852,16 @@ export class Hud {
     const side = el('div', 'side');
     this.choiceBox = el('div', 'choices');
     this.choiceBox.hidden = true;
-    side.append(this.navBox, this.choiceBox);
+    // (on a touch screen the list would lie over the steering and the pedals: there it is a sheet
+    // that this button opens, and that is closed again to drive on)
+    this.choiceBtn = el('button', 'choose');
+    this.choiceBtn.type = 'button';
+    this.choiceBtn.hidden = true;
+    this.choiceBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.choiceBox.classList.add('open');
+    };
+    side.append(this.navBox, this.choiceBtn, this.choiceBox);
     h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox);
     return h;
   }
@@ -853,13 +872,19 @@ export class Hud {
    * asked).  An empty list takes the panel away.
    * May be called every frame: the panel is rebuilt only when the list changes.
    */
-  setChoices(items: ReadonlyArray<{ id: string; label: string }>, pick: (id: string) => void): void {
+  setChoices(items: ReadonlyArray<{ id: string; label: string }>, pick: (id: string) => void, asked = false): void {
     this.choicePick = pick;
     const key = items.length ? `${this.lang}|${items.map((i) => i.id).join(',')}` : '';
+    // (`asked`: it is the driver's turn to do something on foot – the sheet of a touch screen opens by itself)
+    if (asked && !this.choiceAsked && items.length) this.choiceBox.classList.add('open');
+    this.choiceAsked = asked && items.length > 0;
     if (key === this.choiceKey) return;
     this.choiceKey = key;
     this.choiceBox.replaceChildren();
     this.choiceBox.hidden = items.length === 0;
+    this.choiceBtn.hidden = items.length === 0;
+    this.choiceBtn.textContent = this.t('ce.choose', { n: items.length });
+    if (items.length === 0) this.choiceBox.classList.remove('open');
     for (const it of items) {
       const b = el('button');
       b.type = 'button';
@@ -870,7 +895,18 @@ export class Hud {
       };
       this.choiceBox.append(b);
     }
+    if (items.length) {
+      const back = el('button', 'back', this.t('ce.backToSeat'));
+      back.type = 'button';
+      back.onclick = (e) => {
+        e.stopPropagation();
+        this.choiceBox.classList.remove('open');
+      };
+      this.choiceBox.append(back);
+    }
   }
+
+  private choiceAsked = false;
 
   setHudVisible(v: boolean): void {
     this.hud.style.display = v ? '' : 'none';

@@ -4,18 +4,18 @@
  *   node tests/traffic.sim.ts [minutes]
  * Reports flow, stalemates and car-to-car overlaps.
  */
-import { readFileSync } from 'node:fs';
-import { LaneGraph } from '../src/world/lanes.ts';
-import { World } from '../src/world/world.ts';
 import { SignalSystem } from '../src/sim/signals.ts';
 import { Traffic, boxesOverlap } from '../src/sim/traffic.ts';
 import type { PlayerState } from '../src/sim/traffic.ts';
+import { openRealMap } from './realmap.ts';
 
 const minutes = Number(process.argv[2] ?? 4);
-const world = new World(JSON.parse(readFileSync(new URL('../public/map/world.json', import.meta.url), 'utf8')));
-const graph = new LaneGraph(world);
+const real = await openRealMap();
+const { world, lanes: graph, map } = real;
 const signals = new SignalSystem(world.signals);
 const traffic = new Traffic(world, graph, signals);
+real.followers.traffic = traffic;
+real.followers.signals = signals;
 traffic.targetCount = 45;
 const places: Array<[string, number, number]> = [
   ['town centre', 690, -295],
@@ -24,8 +24,10 @@ const places: Array<[string, number, number]> = [
 ];
 for (const [name, x, z] of places) {
   traffic.clear();
+  // (the road network may come in pieces: the piece around the place)
+  await map.loadAround(x, z, 1500);
   // the "player" is parked off the road, high above nothing: only a spawn anchor
-  const player: PlayerState = { x, y: world.nodes.reduce((best, n) => (Math.hypot(n.x - x, n.z - z) < Math.hypot(best.x - x, best.z - z) ? n : best)).y, z, yaw: 0, speed: 0, length: 4.3, width: 1.8 };
+  const player: PlayerState = { x, y: [...world.allNodes].reduce((best, n) => (Math.hypot(n.x - x, n.z - z) < Math.hypot(best.x - x, best.z - z) ? n : best)).y, z, yaw: 0, speed: 0, length: 4.3, width: 1.8 };
   player.x += 3000 * 0; // keep in place
   const dt = 1 / 30;
   let overlaps = 0;

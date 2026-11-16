@@ -1,5 +1,6 @@
 # Builds the simulator and publishes it to GitHub Pages.
-# The map tiles are committed (public/map), so no geodata is downloaded here.
+# The map is not part of the repository: it is built from open geodata (docs/MAP_DATA.md) and kept as a
+# file of a release of this project; map.release names the release the code goes with.
 name: Deploy to GitHub Pages
 
 on:
@@ -26,12 +27,16 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Tests (vehicle dynamics, reality view)
+      - name: Map (the tiles of northern Hesse, from the release named in map.release)
+        run: npm run map:fetch
+      - name: Tests (vehicle dynamics, road network, map, reality view)
         run: npm test
       - run: npm run build
         env:
           # optional: a Mapillary client token for the reality view (repository variable MAPILLARY_TOKEN)
           VITE_MAPILLARY_TOKEN: ${{ vars.MAPILLARY_TOKEN }}
+      - name: Size of the site (GitHub Pages holds 1 GB)
+        run: du -sh dist dist/map
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -3,8 +3,8 @@
 import * as THREE from 'three';
 import { Sky } from '../render/sky.ts';
 import { TileManager } from '../render/tiles.ts';
-import type { WorldJson } from '../world/types.ts';
-import { World } from '../world/world.ts';
+import { MapLoader } from '../world/loader.ts';
+import type { World } from '../world/world.ts';
 
 export class App {
   readonly canvas: HTMLCanvasElement;
@@ -12,6 +12,7 @@ export class App {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(60, 1, 0.08, 4500);
   readonly sky = new Sky();
+  map!: MapLoader;
   world!: World;
   tiles!: TileManager;
   readonly baseUrl: string;
@@ -37,13 +38,28 @@ export class App {
 
   async loadWorld(onProgress?: (text: string) => void): Promise<void> {
     onProgress?.('world');
-    const res = await fetch(`${this.baseUrl}world.json`);
-    if (!res.ok) throw new Error(`world.json: HTTP ${res.status}`);
-    const json = (await res.json()) as WorldJson;
+    // the map: in one piece, or an index with the road network in chunks around the car (world/loader.ts)
+    const base = this.baseUrl;
+    // (every file but the index is asked for with the version of the map the index names: see MapLoader.version)
+    let version = '';
+    this.map = await MapLoader.open({
+      async bytes(path: string): Promise<ArrayBuffer | null> {
+        const res = await fetch(base + path + (version ? `?v=${version}` : ''), path === 'map.json' ? { cache: 'no-cache' } : undefined);
+        // (not there: a 404 – or, from a development server, the start page in its place)
+        if (res.status === 404 || (res.headers.get('content-type') ?? '').includes('text/html')) return null;
+        if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
+        const buf = await res.arrayBuffer();
+        const head = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));
+        // gzip (unless the server already inflated it for us)
+        if (head[0] === 0x1f && head[1] === 0x8b) return await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+        return buf;
+      },
+    });
     // (a breath for the page between the big steps, so that the loading screen is drawn)
     await new Promise((r) => setTimeout(r));
-    this.world = new World(json);
-    this.tiles = new TileManager(json, this.baseUrl);
+    version = this.map.version;
+    this.world = this.map.world;
+    this.tiles = new TileManager(this.map.tiles, this.baseUrl, version);
     this.scene.add(this.tiles.group);
   }
 

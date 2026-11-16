@@ -103,11 +103,28 @@ export class SignalRenderer {
   readonly group = new THREE.Group();
   private readonly heads: Head[] = [];
   private lamps!: THREE.InstancedMesh;
+  private housing: THREE.InstancedMesh | null = null;
   /** positions of the poles for the collision system: x, y, z, radius */
   readonly poles: number[] = [];
 
   constructor(world: World) {
     this.group.name = 'signals';
+    this.rebuild(world);
+  }
+
+  /** Set the heads up anew: for the signals of the roads that are loaded now (the network comes in pieces). */
+  rebuild(world: World): void {
+    if (this.housing) {
+      this.group.remove(this.housing, this.lamps);
+      this.housing.geometry.dispose();
+      (this.housing.material as THREE.Material).dispose();
+      this.lamps.geometry.dispose();
+      (this.lamps.material as THREE.Material).dispose();
+      this.housing.dispose();
+      this.lamps.dispose();
+    }
+    this.heads.length = 0;
+    this.poles.length = 0;
     const tmp = newPolySample();
     const placements: Array<{ x: number; y: number; z: number; yaw: number; controller: number; group: number; overRoad: number }> = [];
     const place = (edge: World['edges'][number], s: number, dir: number, controller: number, grp: number, side: number): void => {
@@ -122,8 +139,8 @@ export class SignalRenderer {
       const fz = -tmp.tz * dir;
       placements.push({ x, y, z, yaw: Math.atan2(-fx, -fz), controller, group: grp, overRoad: 0 });
     };
-    for (const node of world.nodes) {
-      if (node.ctrl !== CTRL.SIGNALS || node.sc < 0) continue;
+    for (const node of world.allNodes) {
+      if (node.stub || node.ctrl !== CTRL.SIGNALS || node.sc < 0) continue;
       for (const arm of node.arms) {
         if (arm.sg < 0 || !arm.isApproach) continue;
         const e = arm.edge;
@@ -186,6 +203,7 @@ export class SignalRenderer {
     this.lamps.instanceMatrix.needsUpdate = true;
     housing.frustumCulled = false;
     this.lamps.frustumCulled = false;
+    this.housing = housing;
     this.group.add(housing, this.lamps);
   }
 

@@ -11,7 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { smoothstep } from '../../src/core/geom.ts';
 import { EF } from '../../src/world/types.ts';
 import { newSurfaceHit } from '../../src/world/world.ts';
-import type { World } from '../../src/world/world.ts';
+import type { SurfaceHit, World } from '../../src/world/world.ts';
 import type { Dgm } from './dgm.ts';
 
 export class TerrainGrid {
@@ -51,19 +51,61 @@ export class TerrainGrid {
   }
 }
 
+/** how far from a road the ground is shaped to it, and how far below the road it then lies */
+const REACH = 20;
+const DROP = 0.25;
+
+/** The natural ground at a point: the terrain model through a small box filter (NaN where there is none). */
+export function naturalHeight(dgm: Dgm, x: number, z: number): number {
+  let sum = 0;
+  let cnt = 0;
+  for (let k = 0; k < 5; k++) {
+    const v = dgm.height(x + (k === 1 ? -1.2 : k === 2 ? 1.2 : 0), z + (k === 3 ? -1.2 : k === 4 ? 1.2 : 0));
+    if (!Number.isNaN(v)) {
+      sum += v;
+      cnt++;
+    }
+  }
+  return cnt ? sum / cnt : NaN;
+}
+
+/** Ground of height `h` at a point, benched to the roads near it (`cell`: spacing of the terrain grid). */
+export function benched(world: World, x: number, z: number, h: number, cell: number, hit: SurfaceHit): number {
+  if (!world.nearestRoad(x, z, REACH, EF.BRIDGE, hit)) return h;
+  // every cell touching a road is fully benched
+  const flat = cell * Math.SQRT2 + 0.3;
+  const wgt = hit.off <= flat ? 1 : 1 - smoothstep(flat, REACH, hit.off);
+  return wgt <= 0 ? h : h + (hit.y - DROP - h) * wgt;
+}
+
+/**
+ * The ground as the tiles will have it, at any point – for what is laid out
+ * before the tiles are built (the tracks of the railways).  Away from the
+ * points of the terrain grid it differs a little from the grid's own.
+ */
+export function groundAt(dgm: Dgm, world: World, cell: number): { at(x: number, z: number): number } {
+  const hit = newSurfaceHit();
+  return {
+    at(x: number, z: number): number {
+      const h = naturalHeight(dgm, x, z);
+      return Number.isNaN(h) ? NaN : benched(world, x, z, h, cell, hit);
+    },
+  };
+}
+
 export function buildTerrain(
   dgm: Dgm,
   world: World,
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number },
   cell: number,
-  cachePath: string,
+  cachePath: string | null = null,
 ): TerrainGrid {
   const g = new TerrainGrid(bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ, cell);
   const { w, h, data, known } = g;
 
   // ---- 1. natural terrain (cached: it only depends on the terrain model) ---
   let cached = false;
-  if (existsSync(cachePath)) {
+  if (cachePath && existsSync(cachePath)) {
     const buf = readFileSync(cachePath);
     if (buf.byteLength === data.byteLength) {
       data.set(new Float32Array(buf.buffer, buf.byteOffset, data.length));
@@ -75,20 +117,10 @@ export function buildTerrain(
       const z = g.minZ + iz * cell;
       for (let ix = 0; ix < w; ix++) {
         const x = g.minX + ix * cell;
-        // small box filter around the grid vertex (pull samples inwards at the rim)
-        let sum = 0;
-        let cnt = 0;
-        for (let k = 0; k < 5; k++) {
-          const v = dgm.height(x + (k === 1 ? -1.2 : k === 2 ? 1.2 : 0), z + (k === 3 ? -1.2 : k === 4 ? 1.2 : 0));
-          if (!Number.isNaN(v)) {
-            sum += v;
-            cnt++;
-          }
-        }
-        data[iz * w + ix] = cnt ? sum / cnt : NaN;
+        data[iz * w + ix] = naturalHeight(dgm, x, z);
       }
     }
-    writeFileSync(cachePath, Buffer.from(data.buffer, data.byteOffset, data.byteLength));
+    if (cachePath) writeFileSync(cachePath, Buffer.from(data.buffer, data.byteOffset, data.byteLength));
   }
   for (let i = 0; i < data.length; i++) known[i] = Number.isNaN(data[i]) ? 0 : 1;
 
@@ -136,7 +168,6 @@ export function buildTerrain(
 
   // ---- 3. bench the terrain along roads ------------------------------------
   // coarse mask of vertices that can be near a road at all
-  const REACH = 20;
   const near = new Uint8Array(w * h);
   for (const e of world.edges) {
     const pad = e.width / 2 + Math.max(e.swL, e.swR) + REACH;
@@ -162,22 +193,19 @@ export function buildTerrain(
     for (let iz = z0; iz <= z1; iz++) near.fill(1, iz * w + x0, iz * w + x1 + 1);
   }
   const hit = newSurfaceHit();
-  const flat = cell * Math.SQRT2 + 0.3; // every cell touching a road is fully benched
-  const DROP = 0.25;
-  let benched = 0;
+  let benchedCount = 0;
   for (let iz = 0; iz < h; iz++) {
     const z = g.minZ + iz * cell;
     for (let ix = 0; ix < w; ix++) {
       const i = iz * w + ix;
       if (!near[i]) continue;
-      const x = g.minX + ix * cell;
-      if (!world.nearestRoad(x, z, REACH, EF.BRIDGE, hit)) continue;
-      const wgt = hit.off <= flat ? 1 : 1 - smoothstep(flat, REACH, hit.off);
-      if (wgt <= 0) continue;
-      data[i] += (hit.y - DROP - data[i]) * wgt;
-      benched++;
+      const v = benched(world, g.minX + ix * cell, z, data[i], cell, hit);
+      if (v !== data[i]) {
+        data[i] = v;
+        benchedCount++;
+      }
     }
   }
-  console.log(`[terrain] ${w}x${h} grid, ${benched} vertices shaped by roads${cached ? ' (natural terrain from cache)' : ''}`);
+  console.log(`[terrain] ${w}x${h} grid, ${benchedCount} vertices shaped by roads${cached ? ' (natural terrain from cache)' : ''}`);
   return g;
 }

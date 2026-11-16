@@ -79,40 +79,71 @@ html, body {
 .overlay.bigmap { display: block; padding: 0; background: #16202a; pointer-events: auto; }
 .bigmap canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; outline: none; }
 .bigmap canvas:active { cursor: grabbing; }
-.bm-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; pointer-events: none; }
-.bm-title { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; max-width: min(60vw, 520px); }
+/* everything on top of the map stands in one column, so that nothing lies over anything else */
+.bm-ui { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); pointer-events: none; }
+.bm-ui > * { flex: none; }
+.bm-top { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+.bm-title { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; max-width: min(60vw, 520px); min-width: 0; pointer-events: auto; }
 .bm-title b { display: block; font-size: 17px; }
 .bm-title small { color: var(--muted); line-height: 1.35; display: block; }
-.bm-tools { display: flex; gap: 6px; pointer-events: auto; }
-.bm-tools .btn { min-width: 44px; height: 44px; padding: 0 12px; font-size: 20px; line-height: 1; background: var(--panel-solid); color: #fff; border: 1px solid rgba(255, 255, 255, 0.35); }
-.bm-tools .btn:hover { border-color: var(--accent); }
-.bm-bottom { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; pointer-events: none; }
+.bm-tools { display: flex; gap: 6px; pointer-events: auto; flex: none; }
+.bm-tools .btn.ghost { min-width: 44px; height: 44px; padding: 0 12px; font-size: 21px; font-weight: 600; line-height: 1; background: #2a3846; color: #fff; border: 1px solid rgba(255, 255, 255, 0.55); }
+.bm-tools .btn.ghost:hover { border-color: var(--accent); }
+/* the room between top and bottom: the panel for planning lives here, and scrolls when it is too long */
+.bm-ui > .bm-mid { flex: 1 1 0; min-height: 0; display: flex; align-items: flex-start; }
+.bm-bottom { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .bm-bottom > * { pointer-events: auto; }
-.bm-bottom .btn { background: var(--panel-solid); color: #fff; border: 1px solid rgba(255, 255, 255, 0.35); padding: 8px 12px; font-size: 14px; }
+.bm-bottom .btn.ghost { background: var(--panel-solid); color: #fff; border: 1px solid rgba(255, 255, 255, 0.35); padding: 8px 12px; font-size: 14px; min-height: 40px; }
 .bm-bottom .btn.bm-demo { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
-.bm-check { display: flex; gap: 8px; align-items: center; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
-.bm-check input { width: 18px; height: 18px; accent-color: #38b6ff; }
-.bm-spot { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; max-width: calc(100vw - 20px); background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); }
+.bm-check { display: flex; gap: 8px; align-items: center; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; cursor: pointer; min-height: 40px; }
+.bm-check input { width: 18px; height: 18px; accent-color: #38b6ff; flex: none; }
+/* the scale: a bar of a round number of metres, at the start of the bottom row */
+.bm-bottom .bm-scale { margin-inline-end: auto; pointer-events: none; display: grid; gap: 2px; justify-items: start; color: #fff; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #0c1218, 0 0 3px #0c1218; max-width: 100%; }
+.bm-scale i { display: block; height: 6px; border: 2px solid #fff; border-top: 0; box-sizing: border-box; min-width: 8px; }
+.bm-scale small { font-weight: 400; font-size: 11px; }
+.bm-scale small:empty { display: none; }
+.bm-spot { align-self: center; display: flex; gap: 14px; align-items: center; max-width: 100%; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); flex-wrap: wrap; justify-content: center; row-gap: 8px; pointer-events: auto; }
 .bm-spot[hidden] { display: none; }
-.bm-spot { flex-wrap: wrap; justify-content: center; row-gap: 8px; }
-.bm-spot .btn { padding: 9px 14px; font-size: 14px; }
-/* planning a demonstration drive: the places, in their order */
+.bm-spot .btn { padding: 9px 14px; font-size: 14px; min-height: 40px; }
+/* planning a drive: the places in their order, a tour of the streets, and who drives */
 .bm-plan {
-  position: absolute; left: 10px; top: 92px; bottom: 64px; height: fit-content; max-height: calc(100% - 156px); width: min(340px, calc(100vw - 20px)); overflow-y: auto;
-  display: grid; gap: 8px; align-content: start; padding: 12px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; z-index: 2;
+  pointer-events: auto; max-height: 100%; width: min(360px, 100%); overflow-y: auto; overscroll-behavior: contain;
+  display: grid; gap: 8px; align-content: start; padding: 12px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px;
 }
 .bm-plan[hidden] { display: none; }
 .bm-plan small { color: var(--muted); line-height: 1.35; }
+.bm-plan .bm-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bm-plan .bm-x { flex: none; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: none; color: var(--text); cursor: pointer; font-size: 15px; }
 .bm-plan ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; counter-reset: stop; }
 .bm-plan li { counter-increment: stop; display: flex; gap: 8px; align-items: center; background: rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; font-size: 14px; }
 .bm-plan li::before { content: counter(stop); flex: none; width: 22px; height: 22px; border-radius: 50%; background: #38b6ff; color: #06131c; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; }
 .bm-plan li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.bm-plan li button { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: none; color: var(--text); cursor: pointer; }
-.bm-plan .bm-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.bm-plan .btn { padding: 9px 14px; font-size: 14px; }
+.bm-plan li button { flex: none; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: none; color: var(--text); cursor: pointer; }
+.bm-plan .bm-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* the buttons that start the drive: at the foot of the panel, also when its contents are longer than the screen is high */
+.bm-plan .bm-go { position: sticky; bottom: -12px; margin: 0 -12px -12px; padding: 8px 12px 12px; background: var(--panel-solid); border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; }
+.bm-plan .btn { padding: 9px 14px; font-size: 14px; min-height: 40px; }
 .bm-plan .btn:disabled { opacity: 0.45; cursor: default; }
 .bm-plan .addr { position: relative; }
+.bm-plan .bm-tour { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.bm-plan .bm-km { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+.bm-plan .bm-km input { width: 76px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.07); color: var(--text); font: inherit; min-height: 40px; box-sizing: border-box; }
+.bm-plan .bm-result { color: var(--text); }
 #ui[dir='rtl'] .bm-plan { direction: rtl; text-align: right; }
+/* a small screen: no explanation under the title, smaller tools, the panel as wide as the screen */
+@media (max-width: 640px), (max-height: 480px) {
+  .bm-title { padding: 6px 10px; }
+  .bm-title small { display: none; }
+  .bm-tools .btn.ghost { min-width: 40px; height: 40px; padding: 0 8px; }
+  .bm-ui { gap: 6px; }
+  .bm-bottom { gap: 6px; }
+  .bm-bottom .btn.ghost, .bm-check { padding: 6px 10px; font-size: 13px; }
+  .bm-plan { padding: 10px; gap: 6px; }
+  .bm-plan .bm-go { bottom: -10px; margin: 0 -10px -10px; padding: 6px 10px 10px; }
+}
+@media (max-width: 640px) {
+  .bm-plan { width: 100%; }
+}
 .bm-spot b { display: block; }
 .bm-spot small { color: var(--muted); font-variant-numeric: tabular-nums; direction: ltr; }
 .panel a { color: #8fc4ff; }
@@ -194,6 +225,10 @@ kbd {
 
 /* ---------- in-game HUD ---------- */
 .hud { position: absolute; inset: 0; pointer-events: none; font-variant-numeric: tabular-nums; }
+/* The HUD lies over the whole view: what is not a control of it must let the mouse and the fingers through
+   to the picture underneath – there the camera is turned and moved.  (As a child of #ui it would take
+   every pointer otherwise: the rule for #ui's children above is the stronger one.) */
+#ui > .hud { pointer-events: none; }
 .hud > * { pointer-events: none; }
 /* the upper left corner: the street-name block, under it things to choose from while standing */
 .hud .side { position: absolute; left: 14px; top: 14px; bottom: 14px; max-width: min(46vw, 520px); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; pointer-events: none; }
@@ -207,6 +242,23 @@ kbd {
   background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); border-radius: 9px;
 }
 .hud .choices button:hover, .hud .choices button:focus-visible { border-color: var(--accent); outline: none; }
+/* with keys the list stands under the street name; "back to the driver's seat" and the button that opens the sheet are for touch screens */
+.hud .choices .back, .hud .side .choose { display: none; }
+.hud.touchmode .side .choose {
+  display: block; pointer-events: auto; position: relative; z-index: 3; min-height: 44px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 600; text-align: start;
+  color: #111; background: var(--accent); border: 1px solid var(--accent); border-radius: 10px; cursor: pointer; max-width: 100%;
+}
+.hud.touchmode .side .choose[hidden] { display: none; }
+/* On a touch screen the things to choose from are a sheet over the lower part of the screen (the street-name block
+   with what is asked, and what went wrong, stays in view above it).  It is closed to get back to the controls. */
+.hud.touchmode .choices { display: none; }
+.hud.touchmode .choices.open:not([hidden]) {
+  display: grid; position: fixed; z-index: 6; left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); top: 112px; bottom: auto; max-height: calc(100% - 120px - env(safe-area-inset-bottom));
+  width: auto; grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); align-content: start; gap: 6px; padding: 10px;
+  background: var(--panel-solid); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+}
+.hud.touchmode .choices.open button { min-height: 44px; }
+.hud.touchmode .choices.open .back { display: block; text-align: center; font-weight: 600; background: none; border-style: dashed; }
 .hud .choices button:active { background: rgba(255, 204, 0, 0.25); }
 .hud .nav {
   max-width: 100%;
@@ -323,7 +375,6 @@ kbd {
 .hud.touchmode .score { display: none; }
 .hud.touchmode .side { max-width: min(40vw, 420px); }
 /* a phone held sideways: two columns of things to choose from, and the steering pad is not needed while standing */
-.hud.touchmode .choices { width: 100%; }
 /* the speed strip sits in the gap between the steering pad (to 37vw) and the brake pedal (from 69vw) */
 .hud.touchmode .dash { left: 53vw; bottom: 5vh; padding: 5px 9px; gap: 7px; max-width: 31vw; }
 .hud.touchmode .dash .rpm { display: none; }

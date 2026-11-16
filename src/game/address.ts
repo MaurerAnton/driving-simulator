@@ -185,7 +185,7 @@ export function mainNetwork(world: World, graph: LaneGraph): Set<number> {
   const sp = world.json.spawns[0] ?? { x: 0, z: 0 };
   let seed: Edge | null = null;
   let bd = Infinity;
-  for (const e of world.edges) {
+  for (const e of world.allEdges) {
     if (!LaneGraph.drivable(e, true)) continue;
     const mid = (e.pl.pts.length / 3) >> 1;
     const d = Math.hypot(e.pl.pts[mid * 3] - sp.x, e.pl.pts[mid * 3 + 2] - sp.z);
@@ -223,10 +223,10 @@ export function mainNetwork(world: World, graph: LaneGraph): Set<number> {
  * drive on – preferably the street of that name –, in the right-hand lane,
  * with the house on the right, clear of the junctions.
  */
-export function findRoadSpot(world: World, graph: LaneGraph, x: number, z: number, street = '', maxDist = 220, main?: Set<number>, accept?: (e: Edge) => boolean, room = 2): SpawnJson | null {
+export function findRoadSpot(world: World, graph: LaneGraph, x: number, z: number, street = '', maxDist = 220, main?: (lane: Lane) => boolean, accept?: (e: Edge) => boolean, room = 2): SpawnJson | null {
   const want = normaliseAddress(street);
   let best: { edge: Edge; s: number; off: number; score: number } | null = null;
-  const usable = (l: Lane): boolean => !main || main.has(l.id);
+  const usable = (l: Lane): boolean => !main || main(l);
   for (const roomy of [true, false]) {
     world.edgesInBox(x - maxDist, z - maxDist, x + maxDist, z + maxDist, (e) => {
       if (!LaneGraph.drivable(e, false) || (accept && !accept(e))) return;

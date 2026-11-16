@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { GameAudio } from '../audio/audio.ts';
 import { Input } from '../input/input.ts';
 import type { Action } from '../input/input.ts';
+import { clearObjects, clearSigns, clearWalls, postInLane } from '../sim/clearlanes.ts';
 import { SceneryCollider } from '../sim/collision.ts';
 import { WorldGround } from '../sim/ground.ts';
 import { RuleMonitor } from '../sim/rules.ts';
@@ -27,19 +28,27 @@ import type { HudState } from '../ui/hud.ts';
 import { LANGS, formatUnit, isRtl, lessonIntro, lessonTitle, loadLang, localeOf, setKeyStyle, tr } from '../i18n/index.ts';
 import { initKeyLabels } from '../i18n/keys.ts';
 import { RealityPanel } from '../ui/reality.ts';
-import { LaneGraph } from '../world/lanes.ts';
+import { LaneGraph, TURN, lanePoint } from '../world/lanes.ts';
 import type { Lane } from '../world/lanes.ts';
+import { newPolySample, projectOnPolyline } from '../core/geom.ts';
 import { CLS, CTRL, SURF_ROLLING } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { Edge } from '../world/world.ts';
 import { App } from './app.ts';
 import { LESSONS, Navigator, findTarget } from './nav.ts';
+import { planTour } from './tour.ts';
+import type { TourPlan } from './tour.ts';
+import { quickest, quickestToEdge, routeGraphOf, wayOf } from '../world/routegraph.ts';
+import type { RouteGraph } from '../world/routegraph.ts';
+import { NetIndex } from '../world/netindex.ts';
+import { netPolyline } from '../world/netfile.ts';
 import type { LessonDef } from './nav.ts';
 import { loadSettings, saveSettings } from './settings.ts';
 import { FaultLog } from './faultlog.ts';
 import { DrivenPath } from './track.ts';
 import { BigMap } from '../ui/bigmap.ts';
+import type { TourPreview } from '../ui/bigmap.ts';
 import { RailTraffic } from '../sim/rail.ts';
 import type { RailObstacle } from '../sim/rail.ts';
 import { RailActors } from '../render/trams.ts';
@@ -50,10 +59,12 @@ import { COUPLING_STEPS, MAX_CORRECTIONS, TRAILER_OUTLINE, TRUCK_OUTLINE, YardFr
 import type { CouplingStepId, TaskId } from './ce.ts';
 import { YardTask } from './yardtask.ts';
 import { AutoDriver } from '../sim/autodriver.ts';
+import { followMap } from '../sim/follow.ts';
 import type { Settings } from './settings.ts';
 
 type State = 'loading' | 'menu' | 'intro' | 'placing' | 'drive' | 'pause' | 'reality' | 'map' | 'result';
-type CameraMode = 'cockpit' | 'chase' | 'free';
+/** the driver's seat, behind the car, a camera that is moved about freely – and a fixed one for pictures (?cam=) */
+type CameraMode = 'cockpit' | 'chase' | 'free' | 'dev';
 
 const PHYS_DT = 1 / 240;
 
@@ -94,10 +105,37 @@ export class Game {
   /** where the drive in traffic begins once the tasks on the yard are done */
   private roadSpawn: SpawnJson | null = null;
   /**
-   * A demonstration drive: the car drives by itself, by the rules, to the
-   * places the player chose – to watch how the way there is driven.
+   * A drive to places the player chose, or along a tour that was planned.
+   * `active`: a demonstration drive – the car drives by itself, by the rules,
+   * to watch how the way is driven; otherwise the player drives and is shown
+   * the way.
    */
-  private demo: { stops: SpawnJson[]; index: number; driver: AutoDriver; active: boolean; look: number; remark: string; takeT: number; lost: number } | null = null;
+  private demo: {
+    stops: SpawnJson[];
+    index: number;
+    driver: AutoDriver | null;
+    active: boolean;
+    look: number;
+    remark: string;
+    takeT: number;
+    lost: number;
+    stuck: number;
+    /** a tour: the ways to drive (world/routegraph.ts), the way they begin behind, and what it comes to */
+    tour: { ways: number[]; from: number; metres: number; fresh: number; odo: number; set: boolean } | null;
+  } | null = null;
+  /** the road network as the route planner sees it, of a map in one piece (made when a way is first planned) */
+  private routeGraph: RouteGraph | null = null;
+  /**
+   * The roads of the whole map – of a map whose road network comes in pieces
+   * around the car: for routes and tours beyond what is loaded, for the big
+   * map, for places far away.  Read in the background once the game runs.
+   */
+  private netIndex: NetIndex | null = null;
+  private signalsDirty = false;
+  private signalsBuilt = 0;
+  /** the street of the address the car is being put at (to find the right road once the roads there are loaded) */
+  private spawnStreet = '';
+  private tourSeed = 1;
   /** open the map for planning such a drive as soon as the car stands (start "demo" of the menu) */
   private planDemo = false;
   private camSnap = false;
@@ -121,7 +159,8 @@ export class Game {
   private spawn: SpawnJson | null = null;
   private lesson: LessonDef | null = null;
   private targetIdx = 0;
-  private homeEdge: Edge | null = null;
+  /** the road a lesson began on (its number in the map: the road itself may be dropped and loaded again on the way), or -1 */
+  private homeEdge = -1;
   private readonly visited = new Set<Edge>();
   private basicsStep = 0;
   private startOdo = 0;
@@ -137,6 +176,11 @@ export class Game {
   private readonly wheelY = [0.316, 0.316, 0.316, 0.316];
   private readonly free = { pos: new THREE.Vector3(0, 3, 8), yaw: 0, pitch: -0.2 };
   private freeRelative = true;
+  /**
+   * The free camera: where it is (from the car, in the directions of the map –
+   * it travels along with the car, but does not turn with it) and where it looks.
+   */
+  private readonly fc = { off: new THREE.Vector3(), yaw: 0, pitch: -0.3, ready: false };
   private readonly keys = new Set<string>();
   private readonly driver: DriverInput = { steer: 0, throttle: 0, brake: 0, clutch: 0, handbrake: 1, gear: 0, ignition: true, starter: false };
   private autoDrive = 0;
@@ -154,6 +198,8 @@ export class Game {
   private autoMap = '';
   private autoTram = false;
   private autoDemo: number[][] = [];
+  private autoTour = 0;
+  private autoSelf = false;
   private mapFrames = 0;
   private readonly tmpV = new THREE.Vector3();
   private readonly camTarget = new THREE.Vector3();
@@ -203,6 +249,19 @@ export class Game {
     app.scene.add(this.car.root, this.actors.group, this.railActors.group, this.signalHeads.group, this.yardScene.group);
     this.yardFrame = world.json.yard ? new YardFrame(world.json.yard) : null;
     this.rail = new RailTraffic(world.json.rails ?? []);
+    // The road network may come in pieces around the car: lanes, traffic and signals follow it.
+    followMap(app.map, { lanes: this.lanes, traffic: this.traffic, signals: this.signals, changed: () => (this.signalsDirty = true) });
+    if (app.map.pieces) {
+      // … then the roads of the whole map (some megabytes: on a connection that asks to save data only
+      // once they are needed) and the railway tracks are read while the menu is up
+      const saving = (globalThis.navigator as unknown as { connection?: { saveData?: boolean } }).connection?.saveData === true;
+      if (!saving || this.autoTour > 0 || this.autoDemo.length > 0 || this.autoMap) this.wantNet();
+      void app.map.rails().then((rails) => {
+        if (rails.length === 0) return;
+        this.rail = new RailTraffic(rails);
+        this.applySettings();
+      });
+    }
     this.car.root.visible = false;
     loading.remove();
 
@@ -242,15 +301,17 @@ export class Game {
       lang: () => this.settings.lang,
       car: () => ({ x: this.mpos[0], z: this.mpos[2], yaw: this.vehicle.yaw }),
       path: this.path,
-      spotAt: (x, z) => {
-        this.mainLanes ??= mainNetwork(world, this.lanes);
-        return findRoadSpot(world, this.lanes, x, z, '', 160, this.mainLanes);
-      },
+      net: () => this.netIndex,
+      spotAt: (x, z) => this.roadSpot(x, z, '', 160),
       canTeleport: () => !this.lesson,
       teleport: (spot) => this.teleportSpot(spot),
       loadAddresses: () => this.loadAddresses(),
       spotOf: (hit) => this.spawnAt(hit),
-      startDemo: (stops) => this.startDemo(stops),
+      startTrip: (stops, self, tour) => this.startTrip(stops, self, tour),
+      planTour: (metres, end) => this.planTour(metres, end),
+      roadsKnown: () => this.routeGraphNow() !== null,
+      tripActive: () => this.demo !== null,
+      endTrip: () => this.endDemo('ended'),
       latLon: (x, z) => worldToLatLon(x, z),
       aerial: () => this.settings.reality.aerial,
       setAerial: (on) => {
@@ -283,11 +344,11 @@ export class Game {
     // developer / test shortcuts: ?start=<mode>&spawn=<n>&view=chase&auto=<throttle>&cam=x,y,z,yaw,pitch&look=yaw,pitch
     const view = q.get('view');
     this.cameraMode = view === 'chase' || view === 'cockpit' || view === 'free' ? view : this.settings.view;
-    this.input.resetLook(this.cameraMode === 'chase');
+    this.input.resetLook(this.cameraMode === 'chase', this.cameraMode === 'free');
     const cam = q.get('cam');
     if (cam) {
       const c = cam.split(',').map(Number);
-      this.cameraMode = 'free';
+      this.cameraMode = 'dev';
       this.free.pos.set(c[0], c[1], c[2]);
       this.free.yaw = ((c[3] ?? 0) * Math.PI) / 180;
       this.free.pitch = ((c[4] ?? -15) * Math.PI) / 180;
@@ -303,11 +364,14 @@ export class Game {
     this.autoMap = q.get('map') ?? '';
     // ?tram=1 puts a tram on the nearest track within 150 m as soon as the drive has started
     this.autoTram = q.get('tram') === '1';
-    // ?demo=x,z;x,z starts a demonstration drive to these places of the map once the drive has started
+    // ?demo=x,z;x,z starts a demonstration drive to these places of the map once the drive has started,
+    // ?tour=<km> one along a tour of the streets of that length; with &self=1 the player drives and is shown the way
     this.autoDemo = (q.get('demo') ?? '')
       .split(';')
       .filter((p) => p.includes(','))
       .map((p) => p.split(',').map(Number));
+    this.autoTour = Number(q.get('tour') ?? 0) || 0;
+    this.autoSelf = q.get('self') === '1';
     const tc = q.get('touch');
     if (tc === 'on' || tc === 'off' || tc === 'auto') this.settings.touchControls = tc;
     for (const s of (q.get('rv') ?? '').split(',')) {
@@ -337,7 +401,95 @@ export class Game {
   private debugLook: [number, number] | null = null;
   private inputMode: 'touch' | 'keys' = 'keys';
   private addressIndex: Promise<AddressIndex | null> | null = null;
-  private mainLanes: Set<number> | null = null;
+  private mainSet: Set<number> | null = null;
+
+  private netAsked = false;
+  /**
+   * Read the roads of the whole map (once): for ways to places far away, for
+   * tours and for the large map.  Until they are there, only the roads around
+   * the car are known.
+   */
+  private wantNet(): void {
+    if (this.netAsked || !this.app.map.pieces) return;
+    this.netAsked = true;
+    void this.app.map
+      .net()
+      .then((net) => (net ? NetIndex.build(net) : null))
+      .then((index) => {
+        if (!index) return;
+        this.netIndex = index;
+        this.nav.net = index.graph;
+      })
+      .catch((err: unknown) => {
+        // (asked again the next time they are needed)
+        this.netAsked = false;
+        console.warn('the road network of the whole map could not be read', err);
+      });
+  }
+
+  /** The way to the nearest stretch of motorway that can be reached, through the roads of the whole map (for the motorway lesson far from one). */
+  private waysToMotorway(g: RouteGraph, lane: Lane, x: number, z: number): number[] | null {
+    const net = this.netIndex?.net;
+    if (!net) return null;
+    const near: Array<[number, number]> = [];
+    for (let e = 0; e < net.edgeCls.length; e++) {
+      if (net.edgeCls[e] !== CLS.MOTORWAY || net.edgeLen[e] < 250) continue;
+      const d = Math.hypot(net.nodeX[net.edgeA[e]] - x, net.nodeZ[net.edgeA[e]] - z);
+      // (a lesson, not a journey)
+      if (d < 60000) near.push([e, d]);
+    }
+    near.sort((a, b) => a[1] - b[1]);
+    for (const [e] of near.slice(0, 12)) {
+      const ways = quickestToEdge(g, wayOf(lane), e);
+      if (ways && ways.length > 0) return ways;
+    }
+    return null;
+  }
+
+  /** May the car be put on this lane, or a way be planned from it: is it part of the network one can drive around in? */
+  private usableLane(): ((l: Lane) => boolean) | undefined {
+    if (this.app.map.pieces) {
+      const index = this.netIndex;
+      return index ? (l) => index.main[wayOf(l)] === 1 : undefined;
+    }
+    const set = (this.mainSet ??= mainNetwork(this.app.world, this.lanes));
+    return (l) => set.has(l.id);
+  }
+
+  /** The road network for planning ways: that of the whole map if it comes in pieces (null until it is read). */
+  private routeGraphNow(): RouteGraph | null {
+    if (this.app.map.pieces) return this.netIndex?.graph ?? null;
+    return (this.routeGraph ??= routeGraphOf(this.lanes));
+  }
+
+  /**
+   * A place on a road near (x, z) – to put the car at, or to drive to.
+   * Where the roads are loaded it lies in a lane; elsewhere it is taken from
+   * the overview of the whole map (`rough`) and put right when the car gets there.
+   */
+  private roadSpot(x: number, z: number, street: string, maxDist: number): SpawnJson | null {
+    const world = this.app.world;
+    if (this.app.map.ready(x, z, maxDist + 60)) return findRoadSpot(world, this.lanes, x, z, street, maxDist, this.usableLane());
+    const index = this.netIndex;
+    if (!index) return null;
+    const hit = index.nearest(x, z, maxDist, (e) => index.main[e * 2] === 1 || index.main[e * 2 + 1] === 1);
+    if (!hit) return null;
+    // (along the road, the way it may be driven)
+    return { name: '', x: hit.x, z: hit.z, yaw: index.main[hit.edge * 2] ? hit.yaw : hit.yaw + Math.PI, kind: 'street', rough: true };
+  }
+
+  /** The road (its number in the map) nearest to a place, or -1. */
+  private edgeNear(x: number, z: number): number {
+    // (from the roads of the whole map if they are known – and of these a road of the network one can
+    // drive around in, if there is one: beside it may lie a yard or a path no way leads to)
+    const index = this.netIndex;
+    if (index) {
+      const hit = index.nearest(x, z, 150, (e) => index.main[e * 2] === 1 || index.main[e * 2 + 1] === 1) ?? index.nearest(x, z, 150);
+      if (hit) return hit.edge;
+    }
+    if (this.app.map.ready(x, z, 120)) return this.app.world.nearestRoad(x, z, 60, 0, this.hit) && this.hit.edge ? this.hit.edge.id : -1;
+    return -1;
+  }
   private autoReality = '';
   private autoNotice = '';
   private realityFrames = 0;
@@ -345,6 +497,14 @@ export class Game {
 
   private onTile(tile: LoadedTile, loaded: boolean): void {
     if (loaded) {
+      // What stands in a lane (a fault of the map) is taken out of the way: sign posts are moved
+      // beside the lane, lamps dropped, walls lose the pieces that reach in.  Maps built since do
+      // this themselves and mark their tiles.
+      const clear = !tile.header.clr;
+      if (clear) {
+        clearSigns(this.lanes, tile.header.signs);
+        clearObjects(this.lanes, tile.header.objects);
+      }
       this.props.add(tile);
       this.signs.add(tile);
       const discs: number[] = [];
@@ -356,16 +516,15 @@ export class Game {
         for (let i = 0; i < trees.length; i += 5) {
           const kind = trees[i + 4];
           if (kind === 2) continue;
+          if (clear && postInLane(this.lanes, trees[i], trees[i + 1], trees[i + 2])) continue;
           discs.push(trees[i], trees[i + 1], trees[i + 2], kind === 3 ? 0.12 : 0.22);
         }
       }
-      this.collider.add({
-        key: tile.key,
-        rings: tile.data.get('collPts') as Float32Array | null,
-        ringCounts: tile.data.get('collCnt') as Uint16Array | null,
-        segments: tile.data.get('collSeg') as Float32Array | null,
-        discs,
-      });
+      const rings = tile.data.get('collPts') as Float32Array | null;
+      const ringCounts = tile.data.get('collCnt') as Uint16Array | null;
+      const segments = tile.data.get('collSeg') as Float32Array | null;
+      if (clear) this.collider.add({ key: tile.key, rings: null, ringCounts: null, segments: clearWalls(this.lanes, rings, ringCounts, segments), discs });
+      else this.collider.add({ key: tile.key, rings, ringCounts, ringSkip: tile.data.get('collSkip') as Uint8Array | null, segments, discs });
     } else {
       this.props.remove(tile);
       this.signs.remove(tile);
@@ -454,9 +613,8 @@ export class Game {
   // ------------------------------------------------- class CE: truck and trailer
   /** A place on a road wide enough to start with a combination of 16 m, near a start point. */
   private truckSpot(near: SpawnJson): SpawnJson {
-    this.mainLanes ??= mainNetwork(this.app.world, this.lanes);
     const wide = (e: Edge): boolean => (e.cls === CLS.PRIMARY || e.cls === CLS.SECONDARY || e.cls === CLS.TERTIARY) && e.len - e.cutA - e.cutB > 60;
-    const spot = findRoadSpot(this.app.world, this.lanes, near.x, near.z, '', 900, this.mainLanes, wide, 20);
+    const spot = findRoadSpot(this.app.world, this.lanes, near.x, near.z, '', 900, this.usableLane(), wide, 20);
     return spot ? { ...spot, name: near.name } : near;
   }
 
@@ -574,6 +732,8 @@ export class Game {
         if (fault) this.rules.note(fault, 'major', {}, 0.5);
         else this.audio.click('chime');
       },
+      // (nothing to do with the truck just now: it is the driver's turn on foot)
+      !st.todo,
     );
     this.lessonLine = st.todo ? tr(`ce.do.${st.todo}`, lang) : choices.length ? tr('ce.onFoot', lang) : tr('ce.do.uPark', lang);
     this.taskSub = `${proc.done.size} / ${COUPLING_STEPS.length}`;
@@ -582,23 +742,30 @@ export class Game {
 
   /** The address list (house numbers of the map), fetched when somebody first searches. */
   private loadAddresses(): Promise<AddressIndex | null> {
-    this.addressIndex ??= fetch(`${this.app.baseUrl}addresses.json`)
-      .then(async (res) => (res.ok ? new AddressIndex((await res.json()) as AddressJson) : null))
+    const map = this.app.map;
+    this.addressIndex ??= map
+      .json<AddressJson>('addresses.json.gz')
+      .then((a) => a ?? map.json<AddressJson>('addresses.json'))
+      .then((a) => (a ? new AddressIndex(a) : null))
       .catch(() => null);
     return this.addressIndex;
   }
 
   /** The spot on the road in front of an address, as a starting point. */
   private spawnAt(hit: AddressHit): SpawnJson | null {
-    this.mainLanes ??= mainNetwork(this.app.world, this.lanes);
-    const spot = findRoadSpot(this.app.world, this.lanes, hit.x, hit.z, hit.street, 220, this.mainLanes);
-    return spot ? { ...spot, name: hit.label } : null;
+    const spot = this.roadSpot(hit.x, hit.z, hit.street, 220);
+    if (spot) return { ...spot, name: hit.label };
+    // Neither the roads there nor those of the whole map are read yet: the house itself, for now –
+    // the car is put into a lane of its street once the roads around it are there (tryPlace).
+    if (this.app.map.pieces && !this.netIndex && !this.app.map.ready(hit.x, hit.z, 280)) return { name: hit.label, x: hit.x, z: hit.z, yaw: 0, kind: 'street', rough: true };
+    return null;
   }
 
   /** Free drive: jump to an address (from the pause menu). */
   private teleportTo(hit: AddressHit): void {
     if (this.state !== 'pause' || this.lesson) return;
     const spot = this.spawnAt(hit);
+    this.spawnStreet = hit.street;
     if (!spot) {
       this.hud.showPause();
       this.hud.message(tr('addressNoRoad', this.settings.lang), hit.label);
@@ -634,6 +801,7 @@ export class Game {
   // ------------------------------------------------------------------ map
   /** The full-screen map: where am I, where have I been – and, in a free drive, put the car elsewhere. */
   private openMap(closeUp = false): void {
+    this.wantNet();
     if (this.state === 'reality') {
       // from the photographs to the map: back to where the photographs were opened from afterwards
       this.reality.close();
@@ -650,48 +818,160 @@ export class Game {
     this.bigMap.open(this.ui, closeUp);
   }
 
-  // ------------------------------------------------- demonstration drives
-  /** Drive by itself to these places, one after the other, from where the car stands. */
-  private startDemo(stops: SpawnJson[]): void {
-    if (this.lesson || stops.length === 0 || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
+  // --------------------------------------- drives to places, tours, demonstrations
+  /** The lane nearest to a place that goes the way `yaw` points. */
+  private laneAt(x: number, z: number, yaw: number): Lane | null {
+    const proj = this.proj;
+    const smp = this.smp;
+    const fx = -Math.sin(yaw);
+    const fz = -Math.cos(yaw);
+    let lane: Lane | null = null;
+    let best = 40;
+    this.app.world.edgesInBox(x - 20, z - 20, x + 20, z + 20, (e) => {
+      const el = this.lanes.edgeLanes[e.id];
+      projectOnPolyline(e.pl, x, z, proj);
+      for (const l of [...el.fwd, ...el.back]) {
+        lanePoint(l, Math.max(0, Math.min(l.len, l.dir > 0 ? proj.s - l.s0 : l.s0 - proj.s)), smp);
+        const score = Math.hypot(smp.x - x, smp.z - z) + (1 - (smp.tx * fx + smp.tz * fz)) * 6;
+        if (score < best) {
+          best = score;
+          lane = l;
+        }
+      }
+    });
+    return lane;
+  }
+
+  /**
+   * A tour of about `metres` through as many different streets as possible:
+   * from where the car stands back to there, or on to `end`.
+   */
+  private planTour(metres: number, end: SpawnJson | null): TourPreview | null {
+    this.wantNet();
+    const v = this.vehicle;
+    v.getModelPosition(this.mpos);
+    const from = this.currentLane() ?? this.laneAt(this.mpos[0], this.mpos[2], v.yaw);
+    if (!from) return null;
+    const g = this.routeGraphNow();
+    if (!g) return null;
+    const start = wayOf(from);
+    // It ends on the road it is meant to end on – whichever way that road is then driven: back
+    // into a car park with one way in and out, the tour arrives facing the other way.
+    const endEdge = end ? this.edgeNear(end.x, end.z) : from.edge.id;
+    if (endEdge < 0) return null;
+    const last = end ? endEdge * 2 : start;
+    const ends = [last, last ^ 1].filter((w) => g.len[w] > 0);
+    const seed = this.tourSeed++;
+    let plan: TourPlan | null = null;
+    for (const goal of ends) {
+      plan = planTour(g, start, goal, metres, { budgetMs: 500, seed });
+      if (plan) break;
+    }
+    let canTurn = false;
+    for (let k = g.first[start]; k < g.first[start + 1]; k++) if (g.to[k] === (start ^ 1)) canTurn = true;
+    if (!plan && canTurn) {
+      // from a street with no way on (a cul-de-sac): turn round at its end first
+      for (const goal of ends) {
+        const back = planTour(g, start ^ 1, goal, Math.max(0, metres - g.len[start]), { budgetMs: 500, seed });
+        if (!back) continue;
+        plan = { ways: [start ^ 1, ...back.ways], metres: back.metres + g.len[start], fresh: back.fresh, again: back.again + g.len[start] };
+        break;
+      }
+    }
+    if (!plan || plan.ways.length === 0) return null;
+    // its line on the map: from the car along the roads, each in the direction it is driven
+    const line: number[] = [this.mpos[0], this.mpos[2]];
+    const edges = this.app.world.edges;
+    const net = this.netIndex?.net ?? null;
+    const add = (w: number, fromS: number): void => {
+      const e = edges[w >> 1];
+      if (!e) {
+        // (a road that is not loaded: its course from the overview of the map)
+        const c = net ? netPolyline(net, w >> 1) : [];
+        if ((w & 1) === 0) for (let i = 0; i < c.length; i += 2) line.push(c[i], c[i + 1]);
+        else for (let i = c.length - 2; i >= 0; i -= 2) line.push(c[i], c[i + 1]);
+        return;
+      }
+      const p = e.pl;
+      const n = p.cum.length;
+      for (let i = 0; i < n; i++) {
+        const k = (w & 1) === 0 ? i : n - 1 - i;
+        // (of the road the car stands on, only what lies ahead)
+        if (fromS >= 0 && ((w & 1) === 0 ? p.cum[k] < fromS : p.cum[k] > fromS)) continue;
+        line.push(p.pts[k * 3], p.pts[k * 3 + 2]);
+      }
+    };
+    projectOnPolyline(from.edge.pl, this.mpos[0], this.mpos[2], this.proj);
+    add(start, this.proj.s);
+    for (const w of plan.ways) add(w, -1);
+    return {
+      plan,
+      line: Float32Array.from(line),
+      from: start,
+      end: end ?? { name: '', x: this.mpos[0], z: this.mpos[2], yaw: v.yaw, kind: 'street' },
+    };
+  }
+
+  /**
+   * Drive to these places, one after the other, from where the car stands –
+   * or along a tour.  `self`: the player drives and is shown the way;
+   * otherwise it is a demonstration drive: the car drives by itself.
+   */
+  private startTrip(stops: SpawnJson[], self: boolean, tour: TourPreview | null): void {
+    if (this.lesson || (stops.length === 0 && !tour) || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
     if (this.state === 'map') {
       this.mapFrom = 'drive';
       this.closeMap();
     } else if (this.state === 'pause') this.resume();
-    // the driver has no hand for a gear lever: the car gets the automatic gearbox for it
-    if (this.vehicle.spec.transmission !== 'automatic') {
-      const old = this.vehicle;
-      old.getModelPosition(this.mpos);
-      const spec = withPower(COMPACT_CAR_AUTOMATIC, this.settings.power);
-      const v = new Vehicle(spec, this.ground);
-      v.teleport(this.mpos[0], this.mpos[1] + 0.02, this.mpos[2], old.yaw);
-      v.odometer = old.odometer;
-      this.vehicle = v;
-      this.input.setSteering(spec.wheelbase, spec.maxWheelAngle);
-      this.input.setAutomatic(true);
-      this.hud.gearbox = 'automatic';
+    let driver: AutoDriver | null = null;
+    if (!self) {
+      // the driver has no hand for a gear lever: the car gets the automatic gearbox for it
+      if (this.vehicle.spec.transmission !== 'automatic') {
+        const old = this.vehicle;
+        old.getModelPosition(this.mpos);
+        const spec = withPower(COMPACT_CAR_AUTOMATIC, this.settings.power);
+        const v = new Vehicle(spec, this.ground);
+        v.teleport(this.mpos[0], this.mpos[1] + 0.02, this.mpos[2], old.yaw);
+        v.odometer = old.odometer;
+        this.vehicle = v;
+        this.input.setSteering(spec.wheelbase, spec.maxWheelAngle);
+        this.input.setAutomatic(true);
+        this.hud.gearbox = 'automatic';
+      }
+      const v = this.vehicle;
+      v.resetDrivetrain(true);
+      const c = this.input.c;
+      c.seatbelt = true;
+      c.ignition = true;
+      c.handbrake = 0;
+      c.gear = 1;
+      c.indicator = 0;
+      c.hazard = false;
+      driver = new AutoDriver(this.app.world, this.signals, this.rules, this.traffic, {
+        spec: v.spec,
+        front: this.isTruck ? TRUCK_OUTLINE.front : (v.spec.length ?? 4.28) / 2,
+        truck: this.isTruck,
+      });
     }
-    const v = this.vehicle;
-    v.resetDrivetrain(true);
-    const c = this.input.c;
-    c.seatbelt = true;
-    c.ignition = true;
-    c.handbrake = 0;
-    c.gear = 1;
-    c.indicator = 0;
-    c.hazard = false;
     this.nav.clear();
-    const driver = new AutoDriver(this.app.world, this.signals, this.rules, this.traffic, {
-      spec: v.spec,
-      front: this.isTruck ? TRUCK_OUTLINE.front : (v.spec.length ?? 4.28) / 2,
-      truck: this.isTruck,
-    });
-    this.demo = { stops: [...stops], index: 0, driver, active: true, look: 0, remark: '', takeT: 0, lost: 0 };
+    this.hud.routeLanes = [];
+    this.demo = {
+      stops: tour ? [tour.end] : [...stops],
+      index: 0,
+      driver,
+      active: !self,
+      look: 0,
+      remark: '',
+      takeT: 0,
+      lost: 0,
+      stuck: 0,
+      tour: tour ? { ways: tour.plan.ways, from: tour.from, metres: tour.plan.metres, fresh: tour.plan.fresh, odo: this.vehicle.odometer, set: false } : null,
+    };
     this.hud.clearNotices();
   }
 
   /** The drive is over: the car has arrived, the player takes it over, or there is no way to go on. */
-  private endDemo(why: 'arrived' | 'taken' | 'lost'): void {
+  private endDemo(why: 'arrived' | 'taken' | 'lost' | 'ended'): void {
     const demo = this.demo;
     if (!demo) return;
     this.demo = null;
@@ -702,12 +982,18 @@ export class Game {
     c.indicator = 0;
     const lang = this.settings.lang;
     if (why === 'arrived') {
-      c.handbrake = 1;
+      // (the car that drove by itself is left standing; the player's own stays in the player's hands)
+      if (demo.active) c.handbrake = 1;
       this.audio.click('chime');
-      this.hud.message(tr('demoArrived', lang));
+      const km = (m: number): string => formatUnit(m / 1000, 'kilometer', lang, 1);
+      if (demo.tour) this.hud.message(tr('tourDone', lang), tr('tourResult', lang, { km: km(this.vehicle.odometer - demo.tour.odo), fresh: km(demo.tour.fresh), again: km(Math.max(0, demo.tour.metres - demo.tour.fresh)) }));
+      else this.hud.message(tr('demoArrived', lang));
     } else if (why === 'lost') {
-      c.handbrake = 1;
+      if (demo.active) c.handbrake = 1;
       this.hud.message(tr('demoNoRoute', lang));
+    } else if (why === 'ended') {
+      if (demo.active) c.handbrake = 1;
+      this.hud.message(tr('tripEnded', lang));
     } else this.hud.message(tr('demoTaken', lang), tr('demoTakenSub', lang));
   }
 
@@ -715,17 +1001,74 @@ export class Game {
   private updateDemo(dt: number, p: PlayerState): void {
     const demo = this.demo!;
     const lane = this.currentLane();
+    const cmd = demo.active && demo.driver ? demo.driver.cmd : null;
+    const lang = this.settings.lang;
+    // The end of a street the way leads back out of: the car is turned round on the spot.
+    // (Turning in the road means going back and forth, which the driver of this drive does not do.)
+    if (cmd?.turnRound) {
+      const to = cmd.turnRound.to;
+      lanePoint(to, Math.min(3, to.len / 2), this.smp);
+      const y = this.app.world.surfaceAt(this.smp.x, this.smp.z, this.smp.y + 1.5, this.hit) ? this.hit.y : this.smp.y;
+      this.putOnRoad({ x: this.smp.x, y, z: this.smp.z, yaw: Math.atan2(-this.smp.tx, -this.smp.tz) });
+      this.camSnap = true;
+      this.hud.message(tr('demoTurned', lang));
+      return;
+    }
+    // Standing, and not for a light, a line or traffic: something is in the way that the driver
+    // cannot pass (a fault of the map), or the car has left the road.  It is put back into its
+    // lane a little further on.  (Waiting for others who do not move either: after a long while, too.)
+    if (!cmd || Math.abs(p.speed) > 0.3) demo.stuck = 0;
+    else if (!this.nav.busy) demo.stuck = 0;
+    else if (cmd.waiting && lane) demo.stuck += cmd.remark === 'red' ? 0 : dt * 0.12;
+    else demo.stuck += dt;
+    if (demo.stuck > 7) {
+      demo.stuck = 0;
+      const g = lane ? { x: p.x, z: p.z, yaw: p.yaw } : this.lastGood;
+      const spot = this.freeSpot(g.x, g.z, g.yaw, 8);
+      if (spot) {
+        this.putOnRoad(spot);
+        this.camSnap = true;
+        this.hud.message(tr('demoRescued', lang));
+        return;
+      }
+      if (!lane) {
+        this.endDemo('lost');
+        return;
+      }
+    }
     if (!lane) {
       // not on a road of the network (a yard, a field): there is no way from here
       demo.lost += dt;
-      if (demo.lost > 4 && !this.nav.goal) this.endDemo('lost');
+      if (demo.lost > 4 && !this.nav.busy) this.endDemo('lost');
       return;
     }
     const last = demo.index >= demo.stops.length - 1;
-    if (!this.nav.goal) {
-      const stop = demo.stops[demo.index];
-      const goal = this.app.world.nearestRoad(stop.x, stop.z, 60, 0, this.hit) ? this.hit.edge : null;
-      if (!goal || !this.nav.setGoal(goal, lane)) {
+    const stop = demo.stops[demo.index];
+    if (!this.nav.busy) {
+      let found = false;
+      const tour = demo.tour;
+      const g = this.routeGraphNow();
+      // (the roads of the whole map are still being read: a moment)
+      if (!g) return;
+      {
+        this.nav.net = g;
+        const here = wayOf(lane);
+        let ways: number[] | null = null;
+        if (tour) {
+          // the tour was planned from a road: if the car is on another one by now, to that one first
+          const lead = here === tour.from ? [] : quickest(g, here, tour.from);
+          ways = lead ? [...lead, ...tour.ways] : null;
+        } else {
+          const edge = this.edgeNear(stop.x, stop.z);
+          ways = edge < 0 ? null : edge === lane.edge.id ? [] : quickestToEdge(g, here, edge);
+        }
+        if (ways) {
+          this.nav.setWays(ways, lane, tour !== null);
+          if (tour) tour.set = true;
+          found = true;
+        }
+      }
+      if (!found) {
         // no way there from here (yet): try again shortly, then give up
         this.nav.clear();
         demo.lost += dt;
@@ -733,10 +1076,12 @@ export class Game {
         return;
       }
       demo.lost = 0;
-      demo.driver.halt = last ? { x: stop.x, z: stop.z } : null;
       this.hud.routeLanes = this.nav.routeLanes;
+      this.rules.allowed = new Set(this.nav.routeLanes.map((l) => l.edge));
     }
-    const lang = this.settings.lang;
+    // where the car that drives by itself comes to a halt: at the last place – on a tour, which may
+    // pass that place before, only once the end is near
+    if (demo.driver) demo.driver.halt = last && (!demo.tour || this.nav.left <= 1) ? { x: stop.x, z: stop.z } : null;
     const h = this.nav.update(dt, lane, this.laneFront(), p.x, p.z);
     if (this.hud.routeLanes !== this.nav.routeLanes) {
       this.hud.routeLanes = this.nav.routeLanes;
@@ -747,7 +1092,7 @@ export class Game {
       this.nav.clear();
       this.audio.click('chime');
       this.hud.message(tr('demoStop', lang, { n: demo.index }));
-    }
+    } else if (h.done && !demo.active) this.endDemo('arrived');
   }
 
   private closeMap(): void {
@@ -763,10 +1108,12 @@ export class Game {
   private begin(mode: string, spawnIdx: number, skipIntro = false, address?: AddressHit): void {
     const world = this.app.world;
     this.audio.start();
+    this.spawnStreet = address?.street ?? '';
     this.spawn = (address ? this.spawnAt(address) : null) ?? world.json.spawns[Math.max(0, Math.min(world.json.spawns.length - 1, spawnIdx))] ?? { name: '', x: 0, z: 0, yaw: 0, kind: 'street' };
     this.lesson = LESSONS.find((l) => l.id === mode) ?? null;
     this.demo = null;
-    this.planDemo = mode === 'demo';
+    // ("demo" and "tour" are free drives that begin with the map open, for planning)
+    this.planDemo = mode === 'demo' || mode === 'tour';
     this.hud.canTeleport = !this.lesson;
     this.hud.canFinish = !this.lesson;
     this.keepClock = false;
@@ -817,7 +1164,7 @@ export class Game {
     this.basicsStep = 0;
     this.visited.clear();
     this.failT = -1;
-    this.homeEdge = null;
+    this.homeEdge = -1;
     this.state = 'placing';
     this.showModel(false);
     this.hud.showLoading(tr('loadingTiles', this.settings.lang));
@@ -830,15 +1177,32 @@ export class Game {
 
   /** Called every frame while waiting for the terrain under the start point. */
   private tryPlace(): void {
-    const sp = this.spawn!;
+    let sp = this.spawn!;
+    // (the roads around the place: without them there is no lane to stand in, and nothing to drive on)
+    if (!this.app.map.ready(sp.x, sp.z, 1500)) return;
+    if (sp.rough) {
+      // chosen on the overview of the map: now that the roads are there, into a lane of the road meant
+      // (or at an address before any roads were known: then from the house to its street)
+      const exact = findRoadSpot(this.app.world, this.lanes, sp.x, sp.z, this.spawnStreet, 230, this.usableLane());
+      sp = this.spawn = exact ? { ...exact, name: sp.name } : { ...sp, rough: false };
+    }
     const ty = this.app.tiles.heightAt(sp.x, sp.z);
     if (Number.isNaN(ty) || !this.app.tiles.settled) return;
-    const y = this.app.world.surfaceAt(sp.x, sp.z, ty + 3, this.hit) ? this.hit.y : ty;
+    let y = this.app.world.surfaceAt(sp.x, sp.z, ty + 3, this.hit) ? this.hit.y : ty;
     // the practice yard is laid out over the field as soon as the ground under it is there
     if (this.task && !this.task.laid) this.task.laid = this.yardScene.show(this.yardFrame!, this.task.run.layout, (x, z) => this.app.tiles.heightAt(x, z));
-    this.vehicle.teleport(sp.x, y + 0.02, sp.z, sp.yaw);
+    let place = { x: sp.x, z: sp.z, yaw: sp.yaw };
+    // (never into a wall or onto a post: then the nearest free place in a lane instead)
+    if (!this.task && this.collider.blocked(sp.x, y, sp.z, sp.yaw, 0.05)) {
+      const free = this.freeSpot(sp.x, sp.z, sp.yaw, 0);
+      if (free) {
+        place = free;
+        y = free.y;
+      }
+    }
+    this.vehicle.teleport(place.x, y + 0.02, place.z, place.yaw);
     this.trailer?.coupleBehind(this.vehicle);
-    this.lastGood = { x: sp.x, y, z: sp.z, yaw: sp.yaw, t: 0 };
+    this.lastGood = { x: place.x, y, z: place.z, yaw: place.yaw, t: 0 };
     this.camSnap = true;
     this.showModel(true);
     if (!this.keepClock) {
@@ -934,11 +1298,19 @@ export class Game {
       else if (this.state === 'reality') this.closeReality();
       else if (this.state === 'map') this.closeMap();
     } else if (a === 'view' && this.state === 'drive') {
-      this.cameraMode = this.cameraMode === 'cockpit' ? 'chase' : 'cockpit';
-      this.input.resetLook(this.cameraMode === 'chase');
-      // the next drive begins with the camera the player chose
-      this.settings.view = this.cameraMode;
-      saveSettings(this.settings);
+      // the driver's seat → behind the car → the free camera → …
+      this.cameraMode = this.cameraMode === 'cockpit' ? 'chase' : this.cameraMode === 'chase' ? 'free' : 'cockpit';
+      this.input.resetLook(this.cameraMode === 'chase', this.cameraMode === 'free');
+      if (this.cameraMode === 'free') {
+        // it starts where the camera is, and says how it is moved
+        this.fc.ready = false;
+        const lang = this.settings.lang;
+        this.hud.message(tr('viewFree', lang), tr(this.inputMode === 'touch' ? 'freeCamTouch' : 'freeCamKeys', lang));
+      } else {
+        // the next drive begins with the camera the player chose
+        this.settings.view = this.cameraMode;
+        saveSettings(this.settings);
+      }
     } else if (a === 'reset' && this.state === 'drive') {
       this.resetToRoad();
     } else if (a === 'help') {
@@ -953,12 +1325,92 @@ export class Game {
     }
   }
 
+  /**
+   * Back onto the road: into the middle of the lane the car was last driving
+   * in, where it touches nothing.  Asked for again from there (something is
+   * still in the way): a stretch further on each time.
+   */
   private resetToRoad(): void {
+    const v = this.vehicle;
     const g = this.lastGood;
-    this.vehicle.teleport(g.x, g.y + 0.05, g.z, g.yaw);
-    if (this.trailer?.coupled) this.trailer.coupleBehind(this.vehicle);
-    this.demo?.driver.reset();
+    v.getModelPosition(this.mpos);
+    const again = this.time - this.resetAt.t < 10 && Math.hypot(this.mpos[0] - this.resetAt.x, this.mpos[2] - this.resetAt.z) < 6;
+    this.resetHop = again ? this.resetHop + 1 : 0;
+    const spot = this.freeSpot(g.x, g.z, g.yaw, this.resetHop * 15) ?? g;
+    this.putOnRoad(spot);
     this.input.c.handbrake = 1;
+  }
+
+  private resetHop = 0;
+  private resetAt = { x: 0, z: 0, t: -100 };
+  private readonly proj = { s: 0, off: 0, d2: 0, seg: 0 };
+  private readonly smp = newPolySample();
+
+  private putOnRoad(spot: { x: number; y: number; z: number; yaw: number }): void {
+    const v = this.vehicle;
+    v.teleport(spot.x, spot.y + 0.05, spot.z, spot.yaw);
+    if (this.trailer?.coupled) this.trailer.coupleBehind(v);
+    this.demo?.driver?.reset();
+    this.lastGood = { x: spot.x, y: spot.y, z: spot.z, yaw: spot.yaw, t: this.time };
+    this.resetAt = { x: spot.x, z: spot.z, t: this.time };
+  }
+
+  /**
+   * A place in the middle of a lane where the vehicle touches nothing: the
+   * lane nearest to (x, z) that goes the way `yaw` points, at least `ahead`
+   * metres on from there – following the route (or the road) over the next
+   * junctions if need be.  Null when there is no lane near, or no room.
+   */
+  private freeSpot(x: number, z: number, yaw: number, ahead: number): { x: number; y: number; z: number; yaw: number } | null {
+    const world = this.app.world;
+    const proj = this.proj;
+    const smp = this.smp;
+    const fx = -Math.sin(yaw);
+    const fz = -Math.cos(yaw);
+    let lane: Lane | null = null;
+    let at = 0;
+    let best = Infinity;
+    world.edgesInBox(x - 15, z - 15, x + 15, z + 15, (e) => {
+      const el = this.lanes.edgeLanes[e.id];
+      projectOnPolyline(e.pl, x, z, proj);
+      for (const l of [...el.fwd, ...el.back]) {
+        if (l.len < 1) continue;
+        const d = Math.max(0, Math.min(l.len, l.dir > 0 ? proj.s - l.s0 : l.s0 - proj.s));
+        lanePoint(l, d, smp);
+        // near, going our way, and a road rather than somebody's yard
+        const score = Math.hypot(smp.x - x, smp.z - z) + (1 - (smp.tx * fx + smp.tz * fz)) * 6 + (LaneGraph.drivable(e, false) ? 0 : 8);
+        if (score < best) {
+          best = score;
+          lane = l;
+          at = d;
+        }
+      }
+    });
+    if (!lane || best > 30) return null;
+    const route = this.nav.route ?? [];
+    let cur: Lane = lane;
+    let d = at + ahead;
+    for (let walked = 0, hops = 0; walked < 200 && hops < 14; ) {
+      if (d > cur.len - 1 && (cur.len > 2.5 || d > cur.len)) {
+        // on to the next lane: by the route, else straight on, else by whatever leads on
+        const from: Lane = cur;
+        const c = route.find((r) => r.from === from) ?? from.out.find((o) => o.turn === TURN.STRAIGHT) ?? from.out.find((o) => o.turn !== TURN.UTURN) ?? from.out[0] ?? null;
+        if (!c) return null;
+        d = Math.max(1.5, d - from.len - c.len);
+        cur = c.to;
+        hops++;
+        continue;
+      }
+      lanePoint(cur, d, smp);
+      const y = world.surfaceAt(smp.x, smp.z, smp.y + 1.5, this.hit) ? this.hit.y : smp.y;
+      const heading = Math.atan2(-smp.tx, -smp.tz);
+      let free = !this.collider.blocked(smp.x, y, smp.z, heading, 0.2);
+      if (free) for (const car of this.traffic.cars) if (Math.hypot(car.x - smp.x, car.z - smp.z) < 7) free = false;
+      if (free) return { x: smp.x, y, z: smp.z, yaw: heading };
+      d += 2;
+      walked += 2;
+    }
+    return null;
   }
 
   // ------------------------------------------------------------- simulation
@@ -988,7 +1440,7 @@ export class Game {
     // a truck is governed at 90 km/h
     if (this.isTruck && v.speed * 3.6 > 85) d.throttle = Math.min(d.throttle, Math.max(0, (89.5 - v.speed * 3.6) / 4));
     const demo = this.demo;
-    if (demo?.active) {
+    if (demo?.active && demo.driver) {
       // Whoever touches a pedal or the steering takes the car over (held for a moment: a wheel
       // that is not quite centred, or a thumb resting on the screen, is no decision).
       demo.takeT = c.throttle > 0.2 || c.brake > 0.2 || Math.abs(c.steer) > 0.35 || c.handbrake > 0.5 ? demo.takeT + dt : 0;
@@ -997,7 +1449,7 @@ export class Game {
         v.getModelPosition(this.mpos);
         const cmd = demo.driver.step(Math.max(dt, 1e-3), v, this.mpos, this.nav.route ?? []);
         // (until the way is known the car stands: no lane under it yet, or no route found yet)
-        const ready = this.nav.goal !== null;
+        const ready = this.nav.busy;
         d.steer = ready ? cmd.steer : 0;
         d.throttle = ready ? cmd.throttle : 0;
         d.brake = ready ? cmd.brake : 0.5;
@@ -1190,10 +1642,32 @@ export class Game {
     }
     // routed lessons and the exam
     if (!lane) return;
-    if (!this.homeEdge) this.homeEdge = lane.edge;
-    if (!this.nav.goal) {
+    if (this.homeEdge < 0) this.homeEdge = lane.edge.id;
+    if (!this.nav.busy) {
+      // (the road network comes in pieces: a destination is looked for once the roads all around are there)
+      if (!this.app.map.ready(p.x, p.z)) return;
       const type = l.targets[this.targetIdx];
-      const goal = findTarget(this.app.world, this.lanes, type, p.x, p.z, lane, this.homeEdge, this.visited);
+      const home = this.app.world.edges[this.homeEdge] ?? null;
+      let goal = type === 'home' && !home ? null : findTarget(this.app.world, this.lanes, type, p.x, p.z, lane, home, this.visited);
+      // The way home, or to a motorway, can lead through parts of the map that are not loaded:
+      // then it is found in the roads of the whole map and followed like a planned drive.
+      if (this.app.map.pieces && (type === 'home' || type === 'motorway') && !(goal && this.nav.setGoal(goal, lane))) {
+        this.nav.clear();
+        goal = null;
+        const g = this.routeGraphNow();
+        if (!g) {
+          // (the roads of the whole map are still being read)
+          this.wantNet();
+          return;
+        }
+        const ways = type === 'home' ? (this.homeEdge === lane.edge.id ? [] : quickestToEdge(g, wayOf(lane), this.homeEdge)) : this.waysToMotorway(g, lane, p.x, p.z);
+        if (ways) {
+          this.nav.net = g;
+          this.nav.setWays(ways, lane, false);
+          this.hud.routeLanes = this.nav.routeLanes;
+          return;
+        }
+      }
       if (!goal) {
         // nothing suitable in reach: skip this part
         this.targetIdx++;
@@ -1238,6 +1712,16 @@ export class Game {
     const app = this.app;
     const tiles = app.tiles;
 
+    // the road network around where things happen (it may come in pieces), and the signal heads of what is loaded
+    if (this.state === 'placing') app.map.update(this.spawn!.x, this.spawn!.z, 40);
+    else if (this.vehicle && this.state !== 'menu' && this.state !== 'loading') app.map.update(this.mpos[0], this.mpos[2], this.state === 'drive' ? 5 : 25);
+    if (this.signalsDirty && this.time - this.signalsBuilt > 0.6) {
+      this.signalsDirty = false;
+      this.signalsBuilt = this.time;
+      this.signalHeads.rebuild(app.world);
+      this.collider.remove('signals');
+      this.collider.add({ key: 'signals', rings: null, ringCounts: null, segments: null, discs: this.signalHeads.poles });
+    }
     if (this.state === 'placing') {
       tiles.update(this.spawn!.x, this.spawn!.z);
       this.tryPlace();
@@ -1279,14 +1763,18 @@ export class Game {
         }
       }
       if (this.autoDemo.length > 0 && this.time - this.startTime > 0.3) {
-        this.mainLanes ??= mainNetwork(this.app.world, this.lanes);
         const stops: SpawnJson[] = [];
         for (const [x, z] of this.autoDemo) {
-          const spot = findRoadSpot(this.app.world, this.lanes, x, z, '', 200, this.mainLanes);
+          const spot = this.roadSpot(x, z, '', 200);
           if (spot) stops.push(spot);
         }
         this.autoDemo = [];
-        this.startDemo(stops);
+        this.startTrip(stops, this.autoSelf, null);
+      }
+      if (this.autoTour > 0 && this.time - this.startTime > 0.3 && this.currentLane() && this.routeGraphNow()) {
+        const tour = this.planTour(this.autoTour * 1000, null);
+        this.autoTour = 0;
+        if (tour) this.startTrip([], this.autoSelf, tour);
       }
       if (this.autoMap && this.time - this.startTime > 0.3) {
         const mode = this.autoMap;
@@ -1475,7 +1963,7 @@ export class Game {
     const h = this.nav.hint;
     let navText = '';
     const demo = this.demo;
-    if (this.nav.goal && ((this.lesson && this.lesson.kind !== 'basics') || demo)) {
+    if (this.nav.busy && ((this.lesson && this.lesson.kind !== 'basics') || demo)) {
       const what = h.what === 'navRoundabout' ? tr('navRoundabout', lang, { n: h.n }) : tr(h.what, lang);
       if (h.what === 'navFollow' || h.dist < 0) navText = tr('navFollow', lang);
       else if (h.dist < 35) navText = tr('navNow', lang, { what });
@@ -1540,9 +2028,12 @@ export class Game {
       yaw: v.yaw,
     };
     if (demo) {
-      // a demonstration drive: where it goes, and under it what the driver is doing just now and why
-      if (!navText) hs.navText = ctx.roadName || tr('demo', lang);
-      hs.navSub = demo.remark ? tr(`demo.${demo.remark}`, lang) : tr('demoRunning', lang, { n: demo.index + 1, max: demo.stops.length });
+      // a drive to places or a tour: where it goes – and, when the car drives by itself, what the
+      // driver is doing just now and why
+      if (!navText) hs.navText = ctx.roadName || tr(demo.active ? 'demo' : 'free', lang);
+      const km = (m: number): string => formatUnit(Math.max(0, m) / 1000, 'kilometer', lang, 1);
+      const where = demo.tour ? tr('tourRunning', lang, { done: km(v.odometer - demo.tour.odo), total: km(demo.tour.metres) }) : tr('guideRunning', lang, { n: demo.index + 1, max: demo.stops.length });
+      hs.navSub = !demo.active ? where : demo.remark ? tr(`demo.${demo.remark}`, lang) : demo.tour ? `${where} · ${tr('demoTakeOver', lang)}` : tr('demoRunning', lang, { n: demo.index + 1, max: demo.stops.length });
     } else if (!navText && !this.lesson) {
       hs.navText = ctx.roadName || tr('free', lang);
       hs.navSub = tr(touch ? 'navSubTouch' : 'navSubKeys', lang);
@@ -1610,6 +2101,61 @@ export class Game {
       else cam.position.lerp(target, Math.min(1, dt * 8));
       this.camSnap = false;
       cam.lookAt(fx, car.position.y + up, fz);
+    } else if (this.cameraMode === 'free') {
+      cam.near = 0.3;
+      cam.fov = 55;
+      const fc = this.fc;
+      const t = this.input.takeCam();
+      const long = this.isTruck;
+      if (!fc.ready) {
+        // from where the camera is now, looking the way it looks
+        fc.ready = true;
+        fc.off.copy(cam.position).sub(car.position);
+        const dir = cam.getWorldDirection(this.tmpV);
+        fc.yaw = Math.atan2(-dir.x, -dir.z);
+        fc.pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
+        // (from the driver's seat, or from nowhere in particular: start behind the car instead)
+        if (fc.off.length() < 2.5 || fc.off.length() > 400) fc.ready = false;
+      }
+      if (!fc.ready || t.reset) {
+        // behind the car, a little above it
+        fc.ready = true;
+        const back = long ? 20 : 8;
+        fc.off.set(Math.sin(v.yaw) * back, long ? 7 : 3.2, Math.cos(v.yaw) * back);
+        fc.yaw = v.yaw;
+        fc.pitch = -0.28;
+      }
+      fc.yaw += t.yaw;
+      fc.pitch = Math.max(-1.5, Math.min(1.3, fc.pitch + t.pitch));
+      const sy = Math.sin(fc.yaw);
+      const cy = Math.cos(fc.yaw);
+      const cp = Math.cos(fc.pitch);
+      const sp = Math.sin(fc.pitch);
+      const tiles = this.app.tiles;
+      let ground = tiles.heightAt(car.position.x + fc.off.x, car.position.z + fc.off.z);
+      if (Number.isNaN(ground)) ground = car.position.y;
+      // what a drag or a key moves it by grows with the height: metres near the ground, a block from high up
+      const reach = Math.max(4, Math.min(220, (car.position.y + fc.off.y - ground) * 1.6 + 3));
+      const speed = (t.fast ? 4 : 1) * Math.max(5, Math.min(90, reach * 0.9));
+      const right = t.right * reach + t.keyRight * speed;
+      const fwd = t.fwd * reach + t.keyFwd * speed;
+      const dolly = t.dolly * reach;
+      fc.off.x += cy * right - sy * fwd - sy * cp * dolly;
+      fc.off.z += -sy * right - cy * fwd - cy * cp * dolly;
+      fc.off.y += sp * dolly + t.keyUp * speed * 0.7;
+      // it stays within the part of the map that is loaded around the car, and above the ground
+      const far = Math.min(900, tiles.viewRadius * 0.7);
+      const hd = Math.hypot(fc.off.x, fc.off.z);
+      if (hd > far) {
+        fc.off.x *= far / hd;
+        fc.off.z *= far / hd;
+      }
+      ground = tiles.heightAt(car.position.x + fc.off.x, car.position.z + fc.off.z);
+      if (Number.isNaN(ground)) ground = car.position.y;
+      fc.off.y = Math.max(ground + 0.4, Math.min(ground + 600, car.position.y + fc.off.y)) - car.position.y;
+      cam.position.copy(car.position).add(fc.off);
+      this.camSnap = false;
+      cam.quaternion.setFromEuler(new THREE.Euler(fc.pitch, fc.yaw, 0, 'YXZ'));
     } else {
       cam.near = 0.2;
       cam.fov = 60;
@@ -1643,6 +2189,9 @@ export class Game {
       calls: this.app.renderer.info.render.calls,
       tris: this.app.renderer.info.render.triangles,
       reality: this.reality?.debugInfo() ?? null,
+      // the road network that is loaded (it may come in pieces around the car), and whether the roads of the whole map are known
+      roads: this.app.world ? { pieces: this.app.map.pieces, edges: this.app.world.allEdges.size, nodes: this.app.world.allNodes.size, whole: this.netIndex !== null } : null,
+      trip: this.demo ? { auto: this.demo.active, tour: this.demo.tour ? Math.round(this.demo.tour.metres) : 0, route: this.nav.route?.length ?? -1, left: this.nav.left } : null,
     };
   }
 }

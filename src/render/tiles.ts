@@ -7,9 +7,9 @@
  */
 import * as THREE from 'three';
 import { COVER_COLORS } from '../world/cover.ts';
+import type { TileGrid } from '../world/loader.ts';
 import { POS_XZ_SCALE, POS_Y_SCALE, tileKey, unpackTile } from '../world/tilefmt.ts';
 import type { SectionArray, TileHeader, UnpackedTile } from '../world/tilefmt.ts';
-import type { WorldJson } from '../world/types.ts';
 import { makeBuildingMaterial, makeGroundMaterial, makeStructMaterial, makeTerrainMaterial } from './materials.ts';
 
 export interface LoadedTile {
@@ -45,10 +45,12 @@ export class TileManager {
   readonly group = new THREE.Group();
   readonly tiles = new Map<string, LoadedTile>();
   private readonly loading = new Set<string>();
-  private readonly failed = new Set<string>();
-  private readonly meta: WorldJson['meta'];
-  private readonly available: Set<string>;
+  /** tiles that could not be fetched: how often it was tried, and when last (they are asked for again a few times) */
+  private readonly failed = new Map<string, { n: number; at: number }>();
+  /** where the tiles lie and which there are */
+  private readonly grid: TileGrid;
   private readonly baseUrl: string;
+  private readonly query: string;
   private readonly groundMat = makeGroundMaterial(false);
   private readonly paintMat = makeGroundMaterial(true);
   private readonly structMat = makeStructMaterial();
@@ -59,10 +61,11 @@ export class TileManager {
   maxConcurrent = 3;
   private wantCount = 0;
 
-  constructor(world: WorldJson, baseUrl: string) {
-    this.meta = world.meta;
-    this.available = new Set(world.tiles);
+  /** `version`: which build of the map (see MapLoader.version) – part of the address of each tile */
+  constructor(grid: TileGrid, baseUrl: string, version = '') {
+    this.grid = grid;
     this.baseUrl = baseUrl;
+    this.query = version ? `?v=${version}` : '';
     this.group.name = 'tiles';
   }
 
@@ -76,7 +79,7 @@ export class TileManager {
   }
 
   update(x: number, z: number): void {
-    const { minX, minZ, tileSize } = this.meta;
+    const { x0: minX, z0: minZ, size: tileSize } = this.grid;
     const r = this.viewRadius;
     const ix0 = Math.floor((x - r - minX) / tileSize);
     const ix1 = Math.floor((x + r - minX) / tileSize);
@@ -86,14 +89,14 @@ export class TileManager {
     const keep = new Set<string>();
     for (let iz = iz0; iz <= iz1; iz++) {
       for (let ix = ix0; ix <= ix1; ix++) {
+        if (!this.grid.has(ix, iz)) continue;
         const key = tileKey(ix, iz);
-        if (!this.available.has(key)) continue;
         const cx = minX + (ix + 0.5) * tileSize;
         const cz = minZ + (iz + 0.5) * tileSize;
         const d = Math.hypot(cx - x, cz - z);
         if (d > r + tileSize * 0.75) continue;
         keep.add(key);
-        if (!this.tiles.has(key) && !this.loading.has(key) && !this.failed.has(key)) wanted.push({ key, d });
+        if (!this.tiles.has(key) && !this.loading.has(key) && this.mayLoad(key)) wanted.push({ key, d });
       }
     }
     wanted.sort((a, b) => a.d - b.d);
@@ -111,10 +114,17 @@ export class TileManager {
     }
   }
 
+  /** May a tile be asked for (again)?  After a failure only after a while, and not for ever: a connection on the road comes and goes. */
+  private mayLoad(key: string): boolean {
+    const f = this.failed.get(key);
+    return !f || (f.n < 5 && performance.now() - f.at > 1500 * 2 ** (f.n - 1));
+  }
+
   private async load(key: string): Promise<void> {
     this.loading.add(key);
     try {
-      const buf = await fetchTile(`${this.baseUrl}tiles/${key}.fsb`);
+      const buf = await fetchTile(`${this.baseUrl}tiles/${key}.fsb${this.query}`);
+      this.failed.delete(key);
       const data = unpackTile(buf);
       const tile = this.build(key, data);
       this.tiles.set(key, tile);
@@ -122,7 +132,7 @@ export class TileManager {
       for (const l of this.listeners) l(tile, true);
     } catch (err) {
       console.warn('tile failed', key, err);
-      this.failed.add(key);
+      this.failed.set(key, { n: (this.failed.get(key)?.n ?? 0) + 1, at: performance.now() });
     } finally {
       this.loading.delete(key);
     }
@@ -309,7 +319,7 @@ export class TileManager {
 
   /** Ground-cover class at a world position (COVER.MEADOW if the tile is not loaded). */
   coverAt(x: number, z: number): number {
-    const { minX, minZ, tileSize } = this.meta;
+    const { x0: minX, z0: minZ, size: tileSize } = this.grid;
     const ix = Math.floor((x - minX) / tileSize);
     const iz = Math.floor((z - minZ) / tileSize);
     const tile = this.tiles.get(tileKey(ix, iz));
@@ -323,7 +333,7 @@ export class TileManager {
 
   /** Terrain height at a world position, or NaN if that tile is not loaded. */
   heightAt(x: number, z: number): number {
-    const { minX, minZ, tileSize } = this.meta;
+    const { x0: minX, z0: minZ, size: tileSize } = this.grid;
     const ix = Math.floor((x - minX) / tileSize);
     const iz = Math.floor((z - minZ) / tileSize);
     const tile = this.tiles.get(tileKey(ix, iz));

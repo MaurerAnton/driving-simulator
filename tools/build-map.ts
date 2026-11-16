@@ -1,325 +1,151 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Map pipeline: OSM extract + Hessen DGM1 + Hessen LoD2  →  public/map/
+ * Map pipeline: from the extracts to public/map.
  *
- *   node --max-old-space-size=3072 tools/build-map.ts [--debug]
+ *   node tools/build-map.ts [--jobs 3] [--tiles] [--only <bx>_<bz>,…] [--resume]
  *
- * Inputs (see docs/MAP_DATA.md for download commands):
- *   data/work/osm-extract.json        (tools/osm-extract.ts)
- *   data/raw/dgm1/tiles/*.tif         (Hessen DGM1, unzipped)
- *   data/raw/lod2/Baunatal-LoD2.gml   (Hessen LoD2, unzipped)
+ * Runs tools/build-graph.ts (the road network of the region; skipped with
+ * --tiles, --only and --resume), then tools/build-tiles.ts for every block
+ * of 8 km – several at a time –, and writes the index of the map
+ * (map.json).  See docs/MAP_DATA.md for the steps before it:
+ *
+ *   python3 -I tools/fetch-geodata.py --district …   terrain and building models
+ *   node tools/osm-extract.ts                        OpenStreetMap, cut to the region
+ *
+ * --resume builds only the blocks that are not there yet (after an interruption).
+ * MAP_OUT=<folder> builds into another folder than public/map.
  */
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
-import {
-  WORLD_MAX_E,
-  WORLD_MAX_N,
-  WORLD_MIN_E,
-  WORLD_MIN_N,
-  WORLD_ORIGIN_E,
-  WORLD_ORIGIN_N,
-} from '../src/geo/utm.ts';
-import { buildCover } from './mapgen/cover.ts';
-import { Dgm } from './mapgen/dgm.ts';
-import { solveElevation } from './mapgen/elevation.ts';
-import { OsmData } from './mapgen/osm.ts';
-import { buildRoadGraph, roadStats } from './mapgen/roads.ts';
-import { DebugSvg } from './mapgen/debug.ts';
-import { deriveControl } from './mapgen/control.ts';
-import { World, computeAllCuts } from '../src/world/world.ts';
-import { CTRL, ROLE, XING } from '../src/world/types.ts';
-import type { WorldJson } from '../src/world/types.ts';
-import { newPolySample, pointInRing, samplePolyline, offsetPolyline, slicePolyline } from '../src/core/geom.ts';
-import { packTile, tileKey } from '../src/world/tilefmt.ts';
-import type { SectionArray } from '../src/world/tilefmt.ts';
-import { TileSet, meshSections } from './mapgen/meshacc.ts';
-import { RoadMesher } from './mapgen/roadmesh.ts';
-import { buildTerrain } from './mapgen/terrain.ts';
-import { addLod2Buildings, addOsmBuildings } from './mapgen/buildings.ts';
-import type { BuildingStats } from './mapgen/buildings.ts';
-import { SignPlacer } from './mapgen/signs.ts';
-import { addBarriersAndRails, addLamps, addVegetation, buildingMask, collectPlaces, collectSpawns } from './mapgen/objects.ts';
-import { collectRails } from './mapgen/rails.ts';
-import { findYard } from './mapgen/yard.ts';
+import { GridSet } from '../src/world/grid.ts';
+import type { GridBits } from '../src/world/grid.ts';
+import type { MapIndexJson, PlaceJson, SpawnJson, WorldJson, YardJson } from '../src/world/types.ts';
+import { BLOCK, gridIndex } from './mapgen/store.ts';
+import type { BlockResult } from './build-tiles.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const args = new Set(process.argv.slice(2));
-const DEBUG = args.has('--debug');
-const t0 = Date.now();
-const lap = (msg: string): void => console.log(`[${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s] ${msg}`);
-
-const bounds = {
-  minX: WORLD_MIN_E - WORLD_ORIGIN_E,
-  maxX: WORLD_MAX_E - WORLD_ORIGIN_E,
-  minZ: -(WORLD_MAX_N - WORLD_ORIGIN_N),
-  maxZ: -(WORLD_MIN_N - WORLD_ORIGIN_N),
-};
-
-const osm = OsmData.load(resolve(root, 'data/work/osm-extract.json'));
-lap(`OSM extract: ${osm.nodes.size} nodes, ${osm.ways.length} ways, ${osm.relations.length} relations`);
-const dgm = await Dgm.load(resolve(root, 'data/raw/dgm1/tiles'), resolve(root, 'data/work/dgm'));
-lap('terrain model loaded');
-
-const cover = buildCover(osm, bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ);
-lap(`ground cover raster ${cover.w}x${cover.h}`);
-
-const graph = buildRoadGraph(osm, dgm, cover, bounds);
-lap(`road graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges — km: ${roadStats(graph)}`);
-
-const elev = solveElevation(graph, dgm);
-lap(
-  `elevation solved: max grade ${(elev.maxGrade * 100).toFixed(1)} %, ${elev.steepEdges} edges > 20 %, ` +
-    `${elev.lowClearances} low bridge clearances (${elev.fixedClearances} decks raised)`,
-);
-
-const control = deriveControl(graph, osm);
-lap(`right-of-way: ${Object.entries(control.report).map(([k, v]) => `${v} ${k}`).join(', ')}`);
-
-/**
- * The municipalities the official terrain and building models were loaded
- * for (see docs/MAP_DATA.md), with their boundaries from OpenStreetMap.
- */
-const MUNICIPALITIES = [
-  { name: 'Baunatal', level: '8', sign: 'Kreis Kassel' },
-  { name: 'Kassel', level: '6', sign: 'documenta-Stadt' },
-].map((m) => {
-  const rel = osm.relations.find((r) => r.tags.boundary === 'administrative' && r.tags.name === m.name && r.tags.admin_level === m.level);
-  if (!rel) console.warn(`[map] no boundary of ${m.name} in the OSM extract`);
-  return { ...m, rings: rel ? osm.multipolygonRings(rel).outer : [] };
-});
-/** The municipality a place belongs to ('' outside of them). */
-const municipalityAt = (x: number, z: number): { name: string; sign: string } | null => {
-  for (const m of MUNICIPALITIES) {
-    let inside = false;
-    for (const ring of m.rings) if (pointInRing(x, z, ring)) inside = !inside;
-    if (inside) return m;
-  }
-  return null;
-};
-
-const worldJson: WorldJson = {
-  version: 1,
-  meta: {
-    name: 'Baunatal · Kassel',
-    generated: new Date().toISOString(),
-    ...bounds,
-    tileSize: 500,
-    originE: WORLD_ORIGIN_E,
-    originN: WORLD_ORIGIN_N,
-    attribution: [
-      'Straßennetz, Verkehrsregelung, Flächennutzung: © OpenStreetMap-Mitwirkende (ODbL 1.0)',
-      'Gelände (DGM1) und Gebäude (LoD2): Hessische Verwaltung für Bodenmanagement und Geoinformation (offene Geobasisdaten)',
-    ],
-  },
-  nodes: graph.nodes,
-  edges: graph.edges,
-  banned: control.banned,
-  signals: control.signals,
-  crossings: control.crossings,
-  places: [],
-  spawns: [],
-  tiles: [],
-};
-computeAllCuts(worldJson);
-// stop / give-way lines never lie inside the junction area
-worldJson.nodes.forEach((n, ni) => {
-  for (const arm of n.arms) {
-    const e = worldJson.edges[arm.e];
-    const cut = e.a === ni ? e.ca : e.cb;
-    const controlled = arm.r === ROLE.YIELD || arm.r === ROLE.STOP || arm.g !== undefined;
-    if (controlled) arm.sl = Math.round(Math.max(arm.sl ?? 0, cut + 0.4) * 100) / 100;
-    else delete arm.sl;
-  }
-});
-const world = new World(worldJson);
-lap(`junction geometry: ${world.nodes.filter((n) => n.shape).length} junction areas`);
-
-// ---- terrain, meshes, tiles -------------------------------------------------
-const TILE = worldJson.meta.tileSize;
-const TERRAIN_CELL = 5;
-const terrain = buildTerrain(dgm, world, bounds, TERRAIN_CELL, resolve(root, `data/work/terrain-natural-${TERRAIN_CELL}m.f32`));
-lap('terrain grid ready');
-
-const tiles = new TileSet(bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ, TILE);
-const mesher = new RoadMesher(world, tiles, { ground: (x, z) => terrain.at(x, z) });
-mesher.build();
-lap(`road meshes: ${mesher.stats.edges} ribbons, ${mesher.stats.junctions} junction areas, ${mesher.stats.bridges} bridges, ${mesher.stats.paintQuads} paint quads`);
-
-const inRect = (x: number, z: number): boolean => x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
-const inWorld = (x: number, z: number): boolean => inRect(x, z) && dgm.covered(x, z);
-
-// ---- buildings ----------------------------------------------------------------
-const bstats: BuildingStats = { lod2Units: 0, osmFallback: 0, triangles: 0, footprints: 0 };
-const lod2Path = resolve(root, 'data/work/lod2-buildings.json');
-if (existsSync(lod2Path)) addLod2Buildings(lod2Path, tiles, bstats);
-else console.warn('[buildings] data/work/lod2-buildings.json missing – run `node tools/lod2-extract.ts` (falling back to OSM footprints only)');
-// inside the municipalities whose LoD2 models are there, only those are used
-const municipality = existsSync(lod2Path) ? MUNICIPALITIES.flatMap((m) => m.rings) : [];
-addOsmBuildings(osm, tiles, terrain, inWorld, municipality, bstats);
-lap(`buildings: ${bstats.lod2Units} LoD2 units, ${bstats.osmFallback} from OSM footprints, ${Math.round(bstats.triangles / 1000)}k triangles, ${bstats.footprints} collision footprints`);
-
-// ---- signs, vegetation, street furniture ---------------------------------------
-worldJson.places = collectPlaces(osm, inRect);
-const signs = new SignPlacer(world, tiles, worldJson.places);
-signs.municipalityAt = municipalityAt;
-signs.build(graph, cover);
-lap(`signs: ${signs.stats.posts} posts — ${[...signs.stats.byCode.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(' ')}`);
-const bmask = buildingMask(tiles, cover);
-const extra = addBarriersAndRails(osm, world, cover, terrain, tiles, inWorld);
-const veg = addVegetation(osm, world, cover, terrain, tiles, bmask, bounds);
-const lamps = addLamps(osm, world, terrain, tiles);
-lap(`vegetation: ${veg.mapped} mapped trees, ${veg.rows} in rows, ${veg.forest} woodland, ${veg.garden} garden; ${lamps} street lamps; ${extra.barriers} walls/hedges, ${extra.railKm.toFixed(1)} km rail, ${extra.guardKm.toFixed(1)} km guard rail`);
-worldJson.spawns = collectSpawns(osm, world, terrain, worldJson.places, inWorld);
-const yard = findYard(cover, terrain, world, osm, bmask, inWorld, worldJson.spawns[0] ?? { x: 0, z: 0 });
-if (yard) worldJson.yard = yard;
-lap(yard ? `practice yard for the truck lessons: a field at ${yard.x}, ${yard.z} (${yard.len} m × ${yard.wid} m, ${yard.rot ? 'north–south' : 'east–west'})` : 'no field for a practice yard found');
-const railNet = collectRails(osm, world, terrain, inWorld);
-worldJson.rails = railNet.rails;
-lap(`tracks for trams and trains: ${railNet.rails.length} pieces – ${railNet.km[0].toFixed(1)} km tram, ${railNet.km[1].toFixed(1)} km light rail, ${railNet.km[2].toFixed(1)} km railway, ${railNet.stops} stops`);
-lap(`start points: ${worldJson.spawns.map((s) => s.name).join('; ')}`);
-
-// (MAP_OUT: build into another folder and swap it in when it is complete)
 const outDir = resolve(root, process.env.MAP_OUT ?? 'public/map');
-rmSync(resolve(outDir, 'tiles'), { recursive: true, force: true });
-mkdirSync(resolve(outDir, 'tiles'), { recursive: true });
-const perTile = TILE / TERRAIN_CELL;
-const terrainN = perTile + 1;
-const coverN = TILE / cover.cell;
+const workDir = resolve(root, 'data/work/graph');
+const argv = process.argv.slice(2);
+const flag = (name: string): boolean => argv.includes(name);
+const value = (name: string): string | undefined => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);
+const jobs = Math.max(1, Number(value('--jobs') ?? 3));
+const only = value('--only')?.split(',').filter(Boolean);
+const resume = flag('--resume');
+const t0 = Date.now();
+const lap = (msg: string): void => console.log(`[${((Date.now() - t0) / 60000).toFixed(1).padStart(6)} min] ${msg}`);
+
+if (!flag('--tiles') && !only && !resume) {
+  // (--expose-gc: the step reports what it holds in memory)
+  const r = spawnSync('node', ['--max-old-space-size=6144', '--expose-gc', resolve(root, 'tools/build-graph.ts')], { stdio: 'inherit', cwd: root });
+  if (r.status !== 0) process.exit(r.status ?? 1);
+  // (tiles of an earlier build do not fit the new network)
+  rmSync(resolve(outDir, 'tiles'), { recursive: true, force: true });
+  lap('the road network is built');
+}
+
+interface Plan {
+  meta: WorldJson['meta'];
+  nodes: number;
+  edges: number;
+  blocks: Array<[number, number]>;
+  chunks: GridBits;
+  places: PlaceJson[];
+  spawns: SpawnJson[];
+}
+const plan = JSON.parse(readFileSync(resolve(workDir, 'plan.json'), 'utf8')) as Plan;
+// the blocks around the first start point come first: what is looked at first is there first
+const home = plan.spawns[0] ?? { x: 0, z: 0 };
+const hx = gridIndex(home.x, BLOCK);
+const hz = gridIndex(home.z, BLOCK);
+let todo = plan.blocks.map(([bx, bz]) => `${bx}_${bz}`).sort((a, b) => {
+  const d = (k: string): number => {
+    const [x, z] = k.split('_').map(Number);
+    return Math.hypot(x - hx, z - hz);
+  };
+  return d(a) - d(b);
+});
+if (only) todo = todo.filter((b) => only.includes(b));
+if (resume) todo = todo.filter((b) => !existsSync(resolve(workDir, `r_${b}.json`)));
+lap(`${todo.length} of ${plan.blocks.length} blocks to build, ${jobs} at a time`);
+
+let failed = 0;
+let done = 0;
+const total = todo.length;
+await new Promise<void>((finish) => {
+  let running = 0;
+  const next = (): void => {
+    if (todo.length === 0) {
+      if (running === 0) finish();
+      return;
+    }
+    const name = todo.shift() as string;
+    running++;
+    const child = spawn('node', ['--max-old-space-size=3072', resolve(root, 'tools/build-tiles.ts'), name], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d: Buffer) => (out += d.toString()));
+    child.stderr.on('data', (d: Buffer) => (out += d.toString()));
+    child.on('close', (code) => {
+      running--;
+      done++;
+      if (code !== 0) {
+        failed++;
+        console.error(`[map] block ${name} failed (${code}):\n${out.split('\n').slice(-12).join('\n')}`);
+      } else {
+        const line = out.split('\n').find((l) => l.startsWith('[tiles] block')) ?? `[tiles] block ${name}`;
+        lap(`${done}/${total} ${line.replace('[tiles] ', '')}`);
+      }
+      next();
+    });
+  };
+  for (let i = 0; i < jobs; i++) next();
+});
+if (failed > 0) {
+  console.error(`[map] ${failed} blocks failed – fix and run again with --resume`);
+  process.exit(1);
+}
+
+// ---- the index of the map: what there is, where to start ----
+const tiles: Array<[number, number]> = [];
 let bytes = 0;
-let tris = 0;
-for (let iz = 0; iz < tiles.nz; iz++) {
-  for (let ix = 0; ix < tiles.nx; ix++) {
-    const t = tiles.at(bounds.minX + (ix + 0.5) * TILE, bounds.minZ + (iz + 0.5) * TILE);
-    const cx = bounds.minX + (ix + 0.5) * TILE;
-    const cz = bounds.minZ + (iz + 0.5) * TILE;
-    // terrain window
-    let tMin = Infinity;
-    let tMax = -Infinity;
-    const hRaw = new Float32Array(terrainN * terrainN);
-    for (let j = 0; j < terrainN; j++) {
-      for (let i = 0; i < terrainN; i++) {
-        const v = terrain.data[(iz * perTile + j) * terrain.w + ix * perTile + i];
-        hRaw[j * terrainN + i] = v;
-        if (v < tMin) tMin = v;
-        if (v > tMax) tMax = v;
-      }
-    }
-    const terrainScale = 0.01;
-    const hgt = new Uint16Array(terrainN * terrainN);
-    for (let k = 0; k < hgt.length; k++) hgt[k] = Math.min(65535, Math.round((hRaw[k] - tMin) / terrainScale));
-    const cov = new Uint8Array(coverN * coverN);
-    for (let j = 0; j < coverN; j++) {
-      const row = (iz * coverN + j) * cover.w + ix * coverN;
-      cov.set(cover.data.subarray(row, row + coverN), j * coverN);
-    }
-    const yBase = Math.round((tMin + tMax) / 2);
-    const sections: Record<string, SectionArray> = { hgt, cov };
-    meshSections('ground', t.ground, cx, cz, yBase, sections);
-    meshSections('mark', t.mark, cx, cz, yBase, sections);
-    meshSections('struct', t.struct, cx, cz, yBase, sections);
-    meshSections('bldg', t.bldg, cx, cz, yBase, sections);
-    if (t.trees.length) sections.trees = Float32Array.from(t.trees);
-    if (t.collPts.length) {
-      sections.collPts = Float32Array.from(t.collPts);
-      sections.collCnt = Uint16Array.from(t.collCnt);
-    }
-    if (t.collSeg.length) sections.collSeg = Float32Array.from(t.collSeg);
-    const bin = packTile(
-      {
-        v: 1,
-        ix,
-        iz,
-        cx,
-        cz,
-        yBase,
-        size: TILE,
-        terrainN,
-        terrainMin: Math.round(tMin * 100) / 100,
-        terrainScale,
-        coverN,
-        signs: t.signs,
-        objects: t.objects,
-      },
-      sections,
-    );
-    // gzip here: static hosts do not compress binary files on their own
-    const gz = gzipSync(bin, { level: 9 });
-    writeFileSync(resolve(outDir, 'tiles', `${tileKey(ix, iz)}.fsb`), gz);
-    worldJson.tiles.push(tileKey(ix, iz));
-    bytes += gz.length;
-    tris += (t.ground.idx.length + t.mark.idx.length + t.struct.idx.length + t.bldg.idx.length) / 3;
-  }
+let triangles = 0;
+let yard: YardJson | null = null;
+const cleared = [0, 0, 0, 0, 0];
+for (const [bx, bz] of plan.blocks) {
+  const file = resolve(workDir, `r_${bx}_${bz}.json`);
+  if (!existsSync(file)) continue;
+  const r = JSON.parse(readFileSync(file, 'utf8')) as BlockResult;
+  tiles.push(...r.tiles);
+  bytes += r.bytes;
+  triangles += r.triangles;
+  if (r.yard) yard = r.yard;
+  r.cleared.forEach((v, i) => (cleared[i] += v));
 }
-const worldText = JSON.stringify(worldJson);
-writeFileSync(resolve(outDir, 'world.json'), worldText);
+const index: MapIndexJson = {
+  version: 2,
+  meta: plan.meta,
+  places: plan.places,
+  spawns: plan.spawns,
+  tiles: GridSet.of(tiles).toJSON(),
+  chunks: plan.chunks,
+  nodes: plan.nodes,
+  edges: plan.edges,
+};
+if (yard) index.yard = yard;
+writeFileSync(resolve(outDir, 'map.json'), JSON.stringify(index));
+// (what an earlier form of the map consisted of)
+rmSync(resolve(outDir, 'world.json'), { force: true });
+
+const sizeOf = (dir: string): number => {
+  let n = 0;
+  for (const f of readdirSync(dir, { withFileTypes: true })) n += f.isDirectory() ? sizeOf(resolve(dir, f.name)) : statSync(resolve(dir, f.name)).size;
+  return n;
+};
+const all = sizeOf(outDir);
 lap(
-  `wrote ${worldJson.tiles.length} tiles (${(bytes / 1048576).toFixed(1)} MB gzipped, ${Math.round(tris / 1000)}k triangles) and world.json (${(worldText.length / 1048576).toFixed(1)} MB)`,
+  `${tiles.length} tiles (${(bytes / 1048576).toFixed(0)} MB, ${Math.round(triangles / 1e6)} million triangles); out of the lanes: ${cleared[0]} signs moved, ${cleared[1]} dropped, ` +
+    `${cleared[2]} lamps, ${cleared[3]} trunks, ${cleared[4]} sides of buildings; ${yard ? `practice yard at ${yard.x}, ${yard.z}` : 'no practice yard'}`,
 );
-
-if (DEBUG) {
-  const out = resolve(root, 'data/work/debug');
-  mkdirSync(out, { recursive: true });
-  const colors = ['#d33', '#e77', '#d60', '#e94', '#c50', '#da6', '#e8a400', '#f0c060', '#333', '#666', '#777', '#888', '#59c', '#bbb', '#b96'];
-  const whole = new DebugSvg(bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ, 0.25);
-  for (const e of graph.edges) whole.line(e.p, 3, colors[e.c], Math.max(e.w, 6));
-  whole.save(resolve(out, 'graph-all.svg'));
-
-  const views: Array<[string, number, number, number, number]> = [
-    ['centre', 150, -800, 850, -300],
-    ['west', -3100, -400, -2500, 50],
-    ['a49', 900, 2500, 1900, 3200],
-  ];
-  const roleColor = ['#1a9a1a', '#e0b000', '#d01010', '#2060e0', '#909090', '#00000000'];
-  const sample = newPolySample();
-  for (const [name, x0, z0, x1, z1] of views) {
-    const svg = new DebugSvg(x0, z0, x1, z1, 2.4);
-    for (const e of world.edges) {
-      if (e.maxX < x0 || e.minX > x1 || e.maxZ < z0 || e.minZ > z1) continue;
-      const s0 = e.cutA;
-      const s1 = e.len - e.cutB;
-      if (s1 - s0 < 0.05) continue;
-      const mid = slicePolyline(e.pl, s0, s1);
-      const L = offsetPolyline(mid, e.width / 2);
-      const R = offsetPolyline(mid, -e.width / 2);
-      const ring: number[] = [];
-      for (let i = 0; i < L.length; i += 3) ring.push(L[i], L[i + 2]);
-      for (let i = R.length - 3; i >= 0; i -= 3) ring.push(R[i], R[i + 2]);
-      svg.polygon(ring, e.surf === 0 ? '#5d5f63' : e.surf <= 3 ? '#8a8378' : '#a89a78', 1);
-      for (const [sw, sign] of [[e.swL, 1], [e.swR, -1]] as Array<[number, number]>) {
-        if (sw <= 0) continue;
-        const a = offsetPolyline(mid, sign * e.width / 2);
-        const b = offsetPolyline(mid, sign * (e.width / 2 + sw));
-        const r2: number[] = [];
-        for (let i = 0; i < a.length; i += 3) r2.push(a[i], a[i + 2]);
-        for (let i = b.length - 3; i >= 0; i -= 3) r2.push(b[i], b[i + 2]);
-        svg.polygon(r2, '#c9c2b4', 1);
-      }
-      if (e.lanesF > 0 && e.lanesB > 0 && (e.flags & 64)) svg.line(mid, 3, '#fff', 0.15, 1, '7 14');
-    }
-    for (const n of world.nodes) {
-      if (!svg.inView(n.x, n.z, 40)) continue;
-      if (n.shape) {
-        svg.polygon(n.shape.ring, n.ctrl === CTRL.SIGNALS ? '#4c4f66' : n.ctrl === CTRL.RBL ? '#4f5f6f' : '#55575b', 1, '#222', 0.05);
-        for (const c of n.shape.corners) {
-          const k3: number[] = [];
-          for (let i = 0; i < c.kerb.length; i += 2) k3.push(c.kerb[i], c.kerb[i + 1]);
-          svg.line(k3, 2, c.swA > 0 || c.swB > 0 ? '#eee' : '#999', 0.18);
-        }
-      }
-      for (const arm of n.arms) {
-        if (!arm.isApproach || n.arms.length < 3) continue;
-        samplePolyline(arm.edge.pl, arm.out ? arm.stopS : arm.edge.len - arm.stopS, sample);
-        svg.circle(sample.x, sample.z, 1.3, arm.sg >= 0 ? '#ff40ff' : roleColor[arm.role]);
-      }
-    }
-    for (const c of world.crossings) {
-      const e = world.edges[c.e];
-      samplePolyline(e.pl, c.s, sample);
-      svg.circle(sample.x, sample.z, 2.2, c.k === XING.ZEBRA ? '#ffffff' : c.k === XING.SIGNAL ? '#ff80ff' : c.k >= XING.RAIL ? '#000' : '#80e0ff', 0.8);
-    }
-    svg.save(resolve(out, `detail-${name}.svg`), '#7d9a4e');
-  }
-  lap('debug SVGs written');
-}
+lap(`${outDir}: ${(all / 1048576).toFixed(0)} MB${all > 950 * 1048576 ? ' – MORE THAN A SITE ON GITHUB PAGES MAY HOLD (1 GB with the game itself)' : ''}`);

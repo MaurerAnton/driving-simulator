@@ -13,9 +13,9 @@ beschreibt, woher die Daten kommen, was daraus abgeleitet wird und wie man die K
 | Verkehrszeichen-Grafiken | Wikimedia Commons, Vektorfassungen der amtlichen Zeichen (StVO / VzKat) | gemeinfrei als amtliche Werke (§ 5 Abs. 1 UrhG) |
 | Luftbilder unter der Karte (nur auf Wunsch, live) | Digitale Orthophotos **DOP20** (20 cm), HVBG, als WMS | wie Gelände und Gebäude: Nutzung ohne Einschränkung (§ 24 HVGG) |
 
-Die Karte umfasst die Stadt **Baunatal** und die kreisfreie Stadt **Kassel** – ein Rechteck von 18 km × 18 km
-(ETRS89/UTM32: Ost 522–540 km, Nord 5674–5692 km). Für beide Städte liegen Gelände und Gebäude vor; die
-Ränder des Rechtecks außerhalb der beiden Stadtgebiete bleiben leer.
+Die Karte umfasst das Gebiet, für das Gelände und Gebäude geladen wurden (siehe unten): zurzeit die
+kreisfreie Stadt **Kassel**, **Baunatal** und den größten Teil des Landkreises Kassel – 1 087 km², in
+Kacheln von 500 m. Sie endet an der Grenze des Gebiets; ein Rechteck ist sie nicht.
 
 ### Warum keine Street-View- oder Satellitenbilder kommerzieller Anbieter?
 
@@ -81,70 +81,120 @@ Das bedeutet: Lage und Art der *erfassten* Regelung stimmen mit der Wirklichkeit
 stehen an plausibler Stelle, können im Einzelfall aber von der Örtlichkeit abweichen. Wer eine Abweichung
 findet, trägt sie am besten in OpenStreetMap ein – nach dem nächsten Kartenlauf stimmt es dann auch hier.
 
+## Die Karte liegt nicht im Repository
+
+Die Karte ist knapp ein Gigabyte groß. Im Git-Verlauf würde jeder Neubau dieses Gigabyte für immer
+hinzufügen; sie liegt deshalb als Datei `map.tar` an einem **Release** des Projekts. Welches Release zum
+Stand des Codes gehört, steht in der Datei [`map.release`](../map.release).
+
+```bash
+npm run map:fetch     # lädt die Karte des in map.release genannten Release nach public/map (curl, tar)
+```
+
+Dasselbe macht der Arbeitsablauf, der die Seite veröffentlicht (`.github/workflows/pages.yml`). Wer die
+Karte selbst gebaut hat, packt und veröffentlicht sie so:
+
+```bash
+npm run map:pack                                             # → data/work/map.tar
+gh release create karte-JJJJ-MM-TT data/work/map.tar --title "Karte JJJJ-MM-TT" --notes "…"
+echo karte-JJJJ-MM-TT > map.release                          # und diese Änderung einchecken
+```
+
 ## Karte neu bauen
 
-Benötigt Node.js ≥ 24 und etwa 2 GB freien Speicher.
+Benötigt Node.js ≥ 24, Python 3 mit `numpy` und `Pillow`, `curl` – und Geduld: Für ganz Nordhessen werden
+rund 25 GB Geländedaten geladen (und gleich wieder gelöscht, sobald sie verkleinert sind); auf der Platte
+bleiben etwa 2 GB Arbeitsdaten, 8 GB Arbeitsspeicher reichen.
 
 ```bash
 # 1. OpenStreetMap-Auszug Hessen (ca. 350 MB)
-mkdir -p data/raw/osm data/raw/dgm1/tiles data/raw/lod2
+mkdir -p data/raw/osm
 curl -L -o data/raw/osm/hessen-latest.osm.pbf \
   https://download.geofabrik.de/europe/germany/hessen-latest.osm.pbf
 
-# 2. DGM1 und LoD2 beider Städte aus dem Downloadcenter der HVBG:
-#    https://gds.hessen.de → Downloadcenter → 3D-Daten
-#      → Digitales Geländemodell (DGM1) → Landkreis Kassel → Baunatal-DGM1.zip
-#      → Digitales Geländemodell (DGM1) → Kreisfreie Stadt Kassel → (Paket) Kassel-DGM1.zip
-#      → 3D-Gebäudemodelle → 3D-Gebäudemodelle LoD2 → Landkreis Kassel → Baunatal-LoD2.zip
-#      → 3D-Gebäudemodelle → 3D-Gebäudemodelle LoD2 → Kreisfreie Stadt Kassel → (Paket) Kassel-LoD2.zip
-#    (Ein „Paket“ ist ein ZIP, in dem das eigentliche ZIP steckt: zweimal auspacken.)
-unzip -o Baunatal-DGM1.zip -d data/raw/dgm1/tiles
-unzip -o Kassel-DGM1.zip   -d data/raw/dgm1/tiles
-unzip -o Baunatal-LoD2.zip -d data/raw/lod2      # Baunatal-LoD2.gml (0,45 GB)
-unzip -o Kassel-LoD2.zip   -d data/raw/lod2      # Kassel-LoD2.gml (2,2 GB)
+# 2. Gelände (DGM1) und Gebäude (LoD2) der gewünschten Kreise aus dem Downloadcenter der HVBG –
+#    Gemeinde für Gemeinde laden, verkleinern, Archiv löschen (wiederholbar: Vorhandenes wird übersprungen)
+python3 -I tools/fetch-geodata.py --list
+python3 -I tools/fetch-geodata.py --district "Kreisfreie Stadt Kassel" --district "Landkreis Kassel" \
+  --district "Schwalm-Eder-Kreis" --district "Werra-Meißner-Kreis" \
+  --district "Landkreis Waldeck-Frankenberg" --district "Landkreis Hersfeld-Rotenburg"
 
-# 3. Pipeline (Zeiten auf einem kleinen ARM-Rechner; 8 GB Arbeitsspeicher reichen)
-npm run map:extract   # schneidet das Kartenrechteck aus dem PBF (eigener PBF-Leser, ~4 min)
-npm run map:lod2      # liest alle *.gml in data/raw/lod2 ein (~7 min)
-npm run map:build     # baut Netz, Höhen, Vorfahrt, Schilder, Gebäude, Kacheln (~11 min)
-npm run map:addresses # Adressliste (Hausnummern aus OSM) für „Start an einer Adresse“ (~1 min)
+# 3. Pipeline
+npm run map:extract   # schneidet das Gebiet, für das Gelände vorliegt, in Blöcken aus dem PBF
+npm run map:build     # Straßennetz des ganzen Gebiets, dann die Kacheln Block für Block (mehrere zugleich)
+npm run map:addresses # Adressliste (Hausnummern aus OSM) für „Start an einer Adresse“
+npm run map:check     # prüft: Im gebauten Ergebnis steht nichts in einem Fahrstreifen
 ```
 
-Mit `MAP_OUT=public/map.neu npm run map:build` (ebenso `map:addresses`) entsteht die Karte in einem anderen
-Ordner und kann am Ende in einem Zug gegen `public/map` getauscht werden.
+**Das Gebiet ist, wofür Gelände geladen wurde** – kein Rechteck, keine Liste im Code. Wer nur seinen
+Landkreis will, lädt nur den. Mit `MAP_OUT=public/map.neu` (für `map:build` und `map:addresses`) entsteht
+die Karte in einem anderen Ordner und kann am Ende in einem Zug gegen `public/map` getauscht werden;
+`node tools/build-map.ts --resume` baut nach einer Unterbrechung nur die Blöcke, die noch fehlen.
 
-Die aktuellen Download-Adressen der HVBG enthalten ein Datum; die Verzeichnisstruktur lässt sich auch
-maschinell abfragen:
-`https://gds.hessen.de/INTERSHOP/rest/WFS/HLBG-Geodaten-Site/-/downloadcenter?path=3D-Daten/...`
+### Was wo liegt
 
-### Stufen von `tools/build-map.ts`
+| Schritt | Ergebnis |
+| --- | --- |
+| `tools/fetch-geodata.py` | `data/work/dgm2/<E km>_<N km>.dgm`: das Gelände in 1-km-Kacheln auf 2-m-Raster (Mittel aus 2 × 2 Zellen des DGM1), Höhen in 2-cm-Schritten, als Differenz zu den Nachbarzellen gepackt – etwa 120 kB je km² statt 2,3 MB. `data/work/lod2/<Gemeinde>/…`: die Gebäude, in Quadrate von 2 km sortiert |
+| `tools/osm-extract.ts` | `data/work/osm/b_<bx>_<bz>.json.gz`: alles aus OSM je Block von 8 km (mit Rand); `roads.json.gz`: Straßen, Wege und Gleise des ganzen Gebiets; `built.bin`: bebaute Flächen im 10-m-Raster; `region.json`: das Gebiet, für das geschnitten wurde |
+| `tools/build-graph.ts` | das Straßennetz des ganzen Gebiets: `public/map/w/<cx>_<cz>.json.gz` (in Stücken von 4 km, wie das Spiel es lädt), `net.bin.gz` (jede Straße in wenigen Zahlen: für Routen, Rundfahrten und die große Karte), `rails.json.gz` (Gleise); dazu je Block, was der Kachelbau braucht (`data/work/graph`) |
+| `tools/build-tiles.ts` | `public/map/tiles/<ix>_<iz>.fsb`: die Kacheln eines Blocks |
+| `tools/build-map.ts` | ruft die beiden vorigen auf und schreibt `public/map/map.json`: Ortsnamen, Startpunkte, Übungsplatz, welche Kacheln und Netzstücke es gibt |
 
-1. **Bodenbedeckung** (`mapgen/cover.ts`): OSM-Flächen als 2-m-Raster (Wiese, Acker, Wald, Wohngebiet …);
-   daraus auch die Maske „bebautes Gebiet“.
-2. **Straßengraph** (`mapgen/roads.ts`): Wege → Knoten/Kanten, Attribute aus Tags, Abschneiden am Rand der
+### Stufen
+
+1. **Straßengraph** (`mapgen/roads.ts`): Wege → Knoten/Kanten, Attribute aus Tags, Abschneiden am Rand der
    Höhendaten, Ausrunden von Knicken.
-3. **Höhen** (`mapgen/elevation.ts`): Geländehöhe je Stützpunkt, gemeinsame Glättung des ganzen Netzes;
+2. **Höhen** (`mapgen/elevation.ts`): Geländehöhe je Stützpunkt, gemeinsame Glättung des ganzen Netzes;
    Brücken werden zwischen ihren Rampen frei gespannt, Unterführungen bei Bedarf abgesenkt.
-4. **Vorfahrt** (`mapgen/control.ts`): Ampelanlagen und Phasen, Rollen jeder Zufahrt, Überwege, Abbiegeverbote.
-5. **Kreuzungsgeometrie** (`src/world/world.ts`): Ausrundungen, Kreuzungsflächen, Bordsteinlinien – derselbe
+3. **Vorfahrt** (`mapgen/control.ts`): Ampelanlagen und Phasen, Rollen jeder Zufahrt, Überwege, Abbiegeverbote.
+4. **Kreuzungsgeometrie** (`src/world/world.ts`): Ausrundungen, Kreuzungsflächen, Bordsteinlinien – derselbe
    Code liefert später die Fahrbahnoberfläche für die Physik.
-6. **Gelände** (`mapgen/terrain.ts`): 5-m-Raster, entlang der Straßen auf Fahrbahnniveau angeglichen.
-7. **Netze** (`mapgen/roadmesh.ts`, `buildings.ts`, `objects.ts`, `signs.ts`): Fahrbahnen, Markierungen,
+5. **Schienen, Startpunkte** (`mapgen/rails.ts`, `mapgen/objects.ts`): das Gleisnetz für Straßenbahnen und
+   Züge; je Ort ein öffentlicher Parkplatz als Startpunkt, sofern von dort das übrige Netz erreichbar ist.
+6. **Netz für Routen** (`src/world/routegraph.ts`, `netfile.ts`): aus den Fahrstreifen und den Wegen über
+   die Kreuzungen (Block für Block gebildet), welche Straße in welche abbiegen darf.
+
+Bis hierher für das ganze Gebiet auf einmal; ab hier **Block für Block** (8 km, mit einem Rand von einer
+Kachel, damit an den Blockgrenzen von beiden Seiten dasselbe herauskommt):
+
+7. **Bodenbedeckung** (`mapgen/cover.ts`): OSM-Flächen als 2-m-Raster (Wiese, Acker, Wald, Wohngebiet …).
+8. **Gelände** (`mapgen/terrain.ts`): 5-m-Raster, entlang der Straßen auf Fahrbahnniveau angeglichen.
+9. **Netze** (`mapgen/roadmesh.ts`, `buildings.ts`, `objects.ts`, `signs.ts`): Fahrbahnen, Markierungen,
    Gehwege, Brücken, Gebäude, Schilder, Bäume, Laternen, Leitplanken, Gleise.
-8. **Schienen und Übungsplatz** (`mapgen/rails.ts`, `mapgen/yard.ts`): das Gleisnetz für Straßenbahnen und
-   Züge, das freie Feld für die Lkw-Fahrstunden.
-9. **Kacheln**: 500-m-Kacheln (`public/map/tiles/*.fsb`, gzip) und `world.json` mit dem Straßennetz.
+10. **Fahrstreifen freiräumen** (`src/sim/clearlanes.ts`): siehe unten.
+11. **Kacheln**: 500-m-Kacheln, gzip. Damit möglichst viel Land in das Gigabyte passt, das GitHub Pages
+    fasst, steht in einer Kachel nichts, was sich beim Laden ausrechnen lässt (`src/world/tilefmt.ts`):
+    - Eckpunkte, Dreiecke und Höhen sind als Schritte zum Vorgänger gespeichert (das Gelände als das, was
+      die Nachbarpunkte links und oben nicht vorhersagen), niedrige und hohe Bytes getrennt – das halbiert
+      die Größe;
+    - das Gelände in Schritten von 4 cm – die Fahrbahn hat ihre eigenen Höhen, der Boden liegt 25 cm
+      darunter;
+    - von einem Baum nur der Ort (auf 10 cm), Höhe und Art: auf welcher Höhe er steht, sagt das Gelände;
+    - von den Flächen der Gebäude nur die Ecken und Farben: Was die Fassade braucht (wo auf der Wand ein
+      Punkt liegt, wie lang und wie hoch die Wand ist, damit Fenster in Reihen und Spalten passen), folgt
+      aus den Ecken. Der Kartenbau prüft das Fläche für Fläche und speichert die Werte nur dort, wo die
+      Regel sie nicht auf 4 cm trifft – bei etwa einer von 200 Ecken (`src/world/facade.ts`).
+
+### Nichts steht im Fahrstreifen
+
+Die Karte entsteht aus Quellen, die nichts voneinander wissen. Die Leitplanke der einen Richtungsfahrbahn
+kann im Fahrstreifen der anderen landen, ein Schilderpfosten auf einer Verkehrsinsel, für die das
+Straßenmodell keinen Platz hat, die Ecke eines Hauses in einer Gasse, die schmaler ist als ihre
+Fahrstreifen. Ein Mensch fährt darum herum oder bleibt davor stehen; der Fahrer der Vorführfahrt bleibt
+stehen. Deshalb gilt beim Kartenbau eine einfache Regel: **Was näher an der Mitte eines Fahrstreifens (oder
+eines Wegs über eine Kreuzung) steht, als ein Fahrzeug breit ist, kommt dort weg.** Pfosten werden neben
+den Fahrstreifen gerückt (oder entfallen, wenn kein Platz ist), Laternen und Baumstämme entfallen, Mauern,
+Hecken, Leitplanken und Brückengeländer bekommen dort eine Lücke, und von Gebäudeumrissen zählen die
+Seiten nicht als Hindernis, die in den Fahrstreifen ragen (das Gebäude selbst bleibt sichtbar).
+`npm run map:check` fährt zur Kontrolle einen wagenbreiten Kreis jeden Fahrstreifen entlang.
 
 ### Andere oder weitere Gemeinden?
 
-Der Kartenausschnitt ist in `src/geo/utm.ts` festgelegt (`WORLD_MIN_E` … in ETRS89/UTM32), die Gemeinden,
-für die Gelände und Gebäude vorliegen, stehen in `tools/build-map.ts` (`MUNICIPALITIES`: Name, Verwaltungsebene
-der OSM-Grenze, zweite Zeile der Ortstafel). Für eine weitere hessische Gemeinde: Rechteck anpassen, deren
-DGM1- und LoD2-Paket dazulegen, Gemeinde eintragen, Pipeline laufen lassen. Je größer das Rechteck, desto
-länger dauert der Start des Spiels – das ganze Straßennetz wird am Anfang geladen (Baunatal und Kassel:
-20 MB, gepackt 6 MB). Für andere
-Bundesländer müssen die Leser für Höhenmodell und Gebäude an das jeweilige Lieferformat angepasst werden
-(viele Länder bieten ebenfalls offene DGM1/LoD2-Daten).
+Weitere hessische Kreise: mit `tools/fetch-geodata.py` laden und die Pipeline laufen lassen. Die Grenze
+setzt GitHub Pages: Eine Seite darf 1 GB groß sein. Für andere Bundesländer müssen der Abruf und die Leser
+für Höhenmodell und Gebäude an das jeweilige Lieferformat angepasst werden (viele Länder bieten ebenfalls
+offene DGM1/LoD2-Daten).
 
 ## Koordinaten
 

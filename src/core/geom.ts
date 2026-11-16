@@ -374,6 +374,27 @@ export class Grid2<T> {
     this.insertBox(x, z, x, z, item);
   }
 
+  /** Take an item out again – with the box it was put in with. */
+  removeBox(minX: number, minZ: number, maxX: number, maxZ: number, item: T): void {
+    const c = this.cell;
+    const x0 = Math.floor(minX / c);
+    const x1 = Math.floor(maxX / c);
+    const z0 = Math.floor(minZ / c);
+    const z1 = Math.floor(maxZ / c);
+    for (let ix = x0; ix <= x1; ix++) {
+      for (let iz = z0; iz <= z1; iz++) {
+        const k = this.key(ix, iz);
+        const arr = this.map.get(k);
+        if (!arr) continue;
+        const i = arr.indexOf(item);
+        if (i < 0) continue;
+        arr[i] = arr[arr.length - 1];
+        arr.pop();
+        if (arr.length === 0) this.map.delete(k);
+      }
+    }
+  }
+
   /** Items whose cells overlap the query cell containing (x,z). */
   at(x: number, z: number): readonly T[] {
     const c = this.cell;

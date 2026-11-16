@@ -152,7 +152,16 @@ export function addLamps(osm: OsmData, world: World, terrain: TerrainGrid, ts: T
 }
 
 /** Walls, hedges, guard rails as low extrusions; railway tracks as rails on ballast. */
-export function addBarriersAndRails(osm: OsmData, world: World, cover: CoverMap, terrain: TerrainGrid, ts: TileSet, inWorld: (x: number, z: number) => boolean): { barriers: number; railKm: number; guardKm: number } {
+export function addBarriersAndRails(
+  osm: OsmData,
+  world: World,
+  cover: CoverMap,
+  terrain: TerrainGrid,
+  ts: TileSet,
+  inWorld: (x: number, z: number) => boolean,
+  /** would a wall from (x1, z1) to (x2, z2) at height y stand in a lane? (then that piece is left out) */
+  inLane: (x1: number, z1: number, x2: number, z2: number, y: number) => boolean = () => false,
+): { barriers: number; railKm: number; guardKm: number } {
   const hit = newSurfaceHit();
   let barriers = 0;
   let railKm = 0;
@@ -224,17 +233,44 @@ export function addBarriersAndRails(osm: OsmData, world: World, cover: CoverMap,
     return runs;
   };
   const ground = (x: number, z: number): number => terrain.at(x, z);
+  /** the pieces of a line that do not stand in a lane (a wall across a driveway gets its gap, a guard rail ends where a slip road joins) */
+  const clear = (c: number[], yAt: (x: number, z: number) => number): number[][] => {
+    const runs: number[][] = [];
+    let cur: number[] = [];
+    // (the ground can jump between the ends of a piece – at the abutment of a bridge, at a retaining
+    // wall: the piece is drawn and collides at the height of its end points, so it is tested at these too)
+    let ya = c.length >= 2 ? yAt(c[0], c[1]) : 0;
+    for (let i = 0; i + 3 < c.length; i += 2) {
+      const yb = yAt(c[i + 2], c[i + 3]);
+      const ym = yAt((c[i] + c[i + 2]) / 2, (c[i + 1] + c[i + 3]) / 2);
+      const y0 = ya;
+      ya = yb;
+      const bad =
+        inLane(c[i], c[i + 1], c[i + 2], c[i + 3], ym) ||
+        (Math.abs(y0 - ym) > 0.5 && inLane(c[i], c[i + 1], c[i + 2], c[i + 3], y0)) ||
+        (Math.abs(yb - ym) > 0.5 && inLane(c[i], c[i + 1], c[i + 2], c[i + 3], yb));
+      if (bad) {
+        if (cur.length >= 4) runs.push(cur);
+        cur = [];
+      } else {
+        if (cur.length === 0) cur.push(c[i], c[i + 1]);
+        cur.push(c[i + 2], c[i + 3]);
+      }
+    }
+    if (cur.length >= 4) runs.push(cur);
+    return runs;
+  };
 
   for (const w of osm.ways) {
     const t = w.tags;
     if (t.barrier === 'wall' || t.barrier === 'retaining_wall' || t.barrier === 'city_wall') {
-      for (const run of clip(densify(osm.wayCoords(w), 4))) strip(run, 0.14, -0.4, t.barrier === 'retaining_wall' ? 1.2 : 1.5, [176, 170, 160], ground, true);
+      for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.14, -0.4, t.barrier === 'retaining_wall' ? 1.2 : 1.5, [176, 170, 160], ground, true);
       barriers++;
     } else if (t.barrier === 'hedge' || t.natural === 'hedge') {
-      for (const run of clip(densify(osm.wayCoords(w), 4))) strip(run, 0.45, -0.3, 1.5, [58, 92, 44], ground, true);
+      for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.45, -0.3, 1.5, [58, 92, 44], ground, true);
       barriers++;
     } else if (t.barrier === 'guard_rail' || t.barrier === 'jersey_barrier') {
-      for (const run of clip(densify(osm.wayCoords(w), 4))) strip(run, 0.06, 0.42, 0.78, [150, 155, 160], ground, true);
+      for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.06, 0.42, 0.78, [150, 155, 160], ground, true);
       barriers++;
     } else if ((t.railway === 'rail' || t.railway === 'tram' || t.railway === 'light_rail') && t.tunnel !== 'yes' && !isClosedWay(w)) {
       for (const run of clip(densify(osm.wayCoords(w), 4))) {
@@ -279,11 +315,12 @@ export function addBarriersAndRails(osm: OsmData, world: World, cover: CoverMap,
         const out = e.width / 2 + 0.55;
         line.push(tmp.x + tmp.tz * out * side, tmp.z - tmp.tx * out * side);
       }
-      strip(line, 0.05, 0.42, 0.78, [150, 155, 160], (x, z) => {
-        samplePolyline(e.pl, 0, tmp);
-        return world.nearestRoad(x, z, 3, 0, hit) ? hit.y : terrain.at(x, z);
-      }, true);
-      guardKm += (s1 - s0) / 1000;
+      const foot = (x: number, z: number): number => (world.nearestRoad(x, z, 3, 0, hit) ? hit.y : terrain.at(x, z));
+      // (not where the carriageway beside it, or a slip road joining it, has its lanes)
+      for (const run of clear(line, foot)) {
+        strip(run, 0.05, 0.42, 0.78, [150, 155, 160], foot, true);
+        guardKm += ((run.length / 2 - 1) * 4) / 1000;
+      }
     }
   }
   return { barriers, railKm, guardKm };
@@ -302,7 +339,7 @@ export function collectPlaces(osm: OsmData, inRect: (x: number, z: number) => bo
 }
 
 /** Start points: one public car park per district, placed on its access aisle. */
-export function collectSpawns(osm: OsmData, world: World, terrain: TerrainGrid, places: PlaceJson[], inWorld: (x: number, z: number) => boolean): SpawnJson[] {
+export function collectSpawns(osm: OsmData, world: World, terrain: { at(x: number, z: number): number }, places: PlaceJson[], inWorld: (x: number, z: number) => boolean): SpawnJson[] {
   interface Lot {
     x: number;
     z: number;

@@ -95,6 +95,21 @@ export class Input {
    * False: the driver's head (stops at the shoulders).
    */
   orbit = false;
+  /**
+   * The free camera: fingers and mouse move the camera itself (see `cam`)
+   * instead of turning a head or circling the car, and it stays where it is put.
+   */
+  freeCam = false;
+  /**
+   * What was asked of the free camera since it was last read (takeCam):
+   * turning in radians, moving sideways / forwards / up and towards what it
+   * looks at in parts of the distance to it – by dragging, pinching and the
+   * wheel – and flying with the keys (Alt held) in seconds of key time.
+   */
+  private readonly cam = { yaw: 0, pitch: 0, right: 0, fwd: 0, dolly: 0, keyRight: 0, keyFwd: 0, keyUp: 0, fast: false, reset: false };
+  /** fingers on the view */
+  private readonly fingers = new Map<number, { x: number; y: number }>();
+  private pinch = 0;
   private lookIdle = 0;
   private wheelbase = 2.63;
   private maxWheelAngle = 0.576;
@@ -110,59 +125,143 @@ export class Input {
     canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse') {
         if (e.button === 0) this.dragging = true;
+        // (a drag goes on when the pointer passes over a part of the HUD)
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch {
+          /* the pointer is gone already */
+        }
         return;
       }
-      // a finger on the view: swipe to glance left or right (shoulder check), let go to look ahead again
+      // A finger on the view.  From the driver's seat: swipe to glance left or right (shoulder
+      // check), let go to look ahead again.  From outside: it turns the camera, which stays.
+      // Two fingers move the free camera, and pinching brings a camera closer or takes it away.
       this.mode = 'touch';
+      this.fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.fingers.size === 2) this.pinch = this.fingerSpread();
       if (this.lookId >= 0) return;
       this.lookId = e.pointerId;
       this.lookX = e.clientX;
       this.lookY = e.clientY;
       this.dragging = true;
-      this.glance = true;
+      this.glance = !this.orbit && !this.freeCam;
     });
     const release = (e: PointerEvent): void => {
-      if (e.pointerType === 'mouse') this.dragging = false;
-      else if (e.pointerId === this.lookId) {
-        this.lookId = -1;
+      if (e.pointerType === 'mouse') {
         this.dragging = false;
+        return;
+      }
+      this.fingers.delete(e.pointerId);
+      if (e.pointerId === this.lookId) {
+        // (another finger still on the view goes on turning it)
+        const rest = this.fingers.entries().next();
+        if (rest.done) {
+          this.lookId = -1;
+          this.dragging = false;
+        } else {
+          this.lookId = rest.value[0];
+          this.lookX = rest.value[1].x;
+          this.lookY = rest.value[1].y;
+        }
       }
     };
     window.addEventListener('pointerup', release);
     window.addEventListener('pointercancel', release);
     canvas.addEventListener('pointermove', (e) => {
-      if (!this.dragging) return;
       const inv = settings.invertLookY ? -1 : 1;
-      this.lookIdle = 0;
       if (e.pointerType === 'mouse') {
-        this.turnLook(-e.movementX * 0.005, -e.movementY * 0.004 * inv);
+        // the left button held – or Alt, with no button at all – turns the view;
+        // the right or the middle button moves the free camera
+        const turn = this.dragging || (e.altKey && e.buttons === 0);
+        if (this.freeCam && (e.buttons & 6) !== 0) {
+          const k = 1 / Math.max(240, window.innerHeight);
+          this.cam.right -= e.movementX * k;
+          this.cam.fwd += e.movementY * k;
+        } else if (turn) {
+          this.lookIdle = 0;
+          this.turnLook(-e.movementX * 0.005, -e.movementY * 0.004 * inv);
+        }
+        return;
+      }
+      const f = this.fingers.get(e.pointerId);
+      if (!f) return;
+      const dx = e.clientX - f.x;
+      const dy = e.clientY - f.y;
+      f.x = e.clientX;
+      f.y = e.clientY;
+      this.lookIdle = 0;
+      if (this.fingers.size >= 2) {
+        const spread = this.fingerSpread();
+        const scale = this.pinch > 8 && spread > 8 ? spread / this.pinch : 1;
+        this.pinch = spread;
+        if (this.freeCam) {
+          // (each finger moves the middle between the two by half of what it moves)
+          const k = 0.5 / Math.max(240, window.innerHeight);
+          this.cam.right -= dx * k;
+          this.cam.fwd += dy * k;
+          this.cam.dolly += Math.log(scale);
+        } else if (this.orbit) this.c.lookZoom = clamp(this.c.lookZoom / scale, 3.5, this.zoomMax);
       } else if (e.pointerId === this.lookId) {
         // a thumb travels less than a mouse: a third of the screen is a full shoulder check
         const k = 5.4 / Math.max(320, window.innerWidth);
-        this.turnLook((e.clientX - this.lookX) * k, (e.clientY - this.lookY) * k * 0.5 * inv);
-        this.lookX = e.clientX;
-        this.lookY = e.clientY;
+        this.turnLook(dx * k, dy * k * 0.5 * inv);
       }
     });
     // the wheel of the mouse moves the camera closer to the car or further away
     canvas.addEventListener(
       'wheel',
       (e) => {
-        if (!this.orbit || !this.enabled) return;
+        if ((!this.orbit && !this.freeCam) || !this.enabled) return;
         e.preventDefault();
-        this.c.lookZoom = clamp(this.c.lookZoom * Math.exp(clamp(e.deltaY, -120, 120) * 0.0016), 3.5, this.zoomMax);
+        const step = clamp(e.deltaY, -120, 120) * 0.0016;
+        if (this.freeCam) this.cam.dolly -= step;
+        else this.c.lookZoom = clamp(this.c.lookZoom * Math.exp(step), 3.5, this.zoomMax);
       },
       { passive: false },
     );
+    // (the right button moves the free camera: no menu of the browser over the view)
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('dblclick', () => {
       this.mouseLookYaw = 0;
       this.mouseLookPitch = 0;
+      this.cam.reset = true;
     });
   }
 
+  private fingerSpread(): number {
+    const it = this.fingers.values();
+    const a = it.next().value;
+    const b = it.next().value;
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  }
+
+  /** What was asked of the free camera since the last call (see `cam`); the object is reused. */
+  takeCam(): Readonly<{ yaw: number; pitch: number; right: number; fwd: number; dolly: number; keyRight: number; keyFwd: number; keyUp: number; fast: boolean; reset: boolean }> {
+    const c = this.cam;
+    const o = this.camOut;
+    o.yaw = c.yaw;
+    o.pitch = c.pitch;
+    o.right = c.right;
+    o.fwd = c.fwd;
+    o.dolly = c.dolly;
+    o.keyRight = c.keyRight;
+    o.keyFwd = c.keyFwd;
+    o.keyUp = c.keyUp;
+    o.fast = c.fast;
+    o.reset = c.reset;
+    c.yaw = c.pitch = c.right = c.fwd = c.dolly = c.keyRight = c.keyFwd = c.keyUp = 0;
+    c.reset = false;
+    return o;
+  }
+
+  private readonly camOut = { yaw: 0, pitch: 0, right: 0, fwd: 0, dolly: 0, keyRight: 0, keyFwd: 0, keyUp: 0, fast: false, reset: false };
+
   /** Looking around with the mouse or a finger; the stops depend on what is turning: a head or a camera. */
   private turnLook(dYaw: number, dPitch: number): void {
-    if (this.orbit) {
+    if (this.freeCam) {
+      this.cam.yaw += dYaw;
+      this.cam.pitch += dPitch;
+    } else if (this.orbit) {
       this.mouseLookYaw = wrap(this.mouseLookYaw + dYaw);
       // from just above the road to almost straight down onto the roof
       this.mouseLookPitch = clamp(this.mouseLookPitch + dPitch, -1.15, 0.28);
@@ -173,8 +272,10 @@ export class Input {
   }
 
   /** The camera was changed: look straight ahead again. */
-  resetLook(orbit: boolean): void {
+  resetLook(orbit: boolean, freeCam = false): void {
     this.orbit = orbit;
+    this.freeCam = freeCam;
+    this.takeCam();
     this.mouseLookYaw = 0;
     this.mouseLookPitch = 0;
     this.c.lookYaw = 0;
@@ -240,6 +341,8 @@ export class Input {
         this.touch.active = false;
       }
       this.keys.add(code);
+      // (Alt alone must not put the browser's menu in charge of the keyboard)
+      if (code === 'AltLeft' || code === 'AltRight') e.preventDefault();
       if (code === 'Escape') this.fire('pause');
       if (code === 'F1') {
         e.preventDefault();
@@ -248,6 +351,11 @@ export class Input {
       // "Foto": what does this place really look like? (also from the pause menu)
       if (code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) this.fire('reality');
       if (!this.enabled) return;
+      // Alt held with the free camera: the keys fly the camera, they do not drive
+      if (this.freeCam && e.altKey) {
+        e.preventDefault();
+        return;
+      }
       const c = this.c;
       switch (code) {
         case 'KeyE':
@@ -310,6 +418,7 @@ export class Input {
       if (code.startsWith('Arrow')) e.preventDefault();
     } else {
       this.keys.delete(code);
+      if (code === 'AltLeft' || code === 'AltRight') e.preventDefault();
     }
   }
 
@@ -332,6 +441,15 @@ export class Input {
     }
     const pad = this.readPad();
     const absSpeed = Math.abs(speed);
+    // the free camera, flown with the keys while Alt is held (the car rolls on by itself meanwhile)
+    const fly = this.freeCam && this.key('AltLeft', 'AltRight');
+    if (fly) {
+      const cam = this.cam;
+      cam.keyFwd += ((this.key('KeyW', 'ArrowUp') ? 1 : 0) - (this.key('KeyS', 'ArrowDown') ? 1 : 0)) * dt;
+      cam.keyRight += ((this.key('KeyD', 'ArrowRight') ? 1 : 0) - (this.key('KeyA', 'ArrowLeft') ? 1 : 0)) * dt;
+      cam.keyUp += ((this.key('KeyE', 'PageUp') ? 1 : 0) - (this.key('KeyQ', 'PageDown') ? 1 : 0)) * dt;
+      cam.fast = this.key('ShiftLeft', 'ShiftRight');
+    }
 
     if (pad && pad.kind === 'wheel') {
       c.device = 'wheel';
@@ -339,7 +457,7 @@ export class Input {
       c.throttle = pad.throttle;
       c.brake = pad.brake;
       c.clutch = pad.clutch;
-    } else if (pad && (Math.abs(pad.steer) > 0.02 || pad.throttle > 0.02 || pad.brake > 0.02 || c.device === 'gamepad') && !this.anyDrivingKey()) {
+    } else if (pad && (Math.abs(pad.steer) > 0.02 || pad.throttle > 0.02 || pad.brake > 0.02 || c.device === 'gamepad') && (fly || !this.anyDrivingKey())) {
       c.device = 'gamepad';
       // gentle non-linearity and less lock at speed make a thumb stick usable
       const limit = this.lockFor(ANALOG_LATERAL, absSpeed);
@@ -357,8 +475,8 @@ export class Input {
       c.clutch = 0;
     } else {
       c.device = 'keyboard';
-      const left = this.key('KeyA', 'ArrowLeft');
-      const right = this.key('KeyD', 'ArrowRight');
+      const left = !fly && this.key('KeyA', 'ArrowLeft');
+      const right = !fly && this.key('KeyD', 'ArrowRight');
       // A key is all or nothing, a steering wheel is not: the keys ask for the lock that turns the car
       // with a comfortable lateral acceleration at this speed – full lock at walking pace, a fraction
       // of a degree on the motorway – and wind it on within about half a second.
@@ -374,13 +492,13 @@ export class Input {
         const centring = clamp(absSpeed / 6, 0, 1) * Math.max((1.4 + Math.abs(selfAlign) * 2.5) * Math.max(limit, 0.15), Math.abs(c.steer) * 3);
         c.steer = approach(c.steer, 0, dt * centring);
       }
-      const gas = this.key('KeyW', 'ArrowUp');
-      const brake = this.key('KeyS', 'ArrowDown');
+      const gas = !fly && this.key('KeyW', 'ArrowUp');
+      const brake = !fly && this.key('KeyS', 'ArrowDown');
       // quick to half travel, slower to the floor: easier to dose with a key
       const gasTarget = gas ? 1 : 0;
       c.throttle = gas ? approach(c.throttle, gasTarget, dt * (c.throttle < 0.35 ? 2.4 : 0.6)) : approach(c.throttle, 0, dt * 5);
       c.brake = brake ? approach(c.brake, 1, dt * (c.brake < 0.45 ? 2.6 : 1.3)) : approach(c.brake, 0, dt * 6);
-      const clutch = this.key('ShiftLeft', 'ShiftRight');
+      const clutch = !fly && this.key('ShiftLeft', 'ShiftRight');
       // press quickly, release smoothly (like lifting the foot with feeling)
       c.clutch = clutch ? approach(c.clutch, 1, dt * 7) : approach(c.clutch, 0, dt * (c.clutch > 0.3 && c.clutch < 0.78 ? 0.55 : 2.2));
     }
@@ -396,6 +514,7 @@ export class Input {
     c.horn = this.key('KeyH') || (pad?.horn ?? false);
 
     // a finger glance swings back by itself
+    if (this.freeCam) this.glance = false;
     if (this.glance && !this.dragging) {
       this.mouseLookYaw = approach(this.mouseLookYaw, 0, dt * 5);
       this.mouseLookPitch = approach(this.mouseLookPitch, 0, dt * 2.5);

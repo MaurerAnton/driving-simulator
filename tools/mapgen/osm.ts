@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /** Loads the JSON extract written by tools/osm-extract.ts and projects it into world space. */
 import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { latLonToWorld } from '../../src/geo/utm.ts';
 
 export type Tags = Record<string, string>;
@@ -37,17 +38,24 @@ export class OsmData {
   readonly relations: ORelation[] = [];
   extractedAt = '';
 
+  /**
+   * Read an extract written by tools/osm-extract.ts (gzipped or not).  Its
+   * nodes are [id, x, z, tags?] in world coordinates, or – extracts of older
+   * builds – [id, lat, lon, tags?].
+   */
   static load(path: string): OsmData {
-    const raw = JSON.parse(readFileSync(path, 'utf8')) as {
-      meta: { extractedAt: string };
+    const bytes = readFileSync(path);
+    const raw = JSON.parse((path.endsWith('.gz') ? gunzipSync(bytes) : bytes).toString('utf8')) as {
+      meta: { extractedAt: string; world?: boolean };
       nodes: Array<[number, number, number, Tags?]>;
       ways: OWay[];
       relations: ORelation[];
     };
     const d = new OsmData();
     d.extractedAt = raw.meta.extractedAt;
+    const world = raw.meta.world === true;
     for (const n of raw.nodes) {
-      const [x, z] = latLonToWorld(n[1], n[2]);
+      const [x, z] = world ? [n[1], n[2]] : latLonToWorld(n[1], n[2]);
       d.nodes.set(n[0], { id: n[0], x, z, tags: n[3] ?? null });
     }
     for (const w of raw.ways) {

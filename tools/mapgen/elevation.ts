@@ -51,10 +51,44 @@ export function solveElevation(graph: RoadGraph, dgm: Dgm): ElevationReport {
     return 1 / (1 + 2 * r * r);
   };
 
+  // The terrain under every node and every point of every road – asked for tile by tile: the
+  // model of a whole region is read piece by piece, and roads come in no particular order.
+  let points = nodes.length;
+  for (const e of edges) points += e.p.length / 3;
+  const sx = new Float64Array(points);
+  const sz = new Float64Array(points);
+  nodes.forEach((n, i) => {
+    sx[i] = n.x;
+    sz[i] = n.z;
+  });
+  const edgeFirst = new Int32Array(E);
+  for (let k = 0, at = nodes.length; k < E; k++) {
+    edgeFirst[k] = at;
+    const p = edges[k].p;
+    for (let i = 0; i < p.length; i += 3, at++) {
+      sx[at] = p[i];
+      sz[at] = p[i + 2];
+    }
+  }
+  const sampled = new Float64Array(points);
+  {
+    const order = new Uint32Array(points);
+    const tile = new Float64Array(points);
+    for (let i = 0; i < points; i++) {
+      order[i] = i;
+      tile[i] = Math.floor(sx[i] / 1000) * 100000 + Math.floor(sz[i] / 1000);
+    }
+    order.sort((a, b) => tile[a] - tile[b]);
+    for (let j = 0; j < points; j++) {
+      const i = order[j];
+      let h = dgm.heightAvg(sx[i], sz[i], 1.5);
+      if (Number.isNaN(h)) h = dgm.heightAvg(sx[i], sz[i], 6);
+      sampled[i] = h;
+    }
+  }
+
   for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i];
-    let h = dgm.heightAvg(n.x, n.z, 1.5);
-    if (Number.isNaN(h)) h = dgm.heightAvg(n.x, n.z, 6);
+    const h = sampled[i];
     nodeRaw[i] = Number.isNaN(h) ? 200 : h;
     nodeH[i] = nodeRaw[i];
     // Abutment nodes float as well: OSM bridge ends are rarely exactly on the
@@ -74,9 +108,7 @@ export function solveElevation(graph: RoadGraph, dgm: Dgm): ElevationReport {
     for (let i = 0; i < n; i++) {
       const x = e.p[i * 3];
       const z = e.p[i * 3 + 2];
-      let v = dgm.heightAvg(x, z, 1.5);
-      if (Number.isNaN(v)) v = dgm.heightAvg(x, z, 6);
-      raw[i] = Number.isNaN(v) ? NaN : v;
+      raw[i] = sampled[edgeFirst[k] + i];
       if (i > 0) seg[i] = Math.hypot(x - e.p[i * 3 - 3], z - e.p[i * 3 - 1]);
     }
     // fill gaps (points just outside coverage)
@@ -398,12 +430,8 @@ export function solveElevation(graph: RoadGraph, dgm: Dgm): ElevationReport {
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     node.y = Math.round(nodeH[i] * 100) / 100;
-    // least-squares plane through the arms' slopes near the node
-    let a11 = 1e-3;
-    let a12 = 0;
-    let a22 = 1e-3;
-    let b1 = 0;
-    let b2 = 0;
+    // the plane through the arms' slopes near the node
+    const arms: PlaneArm[] = [];
     for (const [k, isA] of inc[i]) {
       const e = edges[k];
       const h = eh[k];
@@ -421,28 +449,83 @@ export function solveElevation(graph: RoadGraph, dgm: Dgm): ElevationReport {
       const dz = e.p[j * 3 + 2] - node.z;
       const d = Math.hypot(dx, dz);
       if (d < 0.5) continue;
-      const ux = dx / d;
-      const uz = dz / d;
-      const m = (h[j] - nodeH[i]) / d;
-      const w = CLASS_TIER[e.c] + 1;
-      a11 += w * ux * ux;
-      a12 += w * ux * uz;
-      a22 += w * uz * uz;
-      b1 += w * m * ux;
-      b2 += w * m * uz;
+      arms.push({ ux: dx / d, uz: dz / d, m: (h[j] - nodeH[i]) / d, w: CLASS_TIER[e.c] + 1 });
     }
-    const det = a11 * a22 - a12 * a12;
-    let gx = det > 1e-9 ? (b1 * a22 - b2 * a12) / det : 0;
-    let gz = det > 1e-9 ? (a11 * b2 - a12 * b1) / det : 0;
-    const gl = Math.hypot(gx, gz);
-    if (gl > 0.14) {
-      gx *= 0.14 / gl;
-      gz *= 0.14 / gl;
-    }
+    const [gx, gz] = fitJunctionPlane(arms);
     if (Math.abs(gx) > 5e-4 || Math.abs(gz) > 5e-4) {
       node.gx = Math.round(gx * 1e4) / 1e4;
       node.gz = Math.round(gz * 1e4) / 1e4;
     }
   }
   return { maxGrade, steepEdges, lowClearances, fixedClearances };
+}
+
+/** An arm of a junction as the plane of the junction sees it: its direction away from the node, its slope that way, its weight. */
+export interface PlaneArm {
+  ux: number;
+  uz: number;
+  m: number;
+  w: number;
+}
+
+/** how steep the plane of a junction may be, and how far it may tilt a road sideways for the sake of a lesser road joining it */
+const PLANE_MAX = 0.14;
+const TILT_MAX = 0.04;
+
+/**
+ * The plane of a junction (its slope east and south) from the slopes of its
+ * arms: the least-squares fit – except for what the arms do not say.  Arms
+ * that (nearly) lie in one line, as at a joint in a road or where a track
+ * leaves it, say nothing about the slope across them: fitted freely, a slight
+ * bend with a slight change of grade tilted such a road sideways by a tenth,
+ * a step of half a metre for the wheels on one side.  There the plane follows
+ * the road and is level across it; and a lesser road that joins a greater one
+ * tilts it by a few per cent at most.
+ */
+export function fitJunctionPlane(arms: PlaneArm[]): [number, number] {
+  let a11 = 1e-3;
+  let a12 = 0;
+  let a22 = 1e-3;
+  let b1 = 0;
+  let b2 = 0;
+  for (const a of arms) {
+    a11 += a.w * a.ux * a.ux;
+    a12 += a.w * a.ux * a.uz;
+    a22 += a.w * a.uz * a.uz;
+    b1 += a.w * a.m * a.ux;
+    b2 += a.w * a.m * a.uz;
+  }
+  // along the direction the arms say most about (v), and across it
+  const half = (a11 + a22) / 2;
+  const disc = Math.sqrt(Math.max(0, half * half - (a11 * a22 - a12 * a12)));
+  const l1 = half + disc;
+  const l2 = half - disc;
+  let vx = l1 - a22;
+  let vz = a12;
+  if (Math.abs(vx) + Math.abs(vz) < 1e-9) {
+    vx = a12;
+    vz = l1 - a11;
+  }
+  const vl = Math.hypot(vx, vz);
+  if (vl < 1e-9) {
+    // (no direction stands out: arms all round, or none)
+    vx = 1;
+    vz = 0;
+  } else {
+    vx /= vl;
+    vz /= vl;
+  }
+  const along = (b1 * vx + b2 * vz) / l1;
+  let across = l2 > 1e-6 ? (-b1 * vz + b2 * vx) / l2 : 0;
+  const say = l2 / l1;
+  if (say < 0.12) across = 0;
+  else if (say < 0.6) across = Math.max(-TILT_MAX, Math.min(TILT_MAX, across));
+  let gx = along * vx - across * vz;
+  let gz = along * vz + across * vx;
+  const gl = Math.hypot(gx, gz);
+  if (gl > PLANE_MAX) {
+    gx *= PLANE_MAX / gl;
+    gz *= PLANE_MAX / gl;
+  }
+  return [gx, gz];
 }

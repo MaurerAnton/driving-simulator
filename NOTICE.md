@@ -63,7 +63,8 @@ Bundesamt für Justiz). Der Text der Vorschriften ist nicht Teil des Projekts.
 | --- | --- | --- |
 | [three.js](https://threejs.org) | 3D-Darstellung im Browser | MIT |
 | [Vite](https://vite.dev), [TypeScript](https://www.typescriptlang.org) | Bauen (nur Entwicklung) | MIT, Apache-2.0 |
-| [geotiff.js](https://geotiffjs.github.io), [saxes](https://github.com/lddubeau/saxes), [earcut](https://github.com/mapbox/earcut) | Kartenpipeline (nur Entwicklung) | MIT, ISC, ISC |
+| [saxes](https://github.com/lddubeau/saxes), [earcut](https://github.com/mapbox/earcut) | Kartenpipeline (nur Entwicklung) | ISC, ISC |
+| [Pillow](https://python-pillow.github.io), [NumPy](https://numpy.org) | Geländedaten laden und verkleinern (`tools/fetch-geodata.py`, nur beim Kartenbau; nicht mitgeliefert) | MIT-CMU, BSD-3-Clause |
 | [Playwright](https://playwright.dev) | Bildschirmfotos beim Entwickeln | Apache-2.0 |
 
 Das ausgelieferte Spiel enthält keine Schriften, Texturen, 3D-Modelle oder Tonaufnahmen Dritter: Flächen,

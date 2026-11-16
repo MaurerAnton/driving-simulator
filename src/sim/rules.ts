@@ -359,7 +359,11 @@ export class RuleMonitor {
     // --- leaving the junction: was the turn signalled? ---
     if (this.entry && edge && (hit.zone === 0 || near)) {
       const e = this.entry;
-      if (edge !== e.arm.edge || this.time - e.time > 25) {
+      // (on the road itself, not on the part of it that lies in a junction: where several roads meet
+      // within a few metres, the ground of the junction belongs to more than one of them, and the car
+      // is not turning into each road whose ground it crosses)
+      const onRoad = hit.s > edge.cutA + 0.5 && hit.s < edge.len - edge.cutB - 0.5;
+      if ((edge !== e.arm.edge && onRoad) || this.time - e.time > 25) {
         this.judgeTurn(edge, p);
         this.entry = null;
       }
@@ -625,8 +629,7 @@ export class RuleMonitor {
   }
 
   private checkCrossings(edge: Edge, s: number, dir: number, p: PlayerSnapshot): void {
-    for (const c of this.world.crossings) {
-      if (c.e !== edge.id) continue;
+    for (const c of edge.xings) {
       if (c.k !== XING.ZEBRA && c.k !== XING.SIGNAL) continue;
       // signed distance of the front bumper to the near edge of the crossing
       const d = (c.s - s) * dir - c.w / 2 - (p.front ?? p.length / 2);

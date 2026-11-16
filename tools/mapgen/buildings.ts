@@ -7,13 +7,17 @@
  * shape.  The margin of the map outside the municipality has no LoD2 data;
  * there OSM footprints are extruded with typical heights and simple roofs.
  */
-import { closeSync, openSync, readSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import earcut from 'earcut';
 import { hash01, pointInRing, ringArea } from '../../src/core/geom.ts';
+import { SINK } from '../../src/world/facade.ts';
 import { BS } from '../../src/world/tilefmt.ts';
 import type { TileData, TileSet } from './meshacc.ts';
 import type { OsmData, Tags } from './osm.ts';
 import { isClosedWay } from './osm.ts';
+import { LOD2_BIN, gridIndex } from './store.ts';
 import type { TerrainGrid } from './terrain.ts';
 
 interface Lod2Unit {
@@ -86,7 +90,7 @@ function emit(
     const a = off + i * 3;
     let y = pts[a + 1];
     const at = attr(flat[i * 2] - uMin, flat[i * 2 + 1] - vMin, y);
-    if (y <= lowerBelow) y -= 1.6; // sink the foot of the wall into the ground
+    if (y <= lowerBelow) y -= SINK; // sink the foot of the wall into the ground
     idx.push(m.vert(pts[a], y, pts[a + 2], ...at));
   }
   for (let t = 0; t < tris.length; t += 3) m.tri(idx[tris[t]], idx[tris[t + 1]], idx[tris[t + 2]], normal[0], normal[1], normal[2]);
@@ -116,36 +120,32 @@ function styleFor(fn: string, area: number, height: number): number {
 }
 
 /**
- * The buildings of data/work/lod2-buildings.json one after the other: the
- * file has one building per line and is too big (a city: several hundred MB)
- * to be parsed in one piece.
+ * The building models of an area, one after the other: from the squares of
+ * 2 km they were sorted into when they were extracted
+ * (data/work/lod2/<municipality>/<bx>_<bz>.ndjson.gz, one building per line).
  */
-function* lod2Units(path: string): Generator<Lod2Unit> {
-  const fd = openSync(path, 'r');
-  const buf = Buffer.alloc(1 << 22);
-  let rest = '';
-  const decoder = new TextDecoder();
-  try {
-    for (;;) {
-      const n = readSync(fd, buf, 0, buf.length, null);
-      if (n === 0) break;
-      const lines = (rest + decoder.decode(buf.subarray(0, n), { stream: true })).split('\n');
-      rest = lines.pop() ?? '';
-      for (const line of lines) {
-        if (!line.startsWith('{"id"')) continue;
-        yield JSON.parse(line.endsWith(',') ? line.slice(0, -1) : line) as Lod2Unit;
+export function* lod2Units(lod2Dir: string, area: { minX: number; minZ: number; maxX: number; maxZ: number }): Generator<Lod2Unit> {
+  if (!existsSync(lod2Dir)) return;
+  const dirs = readdirSync(lod2Dir).filter((d) => !d.startsWith('.'));
+  for (let bx = gridIndex(area.minX, LOD2_BIN); bx <= gridIndex(area.maxX, LOD2_BIN); bx++) {
+    for (let bz = gridIndex(area.minZ, LOD2_BIN); bz <= gridIndex(area.maxZ, LOD2_BIN); bz++) {
+      for (const d of dirs) {
+        const file = join(lod2Dir, d, `${bx}_${bz}.ndjson.gz`);
+        if (!existsSync(file)) continue;
+        for (const line of gunzipSync(readFileSync(file)).toString('utf8').split('\n')) {
+          if (line.startsWith('{')) yield JSON.parse(line) as Lod2Unit;
+        }
       }
     }
-    if (rest.startsWith('{"id"')) yield JSON.parse(rest.endsWith(',') ? rest.slice(0, -1) : rest) as Lod2Unit;
-  } finally {
-    closeSync(fd);
   }
 }
 
-export function addLod2Buildings(path: string, ts: TileSet, stats: BuildingStats): Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> {
+export function addLod2Buildings(units: Iterable<Lod2Unit>, ts: TileSet, stats: BuildingStats): Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> {
   const boxes: Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> = [];
   let seed = 1;
-  for (const u of lod2Units(path)) {
+  const endX = ts.minX + ts.nx * ts.size;
+  const endZ = ts.minZ + ts.nz * ts.size;
+  for (const u of units) {
     if (u.fn.startsWith('53001')) continue; // bridges: generated from the road network instead
     let minX = Infinity;
     let maxX = -Infinity;
@@ -173,6 +173,8 @@ export function addLod2Buildings(path: string, ts: TileSet, stats: BuildingStats
     if (area === 0) area = (maxX - minX) * (maxZ - minZ) * 0.7;
     const cx = (minX + maxX) / 2;
     const cz = (minZ + maxZ) / 2;
+    // (a building belongs to the tile its middle lies in – only those of the area that is being built)
+    if (cx < ts.minX || cx >= endX || cz < ts.minZ || cz >= endZ) continue;
     const tile = ts.at(cx, cz);
     seed = (Math.round(cx * 13.7) * 73856093) ^ (Math.round(cz * 17.3) * 19349663);
     const style = styleFor(u.fn, area, top - base);

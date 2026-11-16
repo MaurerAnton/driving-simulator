@@ -13,3 +13,10 @@ shots/
 public/panos/*
 !public/panos/README.md
 !public/panos/index.json
+
+# The map (terrain, roads and buildings of northern Hesse as tiles – close to a gigabyte) is built
+# from open geodata or fetched from a release of the project: see docs/MAP_DATA.md and map.release.
+public/map/
+public/map.new/
+public/map.old/
+public/map.fetching/

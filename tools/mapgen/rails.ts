@@ -14,7 +14,6 @@ import { newSurfaceHit } from '../../src/world/world.ts';
 import type { World } from '../../src/world/world.ts';
 import type { OsmData, OWay, Tags } from './osm.ts';
 import { isClosedWay } from './osm.ts';
-import type { TerrainGrid } from './terrain.ts';
 
 /** distance between the points of a path (m) */
 const STEP = 6;
@@ -27,7 +26,7 @@ const inService = (t: Tags): boolean => t.tunnel !== 'yes' && !['yard', 'siding'
 const isStop = (t: Tags | null): boolean =>
   !!t && (t.railway === 'tram_stop' || t.railway === 'halt' || t.railway === 'station' || t.railway === 'stop' || (t.public_transport === 'stop_position' && (t.tram === 'yes' || t.light_rail === 'yes' || t.train === 'yes')));
 
-export function collectRails(osm: OsmData, world: World, terrain: TerrainGrid, inWorld: (x: number, z: number) => boolean): { rails: RailJson[]; km: number[]; stops: number } {
+export function collectRails(osm: OsmData, world: World, terrain: { at(x: number, z: number): number }, inWorld: (x: number, z: number) => boolean): { rails: RailJson[]; km: number[]; stops: number } {
   const hit = newSurfaceHit();
   // top of the rail as drawn: on the ground, or sunk into the road it runs in
   const railY = (x: number, z: number): number => {

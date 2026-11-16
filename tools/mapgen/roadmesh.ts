@@ -140,6 +140,8 @@ function stationsOf(e: Edge, s0: number, s1: number, maxStep: number): Station[]
 export interface RoadMeshOptions {
   /** natural terrain height (for bridge piers) */
   ground: (x: number, z: number) => number;
+  /** would a wall from (x1, z1) to (x2, z2) at height y stand in a lane? (a parapet is left out there) */
+  inLane?: (x1: number, z1: number, x2: number, z2: number, y: number) => boolean;
 }
 
 export class RoadMesher {
@@ -231,14 +233,31 @@ export class RoadMesher {
       const outerBot = this.line(e, st, side * out, -DECK);
       const innerTop = this.line(e, st, side * inner, PARAPET);
       const innerBot = this.line(e, st, side * inner, yIn);
-      // outside fascia faces away from the road, inside face towards it
-      addBandFacing(ts, 'struct', outerTop, outerBot, CONCRETE, centre, true);
-      addBandFacing(ts, 'struct', innerTop, innerBot, CONCRETE, centre, false);
-      addBand(ts, 'struct', outerTop, innerTop, CONCRETE);
-      // collision line of the parapet
+      // Where the parapet would stand in a lane (two bridges side by side whose decks overlap in
+      // this model) it is left out: the runs of the bridge's length where it may stand.
+      const inLane = this.opt.inLane;
+      const runs: Array<[number, number]> = [];
+      let from = -1;
       for (let i = 0; i < st.length - 1; i++) {
-        const t = ts.at(innerTop[i * 3], innerTop[i * 3 + 2]);
-        t.collSeg.push(innerTop[i * 3], innerTop[i * 3 + 2], innerTop[i * 3 + 3], innerTop[i * 3 + 5], innerTop[i * 3 + 1] - PARAPET);
+        const bad = inLane ? inLane(innerTop[i * 3], innerTop[i * 3 + 2], innerTop[i * 3 + 3], innerTop[i * 3 + 5], innerTop[i * 3 + 1] - PARAPET) : false;
+        if (!bad && from < 0) from = i;
+        if (bad && from >= 0) {
+          runs.push([from, i]);
+          from = -1;
+        }
+      }
+      if (from >= 0) runs.push([from, st.length - 1]);
+      for (const [i0, i1] of runs) {
+        const part = (line: Float64Array): Float64Array => line.subarray(i0 * 3, (i1 + 1) * 3);
+        // outside fascia faces away from the road, inside face towards it
+        addBandFacing(ts, 'struct', part(outerTop), part(outerBot), CONCRETE, part(centre), true);
+        addBandFacing(ts, 'struct', part(innerTop), part(innerBot), CONCRETE, part(centre), false);
+        addBand(ts, 'struct', part(outerTop), part(innerTop), CONCRETE);
+        // collision line of the parapet
+        for (let i = i0; i < i1; i++) {
+          const t = ts.at(innerTop[i * 3], innerTop[i * 3 + 2]);
+          t.collSeg.push(innerTop[i * 3], innerTop[i * 3 + 2], innerTop[i * 3 + 3], innerTop[i * 3 + 5], innerTop[i * 3 + 1] - PARAPET);
+        }
       }
     }
     const underL = this.line(e, st, outL, -DECK);

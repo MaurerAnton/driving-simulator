@@ -22,6 +22,9 @@ export interface SignStats {
   byCode: Map<string, number>;
 }
 
+/** What the signs need of the road graph: what was mapped on each edge, and the node of OpenStreetMap behind each junction. */
+export type SignGraph = Pick<RoadGraph, 'edgeFeatures' | 'nodeOsm'>;
+
 export class SignPlacer {
   private readonly world: World;
   private readonly ts: TileSet;
@@ -110,7 +113,7 @@ export class SignPlacer {
     return best;
   }
 
-  build(graph: RoadGraph, cover: CoverMap): void {
+  build(graph: SignGraph, cover: CoverMap): void {
     const world = this.world;
     for (const node of world.nodes) this.junctionSigns(node);
     for (const node of world.nodes) this.limitSigns(node);
@@ -234,7 +237,7 @@ export class SignPlacer {
   }
 
   /** Town signs (Zeichen 310/311): mapped ones first, then derived boundaries. */
-  private cityLimits(graph: RoadGraph, cover: CoverMap): void {
+  private cityLimits(graph: SignGraph, cover: CoverMap): void {
     const world = this.world;
     const done: Array<[number, number]> = [];
     const place = (edge: Edge, s: number, enterDir: number, name: string): void => {
@@ -306,7 +309,7 @@ export class SignPlacer {
   }
 
   /** Signs mapped as OSM nodes with a DE:… code. */
-  private explicitSigns(graph: RoadGraph): void {
+  private explicitSigns(graph: SignGraph): void {
     this.world.edges.forEach((edge, k) => {
       for (const f of graph.edgeFeatures[k]) {
         if (f.kind === 'bus_stop') {

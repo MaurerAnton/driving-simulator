@@ -115,6 +115,15 @@ class JunctionPath implements Connector {
 const tmpA = newPolySample();
 const tmpB = newPolySample();
 
+/** A point on the centre line of a lane (or of a path through a junction) and how far it is from what was asked about. */
+export interface PathFoot {
+  x: number;
+  z: number;
+  d: number;
+}
+const pathProj = { s: 0, off: 0, d2: 0, seg: 0 };
+const postFoot: PathFoot = { x: 0, z: 0, d: 0 };
+
 /** Position on a lane at distance d from its start. */
 export function lanePoint(lane: Lane, d: number, out: PolySample): PolySample {
   const s = lane.s0 + lane.dir * clamp(d, 0, lane.len);
@@ -168,81 +177,123 @@ function rank(arm: Arm): number {
 
 export class LaneGraph {
   readonly world: World;
+  /** by their number – with gaps once parts of the network were taken away again */
   readonly lanes: Lane[] = [];
   readonly connectors: Connector[] = [];
-  /** lanes of each edge: [forward lanes right→left, backward lanes right→left] */
+  /** lanes of each edge: [forward lanes right→left, backward lanes right→left] (by the number of the edge) */
   readonly edgeLanes: Array<{ fwd: Lane[]; back: Lane[] }> = [];
 
   /** the paths through each junction, and which junctions have their conflicts worked out */
   private readonly pathsAt = new Map<number, JunctionPath[]>();
   private readonly resolved = new Set<number>();
+  private nextLane = 0;
+  private nextPath = 0;
 
+  /** The lanes of everything the world holds; what is added to the world later is added here with `addEdge` and `completeNode`. */
   constructor(world: World) {
     this.world = world;
-    this.buildLanes();
-    this.buildConnectors();
+    for (const e of world.allEdges) this.addEdge(e);
+    for (const node of world.allNodes) if (!node.stub) this.completeNode(node);
   }
 
-  private buildLanes(): void {
-    for (const e of this.world.edges) {
-      const fwd: Lane[] = [];
-      const back: Lane[] = [];
-      const W = e.width;
-      const oR = -W / 2 + e.margin;
-      const oD = oR + e.lanesF * e.laneW;
-      const sA = e.cutA;
-      const sB = e.len - e.cutB;
-      const len = Math.max(0, sB - sA);
-      for (let k = 0; k < e.lanesF; k++) {
-        fwd.push({
-          id: this.lanes.length,
-          edge: e,
-          dir: 1,
-          idx: k,
-          count: e.lanesF,
-          off: oR + (k + 0.5) * e.laneW,
-          width: e.laneW,
-          s0: sA,
-          s1: sB,
-          len,
-          from: e.a,
-          to: e.b,
-          armTo: e.armB,
-          armFrom: e.armA,
-          out: [],
-          in: [],
-          limit: e.maxF > 0 ? e.maxF / 3.6 : Infinity,
-          stopAt: Math.max(0, len - Math.max(0, e.armB.stopS - e.cutB)),
-        });
-        this.lanes.push(fwd[k]);
-      }
-      for (let k = 0; k < e.lanesB; k++) {
-        // right-most backward lane is the left-most seen along a→b
-        const off = e.lanesF > 0 ? W / 2 - e.margin - (k + 0.5) * e.laneW : oD + (e.lanesB - k - 0.5) * e.laneW;
-        back.push({
-          id: this.lanes.length,
-          edge: e,
-          dir: -1,
-          idx: k,
-          count: e.lanesB,
-          off,
-          width: e.laneW,
-          s0: sB,
-          s1: sA,
-          len,
-          from: e.b,
-          to: e.a,
-          armTo: e.armA,
-          armFrom: e.armB,
-          out: [],
-          in: [],
-          limit: e.maxB > 0 ? e.maxB / 3.6 : Infinity,
-          stopAt: Math.max(0, len - Math.max(0, e.armA.stopS - e.cutA)),
-        });
-        this.lanes.push(back[k]);
-      }
-      this.edgeLanes.push({ fwd, back });
+  /** The lanes of a road that was added to the world. */
+  addEdge(e: Edge): void {
+    if (this.edgeLanes[e.id]) return;
+    const fwd: Lane[] = [];
+    const back: Lane[] = [];
+    const W = e.width;
+    const oR = -W / 2 + e.margin;
+    const oD = oR + e.lanesF * e.laneW;
+    const sA = e.cutA;
+    const sB = e.len - e.cutB;
+    const len = Math.max(0, sB - sA);
+    for (let k = 0; k < e.lanesF; k++) {
+      const lane: Lane = {
+        id: this.nextLane++,
+        edge: e,
+        dir: 1,
+        idx: k,
+        count: e.lanesF,
+        off: oR + (k + 0.5) * e.laneW,
+        width: e.laneW,
+        s0: sA,
+        s1: sB,
+        len,
+        from: e.a,
+        to: e.b,
+        armTo: e.armB,
+        armFrom: e.armA,
+        out: [],
+        in: [],
+        limit: e.maxF > 0 ? e.maxF / 3.6 : Infinity,
+        stopAt: Math.max(0, len - Math.max(0, e.armB.stopS - e.cutB)),
+      };
+      fwd.push(lane);
+      this.lanes[lane.id] = lane;
     }
+    for (let k = 0; k < e.lanesB; k++) {
+      // right-most backward lane is the left-most seen along a→b
+      const off = e.lanesF > 0 ? W / 2 - e.margin - (k + 0.5) * e.laneW : oD + (e.lanesB - k - 0.5) * e.laneW;
+      const lane: Lane = {
+        id: this.nextLane++,
+        edge: e,
+        dir: -1,
+        idx: k,
+        count: e.lanesB,
+        off,
+        width: e.laneW,
+        s0: sB,
+        s1: sA,
+        len,
+        from: e.b,
+        to: e.a,
+        armTo: e.armA,
+        armFrom: e.armB,
+        out: [],
+        in: [],
+        limit: e.maxB > 0 ? e.maxB / 3.6 : Infinity,
+        stopAt: Math.max(0, len - Math.max(0, e.armA.stopS - e.cutA)),
+      };
+      back.push(lane);
+      this.lanes[lane.id] = lane;
+    }
+    this.edgeLanes[e.id] = { fwd, back };
+  }
+
+  /** A road was taken out of the world: its lanes go (the paths at its ends went with their junctions). */
+  removeEdge(e: Edge): void {
+    const el = this.edgeLanes[e.id];
+    if (!el) return;
+    for (const lane of [...el.fwd, ...el.back]) {
+      // (paths of a junction that stays, as the end of another road, cannot lead here any more)
+      for (const c of [...lane.out, ...lane.in]) this.dropPath(c as JunctionPath);
+      delete this.lanes[lane.id];
+    }
+    delete this.edgeLanes[e.id];
+  }
+
+  private dropPath(c: JunctionPath): void {
+    const out = c.from.out.indexOf(c);
+    if (out >= 0) c.from.out.splice(out, 1);
+    const into = c.to.in.indexOf(c);
+    if (into >= 0) c.to.in.splice(into, 1);
+    const at = this.pathsAt.get(c.node.id);
+    if (at) {
+      const i = at.indexOf(c);
+      if (i >= 0) at.splice(i, 1);
+    }
+    const k = this.connectors.indexOf(c);
+    if (k >= 0) {
+      this.connectors[k] = this.connectors[this.connectors.length - 1];
+      this.connectors.pop();
+    }
+  }
+
+  /** A junction is no longer whole (its piece of the map was taken away): nothing leads through it any more. */
+  removeNode(node: Node): void {
+    for (const c of [...(this.pathsAt.get(node.id) ?? [])]) this.dropPath(c);
+    this.pathsAt.delete(node.id);
+    this.resolved.delete(node.id);
   }
 
   /** Lanes arriving at / leaving the node on an arm. */
@@ -256,8 +307,17 @@ export class LaneGraph {
     return arm.out ? el.fwd : el.back;
   }
 
-  private buildConnectors(): void {
-    for (const node of this.world.nodes) {
+  /**
+   * A junction is whole (all its roads have their lanes): the paths through
+   * it, and where the lanes that arrive at it have to stop.
+   */
+  completeNode(node: Node): void {
+    if (this.pathsAt.has(node.id)) return;
+    this.pathsAt.set(node.id, []);
+    for (const a of node.arms) {
+      for (const lane of this.lanesInto(a)) lane.stopAt = Math.max(0, lane.len - Math.max(0, a.stopS - a.cut));
+    }
+    {
       const arms = node.arms;
       for (const a of arms) {
         const ins = this.lanesInto(a);
@@ -355,7 +415,7 @@ export class LaneGraph {
       }
     }
     const pl = makePolyline(Float64Array.from(pts));
-    const c = new JunctionPath(this, this.connectors.length, node, from, to, turn, pl);
+    const c = new JunctionPath(this, this.nextPath++, node, from, to, turn, pl);
     this.connectors.push(c);
     const at = this.pathsAt.get(node.id);
     if (at) at.push(c);
@@ -459,6 +519,152 @@ export class LaneGraph {
     }
   }
 
+  /**
+   * The nearest centre line of a lane, or of a path through a junction, to a
+   * point – on the same level (`y`; NaN: on any).  Returns the distance and
+   * writes the foot point to `out`; Infinity when none is closer than `reach`.
+   * What stands closer to such a line than a vehicle is wide is in the way.
+   */
+  nearestPath(x: number, z: number, y: number, reach: number, out: PathFoot): number {
+    let best = reach;
+    let found = false;
+    const proj = pathProj;
+    const smp = tmpA;
+    this.world.segmentsInBox(x - reach, z - reach, x + reach, z + reach, (e, seg) => {
+      const el = this.edgeLanes[e.id];
+      if (el.fwd.length + el.back.length === 0) return;
+      projectOnPolyline(e.pl, x, z, proj, seg, seg);
+      const far = e.width / 2 + best;
+      if (proj.d2 > far * far) return;
+      // (the lanes run between the junction areas at the two ends)
+      samplePolyline(e.pl, clamp(proj.s, e.cutA, Math.max(e.cutA, e.len - e.cutB)), smp);
+      if (!Number.isNaN(y) && Math.abs(smp.y - y) > 2.6) return;
+      for (let side = 0; side < 2; side++) {
+        const list = side === 0 ? el.fwd : el.back;
+        for (let i = 0; i < list.length; i++) {
+          const px = smp.x + smp.tz * list[i].off;
+          const pz = smp.z - smp.tx * list[i].off;
+          const d = Math.hypot(x - px, z - pz);
+          if (d < best) {
+            best = d;
+            out.x = px;
+            out.z = pz;
+            found = true;
+          }
+        }
+      }
+    });
+    this.world.nodesInBox(x - reach, z - reach, x + reach, z + reach, (node) => {
+      if (!Number.isNaN(y) && Math.abs(this.world.planeY(node, x, z) - y) > 2.6) return;
+      const paths = this.pathsAt.get(node.id);
+      if (!paths) return;
+      for (let i = 0; i < paths.length; i++) {
+        projectOnPolyline(paths[i].pl, x, z, proj);
+        if (proj.d2 >= best * best) continue;
+        best = Math.sqrt(proj.d2);
+        samplePolyline(paths[i].pl, proj.s, smp);
+        out.x = smp.x;
+        out.z = smp.z;
+        found = true;
+      }
+    });
+    out.d = found ? best : Infinity;
+    return out.d;
+  }
+
+  /** Does a wall from (x1, z1) to (x2, z2) come closer than `need` to the middle of a lane (on the level `y`; NaN: on any)? */
+  wallInLane(x1: number, z1: number, x2: number, z2: number, y: number, need: number): boolean {
+    const world = this.world;
+    const minX = Math.min(x1, x2) - need;
+    const maxX = Math.max(x1, x2) + need;
+    const minZ = Math.min(z1, z2) - need;
+    const maxZ = Math.max(z1, z2) + need;
+    const need2 = need * need;
+    let hit = false;
+    world.segmentsInBox(minX, minZ, maxX, maxZ, (e, seg) => {
+      if (hit) return;
+      const el = this.edgeLanes[e.id];
+      if (el.fwd.length + el.back.length === 0) return;
+      const p = e.pl.pts;
+      const ax = p[seg * 3];
+      const ay = p[seg * 3 + 1];
+      const az = p[seg * 3 + 2];
+      const bx = p[seg * 3 + 3];
+      const bz = p[seg * 3 + 5];
+      if (!Number.isNaN(y) && Math.abs((ay + p[seg * 3 + 4]) / 2 - y) > 2.6 + Math.abs(ay - p[seg * 3 + 4]) / 2) return;
+      // (most pieces of road in reach of the grid are nowhere near the wall)
+      const far = e.width / 2 + need;
+      if (Math.max(ax, bx) + far < minX + need || Math.min(ax, bx) - far > maxX - need || Math.max(az, bz) + far < minZ + need || Math.min(az, bz) - far > maxZ - need) return;
+      const l = Math.hypot(bx - ax, bz - az);
+      if (l < 1e-6) return;
+      // left of the direction of travel a→b
+      const nx = (bz - az) / l;
+      const nz = -(bx - ax) / l;
+      for (let side = 0; side < 2 && !hit; side++) {
+        const list = side === 0 ? el.fwd : el.back;
+        for (let i = 0; i < list.length; i++) {
+          const o = list[i].off;
+          if (segSegDist2(x1, z1, x2, z2, ax + nx * o, az + nz * o, bx + nx * o, bz + nz * o) < need2) {
+            hit = true;
+            break;
+          }
+        }
+      }
+    });
+    if (hit) return true;
+    world.nodesInBox(minX, minZ, maxX, maxZ, (node) => {
+      if (hit) return;
+      if (!Number.isNaN(y) && Math.abs(world.planeY(node, (x1 + x2) / 2, (z1 + z2) / 2) - y) > 2.6) return;
+      const paths = this.pathsAt.get(node.id);
+      if (!paths) return;
+      for (let k = 0; k < paths.length && !hit; k++) {
+        const p = paths[k].pl.pts;
+        for (let i = 0; i + 5 < p.length; i += 3) {
+          if (segSegDist2(x1, z1, x2, z2, p[i], p[i + 2], p[i + 3], p[i + 5]) < need2) {
+            hit = true;
+            break;
+          }
+        }
+      }
+    });
+    return hit;
+  }
+
+  /**
+   * Where a post (a sign, a lamp) may stand: the place itself when it keeps
+   * `need` metres from the middle of every lane, otherwise the nearest place
+   * beside the lanes within a few metres – or null when there is none.
+   */
+  besideLanes(x: number, z: number, y: number, need: number, out: PathFoot): PathFoot | null {
+    out.x = x;
+    out.z = z;
+    for (let tries = 0; tries < 5; tries++) {
+      const d = this.nearestPath(out.x, out.z, y, need, postFoot);
+      if (d >= need) {
+        out.d = Math.hypot(out.x - x, out.z - z);
+        return out;
+      }
+      // away from the middle of that lane (straight out of it; from dead centre towards where the post came from)
+      let ux = out.x - postFoot.x;
+      let uz = out.z - postFoot.z;
+      if (d < 0.05) {
+        ux = x - postFoot.x;
+        uz = z - postFoot.z;
+        if (Math.hypot(ux, uz) < 0.05) return null;
+      }
+      const l = Math.hypot(ux, uz);
+      out.x = postFoot.x + (ux / l) * (need + 0.15);
+      out.z = postFoot.z + (uz / l) * (need + 0.15);
+      if (Math.hypot(out.x - x, out.z - z) > 4.5) return null;
+    }
+    return null;
+  }
+
+  /** The paths through a junction. */
+  pathsThrough(node: Node): readonly Connector[] {
+    return this.pathsAt.get(node.id) ?? [];
+  }
+
   /** May ordinary traffic use this edge in this direction? */
   static drivable(e: Edge, forTraffic: boolean): boolean {
     if (e.access === ACCESS.PRIVATE || e.access === ACCESS.AGRICULTURAL) return false;
@@ -468,10 +674,11 @@ export class LaneGraph {
 
   /**
    * Shortest route (by travel time) from the end of lane `start` to any lane
-   * of `goal`.  Returns the connectors to take, or null.  `forTraffic`
-   * restricts the search to ordinary public roads.
+   * of `goal` (`goalDir`: only one that runs a→b (1) or b→a (-1)).  Returns
+   * the connectors to take, or null.  `forTraffic` restricts the search to
+   * ordinary public roads.
    */
-  route(start: Lane, goal: Edge, forTraffic = false): Connector[] | null {
+  route(start: Lane, goal: Edge, forTraffic = false, goalDir = 0): Connector[] | null {
     const dist = new Map<number, number>();
     const prev = new Map<number, Connector>();
     const heap = new MinHeap();
@@ -482,7 +689,7 @@ export class LaneGraph {
       const [id, d] = heap.pop();
       if (d > (dist.get(id) ?? Infinity)) continue;
       const lane = this.lanes[id];
-      if (lane.edge === goal && lane !== start) {
+      if (lane.edge === goal && lane !== start && (goalDir === 0 || lane.dir === goalDir)) {
         found = lane;
         break;
       }
@@ -518,6 +725,29 @@ export class LaneGraph {
     }
     return path.reverse();
   }
+}
+
+/** Squared distance of a point from a segment. */
+function pointSegDist2(x: number, z: number, ax: number, az: number, bx: number, bz: number): number {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const l2 = dx * dx + dz * dz;
+  let t = l2 > 1e-12 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const ex = x - (ax + dx * t);
+  const ez = z - (az + dz * t);
+  return ex * ex + ez * ez;
+}
+
+/** Squared distance between two segments in the plane (0 when they cross). */
+function segSegDist2(ax: number, az: number, bx: number, bz: number, cx: number, cz: number, dx: number, dz: number): number {
+  // crossing: each segment has the ends of the other on different sides
+  const d1 = (bx - ax) * (cz - az) - (bz - az) * (cx - ax);
+  const d2 = (bx - ax) * (dz - az) - (bz - az) * (dx - ax);
+  const d3 = (dx - cx) * (az - cz) - (dz - cz) * (ax - cx);
+  const d4 = (dx - cx) * (bz - cz) - (dz - cz) * (bx - cx);
+  if (d1 * d2 < 0 && d3 * d4 < 0) return 0;
+  return Math.min(pointSegDist2(ax, az, cx, cz, dx, dz), pointSegDist2(bx, bz, cx, cz, dx, dz), pointSegDist2(cx, cz, ax, az, bx, bz), pointSegDist2(dx, dz, ax, az, bx, bz));
 }
 
 /** Station on `a` from which it runs closer than `limit` metres to `b` (the end of `a` if never). */
