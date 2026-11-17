@@ -2,11 +2,14 @@
 /** Menus and the in-game HUD (plain DOM, no framework). */
 import type { AddressHit, AddressIndex } from '../game/address.ts';
 import { LESSONS } from '../game/nav.ts';
-import { VEHICLES, VEHICLE_KINDS, powerOf } from '../game/vehicles.ts';
+import { ROAD_VEHICLE_KINDS, VEHICLES, VEHICLE_KINDS, powerOf } from '../game/vehicles.ts';
+import { lessonPlaceRows, routePresetPage } from './lessonroutes.ts';
+import { routeMode } from '../game/routepresets.ts';
 import type { VehicleKind } from '../game/vehicles.ts';
 import { RELEASES, VERSION } from '../game/releases.ts';
 import type { Settings } from '../game/settings.ts';
 import { FAR_VIEWS, GRAPHICS_PRESETS, LOW_RESOLUTIONS, RUN_SPEEDS, VIEW_DISTANCES, saveSettings } from '../game/settings.ts';
+import { setWasmMode, wasmSupported } from '../wasm/kernels.ts';
 import type { Input } from '../input/input.ts';
 import type { Violation } from '../sim/rules.ts';
 import { SIG } from '../sim/signals.ts';
@@ -27,6 +30,8 @@ import { arcadePanel, type ArcadeHost } from './arcade.ts';
 import { locate } from './geolocate.ts';
 import { downloaded, formatBytes } from '../game/netstats.ts';
 import { WEATHER_ATTRIBUTION } from '../game/weather.ts';
+import { playVersionButton, versionSettings } from './versionpicker.ts';
+import { mapPackSettings } from './mappacks.ts';
 
 /** the weathers and seasons one may choose, and the names of each */
 export const WEATHER_CHOICES: ReadonlyArray<Settings['weather']> = ['real', 'off', 'cloudy', 'fog', 'drizzle', 'rain', 'snow', 'storm'];
@@ -36,6 +41,8 @@ export const SEASON_KEYS: Record<Settings['season'], string> = { real: 'seasonRe
 import type { MenuPreview } from './carousel.ts';
 import type { Lang } from '../i18n/index.ts';
 import { FuelGauge } from './fuelgauge.ts';
+import { HudLayout } from './hudlayout.ts';
+import { ZOOM_RELEASES } from '../input/camzoom.ts';
 
 export interface HudState {
   speedKmh: number;
@@ -278,7 +285,11 @@ export class Hud {
     this.hud = this.buildHud();
     this.root.append(this.hud);
     this.setHudVisible(false);
+    this.layout = new HudLayout(this.hud, (k) => this.t(k));
   }
+
+  /** the player's arrangement of the HUD's parts (ui/hudlayout.ts) */
+  readonly layout: HudLayout;
 
   get lang(): Lang {
     return this.settings.lang;
@@ -626,10 +637,12 @@ export class Hud {
       cards.append(c);
     };
     card(this.t(def.kind === 'plane' ? 'freeFly' : 'free'), this.t(def.kind === 'tram' ? 'freeTramDesc' : def.kind === 'pedestrian' ? 'freeWalkDesc' : def.kind === 'plane' ? 'freeFlyDesc' : 'freeDesc'), 'free');
+    // the forklift: its work on the forklift yard (game/forkliftplay.ts) – its free drive begins at the place chosen above
+    if (def.kind === 'forklift') card(this.t('forkWork'), this.t('forkWorkDesc'), 'forklift');
     // (the drives the car does by itself, and the tours, are on the roads – and by car)
     if (def.kind === 'tram') card(this.t('demo'), this.t('demoTramDesc'), 'demo');
     if (def.kind === 'plane') card(this.t('demoFly'), this.t('demoFlyDesc'), 'demo');
-    if (def.kind !== 'tram' && def.kind !== 'pedestrian' && def.kind !== 'plane') {
+    if (def.kind !== 'tram' && def.kind !== 'pedestrian' && def.kind !== 'plane' && def.kind !== 'forklift') {
       card(this.t('demo'), this.t('demoDesc'), 'demo');
       card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
     }
@@ -640,7 +653,7 @@ export class Hud {
     // the lessons of the chosen vehicle: the practice yard first, the test last
     const rank = (kind: string): number => (kind === 'yard' ? 0 : kind === 'exam' ? 2 : 1);
     const kind = def.kind;
-    const lessons = LESSONS.filter((l) => (l.vehicles ? l.vehicles.includes(kind) : l.vehicle ? l.vehicle === kind : kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane' && !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
+    const lessons = LESSONS.filter((l) => (l.vehicles ? l.vehicles.includes(kind) : l.vehicle ? l.vehicle === kind : kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane' && kind !== 'forklift' && !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || !!this.world.json.yard)).sort((a, b) => rank(a.kind) - rank(b.kind));
     // (the lessons on the road were written for the car: what is different with this vehicle is said first)
     const note = def.caps ? `${this.t('lesson.capNote', { vehicle: this.t(def.name), rural: def.caps.rural, motorway: def.caps.motorway })} ` : def.noMotorway ? `${this.t('lesson.slowNote', { vehicle: this.t(def.name), max: def.governed })} ` : '';
     for (const l of lessons) card(lessonTitle(l.id, this.lang), l.id === 'exam' ? this.t('examDesc') : `${l.kind === 'route' ? note : ''}${lessonIntro(l.id, this.lang)}`, l.id);
@@ -742,7 +755,13 @@ export class Hud {
           return { error: this.t(r.why === 'outside' ? 'myLocationOutside' : r.why === 'denied' ? 'myLocationDenied' : 'myLocationNone') };
         },
         // the theory lessons: difficult situations shown on the practice yard (game/theorymode.ts) – for everything but the aeroplane
-        extraModes: [{ id: 'theory', label: this.t('theory.title'), yard: true, kinds: VEHICLE_KINDS.filter((k) => k !== 'plane') }],
+        extraModes: [
+          { id: 'theory', label: this.t('theory.title'), yard: true, kinds: VEHICLE_KINDS.filter((k) => k !== 'plane') },
+          // the set routes (game/routepresets.ts): a page of them – a tap starts the drive at the first place of one
+          { id: 'routes', label: this.t('routes.title'), kinds: ROAD_VEHICLE_KINDS, icon: '<path d="M5 20c0-6 14-4 14-10a4 4 0 0 0-8 0"/><circle cx="5" cy="20" r="1.5"/><circle cx="11" cy="10" r="1.5"/>', run: () => this.setOverlay(routePresetPage((k, v) => this.t(k, v), (id) => this.onStart({ mode: routeMode(id), spawn: 0 }), () => this.showMenu(spawns))) },
+          // the forklift's work on its yard (game/forkliftplay.ts: FORK_WORK_MODE) – its free drive begins at the place chosen
+          { id: 'forklift', label: this.t('forkWork'), kinds: ['forklift'], icon: '<rect x="7" y="6" width="11" height="8" rx="1"/><path d="M3 18h18M6 14v4M12.5 14v4M19 14v4M2 11h4"/>' },
+        ],
         version: this.t('newsVersion', { v: VERSION }),
         start: (req) => this.onStart(req),
         preview: (p) => this.onMenuPreview(p),
@@ -754,6 +773,11 @@ export class Hud {
   }
 
   /** The map opened from the main menu: the drive is to begin at this place of it (the tram at the stop, the aeroplane at the runway nearest to it). */
+  /** Draw the main menu anew (a start place was chosen from outside it: the player's location). */
+  redrawMenu(): void {
+    this.menuRedraw?.();
+  }
+
   menuStartAt(spot: SpawnJson): void {
     const kind = (VEHICLES[this.settings.vehicle] ?? VEHICLES.car).kind;
     if (startFromSpot(kind, this.settings.lastStart, spot, this.tramStops, this.runways, this.t('mapPlace'))) saveSettings(this.settings);
@@ -859,6 +883,11 @@ export class Hud {
     }
     select(this.t('transmission'), s.transmission, [['assist', this.t('trAssist')], ['manual', this.t('trManual')], ['automatic', this.t('trAutomatic')]], (v) => (s.transmission = v as Settings['transmission']));
     p.append(el('p', 'note', this.t('settingsNextDrive')));
+    // where the lessons take place (game/lessonplaces.ts)
+    p.append(...lessonPlaceRows((k, v) => this.t(k, v), s, this.world.json.spawns, () => {
+      saveSettings(s);
+      this.onSettingsChanged();
+    }));
     check(this.t('limiter'), s.limiter, (v) => (s.limiter = v));
     check(this.t('autopilotAssist'), s.autopilotAssist, (v) => (s.autopilotAssist = v));
     // the main beam on and off by itself at night (game/beamplay.ts)
@@ -962,8 +991,40 @@ export class Hud {
     range(this.t('touchOpacity'), s.touchOpacity, (v) => (s.touchOpacity = Math.max(0.15, v)));
     check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
     check(this.t('showFps'), s.showFps, (v) => (s.showFps = v));
+    // the tiles and the quickest way in WebAssembly (wasm/kernels.ts) – or in JavaScript only
+    select(this.t('wasm'), s.wasm, [['auto', this.t(wasmSupported() ? 'wasm.auto' : 'wasm.missing')], ['off', this.t('wasm.off')]], (v) => {
+      s.wasm = v === 'off' ? 'off' : 'auto';
+      setWasmMode(s.wasm);
+    });
+    p.append(el('p', 'note', this.t('wasm.note')));
     check(this.t('startOutside'), s.startOutside, (v) => (s.startOutside = v));
+    // where a drive begins: where the player is (asked of the browser when the game starts), and exactly at the place chosen
+    check(this.t('startHere'), s.startHere, (v) => (s.startHere = v));
+    check(this.t('placeExact'), s.placeExact, (v) => (s.placeExact = v));
     check(this.t('mapOnScreen'), s.mapOnScreen, (v) => (s.mapOnScreen = v));
+    // a tap on the vehicle's screen (ui/screentap.ts), the zoom of the view (input/camzoom.ts), the inside mirror (ui/hudmirror.ts)
+    select(this.t('screenTap'), s.screenTap, [['bigmap', this.t('screenTap.bigmap')], ['minimap', this.t('screenTap.minimap')]], (v) => (s.screenTap = v as Settings['screenTap']));
+    select(this.t('zoomRelease'), s.zoomRelease, ZOOM_RELEASES.map((k): [string, string] => [k, this.t(`zoomRelease.${k}`)]), (v) => (s.zoomRelease = v as Settings['zoomRelease']));
+    select(this.t('insideMirror'), s.insideMirror.mode, [['car', this.t('insideMirror.car')], ['hud', this.t('insideMirror.hud')]], (v) => (s.insideMirror.mode = v === 'hud' ? 'hud' : 'car'));
+    range(this.t('insideMirror.shift'), (s.insideMirror.shift + 0.3) / 0.6, (v) => (s.insideMirror.shift = Math.round((v * 0.6 - 0.3) * 100) / 100));
+    range(this.t('insideMirror.size'), (s.insideMirror.size - 0.6) / 1.4, (v) => (s.insideMirror.size = Math.round((0.6 + 1.4 * v) * 100) / 100));
+    p.append(el('p', 'note', this.t('insideMirror.note')));
+    // arranging the HUD's parts (ui/hudlayout.ts): while driving, over the picture
+    {
+      const b = el('div', 'buttons');
+      if (this.hud.style.display !== 'none') {
+        const ar = el('button', 'btn ghost', this.t('hudLayout.arrange'));
+        ar.onclick = () => {
+          this.onResume();
+          this.layout.arrange();
+        };
+        b.append(ar);
+      }
+      const rs = el('button', 'btn ghost', this.t('hudLayout.reset'));
+      rs.onclick = () => this.layout.reset();
+      b.append(rs);
+      p.append(b);
+    }
     // the aerial photographs under the maps – and where they come from
     check(this.t('mapAerialSetting'), s.reality.aerial, (v) => (s.reality.aerial = v));
     p.append(el('p', 'note', this.t('mapAerialNote')));
@@ -972,6 +1033,11 @@ export class Hud {
     check(this.t('queueLabels'), s.queueLabels, (v) => (s.queueLabels = v));
     check(this.t('hudGear'), s.hudGear, (v) => (s.hudGear = v));
     check(this.t('voice'), s.voice, (v) => (s.voice = v));
+    // the version of the game (an earlier one is a page of its own: ui/versionpicker.ts) and the map (one stored from files: ui/mappacks.ts)
+    {
+      const when = new Intl.DateTimeFormat(localeOf(this.lang), { dateStyle: 'medium', timeStyle: 'short' });
+      p.append(versionSettings((k, v) => this.t(k, v), (iso) => when.format(new Date(iso))), mapPackSettings(s, (k, v) => this.t(k, v), localeOf(this.lang)));
+    }
     // settings live in the browser's storage; say so if this browser keeps none
     if (!saveSettings(s)) p.append(el('p', 'note warn', this.t('settingsNotSaved')));
     const b = el('div', 'buttons');
@@ -1187,8 +1253,13 @@ export class Hud {
     const p = el('div', 'panel news');
     p.append(el('h1', '', this.t('news')));
     const date = new Intl.DateTimeFormat(localeOf(this.lang), { day: 'numeric', month: 'long', year: 'numeric' });
+    // (the moment of the release, where it is known: in the reader's time zone)
+    const dateTime = new Intl.DateTimeFormat(localeOf(this.lang), { day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     for (const r of RELEASES) {
-      p.append(el('h2', '', `${this.t('newsVersion', { v: r.version })} · ${date.format(new Date(`${r.date}T12:00:00`))}`));
+      p.append(el('h2', '', `${this.t('newsVersion', { v: r.version })} · ${r.at ? dateTime.format(new Date(r.at)) : date.format(new Date(`${r.date}T12:00:00`))}`));
+      // every version can be played again (ui/versionpicker.ts) – the button shows where the site has it
+      const play = playVersionButton(r.version, (k, v) => this.t(k, v));
+      if (play) p.append(play);
       if (r.intro) p.append(el('p', '', this.t(r.intro)));
       const list = el('ul');
       for (const key of r.items) list.append(el('li', '', this.t(key)));
@@ -1245,72 +1316,59 @@ export class Hud {
   }
 
   showPause(): void {
+    // Three layers: going on (big), what can be done in the world (a grid of tiles with icons), and the
+    // menu's own things (a bar at the bottom: the settings first, the main menu last).
     const o = el('div', 'overlay');
-    const p = el('div', 'panel narrow');
-    p.append(el('h1', '', this.t('paused')));
-    if (this.last) p.append(el('p', '', `${this.t('faults')}: ${this.last.faults} · ${this.t('points')}: ${this.last.points}`));
-    const b = el('div', 'buttons');
-    const r = el('button', 'btn', this.t('resume'));
+    const p = el('div', 'panel pause');
+    const head = el('div', 'pause-head');
+    head.append(el('h1', '', this.t('paused')));
+    if (this.last) head.append(el('p', 'pause-score', `${this.t('faults')}: ${this.last.faults} · ${this.t('points')}: ${this.last.points}`));
+    const r = el('button', 'btn pause-resume', `▶  ${this.t('resume')}`);
     r.onclick = () => this.onResume();
-    const s = el('button', 'btn ghost', this.t('settings'));
-    s.onclick = () => this.showSettings(() => this.showPause());
-    const c = el('button', 'btn ghost', this.t('controls'));
-    c.onclick = () => this.showControls(() => this.showPause());
-    const q = el('button', 'btn ghost', this.t('menu'));
-    q.onclick = () => this.onQuit();
-    const f = el('button', 'btn ghost', this.t('realityButton'));
-    f.onclick = () => this.onReality();
-    const m = el('button', 'btn ghost', this.t('mapTitle'));
-    m.onclick = () => this.onMap();
-    b.append(r, m, f);
-    if (this.onReplay) {
-      const rp = el('button', 'btn ghost', this.t('replay'));
-      const go = this.onReplay;
-      rp.onclick = () => go();
-      b.append(rp);
-    }
+    const grid = el('div', 'pause-grid');
+    const tile = (icon: string, label: string, act: () => void, cls = ''): void => {
+      const t = el('button', `pause-tile${cls ? ` ${cls}` : ''}`);
+      t.type = 'button';
+      t.append(el('span', 'pause-icon', icon), el('span', 'pause-label', label));
+      t.onclick = act;
+      grid.append(t);
+    };
+    tile('🗺️', this.t('mapTitle'), () => this.onMap());
+    tile('📷', this.t('realityButton'), () => this.onReality());
     if (this.canTeleport) {
-      const a = el('button', 'btn ghost', this.t('teleport'));
-      a.onclick = () => this.showTeleport();
+      tile('📍', this.t('teleport'), () => this.showTeleport());
       // … or have the car drive somewhere by itself and watch how it is done
       // (in the aeroplane the same button switches its autopilot)
-      const demo = el('button', 'btn ghost', this.t(this.root.closest('.flying') ? 'tbAutopilot' : 'demo'));
-      demo.onclick = () => this.onDemo();
-      b.append(a, demo);
-      // on foot: the walker follows the player's real position (the browser asks first)
-      if (this.liveOffer) {
-        const live = el('button', 'btn ghost', this.t(this.liveOn ? 'liveLocationOff' : 'liveLocation'));
-        live.onclick = () => this.onLiveLocation();
-        b.append(live);
-      }
+      tile('🧭', this.t(this.root.closest('.flying') ? 'tbAutopilot' : 'demo'), () => this.onDemo());
       // another vehicle, here and now (the world stays as it is)
-      const cv = el('button', 'btn ghost', this.t('changeVehicle'));
-      cv.onclick = () => this.showVehiclePicker();
-      b.append(cv);
+      tile('🔁', this.t('changeVehicle'), () => this.showVehiclePicker());
+      // on foot: the walker follows the player's real position (the browser asks first)
+      if (this.liveOffer) tile('📡', this.t(this.liveOn ? 'liveLocationOff' : 'liveLocation'), () => this.onLiveLocation(), this.liveOn ? 'on' : '');
       // the arcade mode: the world at another moment, the time faster while the autopilot drives
-      if (this.arcade) {
-        const ar = el('button', 'btn ghost', this.t('arcadeTitle'));
-        ar.onclick = () => this.showArcade();
-        b.append(ar);
-      }
+      if (this.arcade) tile('🕹️', this.t('arcadeTitle'), () => this.showArcade());
+    }
+    if (this.onReplay) {
+      const go = this.onReplay;
+      tile('⏪', this.t('replay'), () => go());
     }
     if (this.onGetOut) {
-      const out = el('button', 'btn ghost', this.t('getOut'));
       const go = this.onGetOut;
-      out.onclick = () => go();
-      b.append(out);
+      tile('🚪', this.t('getOut'), () => go());
     }
-    const log = el('button', 'btn ghost', this.t('logTitle'));
-    log.onclick = () => this.showLog(() => this.showPause());
-    b.append(log, s, c);
-    if (this.canFinish) {
-      // a free drive ends when the driver says so: the result, then the main menu
-      const e = el('button', 'btn ghost', this.t('endDrive'));
-      e.onclick = () => this.onFinish();
-      b.append(e);
-    }
-    b.append(q);
-    p.append(b);
+    const bar = el('div', 'pause-bar');
+    const small = (icon: string, label: string, act: () => void, cls = ''): HTMLButtonElement => {
+      const b = el('button', `btn ghost pause-small${cls ? ` ${cls}` : ''}`, `${icon} ${label}`);
+      b.onclick = act;
+      bar.append(b);
+      return b;
+    };
+    small('⚙️', this.t('settings'), () => this.showSettings(() => this.showPause()));
+    small('⌨️', this.t('controls'), () => this.showControls(() => this.showPause()));
+    small('📝', this.t('logTitle'), () => this.showLog(() => this.showPause()));
+    // a free drive ends when the driver says so: the result, then the main menu
+    if (this.canFinish) small('🏁', this.t('endDrive'), () => this.onFinish());
+    small('🏠', this.t('menu'), () => this.onQuit(), 'pause-quit');
+    p.append(head, r, grid, bar);
     o.append(p);
     this.setOverlay(o);
     r.focus();
@@ -1795,6 +1853,7 @@ export class Hud {
   }
 
   update(s: HudState, now: number): void {
+    this.layout.tick(now);
     if (now - this.lastDom > 0.09) {
       this.lastDom = now;
       const rules = this.settings.hudRules;
@@ -1905,6 +1964,8 @@ export class Hud {
       this.tip.textContent = s.tip;
       this.tipAction = s.tipAction;
       this.tip.classList.toggle('tap', this.mode === 'touch' && s.tipAction !== '');
+      // ("back to the road" is easy to miss: it pulses – still, with reduced motion – ui/style.css)
+      this.tip.classList.toggle('urgent', s.tipAction === 'KeyT');
       this.score.innerHTML = `${this.t('faults')}: <b>${s.faults}</b> · ${this.t('points')}: <b>${s.points}</b>`;
       this.last = s;
       if (this.mode === 'touch') {

@@ -18,6 +18,9 @@ import type { TileData, TileSet } from './meshacc.ts';
 import type { OsmData, Tags } from './osm.ts';
 import { isClosedWay } from './osm.ts';
 import { LOD2_BIN, gridIndex } from './store.ts';
+import { loadObserved } from './observed.ts';
+import { emitWallDetail, loadObservedFacades, matchWall } from './facadedetail.ts';
+import type { ObservedWall } from './facadedetail.ts';
 import type { TerrainGrid } from './terrain.ts';
 
 interface Lod2Unit {
@@ -140,7 +143,15 @@ export function* lod2Units(lod2Dir: string, area: { minX: number; minZ: number; 
   }
 }
 
-export function addLod2Buildings(units: Iterable<Lod2Unit>, ts: TileSet, stats: BuildingStats): Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> {
+export function addLod2Buildings(
+  units: Iterable<Lod2Unit>,
+  ts: TileSet,
+  stats: BuildingStats,
+  /** the measured details of walls (tools/mapgen/facadedetail.ts): building id → its walls */
+  facades: Map<string, ObservedWall[]> = loadObservedFacades(),
+): Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> {
+  // (what was seen on site replaces the palettes' guesses: tools/mapgen/observed-buildings.json)
+  const observed = loadObserved();
   const boxes: Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> = [];
   let seed = 1;
   const endX = ts.minX + ts.nx * ts.size;
@@ -177,19 +188,21 @@ export function addLod2Buildings(units: Iterable<Lod2Unit>, ts: TileSet, stats: 
     if (cx < ts.minX || cx >= endX || cz < ts.minZ || cz >= endZ) continue;
     const tile = ts.at(cx, cz);
     seed = (Math.round(cx * 13.7) * 73856093) ^ (Math.round(cz * 17.3) * 19349663);
-    const style = styleFor(u.fn, area, top - base);
-    const wallCol =
-      style === BS.WALL_HOUSE
+    const seen = observed.get(u.id);
+    const style = seen?.style ?? styleFor(u.fn, area, top - base);
+    const guessed =
+      style === BS.WALL_HOUSE || style === BS.WALL_BRICK
         ? pick(WALLS_HOUSE, seed)
         : style === BS.WALL_GARAGE || style === BS.WALL_PLAIN
           ? pick(WALLS_GARAGE, seed)
           : style === BS.WALL_COMMERCIAL
             ? pick(WALLS_COMMERCIAL, seed)
             : pick(WALLS_PUBLIC, seed);
+    const wallCol = seen?.wall ?? guessed;
     const flatRoof = u.roof === '1000';
     const industrial = style === BS.WALL_COMMERCIAL;
     const roofStyle = flatRoof ? BS.ROOF_FLAT : industrial ? BS.ROOF_METAL : BS.ROOF_TILES;
-    const roofCol = flatRoof ? pick(ROOFS_FLAT, seed + 7) : industrial ? pick(ROOFS_METAL, seed + 7) : pick(ROOFS_TILE, seed + 7);
+    const roofCol = seen?.roof ?? (flatRoof ? pick(ROOFS_FLAT, seed + 7) : industrial ? pick(ROOFS_METAL, seed + 7) : pick(ROOFS_TILE, seed + 7));
     stats.lod2Units++;
     boxes.push({ minX, maxX, minZ, maxZ });
 
@@ -256,6 +269,10 @@ export function addLod2Buildings(units: Iterable<Lod2Unit>, ts: TileSet, stats: 
         // slightly different tone per facade direction keeps boxy houses readable
         const col = shade(wallCol, 0.94 + 0.08 * Math.abs(nx));
         const st = kind === 3 ? BS.WALL_PLAIN : style;
+        // (a wall measured on site: its real windows, doors … as geometry, and no window grid of the shader's)
+        const measured = kind === 0 ? facades.get(u.id) : undefined;
+        const hit = measured ? matchWall(poly, 1, n, ua[0], ua[2], measured) : null;
+        const first = tile.bldg.count;
         stats.triangles += emit(
           tile,
           poly,
@@ -267,6 +284,11 @@ export function addLod2Buildings(units: Iterable<Lod2Unit>, ts: TileSet, stats: 
           (uu, _vv, y) => [st, col[0], col[1], col[2], uu, y - lo, L, H],
           lo <= base + 0.4 ? lo + 0.02 : -Infinity,
         );
+        if (hit && tile.bldg.count > first) {
+          tile.bldgObs.push(first, tile.bldg.count - first);
+          const foot = Number.isFinite(hit.wall.base) ? (hit.wall.base as number) : lo;
+          stats.triangles += emitWallDetail(tile.fdet, hit.wall, hit.A, hit.B, nx / hl, nz / hl, foot, hi, wallCol);
+        }
       }
     }
   }

@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 /* ---------- the forklift: its display and the mast's buttons (ui/forkliftpanel.ts) ---------- */
+/* (a child of #ui: the rule for #ui's children – pointer-events: auto – is the stronger one, so the layer over the
+   whole view says it again with #ui; otherwise it takes every click and drag from the HUD and the picture under it) */
+#ui > .fork-ui { pointer-events: none; }
 .fork-ui { position: absolute; inset: 0; pointer-events: none; }
 .fork-ui[hidden] { display: none; }
 .fork-ui > * { position: absolute; }

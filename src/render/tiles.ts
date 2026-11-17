@@ -8,9 +8,11 @@
 import * as THREE from 'three';
 import { COVER_COLORS } from '../world/cover.ts';
 import type { TileGrid } from '../world/loader.ts';
+import { mapFetch } from '../world/mappack.ts';
 import { POS_XZ_SCALE, POS_Y_SCALE, tileKey, unpackTile } from '../world/tilefmt.ts';
 import type { SectionArray, TileHeader, UnpackedTile } from '../world/tilefmt.ts';
 import { makeBuildingMaterial, makeGroundMaterial, makeStructMaterial, makeTerrainMaterial } from './materials.ts';
+import { buildFacadeDetail, flagObservedWalls, makeDetailMaterial } from './facadedetail.ts';
 
 export interface LoadedTile {
   key: string;
@@ -22,12 +24,15 @@ export interface LoadedTile {
   cover: Uint8Array;
   data: UnpackedTile;
   disposables: Array<{ dispose(): void }>;
+  /** the measured details of its walls (render/facadedetail.ts): null – none, undefined – not built (yet) */
+  detail?: THREE.Group | null;
 }
 
 const COVER_RGB = COVER_COLORS.map((c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255]);
 
 async function fetchTile(url: string): Promise<ArrayBuffer> {
-  const res = await fetch(url);
+  // (from a map stored in this browser, if one is in use: world/mappack.ts)
+  const res = await mapFetch(url);
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
   const head = new Uint8Array(buf, 0, 2);
@@ -56,6 +61,7 @@ export class TileManager {
   private readonly structMat = makeStructMaterial();
   private readonly bldgMat = makeBuildingMaterial();
   private readonly plainMat = makeBuildingMaterial(true);
+  private readonly detailMat = makeDetailMaterial();
   /** what teaches the materials the season and the wet (game/outdoors.ts) – each tile's terrain gets it, too */
   private materialHook: ((m: THREE.Material, kind: 'terrain' | 'ground' | 'paint' | 'struct' | 'building') => void) | null = null;
 
@@ -67,6 +73,7 @@ export class TileManager {
     hook(this.structMat, 'struct');
     hook(this.bldgMat, 'building');
     hook(this.plainMat, 'building');
+    hook(this.detailMat, 'struct');
   }
   /** buildings with windows, doors and roof tiles (false: plain walls and roofs) */
   private facades = true;
@@ -82,6 +89,11 @@ export class TileManager {
     this.group.traverse((o) => {
       if (o.name === 'bldg' && (o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = mat;
     });
+    // the measured details of walls: only with facades (built for the tiles that came without)
+    for (const tile of this.tiles.values()) {
+      if (on && tile.detail === undefined) this.addDetail(tile);
+      if (tile.detail) tile.detail.visible = on;
+    }
   }
   maxConcurrent = 3;
   private wantCount = 0;
@@ -336,6 +348,8 @@ export class TileManager {
       struct.castShadow = true;
       struct.receiveShadow = true;
     }
+    // (walls with measured details: no window grid of the shader's – render/facadedetail.ts)
+    flagObservedWalls(a8('bldg') as Uint8Array | null, data.get('bldg_obs') as Uint32Array | null);
     const bldg = mesh('bldg', this.facades ? this.bldgMat : this.plainMat, (g) => {
       g.setAttribute('astyle', new THREE.BufferAttribute(a8('bldg') as Uint8Array, 4));
       g.setAttribute('auvd', new THREE.BufferAttribute(data.get('bldg_a16') as Int16Array, 4));
@@ -346,7 +360,15 @@ export class TileManager {
     }
 
     group.matrixAutoUpdate = false;
-    return { key, header: h, group, heights, cover: cov, data, disposables };
+    const tile: LoadedTile = { key, header: h, group, heights, cover: cov, data, disposables };
+    if (this.facades) this.addDetail(tile);
+    return tile;
+  }
+
+  /** The measured details of a tile's walls into its group (render/facadedetail.ts). */
+  private addDetail(tile: LoadedTile): void {
+    tile.detail = buildFacadeDetail(tile.data, tile.header, this.detailMat, tile.disposables);
+    if (tile.detail) tile.group.add(tile.detail);
   }
 
   /** Ground-cover class at a world position (COVER.MEADOW if the tile is not loaded). */

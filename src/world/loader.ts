@@ -97,7 +97,8 @@ export class MapLoader {
     this.tiles = tiles;
     this.chunks = chunks;
     this.pieces = chunks !== null;
-    this.version = (world.json.meta.generated ?? '').replace(/\D/g, '').slice(0, 14);
+    // (a patch of tiles changes the address of every tile: a browser does not keep showing the ones it had)
+    this.version = (world.json.meta.generated ?? '').replace(/\D/g, '').slice(0, 14) + (world.json.meta.patched ?? '').replace(/\D/g, '').slice(0, 14);
   }
 
   static async open(files: MapFiles, opts: WorldOptions = {}): Promise<MapLoader> {

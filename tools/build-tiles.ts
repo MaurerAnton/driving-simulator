@@ -35,6 +35,7 @@ import { addLod2Buildings, addOsmBuildings, lod2Units } from './mapgen/buildings
 import type { BuildingStats } from './mapgen/buildings.ts';
 import { buildCover } from './mapgen/cover.ts';
 import { Dgm } from './mapgen/dgm.ts';
+import { detailSections } from './mapgen/facadedetail.ts';
 import { TileSet, meshSections } from './mapgen/meshacc.ts';
 import { addBarriersAndRails, addLamps, addVegetation, buildingMask } from './mapgen/objects.ts';
 import { OsmData } from './mapgen/osm.ts';
@@ -216,6 +217,8 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
       meshSections('mark', t.mark, cx, cz, yBase, plain);
       meshSections('struct', t.struct, cx, cz, yBase, plain);
       meshSections('bldg', t.bldg, cx, cz, yBase, plain);
+      // (the measured details of walls: sections versions before 1.6.0 do not ask for – mapgen/facadedetail.ts)
+      detailSections(t, cx, cz, yBase, plain);
       const sections: Record<string, SectionArray | CodedSection> = { hgt: smallest(hgt, terrainN, [CODING.GRID]), cov };
       // what the faces of the buildings need for their facades: stored only where it does not follow from their corners
       if (plain.bldg_a16 && plain.bldg_pos && plain.bldg_idx) {
@@ -268,7 +271,7 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
       writeFileSync(resolve(outDir, 'tiles', `${tileKey(ix, iz)}.fsb`), gz);
       result.tiles.push([ix, iz]);
       result.bytes += gz.length;
-      result.triangles += (t.ground.idx.length + t.mark.idx.length + t.struct.idx.length + t.bldg.idx.length) / 3;
+      result.triangles += (t.ground.idx.length + t.mark.idx.length + t.struct.idx.length + t.bldg.idx.length + t.fdet.idx.length) / 3;
     }
   }
   result.seconds = Math.round((Date.now() - t0) / 1000);

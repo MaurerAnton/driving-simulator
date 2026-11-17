@@ -15,6 +15,7 @@
  * vertices, in the order of its outline.
  */
 import { POS_XZ_SCALE, POS_Y_SCALE, UV_SCALE } from './tilefmt.ts';
+import { wasmUnpackFaces } from '../wasm/kernels.ts';
 
 export const FACE = {
   /** the four numbers of each corner are stored */
@@ -230,6 +231,9 @@ export function packFaces(pos: Int16Array, idx: ArrayLike<number>, a16: Int16Arr
 
 /** For the game: the four numbers of every corner, from the runs of a tile. */
 export function unpackFaces(pos: ArrayLike<number>, run: ArrayLike<number>, uvx: ArrayLike<number> | null): Int16Array {
+  // (the same in WebAssembly where it is there – src/wasm/kernels.ts; null: not there)
+  const fast = wasmUnpackFaces(pos, run, uvx);
+  if (fast) return fast;
   const out = new Int16Array((pos.length / 3) * 4);
   let first = 0;
   let x = 0;

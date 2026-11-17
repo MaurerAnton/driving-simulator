@@ -163,7 +163,12 @@ function holdButton(cls: string, label: string, hold: (on: boolean) => void): HT
   };
   b.onpointerdown = (e) => {
     e.preventDefault();
-    b.setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    try {
+      b.setPointerCapture(e.pointerId);
+    } catch {
+      /* the pointer is gone already */
+    }
     held = true;
     b.classList.add('on');
     hold(true);
@@ -173,15 +178,51 @@ function holdButton(cls: string, label: string, hold: (on: boolean) => void): HT
   return b;
 }
 
-/** A button that is tapped. */
+/**
+ * A button that is tapped.  It answers to the finger's (or the mouse's) own
+ * pointer events – down on it, up on it – not to the click the browser makes
+ * of them afterwards: on a phone that click may never come while the display
+ * beside it is rewritten several times a second (Safari takes changing
+ * content under the finger for a hover and swallows the tap).  The click
+ * stays for the keyboard (Enter or Space on the focused button).
+ */
 function tapButton(cls: string, label: string, tap: () => void): HTMLButtonElement {
   const b = el('button', cls, label);
   b.type = 'button';
+  let down = -1;
+  b.onpointerdown = (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    down = e.pointerId;
+    try {
+      b.setPointerCapture(e.pointerId);
+    } catch {
+      /* the pointer is gone already */
+    }
+  };
+  b.onpointerup = (e) => {
+    if (e.pointerId !== down) return;
+    down = -1;
+    e.stopPropagation();
+    // (let go on the button: tapped – drawn off it: not)
+    const r = b.getBoundingClientRect();
+    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) tap();
+  };
+  b.onpointercancel = () => {
+    down = -1;
+  };
   b.onclick = (e) => {
     e.stopPropagation();
-    tap();
+    // (a click from the keyboard has no count of presses: the pointer's taps were answered above)
+    if (e.detail === 0) tap();
   };
   return b;
+}
+
+/** Text written only when it changed (the panel is updated every frame: no work, no mutation, when nothing changed). */
+function setText(e: HTMLElement, text: string): void {
+  if (e.textContent !== text) e.textContent = text;
 }
 
 /** shaped for fine control: a little deflection moves a little */
@@ -468,9 +509,9 @@ export class CranePanel {
     this.root.classList.toggle('operating', op);
     // (the buttons that change between driving and working the crane, and sling the load)
     this.modeBtn.hidden = info.type === 'tower' || !(op ? info.canDrive : info.canOperate);
-    this.modeBtn.textContent = this.t(op ? 'craneBtn.drive' : 'craneBtn.operate');
+    setText(this.modeBtn, this.t(op ? 'craneBtn.drive' : 'craneBtn.operate'));
     this.attachBtn.hidden = !op;
-    this.attachBtn.textContent = this.t(info.hooked ? 'craneBtn.release' : 'craneBtn.attach');
+    setText(this.attachBtn, this.t(info.hooked ? 'craneBtn.release' : 'craneBtn.attach'));
     this.attachBtn.classList.toggle('ready', info.canAttach || info.hooked);
     this.fineBtn.hidden = !op;
     this.fineBtn.classList.toggle('on', info.fine);
@@ -485,7 +526,7 @@ export class CranePanel {
     this.bar.style.width = `${Math.min(100, p * 100).toFixed(1)}%`;
     this.lmiBox.classList.toggle('warn', l.warn && !l.stop);
     this.lmiBox.classList.toggle('stop', l.stop);
-    this.barText.textContent = l.capacity > 0 ? `${Math.round(p * 100)} %` : '–';
+    setText(this.barText, l.capacity > 0 ? `${Math.round(p * 100)} %` : '–');
     const n = (v: number, d = 1): string => this.num(v, d);
     const rows: string[] = [
       this.t('lmi.load', { load: n(l.load, 2), max: l.capacity > 0 ? n(l.capacity, 2) : '–' }),
@@ -494,7 +535,9 @@ export class CranePanel {
       this.t('lmi.wind', { v: n(l.wind), max: n(l.windLimit, 0) }),
     ];
     if (info.type !== 'tower') rows.push(this.t(`lmi.setting.${l.setting}`));
-    this.vals.replaceChildren(...rows.map((t) => el('span', '', t)));
+    // (the rows written into the spans that are there – new ones only when their number changes)
+    if (this.vals.children.length !== rows.length) this.vals.replaceChildren(...rows.map((t) => el('span', '', t)));
+    else rows.forEach((t, i) => setText(this.vals.children[i] as HTMLElement, t));
     this.vals.children[3]?.classList.toggle('bad', l.wind > l.windLimit);
     this.vals.children[3]?.classList.toggle('warn', l.wind > l.windLimit * 0.8 && l.wind <= l.windLimit);
     // the bubble level: the slope along the carrier and across it
@@ -507,7 +550,7 @@ export class CranePanel {
       this.bubble.style.transform = `translate(${bx.toFixed(1)}px, ${bz.toFixed(1)}px)`;
       lv.classList.toggle('ok', l.incline <= l.levelGood);
       lv.classList.toggle('bad', l.notLevel);
-      this.level.textContent = this.t('lmi.incline', { d: n(l.incline) });
+      setText(this.level, this.t('lmi.incline', { d: n(l.incline) }));
     }
     // how near tipping: the crane's own measure (100 %: it tips)
     const u = Number.isFinite(l.tipping) ? l.tipping : 9.99;
@@ -517,7 +560,7 @@ export class CranePanel {
     this.tipBar.parentElement!.dataset.label = this.t('lmi.tipping', { p: Math.round(u * 100) });
     // what the limiter says
     const msg = l.stop ? (l.capacity <= 0 ? this.t('lmi.msg.range') : this.t('lmi.msg.stop')) : l.notLevel ? this.t('lmi.msg.level') : l.wind > l.windLimit ? this.t('lmi.msg.wind') : l.warn ? this.t('lmi.msg.warn') : '';
-    this.msg.textContent = msg;
+    setText(this.msg, msg);
     this.msg.hidden = !msg;
   }
 

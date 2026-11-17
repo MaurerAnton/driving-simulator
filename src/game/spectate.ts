@@ -293,6 +293,8 @@ export class Watcher {
       }
     } else {
       if (this.bus && !traffic.cars.includes(this.bus)) this.bus = null;
+      // (the buses of the timetables are put on their roads by the traffic itself: src/game/timedtransit.ts)
+      this.bus ??= traffic.cars.find((c) => c.bus?.trip === this.req.trip) ?? null;
       if (!this.bus && this.spot && this.trip && this.h.ready(this.spot.x, this.spot.z)) this.bus = this.placeBus(traffic);
     }
     // where it is now
@@ -364,8 +366,9 @@ export class Watcher {
     projectOnPolyline(lane.edge.pl, s.x, s.z, proj);
     const along = lane.dir > 0 ? proj.s - lane.s0 : lane.s0 - proj.s;
     const car = traffic.addCar(lane, Math.max(1, Math.min(lane.len - 1, along)), true, { ref: this.req.ref, to: this.req.dest, index: this.req.line, k: s.k, off: 0 });
-    // (it drives off at once if it is under way, not at a crawl)
+    // (it drives off at once if it is under way, not at a crawl – and keeps to its trip's times)
     car.v = this.trip?.standing ? 0 : car.v;
+    if (car.bus) car.bus.trip = this.req.trip;
     return car;
   }
 

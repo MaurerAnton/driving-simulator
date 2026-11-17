@@ -6,6 +6,9 @@
  * is the same on QWERTZ and QWERTY keyboards.
  */
 import type { Settings } from '../game/settings.ts';
+import { analogSteer, keySteer, steerFeel } from './steerfeel.ts';
+import { CamZoom } from './camzoom.ts';
+import type { SteerFeel, SteerSpec } from './steerfeel.ts';
 
 export interface Controls {
   steer: number;
@@ -40,10 +43,6 @@ const ZOOM_FAR = 5;
 /** service: fill up at a pump, wash at a car wash, call for help with an empty tank, skip the loading of a truck (game/serviceworld.ts) */
 export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto' | 'mirror' | 'service' | 'wiper' | 'open';
 
-/** Lateral acceleration (m/s²) the steering keys may ask for: brisk in town, gentle on the motorway. */
-const keyLateral = (v: number): number => 2.4 + 3.4 / (1 + (v / 15) * (v / 15));
-/** … and what full deflection of a stick or of the steering bar asks for: close to what the tyres hold. */
-const ANALOG_LATERAL = 7;
 const TAU = Math.PI * 2;
 /** O held longer than this (ms) is the flasher, not a switch of the main beam */
 const FLASH_HOLD_MS = 350;
@@ -105,6 +104,12 @@ export class Input {
    */
   orbit = false;
   /**
+   * Where the camera circling the vehicle rests (radians, 0: behind it): it
+   * starts there and swings back there – the forklift's view from the side
+   * (game/forkliftplay.ts).  Set by `resetLook`.
+   */
+  orbitRest = 0;
+  /**
    * The free camera: fingers and mouse move the camera itself (see `cam`)
    * instead of turning a head or circling the car, and it stays where it is put.
    */
@@ -120,8 +125,8 @@ export class Input {
   private readonly fingers = new Map<number, { x: number; y: number }>();
   private pinch = 0;
   private lookIdle = 0;
-  private wheelbase = 2.63;
-  private maxWheelAngle = 0.576;
+  /** how the keys, the bar and a stick move the steering for this vehicle (input/steerfeel.ts) */
+  private feel: SteerFeel = steerFeel();
   /** suspend driving input (menus) */
   enabled = true;
   lastGamepadId = '';
@@ -130,6 +135,9 @@ export class Input {
    * gamepad – only the camera (V), the map (M) and the door key (G: back to driving) stay the game's.
    */
   crane = false;
+  /** zooming the view (input/camzoom.ts): pinch, the wheel, + and − – while `viewZoom` (set by the game: on foot, the driver's seat) */
+  readonly zoom = new CamZoom();
+  viewZoom = false;
 
   constructor(canvas: HTMLCanvasElement, settings: Settings) {
     this.settings = settings;
@@ -166,6 +174,7 @@ export class Input {
         return;
       }
       this.fingers.delete(e.pointerId);
+      if (this.fingers.size < 2) this.zoom.fingersOff();
       if (e.pointerId === this.lookId) {
         // (another finger still on the view goes on turning it)
         const rest = this.fingers.entries().next();
@@ -208,7 +217,8 @@ export class Input {
         const spread = this.fingerSpread();
         const scale = this.pinch > 8 && spread > 8 ? spread / this.pinch : 1;
         this.pinch = spread;
-        if (this.freeCam) {
+        if (this.viewZoom) this.zoom.pinch(scale);
+        else if (this.freeCam) {
           // (each finger moves the middle between the two by half of what it moves)
           const k = 0.5 / Math.max(240, window.innerHeight);
           this.cam.right -= dx * k;
@@ -226,6 +236,12 @@ export class Input {
     canvas.addEventListener(
       'wheel',
       (e) => {
+        // (on foot and in the driver's seat the wheel zooms the view)
+        if (this.viewZoom && this.enabled) {
+          e.preventDefault();
+          this.zoom.wheel(clamp(e.deltaY, -120, 120) * 0.0016);
+          return;
+        }
         if ((!this.orbit && !this.freeCam) || !this.enabled) return;
         e.preventDefault();
         const step = clamp(e.deltaY, -120, 120) * 0.0016;
@@ -237,7 +253,7 @@ export class Input {
     // (the right button moves the free camera: no menu of the browser over the view)
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('dblclick', () => {
-      this.mouseLookYaw = 0;
+      this.mouseLookYaw = this.orbit ? this.orbitRest : 0;
       this.mouseLookPitch = 0;
       this.cam.reset = true;
     });
@@ -373,14 +389,15 @@ export class Input {
     }
   }
 
-  /** The camera was changed: look straight ahead again. */
-  resetLook(orbit: boolean, freeCam = false): void {
+  /** The camera was changed: look straight ahead again (circling the vehicle: from `rest`, 0 behind it). */
+  resetLook(orbit: boolean, freeCam = false, rest = 0): void {
     this.orbit = orbit;
     this.freeCam = freeCam;
+    this.orbitRest = orbit ? rest : 0;
     this.takeCam();
-    this.mouseLookYaw = 0;
+    this.mouseLookYaw = this.orbitRest;
     this.mouseLookPitch = 0;
-    this.c.lookYaw = 0;
+    this.c.lookYaw = this.orbitRest;
     this.c.lookPitch = 0;
     this.glance = false;
   }
@@ -390,18 +407,9 @@ export class Input {
   /** how far the camera behind the vehicle goes back as usual (the vehicle's own measure) – scrolled on, ZOOM_FAR times that */
   zoomMax = 18;
 
-  setSteering(wheelbase: number, maxWheelAngle: number): void {
-    this.wheelbase = wheelbase;
-    this.maxWheelAngle = maxWheelAngle;
-  }
-
-  /**
-   * How much of the steering lock an input may ask for at this speed so that
-   * the car turns with at most `lateral` m/s² (v²/r, r = wheelbase / angle).
-   * Full lock up to walking pace.
-   */
-  private lockFor(lateral: number, speed: number): number {
-    return clamp((lateral * this.wheelbase) / (Math.max(speed * speed, 1) * this.maxWheelAngle), 0.003, 1);
+  /** `spec`: the whole vehicle – a heavy one is steered slower and more gently (input/steerfeel.ts). */
+  setSteering(wheelbase: number, maxWheelAngle: number, spec?: SteerSpec): void {
+    this.feel = steerFeel(spec ? { ...spec, wheelbase, maxWheelAngle } : null, wheelbase, maxWheelAngle);
   }
 
   onAction(fn: (a: Action) => void): void {
@@ -474,6 +482,12 @@ export class Input {
       // (working a crane: its own keys – but the camera, the map, the door, and the lights, hazard lights, horn and ignition still work)
       if (this.crane && !['KeyV', 'KeyM', 'KeyG', 'KeyL', 'KeyO', 'KeyX', 'KeyH', 'KeyI'].includes(code)) {
         if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
+        return;
+      }
+      // + and −: the view closer or wider (on foot, in the driver's seat; held, the zoom stays)
+      const zoomDir = zoomKey(e);
+      if (zoomDir !== 0 && this.viewZoom) {
+        this.zoom.press(zoomDir, true);
         return;
       }
       const c = this.c;
@@ -557,6 +571,7 @@ export class Input {
       }
       if (code.startsWith('Arrow')) e.preventDefault();
     } else {
+      if (zoomKey(e) !== 0) this.zoom.press(0, false);
       // the main beam on or off: O tapped, not held as the flasher
       if (code === 'KeyO' && this.keys.has('KeyO') && this.enabled && performance.now() - this.oDownAt < FLASH_HOLD_MS) this.c.highBeam = !this.c.highBeam && this.c.lowBeam;
       this.keys.delete(code);
@@ -619,16 +634,14 @@ export class Input {
     } else if (pad && (Math.abs(pad.steer) > 0.02 || pad.throttle > 0.02 || pad.brake > 0.02 || c.device === 'gamepad') && (fly || !this.anyDrivingKey())) {
       c.device = 'gamepad';
       // gentle non-linearity and less lock at speed make a thumb stick usable
-      const limit = this.lockFor(ANALOG_LATERAL, absSpeed);
       const shaped = Math.sign(pad.steer) * Math.abs(pad.steer) ** 1.6;
-      c.steer = approach(c.steer, shaped * limit, dt * Math.max(3.5 * limit, 0.05));
+      c.steer = analogSteer(this.feel, c.steer, shaped, absSpeed, dt, 3.5);
       c.throttle = pad.throttle;
       c.brake = pad.brake;
       c.clutch = pad.clutch;
     } else if (this.touch.active) {
       c.device = 'touch';
-      const limit = this.lockFor(ANALOG_LATERAL, absSpeed);
-      c.steer = approach(c.steer, this.touch.steer * limit, dt * Math.max(4 * limit, 0.05));
+      c.steer = analogSteer(this.feel, c.steer, this.touch.steer, absSpeed, dt, 4);
       c.throttle = this.touch.throttle;
       c.brake = this.touch.brake;
       c.clutch = 0;
@@ -639,18 +652,8 @@ export class Input {
       // A key is all or nothing, a steering wheel is not: the keys ask for the lock that turns the car
       // with a comfortable lateral acceleration at this speed – full lock at walking pace, a fraction
       // of a degree on the motorway – and wind it on within about half a second.
-      const limit = this.lockFor(keyLateral(absSpeed), absSpeed);
-      const target = (right ? 1 : 0) - (left ? 1 : 0);
-      if (target !== 0) {
-        const rate = limit * (1.2 + 1.3 * (1 - limit));
-        // counter-steering is quicker than winding on more lock
-        if (Math.sign(c.steer) === -target) c.steer = approach(c.steer, 0, dt * Math.max(1.6 * limit, Math.abs(c.steer) * 4));
-        c.steer = approach(c.steer, target * limit, dt * rate);
-      } else {
-        // hands off: the wheel centres itself when the car rolls, and stays put when it stands
-        const centring = clamp(absSpeed / 6, 0, 1) * Math.max((1.4 + Math.abs(selfAlign) * 2.5) * Math.max(limit, 0.15), Math.abs(c.steer) * 3);
-        c.steer = approach(c.steer, 0, dt * centring);
-      }
+      // (hands off: the wheel centres itself when the car rolls, and stays put when it stands)
+      c.steer = keySteer(this.feel, c.steer, (right ? 1 : 0) - (left ? 1 : 0), absSpeed, selfAlign, dt);
       const gas = !fly && this.key('KeyW', 'ArrowUp');
       const brake = !fly && this.key('KeyS', 'ArrowDown');
       // quick to half travel, slower to the floor: easier to dose with a key
@@ -671,7 +674,7 @@ export class Input {
     } else if (pad) {
       this.applyPadButtons(pad.buttons, pad.kind === 'wheel');
       if (Math.abs(pad.lookX) > 0.15) this.mouseLookYaw = -pad.lookX * 1.9;
-      else if (pad.kind === 'standard' && Math.abs(this.mouseLookYaw) > 0 && !this.dragging) this.mouseLookYaw = approach(this.mouseLookYaw, 0, dt * 6);
+      else if (pad.kind === 'standard' && this.mouseLookYaw !== this.orbitRest && !this.dragging) this.mouseLookYaw = this.orbitRest + approach(wrap(this.mouseLookYaw - this.orbitRest), 0, dt * 6);
     }
 
     c.starter = this.key('Enter', 'NumpadEnter') || (pad?.starter ?? false);
@@ -699,7 +702,7 @@ export class Input {
       if (this.dragging || back || lookL || lookR) this.lookIdle = 0;
       else this.lookIdle += dt;
       if (this.lookIdle > 2.2 && absSpeed > 2.5 && !this.glance) {
-        this.mouseLookYaw = approach(this.mouseLookYaw, 0, dt * 1.6);
+        this.mouseLookYaw = this.orbitRest + approach(wrap(this.mouseLookYaw - this.orbitRest), 0, dt * 1.6);
         this.mouseLookPitch = approach(this.mouseLookPitch, 0, dt * 0.6);
       }
       // the short way round
@@ -818,4 +821,12 @@ export class Input {
     }
     this.prevButtons = buttons;
   }
+}
+
+/** The zoom keys: + (1), − (−1), anything else 0 – by the character, so that + on a German keyboard counts too. */
+function zoomKey(e: KeyboardEvent): number {
+  if (e.ctrlKey || e.metaKey || e.altKey) return 0;
+  if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') return 1;
+  if (e.key === '-' || e.code === 'NumpadSubtract') return -1;
+  return 0;
 }

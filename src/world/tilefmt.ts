@@ -9,6 +9,7 @@
  * platforms are), so sections can be viewed in place without copying.
  */
 import { unpackFaces } from './facade.ts';
+import { wasmDecodeSection } from '../wasm/kernels.ts';
 
 export type SectionType = 'u8' | 'i8' | 'u16' | 'i16' | 'u32' | 'i32' | 'f32';
 export type SectionArray =
@@ -96,6 +97,9 @@ function decodeSection(bytes: Uint8Array, info: SectionInfo): SectionArray {
   const { n, t } = info;
   const coding = info.c ?? CODING.RAW;
   const stride = info.s ?? 1;
+  // (the same in WebAssembly where it is there – src/wasm/kernels.ts; null: not there, or not for this section)
+  const fast = wasmDecodeSection(bytes, n, t, coding, stride);
+  if (fast) return fast;
   const B = BYTES[t];
   const out = t === 'u8' ? new Uint8Array(n) : t === 'i8' ? new Int8Array(n) : t === 'u16' ? new Uint16Array(n) : t === 'i16' ? new Int16Array(n) : t === 'u32' ? new Uint32Array(n) : new Int32Array(n);
   const groups = coding === CODING.GRID ? 1 : stride;
@@ -159,6 +163,8 @@ export const BS = {
   WALL_PUBLIC: 3,
   WALL_CHURCH: 4,
   WALL_PLAIN: 5,
+  /** facing brick (with windows like a house) */
+  WALL_BRICK: 6,
   ROOF_TILES: 8,
   ROOF_FLAT: 9,
   ROOF_METAL: 10,

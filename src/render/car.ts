@@ -1174,6 +1174,8 @@ export class PlayerCar {
       });
       const housing = new THREE.Mesh(new Sculpt().tube(rings, true, true).build(50), i === 0 ? mirrorPlastic : shellPaint);
       housing.name = `mirror housing ${s.name}`;
+      // (the housing goes along when the glass is moved: Mirror.place, ui/hudmirror.ts)
+      m.attached.push(housing);
       this.cockpit.add(m.mesh, housing);
     });
     // stem of the inside mirror up to the roof's front edge, feet of the door mirrors
@@ -1216,6 +1218,11 @@ export class PlayerCar {
    * wheel, stalks, levers) form a second layer of the same kind so that they
    * stand out against the dashboard behind them.
    */
+  /** The centre display's picture (a tap on it in the driver's seat: ui/screentap.ts). */
+  get screenMesh(): THREE.Object3D {
+    return this.screen;
+  }
+
   /** The live map on the centre display (true), or its still picture. */
   setMapOnScreen(on: boolean): void {
     const m = this.screen.material as THREE.MeshBasicMaterial;

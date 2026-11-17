@@ -179,6 +179,14 @@ export interface RailVehicle {
   trip?: string;
   /** its passenger doors: 0 shut … 1 open (shut if not said) – they take DOOR_TIME to open or close */
   doors?: number;
+  /** its trip has ended (at the last stop of its timetable): it goes as soon as the player is not close by */
+  retire?: boolean;
+  /** the speed it keeps to so as to be at its next stop on time (m/s, by the timetable – Infinity: none), and when that is worked out again (s) */
+  pace?: number;
+  paceT?: number;
+  /** its way over the tracks to the next stop of its trip ("piece:mark" of that stop), the pieces in order – null: none worked out */
+  routeFor?: string;
+  route?: Array<{ path: number; dir: 1 | -1 }> | null;
 }
 
 /** how long the doors of a tram take to open or to close (s) */
@@ -191,10 +199,27 @@ export const DOOR_TIME = 1.6;
  */
 export interface RailSchedule {
   /** the trips under way within `r1` of (x, z) – those further than `r0` only, unless `all` –: where each is, and how fast it runs */
-  due(x: number, z: number, r0: number, r1: number, all: boolean): Array<{ trip: string; line: number; path: number; s: number; dir: 1 | -1; k: number; speed: number }>;
-  /** how much longer the vehicle should stand at the stop at `mark` of piece `path` to leave on time (s; 0: it may go) */
+  due(x: number, z: number, r0: number, r1: number, all: boolean): Array<{ trip: string; line: number; path: number; s: number; dir: 1 | -1; k: number; speed: number; dwell?: number }>;
+  /**
+   * how much longer the vehicle should stand at the stop at `mark` of piece
+   * `path` to leave on time (s; 0 or less: it may go – negative: it is that
+   * late already, and stands no longer than it must)
+   */
   wait(v: RailVehicle, path: number, mark: number): number;
+  /** does its trip call at the stop at `mark` of piece `path`?  (Those it passes it does not stop at.) */
+  calls?(v: RailVehicle, path: number, mark: number): boolean;
+  /** the speed to run at to arrive at the stop at `mark` of `path`, `dist` metres ahead, in time to leave from it on time (m/s; Infinity: as fast as it may) */
+  pace?(v: RailVehicle, path: number, mark: number, dist: number): number;
+  /** has its trip ended (at the stop it stands at now)? */
+  ends?(v: RailVehicle): boolean;
+  /** where the next stop of its trip is (piece, mark) – null: none, or not known */
+  toward?(v: RailVehicle): { path: number; mark: number } | null;
 }
+
+/** the least a tram of the timetable stands at a stop (s): the doors open and close */
+export const TIMED_DWELL = 8;
+/** the slowest a tram of the timetable runs to keep to it (m/s) – earlier than that, it waits at the stop */
+const PACE_MIN = 4;
 
 /** A line of the trams (lines.json.gz): the pieces it runs, which way, and its stops. */
 export interface RailLine {
@@ -431,6 +456,11 @@ export class RailNetwork {
 
 const tmp = { x: 0, y: 0, z: 0, tx: 0, tz: 0, cap: 0 };
 
+/** a tram whose trip has ended goes when it is further than this from the player (m) */
+const RETIRE_NEAR = 120;
+/** a tram this far from where its trip is by the timetable (m) is put there anew, out of the player's sight */
+const MISPLACED = 300;
+
 export class RailTraffic {
   readonly net: RailNetwork;
   readonly vehicles: RailVehicle[] = [];
@@ -553,6 +583,99 @@ export class RailTraffic {
     return v.line;
   }
 
+  /**
+   * A tram of the timetable finds its way to the next stop of its trip over
+   * the tracks (the pieces of its line in lines.json.gz do not always join up
+   * where the tracks are drawn twice or a stop lies on a siding): worked out
+   * again whenever that stop changes.
+   */
+  private steer(v: RailVehicle, sch: RailSchedule): void {
+    const tg = sch.toward?.(v) ?? null;
+    const key = tg ? `${tg.path}:${tg.mark}` : '';
+    if (key === v.routeFor) return;
+    v.routeFor = key;
+    v.route = tg ? this.wayTo(v.path, v.dir, tg.path, v.consist.tracks) : null;
+    // (what was planned beyond the piece it is on is planned anew along that way)
+    if (v.route) v.plan.length = 0;
+  }
+
+  /**
+   * The way over the tracks from the piece `path` (run in direction `dir`)
+   * to the piece `to` – the shortest, at most `reach` metres, without sharp
+   * bends – as the pieces in order, both ends included.  Null if there is none.
+   */
+  wayTo(path: number, dir: 1 | -1, to: number, tracks: readonly number[], reach = 9000): Array<{ path: number; dir: 1 | -1 }> | null {
+    const start = path * 2 + (dir > 0 ? 1 : 0);
+    if (path === to) return [{ path, dir }];
+    const cost = new Map<number, number>([[start, 0]]);
+    const from = new Map<number, number>();
+    // (a small heap of [cost, state])
+    const heap: Array<[number, number]> = [[0, start]];
+    const push = (c: number, s: number): void => {
+      heap.push([c, s]);
+      let i = heap.length - 1;
+      while (i > 0) {
+        const up = (i - 1) >> 1;
+        if (heap[up][0] <= heap[i][0]) break;
+        [heap[up], heap[i]] = [heap[i], heap[up]];
+        i = up;
+      }
+    };
+    const pop = (): [number, number] => {
+      const top = heap[0];
+      const last = heap.pop()!;
+      if (heap.length > 0) {
+        heap[0] = last;
+        let i = 0;
+        for (;;) {
+          const l = i * 2 + 1;
+          const r = l + 1;
+          let m = i;
+          if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+          if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+          if (m === i) break;
+          [heap[m], heap[i]] = [heap[i], heap[m]];
+          i = m;
+        }
+      }
+      return top;
+    };
+    let goal = -1;
+    for (let guard = 0; heap.length > 0 && guard < 40000; guard++) {
+      const [c, s] = pop();
+      if (c > (cost.get(s) ?? Infinity) || c > reach) continue;
+      const p = s >> 1;
+      if (p === to) {
+        goal = s;
+        break;
+      }
+      for (const w of this.net.waysOn(p, (s & 1) === 1 ? 1 : -1, tracks)) {
+        const ns = w.path * 2 + (w.dir > 0 ? 1 : 0);
+        const nc = c + (this.net.paths[w.path]?.len ?? 0);
+        if (nc < (cost.get(ns) ?? Infinity)) {
+          cost.set(ns, nc);
+          from.set(ns, s);
+          push(nc, ns);
+        }
+      }
+    }
+    if (goal < 0) return null;
+    const out: Array<{ path: number; dir: 1 | -1 }> = [];
+    for (let s: number | undefined = goal; s !== undefined; s = from.get(s)) {
+      out.push({ path: s >> 1, dir: (s & 1) === 1 ? 1 : -1 });
+      if (s === start) break;
+    }
+    return out.reverse();
+  }
+
+  /** The piece after (path, dir) on the way a tram of the timetable has worked out to its next stop – null where it has none, or (path, dir) is not on it. */
+  routeNext(v: RailVehicle, path: number, dir: 1 | -1): { path: number; dir: 1 | -1 } | null {
+    const r = v.route;
+    if (!r) return null;
+    for (let i = 0; i + 1 < r.length; i++) if (r[i].path === path && r[i].dir === dir) return r[i + 1];
+    return null;
+  }
+
   /** The piece that comes after (path, dir) on the vehicle's line – null where it has no line, or the line ends. */
   lineNext(v: RailVehicle, path: number, dir: 1 | -1): { path: number; dir: 1 | -1 } | null {
     const l = v.line ? this.lines[v.line.index] : null;
@@ -570,6 +693,12 @@ export class RailTraffic {
         v.line.k = j;
         return;
       }
+    }
+    // (a tram of the timetable keeps its line – and its number – wherever its way to its next stop leads)
+    if (v.trip) {
+      const j = l.seq.findIndex((q) => q.path === v.path && q.dir === v.dir);
+      if (j >= 0) v.line.k = j;
+      return;
     }
     // off its line (or past its end): the line back from here, else any that runs here
     const back = (this.onLine.get(`${v.path}:${v.dir}`) ?? []).find(([i]) => this.lines[i].ref === l.ref);
@@ -655,27 +784,54 @@ export class RailTraffic {
   update(dt: number, player: RailPlayer, others: readonly RailObstacle[] = []): void {
     // come and go with the player
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
-      const c = this.vehicles[i].cars[0];
-      if (!this.vehicles[i].player && Math.hypot(c.x - player.x, c.z - player.z) > this.far) this.vehicles.splice(i, 1);
+      const v = this.vehicles[i];
+      const c = v.cars[0];
+      const d = Math.hypot(c.x - player.x, c.z - player.z);
+      // (a tram whose trip has ended goes once it has left the player's side)
+      if (!v.player && (d > this.far || (v.retire && v.dwell <= 0 && d > RETIRE_NEAR))) this.vehicles.splice(i, 1);
     }
     this.spawnT -= dt;
     if (this.schedule && this.lines.length > 0) {
-      // by the timetable: the trips under way round the player – each once
+      // by the timetable: the trips under way round the player – each once, the nearest first
       if (this.spawnT <= 0 && this.target > 0) {
         this.spawnT = 2;
         const all = this.fresh;
         this.fresh = false;
-        for (const d of this.schedule.due(player.x, player.z, this.ringMin, this.ringMax, all)) {
-          if (this.vehicles.length >= this.target + 8) break;
-          if (this.vehicles.some((v) => v.trip === d.trip)) continue;
-          // (not into a tram that is there already)
+        const list = this.schedule.due(player.x, player.z, this.ringMin, this.ringMax, all);
+        const dist = (d: (typeof list)[number]): number => {
           this.net.sample(d.path, d.s, tmp);
-          if (this.vehicles.some((v) => v.cars.some((c) => Math.hypot(c.x - tmp.x, c.z - tmp.z) < 60))) continue;
+          return Math.hypot(tmp.x - player.x, tmp.z - player.z);
+        };
+        const near = list.map((d) => ({ d, r: dist(d) })).sort((a, b) => a.r - b.r);
+        // (as many as the timetable has about: a tram missing at a stop whose board announces it is worse than a few more to draw)
+        const cap = Math.max(this.target + 8, this.target * 6);
+        for (const { d } of near) {
+          const had = this.vehicles.find((v) => v.trip === d.trip);
+          this.net.sample(d.path, d.s, tmp);
+          if (had) {
+            // a tram far behind (or ahead of) its trip – the game stood still a while, something blocked it – is put
+            // where its trip is now, if the player sees neither place close up
+            const f = had.cars[0];
+            const off = Math.hypot(f.x - tmp.x, f.z - tmp.z);
+            if (had.player || off < MISPLACED || Math.hypot(f.x - player.x, f.z - player.z) < this.ringMin || Math.hypot(tmp.x - player.x, tmp.z - player.z) < this.ringMin) continue;
+            this.vehicles.splice(this.vehicles.indexOf(had), 1);
+          }
+          if (this.vehicles.length >= cap) break;
+          // (not into a tram that is there already – one whose trip has ended makes room: it turns into this one)
+          const close = (v: RailVehicle): boolean => v.cars.some((c) => Math.hypot(c.x - tmp.x, c.z - tmp.z) < 60);
+          if (this.vehicles.some((v) => close(v) && (!v.retire || v.player))) continue;
+          for (let i = this.vehicles.length - 1; i >= 0; i--) if (this.vehicles[i].retire && !this.vehicles[i].player && close(this.vehicles[i])) this.vehicles.splice(i, 1);
           const v = this.spawnAt(d.path, d.s, d.dir, 0, this.random() < this.doubleShare ? 'double' : 'single');
           if (!v) continue;
           v.trip = d.trip;
           v.line = { index: d.line, k: d.k };
           v.speed = Math.min(d.speed, v.consist.vmax * 0.6, tmp.cap);
+          if (d.dwell !== undefined && d.dwell > 0) {
+            // standing at a stop until its time
+            v.speed = 0;
+            v.dwell = Math.min(600, Math.max(d.dwell, 3));
+            v.noStop = 70;
+          }
         }
       }
     } else if (this.spawnT <= 0 && this.vehicles.length < this.target) {
@@ -758,6 +914,18 @@ export class RailTraffic {
     // ---- look ahead along the way it will take: curves, stops, the end of the line, things on the track
     const reach = (v.speed * v.speed) / (2 * c.brake) + 25;
     let allowed = c.vmax;
+    // (a tram of the timetable: no faster than it needs to be at its next stop on time – now and then worked out anew)
+    const sch = v.trip ? this.schedule : null;
+    if (sch?.toward) this.steer(v, sch);
+    if (sch?.pace) {
+      v.paceT = (v.paceT ?? 0) - dt;
+      if (v.paceT <= 0 || v.pace === undefined) {
+        v.paceT = 1;
+        const next = this.nextStop(v, 4000, sch.calls ? (path, mark) => sch.calls!(v, path, mark) : undefined);
+        v.pace = next ? sch.pace(v, next.path, next.mark, next.dist) : Infinity;
+      }
+      allowed = Math.min(allowed, Math.max(PACE_MIN, v.pace));
+    }
     let stopIn = Infinity;
     let blockIn = Infinity;
     let endIn = Infinity;
@@ -787,6 +955,8 @@ export class RailTraffic {
       // stops on this piece within the next step
       if (v.noStop <= dist) {
         for (const st of p.stops) {
+          // (a stop its trip does not call at it passes)
+          if (sch?.calls && !sch.calls(v, cp, st)) continue;
           const ahead = (st - cs) * cd;
           if (ahead >= 0 && ahead <= Math.min(step, room) + 0.01) stopIn = Math.min(stopIn, dist + ahead);
         }
@@ -803,7 +973,7 @@ export class RailTraffic {
         const ways = this.net.waysOn(cp, cd, c.tracks);
         if (ways.length > 0) {
           // its line's way – else mostly straight on, now and then the branch
-          const want = this.lineNext(v, cp, cd);
+          const want = this.routeNext(v, cp, cd) ?? this.lineNext(v, cp, cd);
           const onLine = want ? ways.find((w) => w.path === want.path && w.dir === want.dir) : undefined;
           const pick = onLine ?? (ways.length > 1 && this.random() < 0.3 ? ways[1 + Math.floor(this.random() * (ways.length - 1))] : ways[0]);
           next = { path: pick.path, dir: pick.dir };
@@ -835,13 +1005,15 @@ export class RailTraffic {
     if (v.speed === 0) {
       if (stopIn < 1.2) {
         v.dwell = 12 + this.random() * 8;
-        // (by the timetable: not before its time)
-        if (this.schedule && v.trip) {
+        // (by the timetable: not before its time – and no longer than the doors take when it is late; at the end of its trip it goes)
+        if (sch) {
           const p = this.net.paths[v.path];
           let mark = -1;
           for (const m of p.stops) if (Math.abs(m - v.s) < 4) mark = m;
-          if (mark >= 0) v.dwell = Math.max(v.dwell, Math.min(600, this.schedule.wait(v, v.path, mark)));
+          if (mark >= 0) v.dwell = Math.max(TIMED_DWELL, Math.min(600, sch.wait(v, v.path, mark)));
+          if (sch.ends?.(v)) v.retire = true;
         }
+        v.pace = undefined;
         v.noStop = 70;
       } else if (endIn < 3 && blockIn === Infinity) {
         // the end of the line: wait, then go back the way it came
@@ -865,7 +1037,7 @@ export class RailTraffic {
    * far ahead of its front – the one it stands at does not count.  Null if
    * there is none within `reach` metres of its way.
    */
-  nextStop(v: RailVehicle, reach = 4000): { path: number; mark: number; dist: number } | null {
+  nextStop(v: RailVehicle, reach = 4000, accept?: (path: number, mark: number) => boolean): { path: number; mark: number; dist: number } | null {
     let cp = v.path;
     let cs = v.s;
     let cd = v.dir;
@@ -878,11 +1050,11 @@ export class RailTraffic {
       for (const st of p.stops) {
         const ahead = (st - cs) * cd;
         const d = dist + ahead;
-        if (ahead >= 0 && d > (v.dwell > 0 ? 2 : 0.5) && (!best || d < best.dist)) best = { path: cp, mark: st, dist: d };
+        if (ahead >= 0 && d > (v.dwell > 0 ? 2 : 0.5) && (!best || d < best.dist) && (!accept || accept(cp, st))) best = { path: cp, mark: st, dist: d };
       }
       if (best) return best;
       dist += cd > 0 ? p.len - cs : cs;
-      const next = v.plan[planned++] ?? this.net.waysOn(cp, cd, v.consist.tracks)[0];
+      const next = v.plan[planned++] ?? this.routeNext(v, cp, cd) ?? this.net.waysOn(cp, cd, v.consist.tracks)[0];
       if (!next) return null;
       cp = next.path;
       cd = next.dir;

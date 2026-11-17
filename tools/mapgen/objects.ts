@@ -12,6 +12,8 @@ import type { TileSet } from './meshacc.ts';
 import type { OsmData } from './osm.ts';
 import { isClosedWay } from './osm.ts';
 import type { TerrainGrid } from './terrain.ts';
+import { loadObservedTrees } from './observed.ts';
+import { BARRIER_LOOK, loadObservedBarriers } from './facadedetail.ts';
 
 const tmp = newPolySample();
 
@@ -68,11 +70,20 @@ export function addVegetation(
     return true;
   };
 
+  const mappedTrees: number[] = [];
   for (const n of osm.nodes.values()) {
     if (n.tags?.natural !== 'tree') continue;
     const conifer = n.tags.leaf_type === 'needleleaved';
     const h = Number.parseFloat(n.tags.height ?? '') || 7 + hash01(n.id) * 8;
     if (put(n.x, n.z, Math.min(28, h), conifer ? 1 : 0, 0.6)) stats.mapped++;
+    mappedTrees.push(n.x, n.z);
+  }
+  // trees seen on site where OpenStreetMap has none (tools/mapgen/observed-trees.json)
+  for (const t of loadObservedTrees()) {
+    if (t.x < bounds.minX || t.x > bounds.maxX || t.z < bounds.minZ || t.z > bounds.maxZ) continue;
+    let near = false;
+    for (let i = 0; i < mappedTrees.length && !near; i += 2) near = Math.hypot(mappedTrees[i] - t.x, mappedTrees[i + 1] - t.z) < 4;
+    if (!near && put(t.x, t.z, t.h, 0, 0.6)) stats.mapped++;
   }
   for (const w of osm.ways) {
     if (w.tags.natural !== 'tree_row') continue;
@@ -322,6 +333,12 @@ export function addBarriersAndRails(
         guardKm += ((run.length / 2 - 1) * 4) / 1000;
       }
     }
+  }
+  // hedges, fences and walls seen on site (tools/mapgen/observed-barriers.json – mapgen/facadedetail.ts)
+  for (const b of loadObservedBarriers()) {
+    const look = BARRIER_LOOK[b.kind];
+    for (const part of clip(densify(b.pts, 4))) for (const run of clear(part, ground)) strip(run, look.halfW, look.y0, b.h, look.rgb, ground, true);
+    barriers++;
   }
   return { barriers, railKm, guardKm };
 }

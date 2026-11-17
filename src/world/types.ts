@@ -572,6 +572,8 @@ export interface WorldJson {
   meta: {
     name: string;
     generated: string;
+    /** when tiles of the map were replaced after its build (tools/fetch-map.ts: tiles-patch.tar) – part of their address */
+    patched?: string;
     /** world-space bounds in metres */
     minX: number;
     maxX: number;

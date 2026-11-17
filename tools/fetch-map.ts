@@ -15,12 +15,16 @@
  * Data that is built after a map release – small files such as the tram
  * timetables or the bus lines (EXTRA below) – may be added to the release
  * as files of their own; they are fetched too when they are there, and take
- * the place of those in map.tar.
+ * the place of those in map.tar.  So may tiles that were built again (the
+ * buildings corrected from what was seen on site): tiles-patch.tar holds
+ * map/tiles/… and map/patch.json ({"patched": "<ISO time>"}); it is unpacked
+ * over the map, and its time goes into map.json (meta.patched), which is
+ * part of the address of every tile.
  *
  * Needs curl and tar.
  */
 import { spawn } from 'node:child_process';
-import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -104,6 +108,24 @@ for (const name of EXTRA) {
     rmSync(resolve(fresh, 'map', `${name}.part`), { force: true });
     console.error(`[map] ${name}: ${(e as Error).message}`);
   }
+}
+// tiles built again after the release of the map
+try {
+  const patch = resolve(fresh, 'tiles-patch.tar');
+  if (await download('tiles-patch.tar', patch)) {
+    const x = spawn('tar', ['-x', '-C', fresh, '-f', patch], { stdio: 'inherit' });
+    if ((await new Promise<number>((r) => x.on('close', (c) => r(c ?? 1)))) !== 0) throw new Error('tar could not unpack it');
+    rmSync(patch, { force: true });
+    const info = JSON.parse(readFileSync(resolve(fresh, 'map', 'patch.json'), 'utf8')) as { patched?: string };
+    const index = resolve(fresh, 'map', 'map.json');
+    const json = JSON.parse(readFileSync(index, 'utf8')) as { meta: { patched?: string } };
+    json.meta.patched = String(info.patched ?? '');
+    writeFileSync(index, JSON.stringify(json));
+    console.log(`[map] tiles-patch.tar (${json.meta.patched})`);
+  }
+} catch (e) {
+  console.error(`[map] tiles-patch.tar: ${(e as Error).message}`);
+  process.exit(1);
 }
 rmSync(resolve(target, 'map'), { recursive: true, force: true });
 renameSync(resolve(fresh, 'map'), resolve(target, 'map'));

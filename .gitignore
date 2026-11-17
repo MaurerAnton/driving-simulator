@@ -6,6 +6,8 @@ data/work/
 .DS_Store
 .vite/
 test-results/
+# builds of the earlier versions for the site (tools/old-versions.ts)
+.old-versions/
 shots/
 
 # Your own street-level pictures for the reality view stay on your machine

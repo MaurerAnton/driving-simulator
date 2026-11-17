@@ -13,6 +13,7 @@
 import { ACCESS, CLS, CTRL, EF } from './types.ts';
 import { TURN } from './lanes.ts';
 import type { LaneGraph, Lane } from './lanes.ts';
+import { wasmQuickest } from '../wasm/kernels.ts';
 
 /** Properties of a way (bits of RouteGraph.kind). */
 export const RG = {
@@ -257,13 +258,21 @@ export const routeFor: { noMotorway: boolean; wayCost: ((way: number) => number)
 
 function quickestTimed(g: RouteGraph, start: number, goal: number): { ways: number[]; secs: number } | null {
   if (start === goal) return { ways: [], secs: 0 };
+  // (the same search in WebAssembly where it is there – src/wasm/kernels.ts; undefined: not there)
+  const fast = wasmQuickest(g, start, goal, routeFor.noMotorway, CLS.MOTORWAY_LINK, routeFor.wayCost);
+  if (fast !== undefined) return fast;
   const dist = new Float64Array(g.n).fill(Infinity);
   const prev = new Int32Array(g.n).fill(-1);
   const heap = new MinHeap();
   // straight-line time at motorway speed never overestimates
+  // (Math.sqrt rather than Math.hypot: the same to the last bit as the WebAssembly – src/wasm/kernels.cpp)
   const gx = g.x1[goal];
   const gz = g.z1[goal];
-  const rest = (w: number): number => Math.hypot(g.x1[w] - gx, g.z1[w] - gz) / 36;
+  const rest = (w: number): number => {
+    const dx = g.x1[w] - gx;
+    const dz = g.z1[w] - gz;
+    return Math.sqrt(dx * dx + dz * dz) / 36;
+  };
   dist[start] = 0;
   heap.push(start, rest(start));
   while (heap.size > 0) {

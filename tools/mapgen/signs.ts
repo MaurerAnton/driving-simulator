@@ -482,7 +482,10 @@ export class SignPlacer {
       }
     }
     // derived: wherever the road one drives on changes between inside and outside a built-up area – between
-    // two sections of a road, at a junction, on a small road that leads into the town (townsigns.ts)
+    // two sections of a road, at a junction, on a small road that leads into the town (townsigns.ts).
+    // Only on request (SIGNS_DERIVED_TOWNS=1, as in tools/build-signs.ts): the built-up flag follows the houses,
+    // not a town's legal boundary, so these stood where no town sign is.
+    if (process.env.SIGNS_DERIVED_TOWNS !== '1') return;
     for (const node of world.nodes) {
       if (node.arms.length < 2) continue;
       for (const t of townSignsAt(node.arms.map(townArm))) {

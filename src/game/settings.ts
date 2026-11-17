@@ -6,6 +6,9 @@ import type { TourPrefs } from './tourlog.ts';
 import { vehicleKind } from './vehicles.ts';
 import type { VehicleKind } from './vehicles.ts';
 import type { TramSet } from '../sim/rail.ts';
+import type { LessonArea, LessonPlaceMode } from './lessonplaces.ts';
+import { ZOOM_RELEASES } from '../input/camzoom.ts';
+import type { ZoomRelease } from '../input/camzoom.ts';
 
 export type Transmission = 'assist' | 'manual' | 'automatic';
 /** a preset of the graphics – or 'custom': the advanced settings chosen one by one */
@@ -162,8 +165,32 @@ export interface Settings {
   showFps: boolean;
   /** begin each drive on foot beside the vehicle: walk round it, get in */
   startOutside: boolean;
+  /** when the game starts, ask the browser where the player is: on the map, the drive begins there */
+  startHere: boolean;
+  /** "place precisely": a drive at an address or a place chosen begins at that very place, not in the lane of the nearest road */
+  placeExact: boolean;
   /** in the driver's seat: the map on the vehicle's own screen (where it has one) instead of the corner */
   mapOnScreen: boolean;
+  /** the map: '' the site's, else the id of a map stored in this browser from files (world/mappack.ts) */
+  mapPack: string;
+  /** a tap on the vehicle's screen in the driver's seat: the big map, or the map back in the corner of the HUD (another tap: on the screen again) */
+  screenTap: 'bigmap' | 'minimap';
+  /** when a zoomed view (on foot, in the driver's seat) goes back by itself once let go (input/camzoom.ts) */
+  zoomRelease: ZoomRelease;
+  /**
+   * The inside rear-view mirror (ui/hudmirror.ts): in the car, moved along the
+   * windscreen's top as on a rail (`shift`, m to the right) – or taken off into
+   * the HUD, its middle at (fx, fy) of the screen; `size`: larger or smaller.
+   */
+  insideMirror: { mode: 'car' | 'hud'; shift: number; size: number; fx: number; fy: number };
+  /** where the driving lessons begin (game/lessonplaces.ts): the start place as before, a random fitting place of the town, or one in the district chosen */
+  lessonPlace: LessonPlaceMode;
+  /** the player was asked once where the lessons are to take place */
+  lessonPlaceAsked: boolean;
+  /** the district chosen for the lessons (lessonPlace 'area'); null: the home town */
+  lessonArea: LessonArea | null;
+  /** the computations that have a WebAssembly twin (src/wasm/kernels.ts – tiles, the quickest way): 'auto' in WebAssembly where the browser has it, 'off' in JavaScript only */
+  wasm: 'auto' | 'off';
   /** what the stored settings were written by (SETTINGS_VERSION): older ones are brought up to date once, in merge */
   version: number;
 }
@@ -220,7 +247,17 @@ export const DEFAULT_SETTINGS: Settings = {
   keyHints: true,
   showFps: false,
   startOutside: false,
+  startHere: false,
+  placeExact: false,
   mapOnScreen: true,
+  mapPack: '',
+  screenTap: 'bigmap',
+  zoomRelease: 'auto',
+  insideMirror: { mode: 'car', shift: 0, size: 1, fx: 0.5, fy: 0.09 },
+  lessonPlace: 'start',
+  lessonPlaceAsked: false,
+  lessonArea: null,
+  wasm: 'auto',
   version: SETTINGS_VERSION,
 };
 
@@ -229,13 +266,13 @@ const KEY = 'fahrsim-baunatal.settings.v2';
 const OLD_KEY = 'fahrsim-baunatal.settings.v1';
 
 function fresh(): Settings {
-  return { ...DEFAULT_SETTINGS, powers: {}, tourPrefs: { ...DEFAULT_TOUR_PREFS }, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality }, lastStart: { ...DEFAULT_SETTINGS.lastStart } };
+  return { ...DEFAULT_SETTINGS, powers: {}, tourPrefs: { ...DEFAULT_TOUR_PREFS }, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality }, lastStart: { ...DEFAULT_SETTINGS.lastStart }, insideMirror: { ...DEFAULT_SETTINGS.insideMirror } };
 }
 
 /** Defaults, overlaid with what was stored – whatever is missing or implausible keeps its default. */
 function merge(parsed: Partial<Settings>): Settings {
   const d = fresh();
-  const s: Settings = { ...d, ...parsed, graphics: { ...d.graphics, ...(parsed.graphics ?? {}) }, wheel: { ...d.wheel, ...(parsed.wheel ?? {}) }, reality: { ...d.reality, ...(parsed.reality ?? {}) }, lastStart: { ...d.lastStart, ...(parsed.lastStart ?? {}) } };
+  const s: Settings = { ...d, ...parsed, graphics: { ...d.graphics, ...(parsed.graphics ?? {}) }, wheel: { ...d.wheel, ...(parsed.wheel ?? {}) }, reality: { ...d.reality, ...(parsed.reality ?? {}) }, lastStart: { ...d.lastStart, ...(parsed.lastStart ?? {}) }, insideMirror: { ...d.insideMirror, ...(typeof parsed.insideMirror === 'object' && parsed.insideMirror ? parsed.insideMirror : {}) } };
   if (!LANGS.some((l) => l.code === s.lang)) s.lang = d.lang;
   // (before 1.2.0 there was one engine power, the car's)
   const old = (parsed as { power?: unknown }).power;
@@ -281,7 +318,21 @@ function merge(parsed: Partial<Settings>): Settings {
   if (typeof s.signalTimers !== 'boolean') s.signalTimers = d.signalTimers;
   if (typeof s.queueLabels !== 'boolean') s.queueLabels = d.queueLabels;
   if (typeof s.startOutside !== 'boolean') s.startOutside = d.startOutside;
+  if (typeof s.startHere !== 'boolean') s.startHere = d.startHere;
+  if (typeof s.placeExact !== 'boolean') s.placeExact = d.placeExact;
   if (typeof s.mapOnScreen !== 'boolean') s.mapOnScreen = d.mapOnScreen;
+  if (typeof s.mapPack !== 'string') s.mapPack = d.mapPack;
+  if (s.screenTap !== 'bigmap' && s.screenTap !== 'minimap') s.screenTap = d.screenTap;
+  if (!ZOOM_RELEASES.includes(s.zoomRelease)) s.zoomRelease = d.zoomRelease;
+  if (s.wasm !== 'auto' && s.wasm !== 'off') s.wasm = d.wasm;
+  {
+    const m = s.insideMirror;
+    if (m.mode !== 'car' && m.mode !== 'hud') m.mode = d.insideMirror.mode;
+    if (!(m.shift >= -0.3 && m.shift <= 0.3)) m.shift = d.insideMirror.shift;
+    if (!(m.size >= 0.6 && m.size <= 2)) m.size = d.insideMirror.size;
+    if (!(m.fx >= 0 && m.fx <= 1)) m.fx = d.insideMirror.fx;
+    if (!(m.fy >= 0 && m.fy <= 1)) m.fy = d.insideMirror.fy;
+  }
   // settings written before 1.4.0 stored the map's old default (not on the screen) as if chosen: the new default, once
   if (!(Number(parsed.version) >= 2)) s.mapOnScreen = true;
   // (the same for the aerial photographs under the maps: before 1.4.0 they had to be asked for)
@@ -301,6 +352,10 @@ function merge(parsed: Partial<Settings>): Settings {
   if (!Number.isInteger(s.lastStart.spawn) || s.lastStart.spawn < 0) s.lastStart.spawn = 0;
   const a = s.lastStart.address;
   if (a && !(typeof a.label === 'string' && Number.isFinite(a.x) && Number.isFinite(a.z))) s.lastStart.address = null;
+  if (s.lessonPlace !== 'start' && s.lessonPlace !== 'town' && s.lessonPlace !== 'area') s.lessonPlace = d.lessonPlace;
+  if (typeof s.lessonPlaceAsked !== 'boolean') s.lessonPlaceAsked = d.lessonPlaceAsked;
+  const la = s.lessonArea;
+  s.lessonArea = la && typeof la === 'object' && typeof la.name === 'string' && Number.isFinite(la.x) && Number.isFinite(la.z) ? { name: la.name, x: la.x, z: la.z } : null;
   return s;
 }
 

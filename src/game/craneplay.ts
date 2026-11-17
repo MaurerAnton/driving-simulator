@@ -124,6 +124,32 @@ export function craneMenuPose(model: CraneModel, type: CraneType): void {
   model.pose(c, 0);
 }
 
+/** how far from the tower crane's axis its operator stands after climbing down (its cross base is 5 × 5 m), and from how far one climbs up */
+const TOWER_OFF = 4.3;
+const TOWER_REACH = 6.5;
+
+/**
+ * Where somebody who climbed down the tower crane stands: beside its base
+ * (axis at bx, bz, turned `yaw`), facing it – on the left of it first, then
+ * round it an eighth at a time to the first place `free` says one can stand.
+ */
+export function towerExit(bx: number, bz: number, yaw: number, free: (x: number, z: number) => boolean): { x: number; z: number; yaw: number } {
+  let first: { x: number; z: number; yaw: number } | null = null;
+  for (let k = 0; k < 8; k++) {
+    const a = yaw + Math.PI / 2 + (k * Math.PI) / 4;
+    // (out along the heading a: forwards is (−sin a, −cos a); facing back to the tower is a + π)
+    const p = { x: bx - Math.sin(a) * TOWER_OFF, z: bz - Math.cos(a) * TOWER_OFF, yaw: a + Math.PI };
+    if (free(p.x, p.z)) return p;
+    first ??= p;
+  }
+  return first as { x: number; z: number; yaw: number };
+}
+
+/** Is somebody standing at (x, z) at the foot of the tower crane (axis at bx, bz), to climb up? */
+export function atTowerFoot(bx: number, bz: number, x: number, z: number): boolean {
+  return Math.hypot(x - bx, z - bz) <= TOWER_REACH;
+}
+
 /** The vehicle's slope from its turn (rise per metre along its x and z). */
 function slopeOf(q: ArrayLike<number>): { gx: number; gz: number } {
   const [x, y, z, w] = [q[0], q[1], q[2], q[3]];
@@ -366,6 +392,31 @@ export class CraneWork {
     this.host.input.crane = on;
     this.host.ui.classList.toggle('craning', on);
     this.lookReady = false;
+  }
+
+  /**
+   * The tower crane's operator climbs down (`away`) or up again: meanwhile the
+   * keys and the on-screen controls are those of somebody on foot (the
+   * steering bar and the pedals walk) – the crane stands as it was left.
+   */
+  setAway(away: boolean): void {
+    if (this.type !== 'tower') return;
+    this.panel.active = !away;
+    this.host.input.crane = !away;
+    this.host.ui.classList.toggle('craning', !away);
+    this.lookReady = false;
+  }
+
+  /** The tower crane: where its operator stands after climbing down (`free`: can one stand there?). */
+  towerExit(free: (x: number, z: number) => boolean): { x: number; z: number; yaw: number } {
+    const b = this.crane.base;
+    return towerExit(b.x, b.z, b.yaw, free);
+  }
+
+  /** The tower crane: is somebody standing here at its foot (to climb up)? */
+  atTowerFoot(x: number, z: number): boolean {
+    const b = this.crane.base;
+    return atTowerFoot(b.x, b.z, x, z);
   }
 
   /**
@@ -667,9 +718,17 @@ export class CraneWork {
   }
 
   /** The panel and the street-name block: what the limiter measures, what to do now. */
-  hud(hs: HudState, touch: boolean): void {
+  hud(hs: HudState, touch: boolean, walker: { x: number; z: number } | null = null): void {
     const lang = this.host.settings.lang;
     const c = this.crane;
+    if (walker) {
+      // climbed down from the tower crane: the game's tips stay (and, at its foot, how to climb up again)
+      if (this.type === 'tower' && !hs.tip && this.atTowerFoot(walker.x, walker.z)) {
+        hs.tip = tr(touch ? 'craneTip.climbUpTouch' : 'craneTip.climbUp', lang);
+        hs.tipAction = 'KeyG';
+      }
+      return;
+    }
     this.panel.setMode(touch ? 'touch' : 'keys');
     const t = this.tasks;
     const canAttach = !!t && !c.load && t.reachable(c.hook, c.spec.hookDrop) !== null;

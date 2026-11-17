@@ -970,6 +970,9 @@ span.st-cls { cursor: default; }
 .crane-ui.touch .crane-setup .crane-btn { min-width: 0; padding: 4px 9px; font-size: 13px; }
 /* working the crane: the steering, the pedals and the gear buttons give way to the joysticks */
 #ui.craning .touch .steer, #ui.craning .touch .pedal, #ui.craning .touch .ind-l, #ui.craning .touch .ind-r, #ui.craning .touch .gear-up, #ui.craning .touch .gear-dn, #ui.craning .touch .hb { display: none; }
+/* (the round button "a car here" – game/spawncar.ts, over everything at the left edge – lay over the left joystick and
+   beside the set-up buttons: with the joysticks it moves to the bottom row, right of the left one) */
+#ui.craning:has(> .crane-ui.touch.operating) > .spawn-car { top: auto !important; bottom: 4vh !important; left: calc(3vw + min(36vh, 30vw) + 14px) !important; }
 #ui[dir='rtl'] .crane-ui { direction: ltr; }
 @media (max-height: 480px) {
   .crane-lmi { width: 196px; font-size: 11px; gap: 2px; }
@@ -1009,3 +1012,52 @@ span.st-cls { cursor: default; }
 /* (the vehicles to change to, in the pause menu) */
 .veh-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 6px; margin: 10px 0 14px; max-height: 60vh; overflow-y: auto; }
 .veh-pick .btn.on { border-color: var(--accent); color: var(--accent); }
+/* ---- 1.6.0: the "back to the road" tip catches the eye (ui/hud.ts), the inside mirror in the HUD (ui/hudmirror.ts),
+   arranging the HUD (ui/hudlayout.ts) ---- */
+.hud .tip.urgent { background: #ffcc00; color: #111; font-weight: 700; animation: tip-urgent 1.2s ease-in-out infinite; }
+@keyframes tip-urgent { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 204, 0, 0.8); scale: 1; } 50% { box-shadow: 0 0 0 12px rgba(255, 204, 0, 0); scale: 1.07; } }
+@media (prefers-reduced-motion: reduce) { .hud .tip.urgent { animation: none; outline: 3px solid #fff; outline-offset: 2px; } }
+.hud .hudmirror { position: absolute; box-sizing: content-box; border: 3px solid #15171a; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5); pointer-events: auto; touch-action: none; cursor: grab; }
+.hud .hudmirror:active { cursor: grabbing; }
+.hud .hudmirror[hidden] { display: none; }
+.hud .hudmirror .hm-grip { position: absolute; right: -16px; bottom: -16px; width: 32px; height: 32px; border-radius: 50%; background: rgba(10, 16, 24, 0.8); border: 2px solid rgba(255, 255, 255, 0.75); cursor: nwse-resize; }
+.hud .hudmirror .hm-grip::after { content: ''; position: absolute; inset: 8px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; }
+.hud > .hud-free { position: absolute; z-index: 3; width: 44px; height: 44px; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 50%; background: rgba(10, 16, 24, 0.78); color: #fff; cursor: pointer; pointer-events: auto; transform: none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.hud > .hud-free svg { display: block; width: 100%; height: 100%; }
+.hud > .hud-free:hover { background: rgba(255, 204, 0, 0.9); color: #111; }
+/* ("my position", taken out of the map onto the screen, is always there) */
+.hud > .mini-back.hud-free[hidden] { display: block; }
+.hud.arranging > .hud-arrange-shield { position: absolute; inset: 0; pointer-events: auto; background: rgba(0, 0, 0, 0.25); touch-action: none; }
+.hud.arranging [data-hud-move] { pointer-events: auto !important; touch-action: none; cursor: move; outline: 2px dashed #ffcc00; outline-offset: 2px; animation: none; }
+.hud.arranging [data-hud-move][hidden], .hud.arranging [data-hud-move][style*='display: none'] { display: block !important; opacity: 0.55; min-width: 44px; min-height: 32px; }
+.hud.arranging [data-hud-move]:empty::after { content: attr(data-hud-name); font-size: 12px; white-space: nowrap; }
+.hud > .hud-arrange { position: absolute; left: 50%; top: max(10px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); padding: 8px 12px; border-radius: 12px; background: var(--panel-solid, #18212b); color: var(--text, #fff); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5); pointer-events: auto; }
+.hud > .hud-arrange span { flex: 1 1 200px; font-size: 14px; }
+.hud > .hud-arrange .btn { min-height: 44px; }
+
+/* ---- the pause menu: going on, a grid of what can be done, the menu's own things in a bar at the bottom ---- */
+.panel.pause { width: min(640px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.pause-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pause-head h1 { margin: 0; }
+.pause-score { margin: 0; opacity: 0.8; font-size: 15px; }
+.btn.pause-resume { width: 100%; min-height: 56px; font-size: 20px; font-weight: 700; }
+.pause-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.pause-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 88px; padding: 10px 8px; border-radius: 12px; cursor: pointer; color: #fff; font: inherit;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16);
+  transition: background 0.12s, border-color 0.12s;
+}
+.pause-tile:hover, .pause-tile:focus-visible { background: rgba(255, 204, 0, 0.12); border-color: var(--accent); outline: none; }
+.pause-tile.on { border-color: var(--accent); background: rgba(255, 204, 0, 0.18); }
+.pause-icon { font-size: 26px; line-height: 1; }
+.pause-label { font-size: 14px; line-height: 1.2; text-align: center; }
+.pause-bar { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.pause-bar .btn.pause-small { flex: 1 1 auto; min-height: 44px; font-size: 14px; padding: 8px 12px; }
+.pause-bar .pause-quit { flex: 0 0 auto; margin-left: auto; }
+@media (max-width: 520px) {
+  .pause-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pause-tile { min-height: 76px; }
+  .pause-icon { font-size: 22px; }
+  .pause-label { font-size: 12.5px; }
+}

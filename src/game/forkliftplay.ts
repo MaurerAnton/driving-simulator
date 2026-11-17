@@ -19,7 +19,15 @@
  *    chart allows, the rear wheels lifting, running into things, tipping
  *    over;
  *  - the street-name block says what to do, the forklift's display the
- *    load moment, the load and the mast.
+ *    load moment, the load and the mast;
+ *  - a free drive (any way to play but "Forklift work" – `FORK_WORK_MODE`
+ *    in game/forkliftmodes.ts, with the cameras and getting off and on)
+ *    lays out no place: the forklift is driven where the menu put it, the
+ *    buildings and walls of the map stopping it (`ForkliftHost.blocked`);
+ *  - its cameras: from the side (where it starts), the operator's seat,
+ *    behind it, the free camera (`ForkView`, V or the camera button);
+ *  - the operator gets off (G, the door button, "Get out" in the pause
+ *    menu) beside the seat, and on again within a few steps of it.
  */
 import type { GameAudio } from '../audio/audio.ts';
 import type { Controls, Input } from '../input/input.ts';
@@ -34,6 +42,8 @@ import type { HudState } from '../ui/hud.ts';
 import { tr } from '../i18n/index.ts';
 import { YardFrame } from './ce.ts';
 import { FORK_START, ForkTasks, buildSite } from './forklifttasks.ts';
+import { forkliftExit, nearForklift, nextForkView } from './forkliftmodes.ts';
+import type { ForkView } from './forkliftmodes.ts';
 import type { ForkSite, ForkSnapshot } from './forklifttasks.ts';
 import type { Settings } from './settings.ts';
 import type * as THREE from 'three';
@@ -54,6 +64,8 @@ export interface ForkliftHost {
   readonly audio: GameAudio;
   /** tell the instructor of a fault (at a place; not again within `cooldown` seconds) */
   note(id: string, severity: Severity, x: number, z: number, data: Record<string, number | string>, cooldown: number): void;
+  /** does the forklift standing here (its middle, its heading) run into a building or a wall of the map? (a free drive) */
+  blocked?(x: number, y: number, z: number, yaw: number): boolean;
 }
 
 /** the place's drawing: one for the whole game, made the first time */
@@ -101,6 +113,12 @@ export function isForkliftModel(m: object): m is ForkliftModel {
 export class ForkliftWork {
   readonly f = new Forklift();
   private readonly host: ForkliftHost;
+  /** the work on the forklift yard with its tasks (false: a free drive where the menu put it) */
+  readonly siteOn: boolean;
+  /** the camera (V goes through them) */
+  view: ForkView = 'side';
+  /** it has been driven (the tip how to start is said till then) */
+  private moved = false;
   private readonly scene: ForkYardScene;
   private readonly panel: ForkPanel;
   private site: ForkSite | null = null;
@@ -122,8 +140,9 @@ export class ForkliftWork {
   private overloadTold = '';
   private readonly ev: ForkEvents = { hit: 0, picked: null, pickedDepth: 0, placed: null, relief: false, rearLift: false, sideLift: false, tipped: false };
 
-  constructor(host: ForkliftHost) {
+  constructor(host: ForkliftHost, site = true) {
     this.host = host;
+    this.siteOn = site;
     this.scene = sceneOf(host);
     this.panel = new ForkPanel(
       host.ui,
@@ -138,10 +157,22 @@ export class ForkliftWork {
 
   /** Lay the place out once its ground is loaded; the forklift where its vehicle stands. */
   private layout(v: Vehicle): boolean {
-    if (this.site) return true;
+    if (this.world) return true;
     if (this.time - this.laidTry < 0.5) return false;
     this.laidTry = this.time;
     v.getModelPosition(this.mpos);
+    if (!this.siteOn) {
+      // a free drive: no place laid out – the ground where it stands, nothing else of its own
+      const y0 = this.host.heightAt(this.mpos[0], this.mpos[2]);
+      if (Number.isNaN(y0)) return false;
+      const ground = (x: number, z: number): number => {
+        const h = this.host.heightAt(x, z);
+        return Number.isFinite(h) ? h : y0;
+      };
+      this.world = { ground, obstacles: [], shelves: [], pallets: [] };
+      this.f.place(this.mpos[0], ground(this.mpos[0], this.mpos[2]), this.mpos[2], v.yaw);
+      return true;
+    }
     // (no practice yard: the place round where the drive began, as if the yard were there)
     const frame = this.host.yard ?? new YardFrame({ x: this.mpos[0] - FORK_START.u, z: this.mpos[2] - FORK_START.w, len: 120, wid: 60, rot: 0 });
     const [mx, mz] = frame.toWorld(MIDDLE.u, MIDDLE.w);
@@ -187,6 +218,7 @@ export class ForkliftWork {
     const ev = this.ev;
     Object.assign(ev, { hit: 0, picked: null, pickedDepth: 0, placed: null, relief: false, rearLift: false, sideLift: false, tipped: false });
     this.acc = Math.min(this.acc + dt, 0.1);
+    const [px, pz, pyaw] = [f.x, f.z, f.yaw];
     while (this.acc >= STEP) {
       const e = f.step(STEP, cmd, w);
       ev.hit = Math.max(ev.hit, e.hit);
@@ -201,6 +233,16 @@ export class ForkliftWork {
       ev.tipped ||= e.tipped;
       this.acc -= STEP;
     }
+    // (a free drive: a building or a wall of the map stops it where it stood – unless it stood in one already)
+    const bl = this.host.blocked;
+    if (!this.siteOn && bl && (f.x !== px || f.z !== pz || f.yaw !== pyaw) && bl(f.x, f.y, f.z, f.yaw) && !bl(px, f.y, pz, pyaw)) {
+      ev.hit = Math.max(ev.hit, Math.abs(f.v));
+      f.x = px;
+      f.z = pz;
+      f.yaw = pyaw;
+      f.v = 0;
+    }
+    if (Math.abs(f.v) > 0.5) this.moved = true;
     // the game's vehicle where the forklift is (the cameras, the speedometer, the sound follow it)
     v.teleport(f.x, f.y, f.z, f.yaw);
     v.speed = f.v;
@@ -298,15 +340,17 @@ export class ForkliftWork {
 
   private updateTasks(): void {
     const t = this.tasks;
-    if (!t) return;
-    const ev = t.update(this.snapshot());
-    const a = this.host.audio;
-    if (ev.stepDone) a.click('chime');
-    if (ev.taskDone) {
-      const r = t.results[t.results.length - 1];
-      this.say('forkTip.taskDone', 4, { stars: '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars), score: r.score });
+    if (t) {
+      const ev = t.update(this.snapshot());
+      const a = this.host.audio;
+      if (ev.stepDone) a.click('chime');
+      if (ev.taskDone) {
+        const r = t.results[t.results.length - 1];
+        this.say('forkTip.taskDone', 4, { stars: '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars), score: r.score });
+      }
+      if (ev.allDone && this.overAt < 0) this.overAt = this.time + 4;
     }
-    if (ev.allDone && this.overAt < 0) this.overAt = this.time + 4;
+    // (tipped over – on the yard or on a free drive – the drive is over)
     if (this.f.tipped && this.overAt < 0) this.overAt = this.time + 5;
     if (this.overAt > 0 && this.time >= this.overAt) this.over = true;
   }
@@ -325,16 +369,49 @@ export class ForkliftWork {
     this.scene.update(this.site.pallets, this.f.load ? { yaw: this.f.yaw, tilt: this.f.tilt } : null, { pallets: tg.pallets, zone: tg.zone, bed: tg.bed, slot: tg.zone === this.site.topSlot }, now);
   }
 
-  /** The display and the street-name block: what to do now, the tips. */
-  hud(hs: HudState, touch: boolean): void {
+  /** A tip of the game's in the tip line (while driving, the forklift's own tips take the line's place). */
+  tell(key: string, seconds = 3): void {
+    this.say(key, seconds);
+  }
+
+  /** Getting off: where the operator stands (null: not while it moves – stop first). */
+  getOff(): { x: number; z: number; yaw: number } | null {
+    const f = this.f;
+    if (Math.abs(f.v) > 0.3 && !f.tipped) return null;
+    return forkliftExit(f.x, f.z, f.yaw);
+  }
+
+  /** Can somebody standing here get on? */
+  canBoard(x: number, z: number): boolean {
+    return nearForklift(this.f.x, this.f.z, x, z);
+  }
+
+  /** The next camera (V): the one now. */
+  nextView(): ForkView {
+    this.view = nextForkView(this.view);
+    return this.view;
+  }
+
+  /** The display and the street-name block: what to do now, the tips; `walker`: the operator got off and stands there. */
+  hud(hs: HudState, touch: boolean, walker: { x: number; z: number } | null = null): void {
     const lang = this.host.settings.lang;
     const f = this.f;
+    if (walker) {
+      // on foot: the game's tips stay (and, near the seat, how to get on again)
+      if (!hs.tip && this.canBoard(walker.x, walker.z)) {
+        hs.tip = tr(touch ? 'forkTip.getOnTouch' : 'forkTip.getOn', lang);
+        hs.tipAction = 'KeyG';
+      }
+      return;
+    }
     this.panel.setMode(touch);
     const st = f.stability();
     const l = f.load;
     this.panel.update({ moment: Math.max(st.forward, f.pitch > 0 ? 1 : 0), side: Math.max(st.side, f.roll > 0 ? 1 : 0), load: l?.def.mass ?? 0, allowed: l ? capacityAt(f.loadCentre()) : FORKLIFT.capacity, lift: f.lift, tilt: f.tilt / DEG });
     const t = this.tasks;
-    if (t) {
+    if (!this.siteOn) {
+      /* (a free drive: the street-name block is the road's) */
+    } else if (t) {
       const ins = t.instruction(this.snapshot());
       hs.navText = tr(ins.key, lang, ins.data);
       const progress = t.stage === 'guide' ? tr('forkProgressGuide', lang) : t.stage === 'done' ? '' : tr('forkProgress', lang, { n: t.task + 1, max: t.taskCount });
@@ -345,13 +422,20 @@ export class ForkliftWork {
     }
     hs.navArrow = 0;
     hs.navActive = false;
-    hs.limit = -1;
-    hs.junction = null;
+    if (this.siteOn) {
+      hs.limit = -1;
+      hs.junction = null;
+    }
     // (the road's tips do not fit here: back onto the road, getting out)
     hs.tip = '';
     hs.tipAction = '';
     if (this.time < this.tipUntil) hs.tip = tr(this.tip, lang, this.tipData);
-    else if (t?.stage === 'guide' && t.step === 0 && Math.abs(f.v) < 0.1 && (this.host.input.c.handbrake > 0.5 || this.host.input.c.gear !== 1)) hs.tip = tr(touch ? 'forkTip.startTouch' : 'forkTip.start', lang);
+    else if ((this.siteOn ? t?.stage === 'guide' && t.step === 0 : !this.moved) && Math.abs(f.v) < 0.1 && (this.host.input.c.handbrake > 0.5 || this.host.input.c.gear !== 1)) hs.tip = tr(touch ? 'forkTip.startTouch' : 'forkTip.start', lang);
+    else if (this.moved && !f.tipped && Math.abs(f.v) < 0.05 && this.host.input.c.handbrake > 0.5) {
+      // parked with its brake on: getting off (on a touch screen the tip is the button)
+      hs.tip = tr(touch ? 'getOutHintTouch' : 'getOutHint', lang);
+      hs.tipAction = 'KeyG';
+    }
   }
 
   /** The tasks as they went, for the result page (null: none was finished). */

@@ -36,6 +36,11 @@
 .bm-pop-title small, .bm-pop > small { color: var(--muted); line-height: 1.35; }
 .bm-pop .bm-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .bm-pop .btn { padding: 9px 14px; font-size: 14px; min-height: 40px; }
+/* the menu of a tram or bus: beside the vehicle on the map (src/ui/transitmap.ts places it), its two buttons side by side and big enough for a finger */
+.bm-pop.bm-ctx { position: absolute; align-self: auto; z-index: 3; min-width: min(250px, calc(100% - 16px)); max-width: min(360px, calc(100% - 16px)); max-height: none; }
+.bm-pop .bm-ctx-row { flex-wrap: nowrap; }
+.bm-pop .bm-ctx-row .btn { flex: 1 1 0; min-height: 46px; min-width: 0; padding: 8px 10px; white-space: normal; line-height: 1.2; }
+.bm-pop .bm-ctx-row .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 /* a line's number on its colour: a tram's square-cornered, a bus's round */
 .bm-line { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 28px; height: 24px; padding: 0 6px; box-sizing: border-box; border-radius: 12px; font-weight: 800; font-size: 13px; line-height: 1; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); }
 .bm-line.tram { border-radius: 5px; }

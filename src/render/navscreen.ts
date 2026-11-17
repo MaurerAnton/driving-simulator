@@ -19,6 +19,8 @@ export interface VehicleScreen {
   drawn(): void;
   /** the live map (true) or the still picture */
   setLive(on: boolean): void;
+  /** the picture in the scene – a tap on it in the driver's seat opens the big map or brings back the corner map (ui/screentap.ts) */
+  hitMesh?(): THREE.Object3D | null;
 }
 
 /** the picture's pixels: the size of the car's centre display (the HUD draws its map to fit any) */
@@ -122,6 +124,10 @@ export class NavScreen implements VehicleScreen {
       }
     }
     return this;
+  }
+
+  hitMesh(): THREE.Object3D {
+    return this.face;
   }
 
   setLive(on: boolean): void {

@@ -164,6 +164,9 @@ const FACADE_GLSL = /* glsl */ `
 // uv2.xy = wall length and eave height.
 vec3 fsFacade(float style, vec3 base, vec4 uvd, vec3 wp, float dist, out float glass) {
   glass = 0.0;
+  // a wall with measured details (render/facadedetail.ts) has its style + 16: its windows and doors are geometry
+  float measured = step(15.5, style);
+  style -= 16.0 * measured;
   float fine = 1.0 - smoothstep(25.0, 110.0, dist);
   float mid = 1.0 - smoothstep(120.0, 420.0, dist);
   float grain = (fsNoise(wp.xz * 9.0 + wp.y * 7.0) - 0.5) * 0.06 * fine;
@@ -186,10 +189,22 @@ vec3 fsFacade(float style, vec3 base, vec4 uvd, vec3 wp, float dist, out float g
   float H = max(uvd.w, 0.1);
   // plinth
   c *= 1.0 - 0.18 * (1.0 - smoothstep(0.35, 0.45, uvd.y)) * mid;
-  if (style < 0.5 || (style > 1.5 && style < 4.5)) {
+  // facing brick (6): courses of bricks with mortar joints – near by, on the buildings with facades
+  float brick = step(5.5, style) * step(style, 6.5);
+  if (brick > 0.5) {
+    float course = uvd.y / 0.0625;
+    float bx = uvd.x / 0.25 + 0.5 * mod(floor(course), 2.0);
+    vec2 bid = vec2(floor(bx), floor(course));
+    float joint = max(1.0 - smoothstep(0.0, 0.09, fract(course)), 1.0 - smoothstep(0.0, 0.04, fract(bx)));
+    c *= mix(1.0, 0.86 + 0.24 * fsHash(bid + floor(wp.xz)), fine);
+    c = mix(c, vec3(0.62, 0.60, 0.56), joint * fine * 0.55);
+    c *= 1.0 - 0.06 * fine * (fsNoise(wp.xz * 0.9 + wp.y * 0.7) - 0.5);
+  }
+  if (measured < 0.5 && (style < 0.5 || (style > 1.5 && style < 4.5) || brick > 0.5)) {
     // regular window grid that always fits the wall
-    float floorH = style < 0.5 ? 2.75 : 3.3;
-    float bay = style < 0.5 ? 2.6 : (style < 2.5 ? 3.4 : 3.0);
+    float house = style < 0.5 || brick > 0.5 ? 1.0 : 0.0;
+    float floorH = house > 0.5 ? 2.75 : 3.3;
+    float bay = house > 0.5 ? 2.6 : (style < 2.5 ? 3.4 : 3.0);
     float rows = max(1.0, floor(H / floorH + 0.35));
     float cols = max(1.0, floor(L / bay + 0.3));
     if (L > 1.7 && H > 2.1) {
@@ -197,7 +212,7 @@ vec3 fsFacade(float style, vec3 base, vec4 uvd, vec3 wp, float dist, out float g
       vec2 id = floor(cell);
       vec2 f = fract(cell);
       vec2 cs = vec2(L / cols, H / rows);          // cell size in metres
-      vec2 win = style < 0.5 ? vec2(1.15, 1.30) : (style < 2.5 ? vec2(cs.x * 0.8, 1.6) : vec2(1.3, 1.7));
+      vec2 win = house > 0.5 ? vec2(1.15, 1.30) : (style < 2.5 ? vec2(cs.x * 0.8, 1.6) : vec2(1.3, 1.7));
       win = min(win, cs * vec2(0.75, 0.62));
       vec2 lo = (cs - win) * vec2(0.5, 0.42);
       vec2 q = f * cs;
@@ -205,7 +220,7 @@ vec3 fsFacade(float style, vec3 base, vec4 uvd, vec3 wp, float dist, out float g
       float below = step(uvd.y, H);                // no windows in the gable triangle
       float rnd = fsHash(id + floor(wp.xz * 0.05));
       // a door on the ground floor now and then
-      float door = step(id.y, 0.5) * step(0.82, rnd) * step(abs(q.x - cs.x * 0.5), 0.5) * step(q.y, 2.05) * (style < 0.5 ? 1.0 : 0.0);
+      float door = step(id.y, 0.5) * step(0.82, rnd) * step(abs(q.x - cs.x * 0.5), 0.5) * step(q.y, 2.05) * house;
       float w = inside * below * mid * (1.0 - door);
       // frame
       vec2 e = min(q - lo, lo + win - q);
@@ -217,7 +232,7 @@ vec3 fsFacade(float style, vec3 base, vec4 uvd, vec3 wp, float dist, out float g
       c = mix(c, base * 0.45 + vec3(0.12, 0.09, 0.06), door * mid);
       glass = w * (1.0 - max(frame, mullion));
     }
-  } else if (style < 1.5) {
+  } else if (style < 1.5 && measured < 0.5) {
     // garage: one sectional door on walls wide enough
     if (L > 2.4 && L < 7.5 && H > 2.0) {
       float cols = max(1.0, floor(L / 3.0));

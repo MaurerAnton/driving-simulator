@@ -31,6 +31,9 @@ const _virt = new THREE.Vector3();
 const _tmp = new THREE.Vector3();
 const _back = new THREE.Vector3();
 const _rel = new THREE.Vector3();
+const _m = new THREE.Matrix4();
+const _b = new THREE.Matrix4();
+const _s = new THREE.Matrix4();
 
 export class Mirror {
   readonly spec: MirrorSpec;
@@ -40,6 +43,11 @@ export class Mirror {
   private readonly localRight = new THREE.Vector3();
   private readonly localUp = new THREE.Vector3();
   enabled = true;
+  /** what moves with the glass when it is put elsewhere (place): its housing */
+  readonly attached: THREE.Object3D[] = [];
+  /** the glass as it was built (place moves it from there) */
+  private base: { centre: THREE.Vector3; normal: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; width: number; height: number } | null = null;
+  private placed = '';
 
   constructor(spec: MirrorSpec) {
     this.spec = spec;
@@ -105,7 +113,8 @@ export class Mirror {
    * `eyeWorld` the driver's eye in world space.
    */
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, carMatrix: THREE.Matrix4, eyeWorld: THREE.Vector3, far: number): void {
-    if (!this.enabled) return;
+    // (a glass not shown – the inside mirror taken off into the HUD – needs no picture)
+    if (!this.enabled || !this.mesh.visible) return;
     if (!this.aim(carMatrix, eyeWorld, far)) return;
     const prevTarget = renderer.getRenderTarget();
     const prevVisible = this.mesh.visible;
@@ -163,6 +172,45 @@ export class Mirror {
     this.camera.projectionMatrix.makePerspective(cx - hw, cx + hw, cy + hh, cy - hh, near, far);
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
     return true;
+  }
+
+  /**
+   * Put the glass elsewhere, as on a rail: `shift` (m) along the vehicle's
+   * x axis and `scale` times its size – with what is `attached` to it.  With
+   * `eye` (the driver's eye, vehicle coordinates) it is turned so that it
+   * still shows the eye the same direction as where it was built.
+   */
+  place(shift: number, scale: number, eye: THREE.Vector3 | null): void {
+    const key = `${shift},${scale},${eye ? eye.toArray().join(',') : ''}`;
+    if (key === this.placed) return;
+    this.placed = key;
+    const s = this.spec;
+    const b = (this.base ??= { centre: s.centre.clone(), normal: s.normal.clone().normalize(), right: this.localRight.clone(), up: this.localUp.clone(), width: s.width, height: s.height });
+    s.centre.copy(b.centre);
+    s.centre.x += shift;
+    s.width = b.width * scale;
+    s.height = b.height * scale;
+    s.normal.copy(b.normal);
+    if (eye) {
+      // the direction it showed: the eye's line reflected in the glass
+      const toEye0 = _tmp.subVectors(eye, b.centre).normalize();
+      const look = _rel.copy(b.normal).multiplyScalar(2 * b.normal.dot(toEye0)).sub(toEye0);
+      s.normal.copy(mirrorNormal(s.centre, eye, look));
+    }
+    const n = s.normal.normalize();
+    this.localUp.set(0, 1, 0).addScaledVector(n, -n.y).normalize();
+    this.localRight.crossVectors(this.localUp, n).normalize();
+    // the move: about the old centre, turned from the old frame of the glass to the new one, scaled, to the new centre
+    _b.makeBasis(b.right, b.up, b.normal).invert();
+    _m.makeBasis(this.localRight, this.localUp, n).multiply(_b);
+    _s.makeScale(scale, scale, scale);
+    _m.multiply(_s);
+    _m.multiply(_s.makeTranslation(-b.centre.x, -b.centre.y, -b.centre.z));
+    _m.premultiply(_s.makeTranslation(s.centre.x, s.centre.y, s.centre.z));
+    for (const o of [this.mesh, ...this.attached]) {
+      _m.decompose(o.position, o.quaternion, o.scale);
+      o.updateMatrix();
+    }
   }
 
   dispose(): void {

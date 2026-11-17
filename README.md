@@ -155,6 +155,15 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   eigenem Tankerkönig-Schlüssel) und **Ebenen** zum Ein- und Ausblenden; „Fahrzeug wechseln“ ohne neu zu laden; zu Fuß
   **der eigenen Position folgen**; eine F1-Seite, die jede Taste und jeden Knopf erklärt; Ortstafeln nur, wo sie wirklich
   stehen; eine leichtere Grafikstufe „Niedrig“ für schwache Handys.
+- **Neu in 1.6.0:** Baunatal-Mitte, wie es wirklich ist – in rund einem Quadratkilometer um die Schubertstraße
+  haben 166 Häuser ihre echten Wand- und Dachfarben und Materialien (auch Klinker), 370 Bäume stehen, wo sie wirklich
+  stehen, und an 36 Wänden sind die gemessenen Fenster und Türen gebaut (ab Grafik „Mittel“) – nur Tatsachen, keine
+  Bilder; Straßenbahnen und Busse halten ihren Fahrplan, ein Tipp auf sie in der Karte: „Linie zeigen“ und „Kamera
+  anhängen“; jede Spielversion seit 1.0.0 spielbar, Karten aus Dateien laden; feste Strecken mit Fehlern beim
+  Verlassen, Fahrstunden auch an echten Orten; „Ein Auto hier“, Start am eigenen Standort, „Genau platzieren“; der
+  Stapler (Kamera, Klicks, Aussteigen, freie Fahrt), vom Turmdrehkran absteigen, schwere Fahrzeuge lenken wirklich
+  langsam; Zoom mit zwei Fingern, verschiebbarer Innenspiegel, eine frei anordenbare Anzeige; ein klareres Pausenmenü;
+  WebAssembly für Kartenteile und lange Routen.
 - **Jedes Modell:** ein Testplatz auf dem Übungsplatz mit allen Fahrzeugen des Spiels nebeneinander (jede
   Führerscheinklasse, mit und ohne Anhänger), den Autos, Radfahrern und Leuten des Verkehrs, zwei Straßenbahnen
   und dem Flugzeug – zu Fuß oder mit dem eigenen Fahrzeug zwischen ihnen.
@@ -466,7 +475,7 @@ muss man zum Spielen und Entwickeln nicht.
 ### Tests
 
 ```bash
-npm test             # 666 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
+npm test             # 723 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
                      # Tank und Waschanlage, Wetter, Jahreszeiten, Ampel-Uhren, Autopilot des Flugzeugs, Karten, Klänge; Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
                      # Klassen mit jeder Motorleistung (77), Flugphysik (25), Flugplätze (3), Straßenbahn fahren, ihr
                      # Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne im Verkehr (10), Fahrpläne
@@ -544,7 +553,7 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 666 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
+- **Automatisch geprüft:** 723 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
   Straßenbahn mit Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne, Buslinien, die Wiederholung, Bus auf der Linie, zu Fuß an Fußgängerampel und Zebrastreifen, Fernsicht, Anhänger, Aufgaben der Klasse CE,
   Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
   Umgebungsverkehrs (seit 1.4.0 auch Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen und Demonstrationen,
@@ -593,6 +602,9 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 - **Zu Fuß:** Die eigene Figur sieht immer gleich aus (wählen lässt sie sich noch nicht). „Der eigenen Position
   folgen“ nutzt nur die GPS-Ortung des Browsers; feinere Schritte zwischen zwei Ortungen aus den Bewegungssensoren
   (Koppelnavigation) wären erst in einer eigenen App verlässlich möglich – vorgemerkt.
+- **Baunatal-Mitte nach Straßenpanoramen:** Farben, Bäume und Fenster wurden aus Panoramen abgelesen; die Fenster
+  erkennt das Verfahren noch unsicher (36 Wände geprüft übernommen), Balkone, Sockel, Hecken und Zäune fehlen noch;
+  außerhalb des Quadratkilometers sind Farben weiter geschätzt.
 - **Kräne:** Die Wiederholung zeigt den Kran in seiner letzten Stellung; die Last dreht sich nicht am Haken;
   der Turmdrehkran lässt sich nicht aufbauen oder klettern; der dreiachsige Autokran fährt auf dem Vierrad-Modell.
 - **Theoriestunden:** auf dem Übungsplatz nachgestellt, nicht an echten Kreuzungen; die Szenen haben keinen Ton.
@@ -743,6 +755,11 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   wipers and real water on "Very high"; queue labels and traffic that gets past blocks; map search, "my location",
   watching emergency vehicles and events, fuel prices and map layers; changing vehicle without reloading; following
   your real position on foot; an F1 page for every key and button.
+- **New in 1.6.0:** Baunatal centre as it really is (about 1 km² round Schubertstraße: real wall and roof colours and
+  materials of 166 houses, 370 trees in their places, measured windows and doors on 36 walls – facts only, no images);
+  trams and buses keep their timetables; any version since 1.0.0 playable; maps loaded from files; set routes; lessons
+  in real places; a car here; start where you are; forklift and crane fixes; realistic heavy-vehicle steering; zoom,
+  a movable inside mirror, an arrangeable display; a clearer pause menu; WebAssembly for map pieces and long routes.
 - **Every model:** a test place on the practice yard with every vehicle of the game side by side, the cars,
   cyclists and people of the traffic, two trams and the aeroplane – walk or drive among them.
 - **Flying:** a light two-seat high-wing aeroplane (100 to 180 PS) takes off from the 21 airfields of
@@ -806,7 +823,7 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 666 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
+Verified automatically by 723 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
 fuel and car washes, weather and seasons, signal timers, the aeroplane's autopilot, maps and sounds; vehicle dynamics of every vehicle with every engine power, the tram with its pantograph and
 coupled units, the trailer, the class-CE tasks, cyclists, traffic lights, on foot and the pedestrian lights, trams with their lines and
 timetables, bus lines, replays, the bus line, flight physics, airfields, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,

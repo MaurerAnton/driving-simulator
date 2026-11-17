@@ -22,11 +22,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # (every tag: the earlier versions are built from theirs – tools/old-versions.ts)
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: WebAssembly rebuilt since its source changed? (src/wasm/kernels.cpp → kernels.wasm.ts, tools/build-wasm.ts)
+        run: node tools/build-wasm.ts --check
       - name: Map (the tiles of northern Hesse, from the release named in map.release)
         run: npm run map:fetch
       - name: Tests (vehicle dynamics, road network, map, reality view)
@@ -35,8 +40,19 @@ jobs:
         env:
           # optional: a Mapillary client token for the reality view (repository variable MAPILLARY_TOKEN)
           VITE_MAPILLARY_TOKEN: ${{ vars.MAPILLARY_TOKEN }}
+      - name: The versions there are (tags vX.Y.Z)
+        id: tags
+        run: echo "list=$(git tag -l 'v*' | sort -V | tr '\n' '_')" >> "$GITHUB_OUTPUT"
+      # the earlier versions, built once each and kept here between runs
+      - uses: actions/cache@v4
+        with:
+          path: .old-versions
+          key: old-versions-${{ hashFiles('tools/old-versions.ts') }}-${{ steps.tags.outputs.list }}
+          restore-keys: old-versions-
+      - name: Earlier versions (dist/v/X.Y.Z, sharing the one map) and versions.json
+        run: node tools/old-versions.ts --out dist --cache .old-versions
       - name: Size of the site (GitHub Pages holds 1 GB)
-        run: du -sh dist dist/map
+        run: du -sh dist dist/map && (du -sh dist/v 2>/dev/null || true)
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

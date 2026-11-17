@@ -46,6 +46,9 @@ export const VIOLATION_REFS: Record<string, string> = {
   busDoorsMoving: '@ref.busService',
   busDoorsEarly: '@ref.busService',
   busPullOut: '§ 10 StVO',
+  // a set route (game/routepresets.ts): the directions are the examiner's – no paragraph of their own
+  routeLeft: '@ref.routePreset',
+  routeReverse: '@ref.routePreset',
   classSpeed: '§ 3 Abs. 3, § 18 Abs. 5 StVO',
   motorwayBan: '§ 18 Abs. 1 StVO',
   doorTraffic: '§ 14 Abs. 1 StVO',

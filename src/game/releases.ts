@@ -7,13 +7,21 @@
  *
  * A new release: raise the version in package.json, put an entry at the top
  * of this list with the keys of its notes, and add the notes to every
- * language (tests/game/releases.test.ts checks that it all fits).
+ * language (tests/game/releases.test.ts checks that it all fits).  Its
+ * `at` stays '' until the release is published; then the moment of it goes
+ * in (gh release view vX.Y.Z --json publishedAt).  Every version in the list
+ * can be played again from "What's new" (game/versions.ts).
  */
 
 export interface Release {
   version: string;
   /** the day it was released (ISO) */
   date: string;
+  /**
+   * the moment it was published (ISO, as GitHub has it:
+   * gh release view vX.Y.Z --json publishedAt) – '' until it is
+   */
+  at: string;
   /** a line before the list (i18n key), if there is one */
   intro?: string;
   /** what it brought: i18n keys, one line each */
@@ -22,33 +30,45 @@ export interface Release {
 
 export const RELEASES: readonly Release[] = [
   {
+    version: '1.6.0',
+    date: '2026-11-17',
+    at: '2026-11-17T19:31:07Z',
+    items: ['news.1_6_0.town', 'news.1_6_0.transit', 'news.1_6_0.versions', 'news.1_6_0.routes', 'news.1_6_0.spawn', 'news.1_6_0.forklift', 'news.1_6_0.camera', 'news.1_6_0.pause', 'news.1_6_0.faster', 'news.1_6_0.more'],
+  },
+  {
     version: '1.5.0',
     date: '2026-11-17',
+    at: '2026-11-17T12:19:15Z',
     items: ['news.1_5_0.vehicles', 'news.1_5_0.doors', 'news.1_5_0.night', 'news.1_5_0.weather', 'news.1_5_0.traffic', 'news.1_5_0.change', 'news.1_5_0.watch', 'news.1_5_0.layers', 'news.1_5_0.search', 'news.1_5_0.favourites', 'news.1_5_0.autopilot', 'news.1_5_0.plane', 'news.1_5_0.foot', 'news.1_5_0.touch', 'news.1_5_0.loading', 'news.1_5_0.lights', 'news.1_5_0.more'],
   },
   {
     version: '1.4.0',
     date: '2026-11-17',
+    at: '2026-11-17T01:52:42Z',
     items: ['news.1_4_0.menu', 'news.1_4_0.cranes', 'news.1_4_0.theory', 'news.1_4_0.traffic', 'news.1_4_0.weather', 'news.1_4_0.arcade', 'news.1_4_0.services', 'news.1_4_0.signs', 'news.1_4_0.plane', 'news.1_4_0.maps', 'news.1_4_0.transit', 'news.1_4_0.cockpit', 'news.1_4_0.sounds', 'news.1_4_0.autopilot', 'news.1_4_0.more'],
   },
   {
     version: '1.3.0',
     date: '2026-11-16',
+    at: '2026-11-16T20:14:29Z',
     items: ['news.1_3_0.menu', 'news.1_3_0.replay', 'news.1_3_0.timetables', 'news.1_3_0.busLines', 'news.1_3_0.pantograph', 'news.1_3_0.coupled', 'news.1_3_0.figure', 'news.1_3_0.models'],
   },
   {
     version: '1.2.0',
     date: '2026-11-16',
+    at: '2026-11-16T17:58:01Z',
     items: ['news.1_2_0.plane', 'news.1_2_0.onFoot', 'news.1_2_0.stops', 'news.1_2_0.tramLines', 'news.1_2_0.busLine', 'news.1_2_0.powers', 'news.1_2_0.motorcycle', 'news.1_2_0.farView', 'news.1_2_0.tours', 'news.1_2_0.loading', 'news.1_2_0.carModel', 'news.1_2_0.fixes'],
   },
   {
     version: '1.1.0',
     date: '2026-11-16',
+    at: '2026-11-16T12:26:20Z',
     items: ['news.1_1_0.tram', 'news.1_1_0.classes', 'news.1_1_0.graphics', 'news.1_1_0.screen', 'news.1_1_0.wheels', 'news.1_1_0.onFoot'],
   },
   {
     version: '1.0.0',
     date: '2026-11-16',
+    at: '2026-11-16T10:37:55Z',
     intro: 'news.1_0_0.intro',
     items: [
       'news.1_0_0.map',

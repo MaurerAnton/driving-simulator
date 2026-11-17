@@ -351,9 +351,11 @@ export function carouselMenu(c: CarouselContext): HTMLElement {
     modes.push(card(`cm-mode${main ? ' main' : ''}`, false, [el('b', '', title), el('small', '', desc)], () => go(m)));
   };
   mode(c.t(kind === 'plane' ? 'freeFly' : 'free'), c.t(kind === 'tram' ? 'freeTramDesc' : kind === 'pedestrian' ? 'freeWalkDesc' : kind === 'plane' ? 'freeFlyDesc' : 'freeDesc'), 'free', true);
+  // the forklift: its work on the forklift yard (game/forkliftplay.ts) – its free drive begins at the place chosen above
+  if (kind === 'forklift') mode(c.t('forkWork'), c.t('forkWorkDesc'), 'forklift', true);
   if (kind === 'tram') mode(c.t('demo'), c.t('demoTramDesc'), 'demo');
   if (kind === 'plane') mode(c.t('demoFly'), c.t('demoFlyDesc'), 'demo');
-  if (kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane') {
+  if (kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane' && kind !== 'forklift') {
     mode(c.t('demo'), c.t('demoDesc'), 'demo');
     mode(c.t('tourTitle'), c.t('tourDesc'), 'tour');
   }
@@ -362,7 +364,7 @@ export function carouselMenu(c: CarouselContext): HTMLElement {
   // the test place: every model of the game on the practice yard
   if (kind !== 'tram' && kind !== 'plane' && c.hasYard) mode(c.t('showTitle'), c.t('showDesc'), 'show');
   const rank = (k: string): number => (k === 'yard' ? 0 : k === 'exam' ? 2 : 1);
-  const lessons = LESSONS.filter((l) => (l.vehicles ? l.vehicles.includes(kind) : l.vehicle ? l.vehicle === kind : kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane' && !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || c.hasYard)).sort((a, b) => rank(a.kind) - rank(b.kind));
+  const lessons = LESSONS.filter((l) => (l.vehicles ? l.vehicles.includes(kind) : l.vehicle ? l.vehicle === kind : kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane' && kind !== 'forklift' && !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || c.hasYard)).sort((a, b) => rank(a.kind) - rank(b.kind));
   for (const l of lessons) mode(lessonTitle(l.id, c.lang), l.id === 'exam' ? c.t('examDesc') : lessonIntro(l.id, c.lang), l.id);
   rows.append(row(`modes-${kind}`, c.t('start'), modes));
 

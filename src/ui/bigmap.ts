@@ -32,6 +32,7 @@ import { locate } from './geolocate.ts';
 import { LAYERS, LAYER_KEYS, drawLayerIcons, layerIconAt, loadLayers, saveLayers } from './maplayers.ts';
 import type { MapEmergency, MapService } from './maplayers.ts';
 import { FUELS } from '../world/services.ts';
+import { routePresetSection } from './lessonroutes.ts';
 
 export interface BigMapHost {
   world: World;
@@ -70,6 +71,8 @@ export interface BigMapHost {
    * the car drives by itself.
    */
   startTrip(stops: SpawnJson[], self: boolean, tour: TourPreview | null): void;
+  /** start a set route (game/routepresets.ts) from where the vehicle stands */
+  startPreset?(id: string): void;
   /**
    * A tour of about `metres` through as many different streets as possible,
    * from where the car stands back to there – or on to `end`.  Null: none found.
@@ -103,6 +106,11 @@ export interface BigMapHost {
   /** the aeroplane is flown: it is put somewhere in the air, `height` metres above the ground there */
   flying?(): boolean;
   teleportAir?(spot: SpawnJson, height: number): void;
+  /** the area of the world in memory, where a car may be put down: the line round it (x1, z1, x2, z2 per side) – null: not shown */
+  loadedArea?(): Float32Array | null;
+  /** may a car be put down at (x, z) now ('outside': not on the loaded area; 'no': not now) – and put it there (game/spawncar.ts) */
+  canSpawnCar?(x: number, z: number): 'ok' | 'outside' | 'no';
+  spawnCar?(x: number, z: number): void;
   close(): void;
 }
 
@@ -410,8 +418,8 @@ export class BigMap {
     const up = (e: PointerEvent): void => {
       if (!this.pointers.delete(e.pointerId)) return;
       this.pinch = 0;
-      // a tap (not a drag): choose that place
-      if (this.pointers.size === 0 && this.moved < 8 && e.type === 'pointerup') this.choose(e.clientX, e.clientY);
+      // a tap (not a drag): choose that place (a fingertip wobbles a little more than a mouse)
+      if (this.pointers.size === 0 && this.moved < (e.pointerType === 'mouse' ? 8 : 16) && e.type === 'pointerup') this.choose(e.clientX, e.clientY);
     };
     c.addEventListener('pointerup', up);
     c.addEventListener('pointercancel', up);
@@ -569,6 +577,8 @@ export class BigMap {
       box.append(list);
     }
 
+    // --- the set routes (game/routepresets.ts): driven from where the vehicle stands (not from the menu's map: no vehicle yet) ---
+    if (this.host.startPreset && !this.host.menu?.()) box.append(routePresetSection((k, v) => this.t(k, v), (id) => this.host.startPreset?.(id)));
     // --- a tour of the streets: as long as asked for, through as many different streets as possible ---
     const tourBox = el('div', 'bm-tour');
     tourBox.append(el('b', '', this.t('tourTitle')), el('small', '', this.t(this.stops.length > 0 ? 'tourHintTo' : 'tourHintRound')));
@@ -938,6 +948,14 @@ export class BigMap {
         go.onclick = () => this.host.teleport(spot);
         bar.append(go);
       }
+      // a car put down here (on foot, at a crane): only on the area in memory, inside the dashed line
+      const can = this.host.canSpawnCar?.(x, z) ?? 'no';
+      if (can === 'ok') {
+        const car = el('button', 'btn ghost', this.t('mapSpawnCar'));
+        car.type = 'button';
+        car.onclick = () => this.host.spawnCar?.(x, z);
+        bar.append(car);
+      } else if (can === 'outside') bar.append(el('small', '', this.t('spawnCarOutside')));
       // a favourite place: kept on this device, a star on the map, in the list of the plan panel
       const fav = loadFavourites().find((f) => Math.hypot(f.x - spot.x, f.z - spot.z) <= 20);
       const star = el('button', 'btn ghost', fav ? `★ ${this.t('favRemove')}` : `☆ ${this.t('favAdd')}`);
@@ -1274,6 +1292,21 @@ export class BigMap {
     }
     g.restore();
     drawLayerIcons(g, W, H, s, (x) => W / 2 + (x - this.cx) * s, (z) => H / 2 + (z - this.cz) * s, this.host.services?.() ?? [], this.host.emergencies?.() ?? [], this.layers, Math.floor(performance.now() / 400) % 2 === 0);
+    // the area of the world in memory (where a car may be put down): a dashed line round it
+    const area = this.host.loadedArea?.() ?? null;
+    if (area && area.length > 0) {
+      g.save();
+      g.strokeStyle = 'rgba(56,182,255,0.9)';
+      g.lineWidth = 2;
+      g.setLineDash([8, 6]);
+      g.beginPath();
+      for (let i = 0; i + 3 < area.length; i += 4) {
+        g.moveTo(W / 2 + (area[i] - this.cx) * s, H / 2 + (area[i + 1] - this.cz) * s);
+        g.lineTo(W / 2 + (area[i + 2] - this.cx) * s, H / 2 + (area[i + 3] - this.cz) * s);
+      }
+      g.stroke();
+      g.restore();
+    }
     // the trams and buses with their stops, and a way drawn on the map
     this.transit.draw(g, W, H, s, this.cx, this.cz);
     this.drawer.draw(g, W, H, s, this.cx, this.cz);

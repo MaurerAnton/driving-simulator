@@ -72,7 +72,7 @@ export interface TrafficCar {
    * indicates to pull out again; the line it runs (null: none), and how many
    * roads it has driven since it last had one.
    */
-  bus?: { dwell: number; served: number; doors: boolean; pullOut: number; line?: BusOnLine | null; free?: number };
+  bus?: { dwell: number; served: number; doors: boolean; pullOut: number; line?: BusOnLine | null; free?: number; trip?: string; retired?: boolean };
   /**
    * The lane of the same road it is moving over to (a bus whose line turns
    * where its own lane does not lead) – and, once it has, how far it is
@@ -110,6 +110,23 @@ export interface BusOnLine {
    * driven since – it drives on as the others do and looks for its way again
    */
   off: number;
+}
+
+/**
+ * The timetables of the buses as the traffic asks them (the game answers
+ * from src/game/timedtransit.ts): the buses of the lines that have one are
+ * put where and when their trips are, not by chance, and stand at a stop
+ * until their time.
+ */
+export interface BusSchedule {
+  /** does the line (its number in BusLines.lines) run by a timetable? */
+  timed(line: number): boolean;
+  /** a step: the buses of the trips under way round the player put on their roads (by addCar), each once */
+  step(dt: number, player: PlayerState): void;
+  /** the traffic was cleared: the trips are put where they are, also close to the player */
+  reset(): void;
+  /** how long a bus of a trip stands at the stop of pole `pole` it has come to (s; `least`: what it would stand without a timetable) */
+  dwell(car: TrafficCar, pole: number, least: number): number;
 }
 
 /**
@@ -223,6 +240,8 @@ export class Traffic {
   busStops: ((lane: Lane) => readonly BusStopOnLane[]) | null = null;
   /** the share of the traffic that are buses (where there are stops, or where a line runs) */
   busShare = 0.08;
+  /** the timetables of the buses (src/game/timedtransit.ts – null: none): the buses of their lines come where and when their trips are */
+  busSchedule: BusSchedule | null = null;
   /** the lines of the city buses (setBusLines) */
   private lines: BusLines | null = null;
   targetCount = 24;
@@ -421,7 +440,8 @@ export class Traffic {
           if (at !== lane && there && there.some((o) => Math.abs(o.s - s) < 22)) continue;
         }
       }
-      this.addCar(at, s, bus, line);
+      // (where only lines of the timetables run, no bus by chance: a car)
+      this.addCar(at, s, bus && (line !== null || !lineHere || !this.busSchedule), line);
       return;
     }
   }
@@ -510,7 +530,8 @@ export class Traffic {
   private pickLine(lane: Lane, prefer = ''): BusOnLine | null {
     if (!this.lines) return null;
     // (not on the way round from the end of a route to the line back: there it shows where it came from)
-    const here = this.lines.at(wayOf(lane)).filter(({ line, k }) => k < line.end);
+    // (nor on a line of the timetables: its buses come by them – busSchedule)
+    const here = this.lines.at(wayOf(lane)).filter(({ line, k }) => k < line.end && !this.busSchedule?.timed(line.index));
     if (here.length === 0) return null;
     const pick = (prefer ? here.find((h) => h.line.ref === prefer) : undefined) ?? here[Math.floor(this.rand() * here.length)];
     return Traffic.onLine(pick.line, pick.k);
@@ -714,7 +735,7 @@ export class Traffic {
     const on = bus.line;
     if (!on) {
       bus.free = (bus.free ?? 0) + 1;
-      if (bus.free > 2) {
+      if (bus.free > 2 && !bus.retired) {
         bus.line = this.pickLine(lane);
         if (bus.line) bus.served = -1;
       }
@@ -734,7 +755,11 @@ export class Traffic {
     if (back && on.k >= line.ways.length - 2) {
       for (let j = 0; j < Math.min(back.ways.length, 6); j++) {
         if (back.ways[j] !== w) continue;
-        // the line back: its own number and destination, and its stops anew
+        // the line back: its own number and destination, and its stops anew (a bus of the timetables has ended its trip: it goes)
+        if (bus.trip || bus.retired) {
+          this.retireBus(car);
+          return;
+        }
         bus.line = Traffic.onLine(back, j);
         bus.served = -1;
         car.detour = null;
@@ -745,6 +770,7 @@ export class Traffic {
       // the end of its line, and none goes on from here: on without a line
       bus.line = null;
       bus.free = 0;
+      if (bus.trip) this.retireBus(car);
       return;
     }
     // off its way: on along the way back if it has one (looked for anew now and then), else it gives up after a while
@@ -754,7 +780,16 @@ export class Traffic {
       bus.line = null;
       bus.free = 0;
       car.detour = null;
+      if (bus.trip) this.retireBus(car);
     }
+  }
+
+  /** A bus of the timetables at the end of its trip (or off its way for good): it calls nowhere any more, and goes once the player is not close by. */
+  private retireBus(car: TrafficCar): void {
+    if (!car.bus) return;
+    car.bus.retired = true;
+    car.bus.line = null;
+    car.detour = null;
   }
 
   private readonly stopList: BusStopOnLane[] = [];
@@ -768,7 +803,7 @@ export class Traffic {
    */
   private stopAhead(car: TrafficCar, lane: Lane | null, conn: Connector | null): { d: number; id: number; here: boolean } | null {
     const bus = car.bus;
-    if (!bus) return null;
+    if (!bus || bus.retired) return null;
     // (a bus on a line calls once at a stop place, at whichever of its poles)
     const skip = (id: number): boolean => (bus.line ? stopPlaceOf(id) === stopPlaceOf(bus.served) : id === bus.served);
     const front = car.s + car.length / 2;
@@ -819,6 +854,11 @@ export class Traffic {
     return out;
   }
 
+  /** Take a car out of the traffic (a bus of the timetables put where its trip is anew). */
+  removeCar(car: TrafficCar): void {
+    this.remove(car);
+  }
+
   private remove(car: TrafficCar): void {
     this.detach(car);
     const i = this.cars.indexOf(car);
@@ -828,6 +868,7 @@ export class Traffic {
   clear(): void {
     this.cyclists.clear();
     this.cars.length = 0;
+    this.busSchedule?.reset();
     this.crowd.clear();
     this.onLane.clear();
     this.onConn.clear();
@@ -1358,12 +1399,14 @@ export class Traffic {
       this.spawn(player);
       this.spawnTimer = 0.12;
     }
+    // the buses of the timetables: where and when their trips are (src/game/timedtransit.ts)
+    this.busSchedule?.step(dt, player);
     // emergency vehicles: their calls, and how the others make way for them (src/sim/emergency.ts)
     this.emergency?.update(dt, player);
     for (let i = this.cars.length - 1; i >= 0; i--) {
       const car = this.cars[i];
       const d = Math.hypot(car.x - player.x, car.z - player.z);
-      if (d > this.spawnRadius + 110 || car.stuck > 45 || (car.crashed > 0 && (car.crashed -= dt) <= 0 && d > 60)) {
+      if (d > this.spawnRadius + 110 || car.stuck > 45 || (car.crashed > 0 && (car.crashed -= dt) <= 0 && d > 60) || (car.bus?.retired && car.bus.dwell <= 0 && d > 120)) {
         this.remove(car);
         continue;
       }
@@ -1595,6 +1638,8 @@ export class Traffic {
         bus.served = st.id;
         bus.doors = true;
         bus.dwell = 10 + this.rand() * 10;
+        // (a bus of the timetables: until its time – no longer than the doors take when it is late)
+        if (bus.trip && this.busSchedule) bus.dwell = this.busSchedule.dwell(car, st.id, bus.dwell);
       } else if (st) {
         stopDist = Math.min(stopDist, Math.max(0, st.d));
         // (pulling in: the indicator to the right – once it is on the road of the stop, not while it turns into it)

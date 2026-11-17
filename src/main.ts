@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Game } from './game/game.ts';
 import { startNetStats } from './game/netstats.ts';
+import { restoreAfterOldVersion } from './game/versions.ts';
 
 // (how much is downloaded: shown on the loading screens)
 startNetStats();
+// (back from an earlier version of the game: the settings as they were before it – game/versions.ts)
+restoreAfterOldVersion(document.baseURI);
 import { loadSettings } from './game/settings.ts';
+import { setWasmMode } from './wasm/kernels.ts';
 import { loadLang, tr } from './i18n/index.ts';
+
+// (WebAssembly for the tiles and the quickest way, or JavaScript only: src/wasm/kernels.ts)
+setWasmMode(loadSettings().wasm);
 
 declare global {
   interface Window {

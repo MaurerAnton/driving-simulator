@@ -67,12 +67,15 @@ import { AddressIndex, findRoadSpot, mainNetwork } from './address.ts';
 import type { AddressHit, AddressJson } from './address.ts';
 import { Hud, SEASON_CHOICES, SEASON_KEYS, WEATHER_CHOICES, WEATHER_KEYS } from '../ui/hud.ts';
 import { MirrorZoomPanel } from '../ui/mirrorzoom.ts';
+import { HudMirror } from '../ui/hudmirror.ts';
+import { ScreenTap } from '../ui/screentap.ts';
 import type { HudState, ReplayState, ResultSummary, RunwayChoice, TramStopChoice } from '../ui/hud.ts';
 import type { MenuPreview } from '../ui/carousel.ts';
 import { stageFrame } from '../ui/stage.ts';
 import { Stops } from '../world/stops.ts';
 import { LANGS, formatUnit, isRtl, lessonIntro, lessonTitle, loadLang, localeOf, setKeyStyle, tr } from '../i18n/index.ts';
 import { gameClock, gameNow, sunAt } from './clock.ts';
+import { busSchedule, resyncBuses, tramSchedule } from './timedtransit.ts';
 import { downloaded, formatBytes } from './netstats.ts';
 import { clockBadge } from '../ui/arcade.ts';
 import { Outdoors } from './outdoors.ts';
@@ -95,6 +98,10 @@ import type { Edge, Node as Junction } from '../world/world.ts';
 import { App } from './app.ts';
 import { LESSONS, Navigator, findTarget } from './nav.ts';
 import { planTourInSlices } from './tour.ts';
+import { ROUTE_PRESETS, RouteWatch, planPreset, presetOfMode, routeLine } from './routepresets.ts';
+import { findLessonPlace, lessonStart, placeKindOf, searchRadius } from './lessonplaces.ts';
+import type { LessonStart } from './lessonplaces.ts';
+import { askLessonPlace } from '../ui/lessonroutes.ts';
 import { BusService } from './busline.ts';
 import type { BusEvent } from './busline.ts';
 import { saveTour, thinLine } from './tourlog.ts';
@@ -120,10 +127,10 @@ import type { TransitSource, WatchRequest } from '../ui/transitmap.ts';
 import { roadSource } from '../ui/pathdraw.ts';
 import type { TourPreview } from '../ui/bigmap.ts';
 import { RailTraffic, carLayout, consistLength, consistOf } from '../sim/rail.ts';
-import type { RailObstacle, RailSchedule, RailVehicle } from '../sim/rail.ts';
-import { departures, parseTimetable, scheduledAt, serviceTime, tripsAt } from '../sim/timetable.ts';
+import type { RailObstacle, RailVehicle } from '../sim/rail.ts';
+import { departures, parseTimetable, scheduledAt, serviceTime } from '../sim/timetable.ts';
 import { loadBusLines } from '../world/buslines.ts';
-import type { Timetable, TripRef } from '../sim/timetable.ts';
+import type { Timetable } from '../sim/timetable.ts';
 import type { CrossingJson } from '../world/types.ts';
 import { RailActors } from '../render/trams.ts';
 import { PlayerTruck } from '../render/truck.ts';
@@ -147,6 +154,7 @@ import { YardTask } from './yardtask.ts';
 import { CraneWork, craneMenuPose, craneMenuSite, craneStart, isCraneModel } from './craneplay.ts';
 import { makeCraneModel } from '../render/crane.ts';
 import { ForkliftWork, forkliftMenuSite, forkliftStart, isForkliftModel } from './forkliftplay.ts';
+import { FORK_WORK_MODE, forkCamera } from './forkliftmodes.ts';
 import { ForkliftModel } from '../render/forklift.ts';
 import type { CraneType } from '../sim/crane.ts';
 import { TheoryMode } from './theorymode.ts';
@@ -157,6 +165,10 @@ import { ServiceWorld } from './serviceworld.ts';
 import { Wading } from './wading.ts';
 import { BeamPlay } from './beamplay.ts';
 import type { Settings } from './settings.ts';
+import { SpawnCars } from './spawncar.ts';
+import type { Parked } from './spawncar.ts';
+import { exactSpots, freeNear, inBuilding } from './spawnplace.ts';
+import { locate } from '../ui/geolocate.ts';
 
 type State = 'loading' | 'menu' | 'intro' | 'placing' | 'drive' | 'pause' | 'reality' | 'map' | 'result' | 'replay' | 'theory';
 /** the driver's seat, behind the car, a camera that is moved about freely – and a fixed one for pictures (?cam=) */
@@ -256,7 +268,7 @@ export class Game {
   /** the box trailer behind a car (class BE) */
   private carTrailer: TowedModel | null = null;
   /** the car's centre display, for the HUD to draw the map on */
-  private readonly carScreen: VehicleScreen = { canvas: this.car.mapCanvas, drawn: (): void => void (this.car.mapTexture.needsUpdate = true), setLive: (on) => this.car.setMapOnScreen(on) };
+  private readonly carScreen: VehicleScreen = { canvas: this.car.mapCanvas, drawn: (): void => void (this.car.mapTexture.needsUpdate = true), setLive: (on) => this.car.setMapOnScreen(on), hitMesh: () => this.car.screenMesh };
   /** what the vehicle's lamps showed in the last picture (for the trailer's) */
   private lastVisual: CarVisualState | null = null;
   /** the truck with the trailer of the class CE (its yard tasks, the coupling) */
@@ -316,6 +328,12 @@ export class Game {
   private tourSeed = 1;
   /** open the map for planning such a drive as soon as the car stands (start "demo" of the menu) */
   private planDemo = false;
+  /** a set route being driven (game/routepresets.ts): is it kept?  And one to start once the drive is placed (from the menu). */
+  private routeWatch: RouteWatch | null = null;
+  private presetPending = '';
+  /** a lesson in a real place (game/lessonplaces.ts): what to look for once the roads round the start are there – and the destination found with it */
+  private placeSearch: LessonStart | null = null;
+  private placeGoal: Edge | null = null;
   private camSnap = false;
   private demoHead = 0;
   /** trams and trains on the tracks around the player */
@@ -397,6 +415,10 @@ export class Game {
   private readonly windscreen = new WindscreenView();
   /** looking into a mirror, large over the picture (ui/mirrorzoom.ts) – made with the first picture of a drive */
   private mirrorZoom: MirrorZoomPanel | null = null;
+  /** the inside mirror moved in the car or taken off into the HUD (ui/hudmirror.ts) */
+  private hudMirror: HudMirror | null = null;
+  /** a tap on the vehicle's screen: the big map or the corner map (ui/screentap.ts) */
+  private screenTap: ScreenTap | null = null;
   private spawn: SpawnJson | null = null;
   private lesson: LessonDef | null = null;
   private targetIdx = 0;
@@ -540,6 +562,8 @@ export class Game {
     // (the green arrows of what is there already – a map in one piece; the pieces of a map in pieces get theirs as they come)
     markArrows(world, this.lanes, this.signals, world.allNodes);
     this.traffic = new Traffic(world, this.lanes, this.signals);
+    // the buses of the lines with timetables come where and when their trips are (src/game/timedtransit.ts)
+    this.traffic.busSchedule = busSchedule({ timetable: () => this.timetable, source: () => this.transitData(), traffic: () => this.traffic, nowMs: () => gameClock.ms() });
     // now and then an emergency vehicle on a call, police on patrol (src/sim/emergency.ts; ?emergency=<s>: a call every <s> seconds)
     this.traffic.emergency = new Emergencies(this.traffic, Number(new URLSearchParams(location.search).get('emergency')) || 0);
     this.rules = new RuleMonitor(world, this.lanes, this.signals, this.traffic);
@@ -572,6 +596,7 @@ export class Game {
     this.airfieldView = new AirfieldRenderer((x, z) => this.groundHeight(x, z), (x, z) => !Number.isNaN(this.app.tiles.heightAt(x, z)));
     this.services = new ServiceWorld({ scene: app.scene, collider: this.collider, ui: this.ui, map: app.map, ground: (x, z) => app.tiles.heightAt(x, z), onRoad: (x, z) => app.world.surfaceAt(x, z, app.tiles.heightAt(x, z) + 1, this.hit), blocked: (x, z, yaw) => this.collider.blocked(x, app.tiles.heightAt(x, z), z, yaw, 0.2), lang: () => this.settings.lang, message: (t, sub) => this.hud.message(t, sub), click: (k) => this.audio.click(k), hideOverlay: () => this.hud.hideOverlay(), rules: this.rules, shadows: () => this.settings.graphics.shadows !== 'off' });
     await this.services.load();
+    this.spawnCars = this.makeSpawnCars();
     app.tiles.onTile((tile, loaded) => this.onTile(tile, loaded));
     app.scene.add(this.car.root, this.actors.group, this.railActors.group, this.signalHeads.group, this.pedHeads.group, this.passengerView.group, this.far.group, this.transit.group, this.airfieldView.group, this.yardScene.group, this.markers.group, this.figure.group, this.showGroup, this.showRail.group, this.showPeople.group, this.explosion.group);
     this.showGroup.name = 'every model';
@@ -729,6 +754,13 @@ export class Game {
       if (this.state === 'pause') this.hud.showArcade();
     };
     this.hud.onGetOut = () => {
+      // (off the forklift, down from the tower crane: on foot beside it – game/forkliftplay.ts, craneplay.ts)
+      if (!this.walker && (this.forklift || this.crane?.type === 'tower')) {
+        this.resume();
+        if (this.forklift) this.forkliftDoor();
+        else this.towerDoor();
+        return;
+      }
       if (this.walker || this.demo?.active || this.task || this.crane || this.forklift) return;
       // (the tram: standing, not driving by itself – out of the cab and on foot beside it)
       if (this.tram ? this.tram.speed > 0.1 || this.tramAuto : Math.abs(this.vehicle.speed) > 0.3) return;
@@ -773,7 +805,13 @@ export class Game {
       car: () => ({ x: this.mpos[0], z: this.mpos[2], yaw: this.mapFrom === 'menu' ? (this.menuPreview?.yaw ?? 0) : this.vehicle.yaw }),
       path: this.path,
       net: () => this.netIndex,
-      spotAt: (x, z) => this.roadSpot(x, z, '', 160),
+      spotAt: (x, z) => (this.settings.placeExact ? this.exactSpot(tr('mapPlace', this.settings.lang), x, z) : this.roadSpot(x, z, '', 160)),
+      loadedArea: () => (this.mapFrom === 'menu' ? null : this.spawnCars.area.outline()),
+      canSpawnCar: (x, z) => (!this.canSpawnCar(true) ? 'no' : this.spawnCars.canPlaceAt(x, z) ? 'ok' : 'outside'),
+      spawnCar: (x, z) => {
+        this.closeMap();
+        this.spawnCars.spawnAt(x, z);
+      },
       canTeleport: () => this.mapFrom !== 'menu' && !this.lesson && !this.crane && !this.forklift,
       teleport: (spot) => {
         if (this.mapFrom !== 'menu') return this.teleportSpot(spot);
@@ -794,6 +832,7 @@ export class Game {
       loadAddresses: () => this.loadAddresses(),
       spotOf: (hit) => this.spawnAt(hit),
       startTrip: (stops, self, tour) => this.startTrip(stops, self, tour),
+      startPreset: (id) => this.startPreset(id),
       planTour: (metres, end, progress) => this.planTour(metres, end, progress),
       tramways: () => this.tramways(),
       tourPrefs: () => this.settings.tourPrefs,
@@ -904,7 +943,10 @@ export class Game {
     if (start && addr) {
       void this.loadAddresses().then((ix) => this.begin(start, Number(q.get('spawn') ?? 0), true, ix?.search(addr, 1, app.world.json.spawns[Number(q.get('spawn') ?? 0)] ?? null)[0]));
     } else if (start) this.begin(start, Number(q.get('spawn') ?? 0), true);
-    else this.toMenu();
+    else {
+      this.toMenu();
+      this.startWhereIAm();
+    }
   }
 
   private debugLook: [number, number] | null = null;
@@ -1006,6 +1048,8 @@ export class Game {
 
   private onTile(tile: LoadedTile, loaded: boolean): void {
     this.services.tile(tile, loaded);
+    // (where a car may be put down: the loaded area, the footprints of its buildings – game/spawncar.ts)
+    this.spawnCars.tile(tile.key, tile.header, tile.data.get('collPts') as Float32Array | null, tile.data.get('collCnt') as Uint16Array | null, loaded);
     if (loaded) {
       // What stands in a lane (a fault of the map) is taken out of the way: sign posts are moved
       // beside the lane, lamps dropped, walls lose the pieces that reach in.  Maps built since do
@@ -1121,9 +1165,10 @@ export class Game {
     this.services.end();
     this.crane?.dispose();
     this.crane = null;
-    this.forklift?.dispose();
-    this.forklift = null;
+    this.endForklift();
     this.figure.hide();
+    this.spawnCars?.clear();
+    this.intoParked = false;
     // (the menu of rows places the vehicle chosen anew; the test place is left)
     this.previewKey = '';
     this.showOn = false;
@@ -1152,53 +1197,8 @@ export class Game {
   private readonly menuFocus = new THREE.Vector3();
 
   // ------------------------------------------------------------- timetables
-  /** the timetables of the trams (null: none for this map), and the trips the traffic runs by them (by the schedule's name for each) */
+  /** the timetables of the trams and buses (null: none for this map) – the trams and buses of the traffic keep to them (src/game/timedtransit.ts) */
   private timetable: Timetable | null = null;
-  private readonly trips = new Map<string, TripRef>();
-
-  /** The timetable as the traffic of the trams asks it: the trips under way round a place, and how long to stand at a stop. */
-  private railSchedule(): RailSchedule {
-    const smp = { x: 0, y: 0, z: 0, tx: 0, tz: 0, cap: 0 };
-    return {
-      due: (x, z, r0, r1, all) => {
-        const tt = this.timetable;
-        const lines = this.lines;
-        const out: ReturnType<RailSchedule['due']> = [];
-        if (!tt || !lines) return out;
-        if (this.trips.size > 4000) this.trips.clear();
-        const now = serviceTime(gameNow());
-        for (const line of tt.lines) {
-          const stops = line ? lines.lines[line.index]?.stops : undefined;
-          if (!line || !stops) continue;
-          for (const trip of tripsAt(tt, line.index, now)) {
-            const p = trip.pattern;
-            const a = stops[p.lineStops[trip.from]];
-            const b = stops[p.lineStops[trip.to]];
-            if (!a || !b) continue;
-            const spot = this.rail.lineSpot(line.index, a, b, trip.standing ? 0 : trip.frac);
-            if (!spot) continue;
-            this.rail.net.sample(spot.path, spot.s, smp);
-            const d = Math.hypot(smp.x - x, smp.z - z);
-            if (d > r1 || (!all && d < r0)) continue;
-            const key = `${line.index}:${line.patterns.indexOf(p)}:${trip.t0}`;
-            this.trips.set(key, trip);
-            out.push({ trip: key, line: line.index, path: spot.path, s: spot.s, dir: spot.dir, k: spot.k, speed: trip.standing ? 0 : 9 });
-          }
-        }
-        return out;
-      },
-      wait: (v, path, mark) => {
-        const ref = v.trip ? this.trips.get(v.trip) : undefined;
-        const stops = ref ? this.lines?.lines[ref.pattern.line.index]?.stops : undefined;
-        if (!ref || !stops) return 0;
-        const k = ref.pattern.lineStops.findIndex((j) => j >= 0 && stops[j] && stops[j][0] === path && Math.abs(stops[j][1] - mark) < 1);
-        if (k < 0) return 0;
-        // (while the time runs faster the timetable is left aside: no waiting for it)
-        if (gameClock.rate > 1) return 0;
-        return Math.max(0, ref.t0 + ref.pattern.dep[k] - serviceTime(gameNow()).s);
-      },
-    };
-  }
 
   /** The model of a vehicle, made the first time it is needed (and the box trailer behind a car, a 7.5-tonner or a bus). */
   private ensureModel(def: VehicleDef): VehicleModel {
@@ -1235,7 +1235,7 @@ export class Game {
   private setMenuPreview(p: MenuPreview | null): void {
     // (a crane is shown where its work begins: on the construction site)
     const crane = p ? VEHICLES[p.kind]?.crane : undefined;
-    const at = crane ? craneStart(crane, this.yardFrame) : p?.kind === 'forklift' ? forkliftStart(this.yardFrame) : null;
+    const at = crane ? craneStart(crane, this.yardFrame) : null;
     this.menuPreview = p && at ? { ...p, x: at.x, z: at.z, yaw: at.yaw } : p;
     if (!p) this.clearPreview();
   }
@@ -1267,6 +1267,9 @@ export class Game {
   private placePreview(p: MenuPreview): void {
     this.clearPreview();
     this.previewKey = this.menuPreviewKey(p);
+    // (where it sensibly stands: on the road in front of the place chosen, facing along it, outside the buildings)
+    const fit = this.menuSpot(p);
+    p = { ...p, x: fit.x, z: fit.z, yaw: fit.yaw };
     const def = VEHICLES[p.kind] ?? VEHICLES.car;
     this.def = def;
     const tiles = this.app.tiles;
@@ -1622,7 +1625,8 @@ export class Game {
   private showModel(on: boolean): void {
     this.car.root.visible = on && this.def.model === 'car';
     const key = modelKey(this.def);
-    for (const [k, model] of this.models) if (model !== this.car) model.root.visible = on && k === key;
+    // (the vehicle left standing when the player got into another stays drawn – game/spawncar.ts)
+    for (const [k, model] of this.models) if (model !== this.car) model.root.visible = (on && k === key) || !!this.spawnCars?.keeps(model.root);
     if (this.carTrailer) this.carTrailer.group.visible = on && !!this.def.trailer && this.def.model !== 'truck';
     if (this.truck) {
       this.truck.trailer.visible = on && this.def.kind === 'truck';
@@ -1783,7 +1787,7 @@ export class Game {
   /** Free drive: jump to an address (from the pause menu). */
   private teleportTo(hit: AddressHit): void {
     if (this.state !== 'pause' || this.lesson) return;
-    const spot = this.spawnAt(hit);
+    const spot = this.startSpot(hit);
     this.spawnStreet = hit.street;
     if (!spot) {
       this.hud.showPause();
@@ -1969,6 +1973,7 @@ export class Game {
   private startTrip(stops: SpawnJson[], self: boolean, tour: TourPreview | null): void {
     if (this.lesson || (stops.length === 0 && !tour) || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
     this.endWatch();
+    this.routeWatch = null;
     // (on foot beside the vehicle: back into the seat first; a tram is driven by hand only)
     if (this.walker) this.leaveWalk();
     const plane = this.aircraft;
@@ -2021,7 +2026,7 @@ export class Game {
         v.teleport(this.mpos[0], this.mpos[1] + 0.02, this.mpos[2], old.yaw);
         v.odometer = old.odometer;
         this.vehicle = v;
-        this.input.setSteering(spec.wheelbase, spec.maxWheelAngle);
+        this.input.setSteering(spec.wheelbase, spec.maxWheelAngle, spec);
         this.input.setAutomatic(true);
         this.hud.gearbox = 'automatic';
       }
@@ -2063,11 +2068,45 @@ export class Game {
     this.hud.clearNotices();
   }
 
+  /**
+   * A set route (game/routepresets.ts): planned from the road the vehicle is on through its places
+   * and back, then driven by the player with the way shown, as a tour – leaving it, or driving
+   * along it the other way, is a fault (RouteWatch).
+   */
+  private startPreset(id: string): void {
+    const preset = ROUTE_PRESETS.find((r) => r.id === id);
+    const lang = this.settings.lang;
+    if (!preset || this.lesson) return;
+    const lane = this.currentLane();
+    const g = this.routeGraphNow();
+    if (!lane || !g) {
+      // (not on a road – or the roads of the whole map are still being read)
+      this.wantNet();
+      this.hud.message(tr(lane ? 'realityLoading' : 'routes.noRoad', lang));
+      return;
+    }
+    const from = wayOf(lane);
+    const plan = planPreset(g, from, preset, this.netIndex?.main);
+    if (!plan) {
+      this.hud.message(tr('routes.none', lang));
+      return;
+    }
+    const net = this.netIndex?.net ?? null;
+    const line = routeLine(g, from, plan.ways, net ? (e) => netPolyline(net, e) : undefined);
+    const p0 = preset.points[0];
+    const name = tr(`routes.${id}.name`, lang);
+    this.startTrip([], true, { plan: { ways: plan.ways, metres: plan.metres, fresh: plan.metres, again: 0, valued: plan.metres }, line, from, end: { name, x: p0.x, z: p0.z, yaw: 0, kind: 'street' } });
+    if (!this.demo) return;
+    this.routeWatch = new RouteWatch(from, plan.ways);
+    this.hud.message(name, tr('routes.started', lang, { km: formatUnit(plan.metres / 1000, 'kilometer', lang, 1) }));
+  }
+
   /** The drive is over: the car has arrived, the player takes it over, or there is no way to go on. */
   private endDemo(why: 'arrived' | 'taken' | 'lost' | 'ended'): void {
     const demo = this.demo;
     if (!demo) return;
     this.demo = null;
+    this.routeWatch = null;
     // a tour is kept with its date – also one given up half-way (but not one hardly begun)
     if (demo.tour) {
       const driven = this.vehicle.odometer - demo.tour.odo;
@@ -2187,6 +2226,9 @@ export class Game {
     // pass that place before, only once the end is near
     if (demo.driver) demo.driver.halt = last && (!demo.tour || this.nav.left <= 1) ? { x: stop.x, z: stop.z } : null;
     const h = this.nav.update(dt, lane, this.laneFront(), p.x, p.z);
+    // a set route: kept – or left, or driven the other way (game/routepresets.ts)
+    const off = this.routeWatch?.update(wayOf(lane), this.vehicle.odometer);
+    if (off) this.rules.note(off, off === 'routeReverse' ? 'major' : 'minor', {}, 20);
     if (this.hud.routeLanes !== this.nav.routeLanes) {
       this.hud.routeLanes = this.nav.routeLanes;
       this.rules.allowed = new Set(this.nav.routeLanes.map((l) => l.edge));
@@ -2256,6 +2298,25 @@ export class Game {
       this.openTheory();
       return;
     }
+    // a set route from the menu (game/routepresets.ts): a drive of one's own from its first place – the route begins once there
+    const preset = presetOfMode(mode);
+    if (preset) {
+      mode = 'free';
+      address = { label: tr(`routes.${preset.id}.name`, this.settings.lang), street: '', x: preset.points[0].x, z: preset.points[0].z, exact: false };
+      this.wantNet();
+    }
+    this.presetPending = preset?.id ?? '';
+    // the first lesson: where shall the lessons take place?  (asked once – game/lessonplaces.ts)
+    const lessonAsked = LESSONS.find((l) => l.id === mode);
+    if (lessonAsked && !address && !this.settings.lessonPlaceAsked && placeKindOf(lessonAsked)) {
+      const ask = askLessonPlace((k, v) => tr(k, this.settings.lang, v), this.settings, this.app.world.json.spawns, () => {
+        ask.remove();
+        saveSettings(this.settings);
+        this.begin(mode, spawnIdx, skipIntro, address, stop, runway);
+      });
+      this.ui.append(ask);
+      return;
+    }
     if (VEHICLES[this.settings.vehicle]?.kind === 'plane' && !runway && !this.air && !this.airAwaited && this.app.map.pieces) {
       // (a flight asked for by a link before the airfields were read: it begins once they are)
       this.airAwaited = true;
@@ -2265,8 +2326,13 @@ export class Game {
     const world = this.app.world;
     this.audio.start();
     this.spawnStreet = address?.street ?? '';
-    this.spawn = (address ? this.spawnAt(address) : null) ?? world.json.spawns[Math.max(0, Math.min(world.json.spawns.length - 1, spawnIdx))] ?? { name: '', x: 0, z: 0, yaw: 0, kind: 'street' };
+    this.spawn = (address ? this.startSpot(address) : null) ?? world.json.spawns[Math.max(0, Math.min(world.json.spawns.length - 1, spawnIdx))] ?? { name: '', x: 0, z: 0, yaw: 0, kind: 'street' };
     // On foot from the first start place: at the stop Baunatal Stadtmitte, looking at its departure board
+    // (into a vehicle parked on the map: where it stands, as it stands – game/spawncar.ts)
+    if (this.parkedAt) {
+      this.spawn = { name: tr('mapPlace', this.settings.lang), x: this.parkedAt.x, z: this.parkedAt.z, yaw: this.parkedAt.yaw, kind: 'street' };
+      this.parkedAt = null;
+    }
     this.boardStart = null;
     if (VEHICLES[this.settings.vehicle]?.kind === 'pedestrian' && !address && spawnIdx === 0 && mode === 'free') {
       const st = this.stops?.places.find((p) => /stadtmitte/i.test(p.name) && (p.town === 'Baunatal' || /baunatal/i.test(p.name)));
@@ -2303,6 +2369,7 @@ export class Game {
     }
     this.lesson = LESSONS.find((l) => l.id === mode) ?? null;
     this.demo = null;
+    this.routeWatch = null;
     this.wrecked = false;
     this.explosion.clear();
     this.hud.setWrecked(false);
@@ -2363,6 +2430,13 @@ export class Game {
     this.collider.setShape(this.def.circles, this.def.radius);
     this.rules.setVehicle(this.def.caps, this.def.capFault, this.def.heavy, this.def.noMotorway);
     this.taskFailed = false;
+    // a lesson in a real place (game/lessonplaces.ts): from the district chosen – the place itself is looked for once the roads round it are there
+    this.placeGoal = null;
+    this.placeSearch = this.lesson && !address && this.spawn ? lessonStart(this.lesson, this.settings.lessonPlace, this.settings.lessonArea, world.json.spawns, this.spawn) : null;
+    if (this.placeSearch) {
+      this.spawn = this.placeSearch.spawn;
+      if (this.placeSearch.kind === 'area') this.placeSearch = null;
+    }
     this.roadSpawn = this.spawn;
     this.tasksLeft = this.isTruck && this.yardFrame && this.lesson?.tasks ? [...this.lesson.tasks] : [];
     this.taskCount = this.tasksLeft.length;
@@ -2379,18 +2453,22 @@ export class Game {
       this.rules.yard = true;
       this.hud.canTeleport = false;
     }
-    // the forklift: on its place on the practice yard (game/forkliftplay.ts), whatever was chosen to do with it
-    this.forklift?.dispose();
-    this.forklift = null;
+    // the forklift (game/forkliftplay.ts): "Forklift work" on its place on the practice yard – any other way to play
+    // a free drive where the menu put it (the place, the address, the test place); its camera from the side at first
+    this.endForklift();
     if (this.def.kind === 'forklift') {
-      this.forklift = this.makeForkliftWork();
-      const at = forkliftStart(this.yardFrame);
+      const work = mode === FORK_WORK_MODE && !this.lesson;
+      this.forklift = this.makeForkliftWork(work);
+      const at = work ? forkliftStart(this.yardFrame) : null;
       if (at) this.spawn = { name: tr('forkPlace', this.settings.lang), x: at.x, z: at.z, yaw: at.yaw, kind: 'street' };
-      this.showOn = false;
-      this.rules.yard = true;
+      if (work) {
+        this.showOn = false;
+        this.rules.yard = true;
+      }
       this.hud.canTeleport = false;
+      this.forkView();
     }
-    this.input.setSteering(spec.wheelbase, spec.maxWheelAngle);
+    this.input.setSteering(spec.wheelbase, spec.maxWheelAngle, spec);
     this.input.setAutomatic(spec.transmission === 'automatic');
     const c = this.input.c;
     c.handbrake = 1;
@@ -2466,6 +2544,23 @@ export class Game {
     this.hud.setLoadingProgress(this.app.map.pieces ? 0.35 * this.app.map.progress(sp.x, sp.z, 1500) + 0.65 * this.app.tiles.progress : this.app.tiles.progress);
     // (the roads around the place: without them there is no lane to stand in, and nothing to drive on)
     if (!this.app.map.ready(sp.x, sp.z, 1500)) return;
+    // a lesson in a real place: now that the roads round the district are there, the place itself (game/lessonplaces.ts)
+    if (this.placeSearch && !this.task) {
+      const ps = this.placeSearch;
+      const radius = searchRadius(ps.kind);
+      if (radius > 1500 && !this.app.map.ready(sp.x, sp.z, radius + 200)) return;
+      this.placeSearch = null;
+      const at = findLessonPlace(this.app.world, this.lanes, ps.kind, sp.x, sp.z, { usable: this.usableLane() });
+      if (at) {
+        this.placeGoal = at.goal;
+        sp = this.spawn = this.roadSpawn = { name: at.name, x: at.x, z: at.z, yaw: at.yaw, kind: 'street' };
+      } else {
+        // (nothing fits there: where the player chose to start)
+        sp = this.spawn = this.roadSpawn = ps.fallback;
+        this.hud.message(tr('lessonPlace.none', this.settings.lang));
+      }
+      if (!this.app.map.ready(sp.x, sp.z, 1500)) return;
+    }
     if (sp.rough) {
       // chosen on the overview of the map: now that the roads are there, into a lane of the road meant
       // (or at an address before any roads were known: then from the house to its street)
@@ -2474,12 +2569,14 @@ export class Game {
     }
     const ty = this.app.tiles.heightAt(sp.x, sp.z);
     if (Number.isNaN(ty) || !this.app.tiles.settled) return;
+    // "place precisely": at the very place chosen, facing along the road nearest – or the nearest free place round it
+    if (exactSpots.has(sp)) sp = this.spawn = { ...sp, ...this.fitExact(sp, this.def.outline), rough: false };
     let y = this.app.world.surfaceAt(sp.x, sp.z, ty + 3, this.hit) ? this.hit.y : ty;
     // the practice yard is laid out over the field as soon as the ground under it is there
     if (this.task && !this.task.laid) this.task.laid = this.yardScene.show(this.yardFrame!, this.task.run.layout, (x, z) => this.app.tiles.heightAt(x, z));
     let place = { x: sp.x, z: sp.z, yaw: sp.yaw };
     // (never into a wall or onto a post: then the nearest free place in a lane instead)
-    if (!this.task && this.collider.blocked(sp.x, y, sp.z, sp.yaw, 0.05)) {
+    if (!this.task && (this.collider.blocked(sp.x, y, sp.z, sp.yaw, 0.05) || (!this.crane && !this.forklift?.siteOn && inBuilding(sp.x, sp.z, sp.yaw, this.def.outline, (x, z) => this.spawnCars.footprints.inside(x, z))))) {
       const free = this.freeSpot(sp.x, sp.z, sp.yaw, 0);
       if (free) {
         place = free;
@@ -2490,7 +2587,8 @@ export class Game {
     this.trailer?.coupleBehind(this.vehicle);
     this.lastGood = { x: place.x, y, z: place.z, yaw: place.yaw, t: 0 };
     // (on foot first – not on the yard of the class CE tasks, not when the car is to drive by itself)
-    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker && this.def.kind !== 'tram' && this.def.kind !== 'pedestrian' && !this.crane && !this.forklift;
+    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker && this.def.kind !== 'tram' && this.def.kind !== 'pedestrian' && !this.crane && !this.forklift && !this.intoParked;
+    this.intoParked = false;
     this.footPending = this.def.kind === 'pedestrian';
     if (this.tramAt) {
       // the player's tram, its front at the stop's mark (the other way round if it does not fit behind it there)
@@ -2808,6 +2906,7 @@ export class Game {
    */
   private clockJumped(): void {
     this.rail.resync();
+    resyncBuses(this.traffic);
     this.sunPlacedAt = -1;
     this.updateSun();
   }
@@ -3157,13 +3256,19 @@ export class Game {
       this.audio.click('airDoor');
       for (const e of ev) this.rules.noteAt(e.fault, e.severity, this.mpos[0], this.mpos[2], {}, 8);
     } else if (a === 'door' && this.state === 'drive' && this.forklift) {
-      // (the forklift: the operator stays on the seat)
+      // the forklift: the operator gets off beside the seat, and on again
+      this.forkliftDoor();
+    } else if (a === 'door' && this.state === 'drive' && this.crane?.type === 'tower') {
+      // the tower crane: its operator climbs down, and up again
+      this.towerDoor();
     } else if (a === 'door' && this.state === 'drive' && this.crane && !this.walker) {
       // the crane: from driving to working it, and back
       this.craneToggle();
     } else if (a === 'door' && this.state === 'drive') {
       // (out of the tram's cab: the door key gets one in again at its door – after a vehicle went up in flames, a new one)
-      if (this.walker && this.wrecked) this.newVehicle();
+      const parked = this.walker ? this.spawnCars.near(this.walker.x, this.walker.z) : null;
+      if (parked && this.canEnterParked()) this.enterParked(parked);
+      else if (this.walker && this.wrecked) this.newVehicle();
       else if (this.walker && this.aircraft) this.boardPlane();
       else if (this.walker) this.getIn();
       else if (this.aircraft && !this.aircraft.onGround) {
@@ -3195,6 +3300,11 @@ export class Game {
       this.settings.footView = this.settings.footView === 'eyes' ? 'behind' : 'eyes';
       saveSettings(this.settings);
       this.hud.message(tr(this.settings.footView === 'behind' ? 'footViewBehind' : 'footViewEyes', this.settings.lang));
+    } else if (a === 'view' && this.state === 'drive' && !this.walker && this.forklift) {
+      // the forklift: from the side → the operator's seat → behind it → the free camera → …
+      this.forklift.nextView();
+      this.forkView();
+      if (this.cameraMode === 'free') this.hud.message(tr('viewFree', this.settings.lang), tr(this.inputMode === 'touch' ? 'freeCamTouch' : 'freeCamKeys', this.settings.lang));
     } else if (a === 'view' && this.state === 'drive' && !this.walker) {
       // the driver's seat → behind the car → the free camera → …
       this.cameraMode = this.cameraMode === 'cockpit' ? 'chase' : this.cameraMode === 'chase' ? 'free' : 'cockpit';
@@ -3656,11 +3766,14 @@ export class Game {
    */
   private stepCrane(dt: number): void {
     const cw = this.crane as CraneWork;
-    cw.work(dt, this.vehicle);
+    // (climbed down from the tower crane: on foot – the crane stands as it was left)
+    const w = this.walker;
+    if (w) this.stepWalk(dt);
+    else cw.work(dt, this.vehicle);
     this.vehicle.getModelPosition(this.mpos);
     this.rules.time += dt;
     this.signals.update(dt);
-    const player: PlayerState = { x: this.mpos[0], y: this.mpos[1], z: this.mpos[2], yaw: this.vehicle.yaw, speed: 0, length: 0.1, width: 0.1 };
+    const player: PlayerState = w ? { x: w.x, y: w.y, z: w.z, yaw: w.yaw, speed: w.speed, length: 0.6, width: 0.6, onFoot: true } : { x: this.mpos[0], y: this.mpos[1], z: this.mpos[2], yaw: this.vehicle.yaw, speed: 0, length: 0.1, width: 0.1 };
     this.rail.update(dt, player, []);
     this.traffic.obstacles = [];
     this.traffic.update(dt, player);
@@ -3668,8 +3781,9 @@ export class Game {
   }
 
   /** The forklift's work (game/forkliftplay.ts), told what it needs of the game. */
-  private makeForkliftWork(): ForkliftWork {
-    return new ForkliftWork({
+  private makeForkliftWork(site: boolean): ForkliftWork {
+    return new ForkliftWork(
+      {
       scene: this.app.scene,
       ui: this.ui,
       settings: this.settings,
@@ -3678,17 +3792,113 @@ export class Game {
       input: this.input,
       audio: this.audio,
       note: (id, severity, x, z, data, cooldown) => this.rules.noteAt(id, severity, x, z, data, cooldown),
+      blocked: (x, y, z, yaw) => this.collider.blocked(x, y, z, yaw, 0.02),
+      },
+      site,
+    );
+  }
+
+  /** The forklift's drive ends: its work goes, and the camera is the player's own again (not the forklift's view from the side). */
+  private endForklift(): void {
+    if (!this.forklift) return;
+    this.forklift.dispose();
+    this.forklift = null;
+    this.cameraMode = this.settings.view;
+    this.input.resetLook(this.cameraMode === 'chase', false);
+  }
+
+  /** The forklift's camera, as chosen with V (game/forkliftplay.ts: from the side at first). */
+  private forkView(): void {
+    const fw = this.forklift;
+    if (!fw) return;
+    const cam = forkCamera(fw.view);
+    this.cameraMode = cam.mode;
+    this.input.resetLook(cam.mode === 'chase', cam.mode === 'free', cam.rest);
+    this.fc.ready = false;
+    this.camSnap = true;
+  }
+
+  /** Off the forklift, beside its seat – or, on foot near it, on again (G, the door button, "Get out"). */
+  private forkliftDoor(): void {
+    const fw = this.forklift;
+    if (!fw || this.state !== 'drive') return;
+    const w = this.walker;
+    if (w) {
+      if (!fw.canBoard(w.x, w.z)) {
+        this.tipText = tr('forkTooFar', this.settings.lang);
+        this.tipUntil = this.time + 3;
+        return;
+      }
+      this.walker = null;
+      this.figure.hide();
+      this.forkView();
+      this.audio.click('door');
+      return;
+    }
+    const at = fw.getOff();
+    if (!at) {
+      fw.tell('stopFirst');
+      return;
+    }
+    this.input.c.handbrake = 1;
+    this.vehicle.getModelPosition(this.mpos);
+    this.leaveOnFoot(at, this.mpos[1]);
+  }
+
+  /** Down from the tower crane's cab, beside its base – or, on foot at its foot, up again (G, "Get out"). */
+  private towerDoor(): void {
+    const cw = this.crane;
+    if (!cw || cw.type !== 'tower' || this.state !== 'drive') return;
+    const w = this.walker;
+    if (w) {
+      if (!cw.atTowerFoot(w.x, w.z)) {
+        this.tipText = tr('craneTooFar', this.settings.lang);
+        this.tipUntil = this.time + 3;
+        return;
+      }
+      this.walker = null;
+      this.figure.hide();
+      cw.setAway(false);
+      this.cameraMode = 'cockpit';
+      this.input.resetLook(false, false);
+      this.input.c.lookZoom = 22;
+      this.camSnap = true;
+      this.audio.click('door');
+      return;
+    }
+    this.vehicle.getModelPosition(this.mpos);
+    const y0 = this.mpos[1];
+    const at = cw.towerExit((x, z) => {
+      const y = this.footGround(x, z, y0 + 2);
+      return Number.isFinite(y) && !this.collider.circleBlocked(x, y, z, 0.4);
     });
+    cw.setAway(true);
+    this.leaveOnFoot(at, y0);
+  }
+
+  /** On foot here (off the forklift, down from the tower crane): the person's own eyes, the keys and the controls walk. */
+  private leaveOnFoot(at: { x: number; z: number; yaw: number }, yRef: number): void {
+    const y = this.footGround(at.x, at.z, yRef + 2);
+    this.walker = new OnFoot(null, { x: at.x, y: Number.isFinite(y) ? y : yRef, z: at.z, yaw: at.yaw });
+    this.walker.runSpeed = this.settings.runSpeed / 3.6;
+    this.walkSince = this.time;
+    this.cameraMode = 'cockpit';
+    this.input.resetLook(false, true);
+    this.camSnap = true;
+    this.audio.click('door');
   }
 
   /** A step of the forklift: its own simulation drives it (game/forkliftplay.ts) – and the traffic beyond the yard. */
   private stepForklift(dt: number): void {
     const fw = this.forklift as ForkliftWork;
-    fw.step(dt, this.vehicle, this.input.c);
+    // (the operator got off: on foot – the forklift stands as it was left)
+    const w = this.walker;
+    if (w) this.stepWalk(dt);
+    else fw.step(dt, this.vehicle, this.input.c);
     this.vehicle.getModelPosition(this.mpos);
     this.rules.time += dt;
     this.signals.update(dt);
-    const player: PlayerState = { x: this.mpos[0], y: this.mpos[1], z: this.mpos[2], yaw: this.vehicle.yaw, speed: this.vehicle.speed, length: 3.8, width: 1.2 };
+    const player: PlayerState = w ? { x: w.x, y: w.y, z: w.z, yaw: w.yaw, speed: w.speed, length: 0.6, width: 0.6, onFoot: true } : { x: this.mpos[0], y: this.mpos[1], z: this.mpos[2], yaw: this.vehicle.yaw, speed: this.vehicle.speed, length: 3.8, width: 1.2 };
     this.rail.update(dt, player, []);
     this.traffic.obstacles = [];
     this.traffic.update(dt, player);
@@ -3978,6 +4188,159 @@ export class Game {
       const r = near ? { field: near.field.name, end: runwayEnd(near.runway, near.fromSecond), ...runwayStart(near.runway, near.fromSecond) } : undefined;
       this.begin('free', 0, true, undefined, undefined, r);
     } else this.begin('free', 0, true, { label: tr('mapPlace', this.settings.lang), street: '', x, z, exact: false });
+  }
+
+  // ------------------------------------------------- a car here, places chosen precisely (game/spawncar.ts)
+  /** the cars put down on the map, the vehicle left standing, the button and the taps for them */
+  private spawnCars!: SpawnCars;
+  /** the drive begins in a parked vehicle: where it stands (begin), the player in it rather than beside it (tryPlace) */
+  private parkedAt: { x: number; z: number; yaw: number } | null = null;
+  private intoParked = false;
+
+  private makeSpawnCars(): SpawnCars {
+    const app = this.app;
+    return new SpawnCars({
+      scene: app.scene,
+      camera: app.camera,
+      canvas: app.canvas,
+      ui: this.ui,
+      collider: this.collider,
+      heightAt: (x, z) => app.tiles.heightAt(x, z),
+      ground: (x, z) => {
+        const ty = app.tiles.heightAt(x, z);
+        return app.world.surfaceAt(x, z, ty + 3, this.hit) ? this.hit.y : ty;
+      },
+      canSpawn: () => this.canSpawnCar(),
+      canEnter: () => this.canEnterParked(),
+      player: () => {
+        const w = this.walker;
+        if (w) return { x: w.x, z: w.z, yaw: w.yaw };
+        this.vehicle.getModelPosition(this.mpos);
+        return { x: this.mpos[0], z: this.mpos[2], yaw: this.vehicle.yaw };
+      },
+      others: () => {
+        const out: Array<{ x: number; z: number; r: number }> = [];
+        const w = this.walker;
+        if (w) out.push({ x: w.x, z: w.z, r: 0.5 });
+        if (this.state === 'drive' && !this.wrecked && !this.tram) {
+          if (this.aircraft) out.push({ x: this.aircraft.pos.x, z: this.aircraft.pos.z, r: 6 });
+          else {
+            // (the player's vehicle: its circles along its axis, as the collider has them)
+            this.vehicle.getModelPosition(this.mpos);
+            const s = Math.sin(this.vehicle.yaw);
+            const c = Math.cos(this.vehicle.yaw);
+            for (const o of this.def.circles) out.push({ x: this.mpos[0] + s * o, z: this.mpos[2] + c * o, r: this.def.radius });
+          }
+        }
+        return out;
+      },
+      roadSpot: (x, z, d) => (app.map.ready(x, z, d + 60) ? findRoadSpot(app.world, this.lanes, x, z, '', d, this.usableLane()) : null),
+      exact: () => this.settings.placeExact,
+      paint: () => this.car.exterior.paint.color.getHex(),
+      carOutline: VEHICLES.car.outline,
+      enter: (p) => this.enterParked(p),
+      tip: (text) => {
+        this.tipText = text;
+        this.tipUntil = this.time + 5;
+      },
+      t: (k) => tr(k, this.settings.lang),
+    });
+  }
+
+  /** May a car be put down now: on foot, or at the controls of a crane – in a free drive (`fromMap`: the large map opened from it). */
+  private canSpawnCar(fromMap = false): boolean {
+    if (!(fromMap ? this.state === 'map' && this.mapFrom !== 'menu' : this.state === 'drive') || this.lesson || this.task || this.demo?.active || this.watcher || this.forklift || this.showOn) return false;
+    return (!!this.walker && !this.riding && !this.busRide) || !!this.crane?.operating;
+  }
+
+  /** May the player get into a parked vehicle now: on foot, at a crane, or standing still in a vehicle – in a free drive. */
+  private canEnterParked(): boolean {
+    if (this.state !== 'drive' || this.lesson || this.task || this.demo?.active || this.watcher || this.doorT >= 0 || this.opens.busy || this.riding || this.busRide) return false;
+    if (this.walker || this.crane?.operating) return true;
+    return !this.aircraft && !this.tram && !this.forklift && Math.abs(this.vehicle.speed) < 0.5;
+  }
+
+  /**
+   * Into a vehicle parked on the map (the car put down, or the vehicle left
+   * before): a free drive with it begins where it stands – the vehicle driven
+   * till now stays where it is (not a wreck, a tram, the aeroplane, the
+   * forklift, nor a combination with a trailer: those go, as before).
+   */
+  private enterParked(p: Parked): void {
+    if (!this.canEnterParked()) return;
+    const def = this.def;
+    this.vehicle.getModelPosition(this.mpos);
+    const stays = !this.wrecked && !this.aircraft && !this.tram && def.kind !== 'pedestrian' && def.kind !== 'forklift' && !def.trailer;
+    const height = def.model === 'car' || def.model === 'motorcycle' ? 1.6 : 3.6;
+    this.spawnCars.swap(p, stays ? { kind: this.settings.vehicle, x: this.mpos[0], y: this.mpos[1], z: this.mpos[2], yaw: this.vehicle.yaw, outline: def.outline, height, root: def.model === 'car' ? null : this.model.root } : null);
+    this.endWatch(false);
+    if (this.demo) this.endDemo('ended');
+    this.settings.vehicle = p.kind;
+    saveSettings(this.settings);
+    this.parkedAt = { x: p.x, z: p.z, yaw: p.yaw };
+    this.intoParked = true;
+    this.begin('free', 0, true, { label: tr('mapPlace', this.settings.lang), street: '', x: p.x, z: p.z, exact: true });
+  }
+
+  /** A start place exactly at (x, z) ("place precisely"): fitted to the ground and the vehicle once it is loaded (tryPlace). */
+  private exactSpot(name: string, x: number, z: number): SpawnJson {
+    const s: SpawnJson = { name, x, z, yaw: 0, kind: 'street' };
+    exactSpots.add(s);
+    return s;
+  }
+
+  /** Where a drive at an address or a place chosen begins: in front of it on the road – or, "place precisely", at the very place. */
+  private startSpot(hit: AddressHit): SpawnJson | null {
+    return this.settings.placeExact ? this.exactSpot(hit.label, hit.x, hit.z) : this.spawnAt(hit);
+  }
+
+  /** A place chosen precisely, made fit: facing along the road nearest (if one is near), and if it is not free, the nearest free place round it. */
+  private fitExact(sp: { x: number; z: number; yaw: number }, o: VehicleDef['outline']): { x: number; z: number; yaw: number } {
+    const road = findRoadSpot(this.app.world, this.lanes, sp.x, sp.z, '', 30, this.usableLane());
+    const yaw = road?.yaw ?? sp.yaw;
+    return freeNear(sp.x, sp.z, yaw, (x, z, y) => this.spawnCars.free(x, z, y, o, false), 40) ?? { x: sp.x, z: sp.z, yaw };
+  }
+
+  /**
+   * Where the vehicle behind the main menu stands: where the drive would
+   * begin – at an address or a place chosen, in the lane of the road in front
+   * of it (or, "place precisely", at the very place) – facing along the road,
+   * clear of walls and outside the buildings.  The tram, the aeroplane and
+   * the cranes have places of their own (the forklift's free drive begins
+   * where the others' do – its work on the yard is a way to play of its own).
+   */
+  private menuSpot(p: MenuPreview): { x: number; z: number; yaw: number } {
+    const def = VEHICLES[p.kind] ?? VEHICLES.car;
+    if (def.kind === 'tram' || def.kind === 'plane' || def.crane) return p;
+    const a = this.settings.lastStart.address;
+    const chosen = !!a && Math.abs(a.x - p.x) < 0.01 && Math.abs(a.z - p.z) < 0.01;
+    const o = def.outline;
+    if (chosen && this.settings.placeExact) return this.fitExact(p, o);
+    const ok = (x: number, z: number, yaw: number): boolean => this.spawnCars.free(x, z, yaw, o, false);
+    const at = (chosen ? findRoadSpot(this.app.world, this.lanes, p.x, p.z, a?.street ?? '', 220, this.usableLane()) : null) ?? p;
+    if (ok(at.x, at.z, at.yaw)) return at;
+    const lane = this.freeSpot(at.x, at.z, at.yaw, 0);
+    if (lane && ok(lane.x, lane.z, lane.yaw)) return lane;
+    return freeNear(at.x, at.z, at.yaw, ok, 40) ?? at;
+  }
+
+  /**
+   * "Start where I am" (a setting): once, when the game starts, the browser
+   * is asked where the player is – on the map, the drive is to begin there
+   * (the main menu shows the vehicle there).
+   */
+  private startWhereIAm(): void {
+    if (!this.settings.startHere) return;
+    void locate(this.app.world.json.meta).then((r) => {
+      const lang = this.settings.lang;
+      if (!r.ok) {
+        this.hud.message(tr(r.why === 'outside' ? 'myLocationOutside' : r.why === 'denied' ? 'myLocationDenied' : 'myLocationNone', lang));
+        return;
+      }
+      if (this.state !== 'menu') return;
+      this.hud.menuStartAt({ name: tr('myLocation', lang), x: r.x, z: r.z, yaw: 0, kind: 'street' });
+      this.hud.redrawMenu();
+    });
   }
 
   /** A new vehicle of the same kind, in the lane nearest to the person on foot – and the person in it. */
@@ -5112,7 +5475,10 @@ export class Game {
       if (!this.app.map.ready(p.x, p.z)) return;
       const type = l.targets[this.targetIdx];
       const home = this.app.world.edges[this.homeEdge] ?? null;
-      let goal = type === 'home' && !home ? null : findTarget(this.app.world, this.lanes, type, p.x, p.z, lane, home, this.visited);
+      // (the first destination of a lesson in a real place: the road behind that place – game/lessonplaces.ts)
+      const placed = this.placeGoal;
+      this.placeGoal = null;
+      let goal = placed ?? (type === 'home' && !home ? null : findTarget(this.app.world, this.lanes, type, p.x, p.z, lane, home, this.visited));
       // The way home, or to a motorway, can lead through parts of the map that are not loaded:
       // then it is found in the roads of the whole map and followed like a planned drive.
       if (this.app.map.pieces && (type === 'home' || type === 'motorway') && !(goal && this.nav.setGoal(goal, lane))) {
@@ -5185,6 +5551,7 @@ export class Game {
     }
     const app = this.app;
     const tiles = app.tiles;
+    this.spawnCars?.frame();
 
     // the road network around where things happen (it may come in pieces), and the signal heads of what is loaded
     if (this.state === 'placing') app.map.update(this.spawn!.x, this.spawn!.z, 40);
@@ -5280,6 +5647,11 @@ export class Game {
         this.autoDemo = [];
         this.startTrip(stops, this.autoSelf, null);
       }
+      if (this.presetPending && this.time - this.startTime > 0.3 && this.currentLane() && this.routeGraphNow()) {
+        const id = this.presetPending;
+        this.presetPending = '';
+        this.startPreset(id);
+      }
       if (this.autoTour > 0 && this.time - this.startTime > 0.3 && this.currentLane() && this.routeGraphNow()) {
         const km = this.autoTour;
         this.autoTour = 0;
@@ -5336,8 +5708,9 @@ export class Game {
       this.props.update(fx, fz);
       this.updateVisuals(dt);
       // a crane posed as it works, the loads of its site where they are
-      if (this.crane && isCraneModel(model)) this.crane.render(model, this.time, this.state === 'drive');
-      if (this.forklift && isForkliftModel(model)) this.forklift.render(model, this.time, this.cameraMode === 'cockpit', this.state === 'drive');
+      if (this.crane && isCraneModel(model)) this.crane.render(model, this.time, this.state === 'drive' && !this.walker);
+      // (off the forklift: nobody on its seat, its display and buttons away)
+      if (this.forklift && isForkliftModel(model)) this.forklift.render(model, this.time, this.cameraMode === 'cockpit' || !!this.walker, this.state === 'drive' && !this.walker);
       // the drive written down for its replay
       if (this.state === 'drive') {
         const due = this.recorder.due(this.time);
@@ -5404,7 +5777,7 @@ export class Game {
       this.transit.lines = this.lines.lines.map((l) => ({ ref: l.ref, to: l.to, stops: l.stops.map(([p, mark]) => paths[p]?.stopNames[paths[p].stops.indexOf(mark)] ?? '') }));
       // (every line in its place – the timetables count them so –, one that does not fit the tracks without a way)
       this.rail.setLines(this.lines.lines.map((l) => ({ ref: l.ref, from: l.from, to: l.to, colour: l.colour, kind: l.kind, seq: l.paths.every(([p]) => p < paths.length) ? l.paths.map(([p, d]) => ({ path: p, dir: d > 0 ? 1 : -1 })) : [] })));
-      this.rail.schedule = this.timetable ? this.railSchedule() : null;
+      this.rail.schedule = this.timetable ? tramSchedule({ timetable: () => this.timetable, lines: () => this.lines, rail: () => this.rail, nowMs: () => gameClock.ms() }) : null;
     }
     const cam = this.app.camera.position;
     // (the player's bus on its line, its doors open at a stop: the people there get on it like on any other)
@@ -5473,6 +5846,16 @@ export class Game {
     if (this.state === 'drive' && !this.lesson && this.settings.queueLabels && this.traffic) {
       (this.queueLabels ??= new QueueLabels(this.ui)).update(app.camera, window.innerWidth, window.innerHeight, this.settings.uiScale, this.traffic.cars, this.signals, this.settings.lang);
     } else this.queueLabels?.hide();
+    // the inside mirror where the player put it: moved in the car, or its picture in the HUD (ui/hudmirror.ts)
+    (this.hudMirror ??= new HudMirror(this.ui, app, this.settings)).frame({
+      mirrors: haveCar ? model.mirrors : null,
+      cockpit: this.state === 'drive' && haveCar && !rp && !this.walker && !this.watcher && this.doorT < 0 && this.cameraMode === 'cockpit',
+      eye: this.eyeWorld,
+      eyeLocal: haveCar ? model.eye : null,
+      far: Math.min(450, app.tiles.viewRadius * 0.4),
+      refresh: this.settings.mirrors === 'full' || (this.frames & 1) === 0,
+      lang: this.settings.lang,
+    });
     // looking into a mirror: one of the vehicle's mirrors large over the upper half of the picture (ui/mirrorzoom.ts)
     if (this.input) {
       (this.mirrorZoom ??= new MirrorZoomPanel(this.ui, this.input, app)).frame({
@@ -5611,8 +5994,12 @@ export class Game {
     // the map on the vehicle's own screen, in the driver's seat – the corner map is hidden meanwhile (render/navscreen.ts)
     const screen = this.model === this.car ? this.carScreen : (this.model.navScreen ?? null);
     const onScreen = !!screen && this.settings.mapOnScreen && this.cameraMode === 'cockpit' && !this.walker && this.doorT < 0;
-    screen?.setLive(onScreen);
-    this.hud.screen = onScreen ? screen : null;
+    // (a tap on the screen opens the big map – or, as the settings choose, brings the map back into the corner: ui/screentap.ts)
+    const tap = (this.screenTap ??= new ScreenTap(this.app.canvas, this.app.camera, () => this.settings.screenTap, () => this.openMap()));
+    tap.setScreen(onScreen && this.state === 'drive' ? screen : null);
+    const peek = tap.peek && this.settings.screenTap === 'minimap';
+    screen?.setLive(onScreen && !peek);
+    this.hud.screen = onScreen && !peek ? screen : null;
 
     // sound
     let skid = 0;
@@ -5932,8 +6319,8 @@ export class Game {
       hs.yaw = this.watcher.at.yaw;
     }
     this.services.hud(hs, touch);
-    if (this.crane) this.crane.hud(hs, touch);
-    if (this.forklift) this.forklift.hud(hs, touch);
+    if (this.crane) this.crane.hud(hs, touch, this.walker);
+    if (this.forklift) this.forklift.hud(hs, touch, this.walker);
     this.hud.update(hs, this.time);
   }
 
@@ -5963,6 +6350,10 @@ export class Game {
       this.footGlance += (want - this.footGlance) * (1 - Math.exp(-dt * 8));
     }
     const cam = this.app.camera;
+    // zooming the view (input/camzoom.ts): on foot and in the driver's seat – pinch, the wheel, + and −
+    const zoomable = !this.watcher && !this.crane && this.doorT < 0 && !this.opens.blending && (!!this.walker || this.cameraMode === 'cockpit');
+    this.input.viewZoom = zoomable;
+    this.input.zoom.update(dt, this.settings.zoomRelease, zoomable);
     if (this.watcher) {
       this.watcher.camera(cam, this.input.c, dt);
       return;
@@ -5976,7 +6367,7 @@ export class Game {
     this.eyeWorld.copy(this.model.eye).add(lean).applyMatrix4(car.matrixWorld);
     // working a crane: from the operator's seat, or round the hook (game/craneplay.ts)
     const craneModel = this.model;
-    if (this.crane && isCraneModel(craneModel) && this.crane.camera(cam, this.cameraMode, c, dt, craneModel)) {
+    if (this.crane && !this.walker && isCraneModel(craneModel) && this.crane.camera(cam, this.cameraMode, c, dt, craneModel)) {
       cam.updateProjectionMatrix();
       return;
     }
@@ -6036,6 +6427,7 @@ export class Game {
         cam.position.copy(to);
         cam.quaternion.copy(q);
       }
+      cam.fov = this.input.zoom.fov(cam.fov);
       cam.updateProjectionMatrix();
       return;
     }
@@ -6158,6 +6550,8 @@ export class Game {
       }
     }
     this.services.camera(cam);
+    // (1 – nothing – unless the view is zoomed: only on foot and in the driver's seat)
+    cam.fov = this.input.zoom.fov(cam.fov);
     cam.updateProjectionMatrix();
   }
 

@@ -1,0 +1,1107 @@
+{
+ "about": "Wall and roof colours and wall materials of single buildings as they are on site, where the map build's palettes would guess otherwise. Keyed by the building's identifier in the Hessian LoD2 models. Facts only - no pictures are kept here. Observed from street-level panoramas (2026-11).",
+ "buildings": [
+  {
+   "id": "GUID_1488958994062_25980754",
+   "wall": "#b4583e",
+   "roof": "#5c4844",
+   "material": "brick",
+   "note": "Schubertstraße: block of flats in red facing brick, dark tiled hip roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980755",
+   "wall": "#b4583e",
+   "roof": "#5c4844",
+   "material": "brick",
+   "note": "Schubertstraße: block of flats in red facing brick, dark tiled hip roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980757",
+   "wall": "#b4583e",
+   "roof": "#5c4844",
+   "material": "brick",
+   "note": "Schubertstraße: block of flats in red facing brick, dark tiled hip roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980758",
+   "wall": "#b4583e",
+   "roof": "#5c4844",
+   "material": "brick",
+   "note": "Schubertstraße: block of flats in red facing brick, dark tiled hip roof"
+  },
+  {
+   "id": "UUID_471702f9-7ebd-43fe-b887-0e4e86e55483",
+   "wall": "#b4583e",
+   "roof": "#5c4844",
+   "material": "brick",
+   "note": "Schubertstraße: block of flats in red facing brick, dark tiled hip roof"
+  },
+  {
+   "id": "DEHE061800006LLZ",
+   "wall": "#a3a39d",
+   "material": "plain",
+   "note": "Schubertstraße: the brick block's concrete balconies"
+  },
+  {
+   "id": "DEHE061800006LLY",
+   "wall": "#a3a39d",
+   "material": "plain",
+   "note": "Schubertstraße: the brick block's concrete balconies"
+  },
+  {
+   "id": "DEHE061800006LLX",
+   "wall": "#a3a39d",
+   "material": "plain",
+   "note": "Schubertstraße: the brick block's concrete balconies"
+  },
+  {
+   "id": "GUID_1488958994062_25980235",
+   "wall": "#eee4c8",
+   "roof": "#a8553a",
+   "material": "render",
+   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980236",
+   "wall": "#eee4c8",
+   "roof": "#a8553a",
+   "material": "render",
+   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980237",
+   "wall": "#eee4c8",
+   "roof": "#a8553a",
+   "material": "render",
+   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980238",
+   "wall": "#eee4c8",
+   "roof": "#a8553a",
+   "material": "render",
+   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980239",
+   "wall": "#eee4c8",
+   "roof": "#a8553a",
+   "material": "render",
+   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof"
+  },
+  {
+   "id": "GUID_1488958994062_25981063",
+   "wall": "#eee4c8",
+   "roof": "#a8553a",
+   "material": "render",
+   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof"
+  },
+  {
+   "id": "UUID_29b31aec-f92e-4977-9ebc-dc89b4945fa7",
+   "wall": "#eee4c8",
+   "roof": "#a8553a",
+   "material": "render",
+   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof"
+  },
+  {
+   "id": "DEHE061800006Lnt",
+   "wall": "#eee4c8",
+   "note": "Schubertstraße: the cream block's balconies"
+  },
+  {
+   "id": "DEHE061800006Lnu",
+   "wall": "#eee4c8",
+   "note": "Schubertstraße: the cream block's balconies"
+  },
+  {
+   "id": "DEHE061800006Lns",
+   "wall": "#eee4c8",
+   "note": "Schubertstraße: the cream block's balconies"
+  },
+  {
+   "id": "DEHE061800006LnA",
+   "wall": "#eee4c8",
+   "note": "Schubertstraße: the cream block's balconies"
+  },
+  {
+   "id": "DEHE061800006Lpw",
+   "wall": "#e6e4da",
+   "roof": "#8a8a86",
+   "material": "render",
+   "note": "Schubertstraße north: light rendered block, flat roof"
+  },
+  {
+   "id": "DEHE061800006LWt",
+   "wall": "#d9c39a",
+   "material": "plain",
+   "note": "Baunatal centre: sand walls"
+  },
+  {
+   "id": "DEHE061800006LEo",
+   "wall": "#efe2a8",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: paleyellow walls, anthracite roof"
+  },
+  {
+   "id": "UUID_273c016d-8995-403c-9064-41fac07b41d1",
+   "wall": "#e2d3b5",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: beige walls, redbrown roof"
+  },
+  {
+   "id": "DEHE061800006Lx0",
+   "wall": "#d6d6d2",
+   "material": "render",
+   "note": "Baunatal centre: palegrey walls"
+  },
+  {
+   "id": "DEHE061800006LFY",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006Lpq",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "UUID_a9e9b31e-e8fb-4e6f-89ed-a42635ba3827",
+   "wall": "#eee4c8",
+   "material": "render",
+   "note": "Baunatal centre: cream walls"
+  },
+  {
+   "id": "DEHE061800006LvC",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006LBd",
+   "wall": "#efe9dc",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: warmwhite walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006LCf",
+   "wall": "#efe2a8",
+   "material": "render",
+   "note": "Baunatal centre: paleyellow walls"
+  },
+  {
+   "id": "DEHE061800006LEL",
+   "wall": "#eee4c8",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: cream walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LCX",
+   "wall": "#f2f0ea",
+   "roof": "#6b4a3a",
+   "material": "render",
+   "note": "Baunatal centre: white walls, brown roof"
+  },
+  {
+   "id": "DEHE061800006Lcr",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006LcC",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LE8",
+   "wall": "#efe2a8",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: paleyellow walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LFM",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LBI",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006LlG",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LBv",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "UUID_3b6623ed-2e03-477b-a2ac-1e441978c8d9",
+   "wall": "#eee4c8",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: cream walls, redbrown roof"
+  },
+  {
+   "id": "DEHE061800006Lvv",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LwI",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LFQ",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "UUID_f62daef4-6300-4923-a10a-ea0db1efc29f",
+   "wall": "#eee4c8",
+   "material": "render",
+   "note": "Baunatal centre: cream walls"
+  },
+  {
+   "id": "UUID_fe406a04-057f-4091-82d6-1db1d7de3f20",
+   "wall": "#efe9dc",
+   "roof": "#6b4a3a",
+   "material": "render",
+   "note": "Baunatal centre: warmwhite walls, brown roof"
+  },
+  {
+   "id": "DEHE061800006LqA",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006KXg",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "UUID_e273f6ec-e0be-4d27-94e1-c7e874dd7601",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006LvG",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "GUID_1488958994062_25979726",
+   "wall": "#b4583e",
+   "roof": "#7a3f30",
+   "material": "brick",
+   "note": "Baunatal centre: brick facing brick, redbrown roof"
+  },
+  {
+   "id": "DEHE061800006Lxl",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LFv",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006LBC",
+   "wall": "#f2f0ea",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: white walls, redbrown roof"
+  },
+  {
+   "id": "UUID_f6882d15-35f4-4414-aad6-5856bb1e2aa1",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "GUID_1488958994062_26860573",
+   "wall": "#efe9dc",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: warmwhite walls, redbrown roof"
+  },
+  {
+   "id": "DEHE061800006LBi",
+   "wall": "#efe2a8",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: paleyellow walls, greybrown roof"
+  },
+  {
+   "id": "UUID_e6db7ded-5a12-4cdd-8be3-fc32946c233f",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006LwS",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006Lvf",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "GUID_1488958994062_26860565",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "UUID_342f387d-2394-48d9-bae6-787c55fe0a5c",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006LGq",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980201",
+   "wall": "#eee4c8",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: cream walls, redbrown roof"
+  },
+  {
+   "id": "UUID_9f1c8822-1695-4d83-8651-1c8cc7282246",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006rwh",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LCi",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LcQ",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LBp",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LgX",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980440",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006Lr7",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006LaG",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006Lgp",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006LH4",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980921",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006LFV",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006Li2",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006LqT",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "GUID_1488958994062_25983503",
+   "wall": "#8e4a3a",
+   "roof": "#4f6a52",
+   "material": "brick",
+   "note": "Baunatal centre: darkbrick facing brick, green roof"
+  },
+  {
+   "id": "DEHE061800006LFJ",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006L7z",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006Loh",
+   "wall": "#55575a",
+   "material": "plain",
+   "note": "Baunatal centre: anthracite walls"
+  },
+  {
+   "id": "UUID_468d55a3-104d-4e9e-8c7b-7c74a53c113a",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "UUID_c1f10f2e-5cde-4fab-a412-f24f0af6f3c8",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "UUID_46c4cfb1-1618-4b4f-a718-1ed41cda2961",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "UUID_019a1962-5866-4602-8691-dc1704880ff3",
+   "wall": "#b4583e",
+   "material": "brick",
+   "note": "Baunatal centre: brick facing brick"
+  },
+  {
+   "id": "DEHE061800006LsC",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "UUID_a5c59952-9b3f-4b4e-9a71-202b61736ac2",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "UUID_8a563b92-8cae-47b4-93dc-0f676c99fb14",
+   "wall": "#efe2a8",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: paleyellow walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006LEW",
+   "wall": "#d6d6d2",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: palegrey walls, greybrown roof"
+  },
+  {
+   "id": "GUID_1488958994062_26860574",
+   "wall": "#f2f0ea",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: white walls, redbrown roof"
+  },
+  {
+   "id": "GUID_1488958994062_26860566",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006L7t",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "UUID_26f1f111-606b-45e6-b94c-7506448a70de",
+   "wall": "#d6d6d2",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Baunatal centre: palegrey walls, grey roof"
+  },
+  {
+   "id": "UUID_0b199420-27cf-461e-8951-cc43cc466a02",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006rGW",
+   "wall": "#f2f0ea",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: white walls, redbrown roof"
+  },
+  {
+   "id": "UUID_dea8dc91-1625-4d8d-b6b8-6cc40be2db7e",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006KXl",
+   "wall": "#b4583e",
+   "roof": "#7a3f30",
+   "material": "brick",
+   "note": "Baunatal centre: brick facing brick, redbrown roof"
+  },
+  {
+   "id": "DEHE061800006Loe",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LG3",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "UUID_6a50f611-cee0-439a-8883-409ac664a028",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006LMu",
+   "wall": "#55575a",
+   "roof": "#5c4b46",
+   "material": "plain",
+   "note": "Baunatal centre: anthracite walls, greybrown roof"
+  },
+  {
+   "id": "GUID_1488958994062_25982476",
+   "wall": "#55575a",
+   "roof": "#4b4b4e",
+   "material": "plain",
+   "note": "Baunatal centre: anthracite walls, anthracite roof"
+  },
+  {
+   "id": "UUID_82825412-ffe1-49f2-8b1b-13de2f44f761",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LwW",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "UUID_0cc39d9f-6290-44fc-98fa-51b8b143ff54",
+   "wall": "#f2f0ea",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: white walls, redbrown roof"
+  },
+  {
+   "id": "DEHE061800006L6R",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "UUID_f96bed7c-a1d8-460d-a319-23f967b9620b",
+   "wall": "#f2f0ea",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: white walls, redbrown roof"
+  },
+  {
+   "id": "DEHE061800006LCQ",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "GUID_1488958994062_25982449",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE06180001k6BR",
+   "wall": "#e2d3b5",
+   "material": "render",
+   "note": "Baunatal centre: beige walls"
+  },
+  {
+   "id": "UUID_9b031498-ad72-4bf3-a536-0a57cdd2cfe2",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "UUID_d31d212d-7d53-46f5-b695-c3e10f5eea08",
+   "wall": "#e3b9a0",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: salmon walls, red roof"
+  },
+  {
+   "id": "UUID_48bb483a-e4b1-49fe-b61e-8eeacd613a87",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "GUID_1488958994062_26862302",
+   "wall": "#b9b9b5",
+   "material": "render",
+   "note": "Baunatal centre: grey walls"
+  },
+  {
+   "id": "UUID_3e3360f6-9cc1-4c9a-b86d-cd7aea053f44",
+   "wall": "#efe9dc",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: warmwhite walls, red roof"
+  },
+  {
+   "id": "UUID_bf75b2b4-805f-470f-8c9c-695ba47d07e5",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006Lr0",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "UUID_3abfb2aa-6755-4268-9af8-f8b959fb6503",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006KZr",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006Lxh",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006Lh1",
+   "wall": "#f2f0ea",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Baunatal centre: white walls, grey roof"
+  },
+  {
+   "id": "DEHE061800006LdP",
+   "wall": "#eee4c8",
+   "roof": "#57504c",
+   "material": "brick",
+   "note": "Baunatal centre: cream facing brick, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006L7j",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006L8s",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980215",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "UUID_c6afc863-31ba-4750-a4f9-4b4102b8ce21",
+   "wall": "#d6d6d2",
+   "material": "render",
+   "note": "Baunatal centre: palegrey walls"
+  },
+  {
+   "id": "DEHE061800006LaC",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006Llb",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LKx",
+   "wall": "#8e4a3a",
+   "material": "brick",
+   "note": "Baunatal centre: darkbrick facing brick"
+  },
+  {
+   "id": "GUID_1488958994062_25981078",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006Lxy",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LlM",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "UUID_0d60fbb9-f37e-452b-8767-49456ff641d3",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006Ll8",
+   "wall": "#55575a",
+   "material": "plain",
+   "note": "Baunatal centre: anthracite walls"
+  },
+  {
+   "id": "UUID_70567d68-76cb-4120-aea6-958587b1e52d",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE06180001k6BQ",
+   "wall": "#e2d3b5",
+   "material": "render",
+   "note": "Baunatal centre: beige walls"
+  },
+  {
+   "id": "DEHE061800006LsO",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "UUID_8fccf7f3-ed0b-4794-b0f5-6a7a6baf0fb5",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006LuK",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LvJ",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Baunatal centre: white walls, anthracite roof"
+  },
+  {
+   "id": "UUID_147766dd-0682-45d8-b990-42d0310af9af",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006LKA",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "UUID_984219bb-d611-47ae-a765-3abe1c575928",
+   "wall": "#f2f0ea",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Baunatal centre: white walls, grey roof"
+  },
+  {
+   "id": "UUID_7fa33360-73f2-474a-87ea-597f234cd672",
+   "wall": "#d9c39a",
+   "material": "render",
+   "note": "Baunatal centre: sand walls"
+  },
+  {
+   "id": "DEHE061800006LoW",
+   "wall": "#b4583e",
+   "roof": "#9a5540",
+   "material": "brick",
+   "note": "Baunatal centre: brick facing brick, red roof"
+  },
+  {
+   "id": "UUID_1f749af9-6ccc-4078-bf72-9cc0306a4dcc",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980862",
+   "wall": "#eee4c8",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Baunatal centre: cream walls, redbrown roof"
+  },
+  {
+   "id": "UUID_f01e17ed-458c-4e0a-8288-a5af5df497cb",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006Ltm",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Baunatal centre: white walls, darkbrown roof"
+  },
+  {
+   "id": "DEHE061800006LgW",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006LuE",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006LyB",
+   "wall": "#7a5a40",
+   "material": "plain",
+   "note": "Baunatal centre: brown walls"
+  },
+  {
+   "id": "DEHE061800006LbB",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "UUID_288c19b6-6f12-4471-913d-e57280e23cf3",
+   "wall": "#f2f0ea",
+   "roof": "#9a5540",
+   "material": "render",
+   "note": "Baunatal centre: white walls, red roof"
+  },
+  {
+   "id": "DEHE061800006LcF",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "UUID_5c5bd334-9e0a-4e3b-80c9-c438b34fa76e",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006Lxe",
+   "wall": "#f2f0ea",
+   "material": "plain",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "GUID_1592389822899_19656474",
+   "wall": "#b4583e",
+   "material": "brick",
+   "note": "Baunatal centre: brick facing brick"
+  },
+  {
+   "id": "UUID_0c73831d-2444-4746-8ab7-62897076190d",
+   "wall": "#c3cbd0",
+   "material": "render",
+   "note": "Baunatal centre: bluegrey walls"
+  },
+  {
+   "id": "DEHE061800006rHU",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LoM",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LGO",
+   "wall": "#f2f0ea",
+   "roof": "#5c4b46",
+   "material": "render",
+   "note": "Baunatal centre: white walls, greybrown roof"
+  },
+  {
+   "id": "DEHE061800006Lon",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LCp",
+   "wall": "#d6d6d2",
+   "material": "render",
+   "note": "Baunatal centre: palegrey walls"
+  },
+  {
+   "id": "DEHE061800006LIB",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Baunatal centre: white walls"
+  }
+ ]
+}

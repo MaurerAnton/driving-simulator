@@ -5,6 +5,8 @@ import { Sky } from '../render/sky.ts';
 import { TileManager } from '../render/tiles.ts';
 import { lightsOutBy } from '../sim/signals.ts';
 import { MapLoader } from '../world/loader.ts';
+import { mapFetch, useMapPack } from '../world/mappack.ts';
+import { loadSettings } from './settings.ts';
 import type { World } from '../world/world.ts';
 
 /** the share of the traffic lights that are out of order on any one day */
@@ -44,6 +46,8 @@ export class App {
     onProgress?.('world');
     // the map: in one piece, or an index with the road network in chunks around the car (world/loader.ts)
     const base = this.baseUrl;
+    // (a map stored in this browser from files, if one is chosen: its files then come from there – world/mappack.ts)
+    await useMapPack(loadSettings().mapPack, base);
     // (every file but the index is asked for with the version of the map the index names: see MapLoader.version)
     let version = '';
     // Some traffic lights are out of order – other ones every day.  (?lightsout=0.5 for more of them, 0 for none.)
@@ -53,7 +57,7 @@ export class App {
     const day = today.getFullYear() * 372 + today.getMonth() * 31 + today.getDate();
     this.map = await MapLoader.open({
       async bytes(path: string): Promise<ArrayBuffer | null> {
-        const res = await fetch(base + path + (version ? `?v=${version}` : ''), path === 'map.json' ? { cache: 'no-cache' } : undefined);
+        const res = await mapFetch(base + path + (version ? `?v=${version}` : ''), path === 'map.json' ? { cache: 'no-cache' } : undefined);
         // (not there: a 404 – or, from a development server, the start page in its place)
         if (res.status === 404 || (res.headers.get('content-type') ?? '').includes('text/html')) return null;
         if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);

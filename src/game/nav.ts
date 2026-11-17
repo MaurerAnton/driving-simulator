@@ -4,7 +4,7 @@ import { projectOnPolyline } from '../core/geom.ts';
 import { LaneGraph, TURN } from '../world/lanes.ts';
 import type { Connector, Lane } from '../world/lanes.ts';
 import { CLS, CTRL, EF, ROLE } from '../world/types.ts';
-import type { Edge, World } from '../world/world.ts';
+import type { Edge, Node, World } from '../world/world.ts';
 import { quickest, quickestToEdge, wayOf } from '../world/routegraph.ts';
 import type { RouteGraph } from '../world/routegraph.ts';
 import type { VehicleKind } from './vehicles.ts';
@@ -463,7 +463,7 @@ export const LESSONS: LessonDef[] = [
  * edge of the map or into a dead end, in either direction of travel?
  * Whoever is sent there has to turn round (or cannot get back at all).
  */
-function deadEndSpur(graph: LaneGraph, e: Edge): boolean {
+export function deadEndSpur(graph: LaneGraph, e: Edge): boolean {
   const el = graph.edgeLanes[e.id];
   for (const first of [el.fwd[0], el.back[0]]) {
     if (!first) continue;
@@ -487,6 +487,16 @@ function deadEndSpur(graph: LaneGraph, e: Edge): boolean {
   return false;
 }
 
+/** Is node `n` a junction of this kind (right before left, lights, a roundabout, signs that give priority)? */
+export function junctionOfType(n: Node, type: TargetType): boolean {
+  if (n.stub || n.arms.length < 3) return false;
+  if (type === 'rbl') return n.ctrl === CTRL.RBL && n.arms.every((a) => a.edge.tier === 2);
+  if (type === 'signals') return n.ctrl === CTRL.SIGNALS;
+  if (type === 'roundabout') return n.ctrl === CTRL.ROUNDABOUT;
+  if (type === 'priority') return n.ctrl === CTRL.SIGNS && n.arms.some((a) => a.isApproach && (a.role === ROLE.YIELD || a.role === ROLE.STOP) && a.edge.tier >= 2);
+  return false;
+}
+
 export function findTarget(world: World, graph: LaneGraph, type: TargetType, x: number, z: number, from: Lane, home: Edge | null, avoid: Set<Edge>): Edge | null {
   if (type === 'home') return home;
   const cands: Array<{ e: Edge; d: number }> = [];
@@ -503,13 +513,7 @@ export function findTarget(world: World, graph: LaneGraph, type: TargetType, x: 
     for (const e of world.allEdges) if (e.cls === CLS.MOTORWAY && e.len > 250) cands.push({ e, d: Math.hypot(e.a.x - x, e.a.z - z) });
   } else {
     for (const n of world.allNodes) {
-      if (n.stub || n.arms.length < 3) continue;
-      let ok = false;
-      if (type === 'rbl') ok = n.ctrl === CTRL.RBL && n.arms.every((a) => a.edge.tier === 2);
-      else if (type === 'signals') ok = n.ctrl === CTRL.SIGNALS;
-      else if (type === 'roundabout') ok = n.ctrl === CTRL.ROUNDABOUT;
-      else if (type === 'priority') ok = n.ctrl === CTRL.SIGNS && n.arms.some((a) => a.isApproach && (a.role === ROLE.YIELD || a.role === ROLE.STOP) && a.edge.tier >= 2);
-      if (!ok) continue;
+      if (!junctionOfType(n, type)) continue;
       // drive through the junction: aim at an arm leading away from it
       for (const a of n.arms) {
         if (!a.isExit) continue;

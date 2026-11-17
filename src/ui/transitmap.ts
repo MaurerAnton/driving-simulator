@@ -4,8 +4,9 @@
  * timetables (src/sim/timetable.ts, at the game's clock) as a small round
  * sign in its line's colour with the line's number, moving along its line;
  * the stops, once the map is close enough, with their next departures at a
- * tap; and at a tap on a vehicle a small menu – watch it (the camera goes
- * with it while it runs on, src/game/spectate.ts) or show its line's way.
+ * tap; and at a tap on a vehicle a small menu beside it – show its line's
+ * whole way, or attach the camera to it (it goes with the vehicle while it
+ * runs on, src/game/spectate.ts).  The menu follows the vehicle on the map.
  *
  * Where a vehicle is comes from the timetable alone: between which two stops
  * of its line it is and how far, laid onto the line's way – a tram's along
@@ -316,6 +317,8 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
 const BUS_STOPS_FROM = 0.45;
 /** below this zoom the vehicles are dots without their numbers */
 const SMALL_BELOW = 0.035;
+/** how far from a vehicle's sign a tap still chooses it (px) – a fingertip's width */
+const TAP_REACH = 28;
 
 export class TransitLayer {
   private readonly host: TransitMapHost;
@@ -381,7 +384,32 @@ export class TransitLayer {
 
   closePopup(): void {
     this.sel = null;
+    this.menuAt = null;
     if (this.pop) this.pop.hidden = true;
+  }
+
+  /** where the menu of a vehicle was put last (px of the map), so that it is moved only when its vehicle has */
+  private menuAt: { x: number; y: number } | null = null;
+
+  /**
+   * The menu of the vehicle chosen, beside it: below its sign – above, where
+   * there is no room below – and within the map, so that neither the
+   * vehicle nor the menu is covered by the other.
+   */
+  private placeMenu(x: number, y: number): void {
+    const pop = this.pop;
+    if (!pop || pop.hidden || this.sel?.kind !== 'vehicle') return;
+    if (this.menuAt && Math.abs(this.menuAt.x - x) < 0.5 && Math.abs(this.menuAt.y - y) < 0.5) return;
+    this.menuAt = { x, y };
+    const { W, H } = this.view;
+    const w = pop.offsetWidth;
+    const h = pop.offsetHeight;
+    const gap = 26;
+    const left = Math.max(8, Math.min(W - w - 8, x - w / 2));
+    const below = y + gap;
+    const top = below + h <= H - 64 || y - gap - h < 8 ? Math.min(below, Math.max(8, H - h - 8)) : y - gap - h;
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.top = `${Math.round(top)}px`;
   }
 
   /** The colour of a line (worked out once). */
@@ -494,6 +522,8 @@ export class TransitLayer {
         else this.drawVehicle(g, v, sx(v.x), sy(v.z), small, false);
       }
       if (top) this.drawVehicle(g, top, sx(top.x), sy(top.z), small, true);
+      // (the menu of the vehicle chosen goes with it)
+      if (top) this.placeMenu(sx(top.x), sy(top.z));
     }
     g.restore();
   }
@@ -570,8 +600,9 @@ export class TransitLayer {
     const sx = (x: number): number => W / 2 + (x - cx) * s;
     const sy = (z: number): number => H / 2 + (z - cz) * s;
     // a vehicle (the nearest within reach of a finger)
+    // (a finger covers more than the sign: within TAP_REACH of its middle counts)
     let best: MapVehicle | null = null;
-    let bd = s < SMALL_BELOW ? 12 : 20;
+    let bd = s < SMALL_BELOW ? TAP_REACH * 0.7 : TAP_REACH;
     for (const v of this.list) {
       const d = Math.hypot(sx(v.x) - px, sy(v.z) - py);
       if (d < bd) {
@@ -582,6 +613,7 @@ export class TransitLayer {
     if (best) {
       this.sel = { kind: 'vehicle', trip: best.trip };
       this.render();
+      this.placeMenu(sx(best.x), sy(best.z));
       this.host.redraw();
       return true;
     }
@@ -631,6 +663,11 @@ export class TransitLayer {
       this.closePopup();
       this.host.redraw();
     };
+    pop.classList.toggle('bm-ctx', sel.kind === 'vehicle');
+    if (sel.kind !== 'vehicle') {
+      pop.style.left = '';
+      pop.style.top = '';
+    }
     if (sel.kind === 'vehicle') {
       const v = this.list.find((q) => q.trip === sel.trip);
       if (!v || !src) {
@@ -647,23 +684,31 @@ export class TransitLayer {
       const mins = Math.max(0, Math.round((run.until - now) / 60));
       const line = run.standing ? this.t('transitAt', { stop: run.fromName || '?' }) : this.t('transitNext', { stop: run.toName || '?', min: mins });
       pop.append(el('small', '', `${this.t(run.kind === 'tram' ? 'transitTram' : 'transitBus')} ${run.ref} · ${line}`));
-      const row = el('div', 'bm-row');
-      if (this.host.canWatch()) {
-        const watch = el('button', 'btn', this.t('transitWatch'));
-        watch.type = 'button';
-        watch.onclick = () => this.host.watch({ kind: run.kind, line: run.line, ref: run.ref, colour: v.colour, dest: run.dest, pattern: run.pattern, t0: run.t0, trip: v.trip });
-        row.append(watch);
-      }
+      // the two things to do with it, side by side: its line's whole way on the map, the camera on it
+      const row = el('div', 'bm-row bm-ctx-row');
       const shown = this.line?.kind === run.kind && this.line.index === run.line;
-      const lineBtn = el('button', 'btn ghost', this.t(shown ? 'transitLineHide' : 'transitLine'));
+      const lineBtn = el('button', shown ? 'btn' : 'btn ghost', this.t(shown ? 'transitLineHide' : 'transitLine'));
       lineBtn.type = 'button';
+      lineBtn.setAttribute('aria-pressed', String(shown));
       lineBtn.onclick = () => {
         this.line = shown ? null : { kind: run.kind, index: run.line, colour: v.colour };
         this.render();
         this.host.redraw();
       };
-      row.append(lineBtn);
+      const watch = el('button', 'btn', this.t('transitAttach'));
+      watch.type = 'button';
+      // (not while a lesson or a tour runs: then it says why)
+      if (!this.host.canWatch()) {
+        watch.disabled = true;
+        watch.title = this.t('transitAttachNot');
+      }
+      watch.onclick = () => {
+        if (this.host.canWatch()) this.host.watch({ kind: run.kind, line: run.line, ref: run.ref, colour: v.colour, dest: run.dest, pattern: run.pattern, t0: run.t0, trip: v.trip });
+      };
+      row.append(lineBtn, watch);
       pop.append(row);
+      if (!this.host.canWatch()) pop.append(el('small', '', this.t('transitAttachNot')));
+      this.menuAt = null;
       return;
     }
     // a stop: its next departures

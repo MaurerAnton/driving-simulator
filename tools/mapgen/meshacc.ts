@@ -68,6 +68,10 @@ export class TileData {
   readonly bldg = new MeshAcc(4, 4);
   /** bridges, walls, fences, guard rails: r, g, b */
   readonly struct = new MeshAcc(3);
+  /** the measured details of walls – windows, doors, balconies …: r, g, b (tools/mapgen/facadedetail.ts) */
+  readonly fdet = new MeshAcc(3);
+  /** the walls in `bldg` that have them: first corner, how many corners */
+  readonly bldgObs: number[] = [];
   readonly signs: SignPost[] = [];
   readonly objects: TileObject[] = [];
   /** x, y, z, height, kind */

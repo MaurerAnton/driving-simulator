@@ -56,16 +56,27 @@ export class MirrorZoom {
    * pixels of the canvas, from its top left corner), after the scene was
    * drawn.  `frame`: the world matrix of what the mirror is fixed to, `eye`:
    * the driver's eye in the world.  False: nothing to show (the eye behind the glass).
+   * `opts.minTan`: how far up and down the picture reaches at least (the
+   * tangent; the inside mirror in the HUD shows what its glass shows: 0);
+   * `opts.refresh` false: lay the last picture again without drawing the scene anew.
    */
-  draw(renderer: THREE.WebGLRenderer, scene: THREE.Scene, mirror: Mirror, frame: THREE.Matrix4, eye: THREE.Vector3, far: number, rect: { x: number; y: number; w: number; h: number }): boolean {
+  draw(renderer: THREE.WebGLRenderer, scene: THREE.Scene, mirror: Mirror, frame: THREE.Matrix4, eye: THREE.Vector3, far: number, rect: { x: number; y: number; w: number; h: number }, opts: { minTan?: number; refresh?: boolean } = {}): boolean {
     if (rect.w < 8 || rect.h < 8) return false;
-    if (!mirror.aim(frame, eye, far, 1, rect.w / rect.h, MIN_TAN)) return false;
+    if (!mirror.aim(frame, eye, far, 1, rect.w / rect.h, opts.minTan ?? MIN_TAN)) return false;
     // as sharp as the panel is on the screen, within limits
     const pr = renderer.getPixelRatio();
     const k = Math.min(1, MAX_W / (rect.w * pr), MAX_H / (rect.h * pr));
     const w = Math.max(16, Math.round(rect.w * pr * k));
     const h = Math.max(16, Math.round(rect.h * pr * k));
-    if (this.target.width !== w || this.target.height !== h) this.target.setSize(w, h);
+    const resized = this.target.width !== w || this.target.height !== h;
+    if (resized) this.target.setSize(w, h);
+    if (opts.refresh !== false || resized) this.picture(renderer, scene, mirror);
+    this.lay(renderer, rect);
+    return true;
+  }
+
+  /** The mirror's picture into the target. */
+  private picture(renderer: THREE.WebGLRenderer, scene: THREE.Scene, mirror: Mirror): void {
     // the picture: the mirror's own glass is not in it (as when the glass itself is drawn)
     const prevTarget = renderer.getRenderTarget();
     const prevVisible = mirror.mesh.visible;
@@ -77,7 +88,10 @@ export class MirrorZoom {
     renderer.setRenderTarget(prevTarget);
     renderer.shadowMap.autoUpdate = shadows;
     mirror.mesh.visible = prevVisible;
-    // … laid onto the screen, over what is there
+  }
+
+  /** The picture laid onto the screen, over what is there. */
+  private lay(renderer: THREE.WebGLRenderer, rect: { x: number; y: number; w: number; h: number }): void {
     renderer.getSize(this.size);
     const autoClear = renderer.autoClear;
     renderer.autoClear = false;
@@ -90,7 +104,6 @@ export class MirrorZoom {
     renderer.setViewport(0, 0, this.size.x, this.size.y);
     renderer.setScissor(0, 0, this.size.x, this.size.y);
     renderer.autoClear = autoClear;
-    return true;
   }
 
   dispose(): void {
