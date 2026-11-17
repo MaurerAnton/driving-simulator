@@ -18,8 +18,12 @@ import type { CrossingJson } from '../world/types.ts';
 import type { Edge, World } from '../world/world.ts';
 import { CYCLE_LENGTH, CYCLE_WIDTH, Cyclists } from './cyclists.ts';
 import type { CycleEvent } from './cyclists.ts';
+import { Crowd } from './pedestrians.ts';
+import type { Walker } from './pedestrians.ts';
 import { SIG } from './signals.ts';
 import type { SignalSystem } from './signals.ts';
+import type { Emergencies, EmergencyCar } from './emergency.ts';
+import type { RoadEvents } from './roadevents.ts';
 
 export interface TrafficCar {
   id: number;
@@ -77,6 +81,10 @@ export interface TrafficCar {
   slide?: number;
   /** a bus that has lost its line's way: the connectors back onto it, the next first ([]: none found) */
   detour?: Connector[] | null;
+  /** an emergency vehicle – police, ambulance, fire engine, the emergency doctor – and its call (src/sim/emergency.ts) */
+  em?: EmergencyCar;
+  /** how far it keeps left (+) or right (−) of the middle of its lane (m): making way for one of those, or passing the others */
+  side?: number;
   crashed: number;
   wheelSpin: number;
 }
@@ -100,24 +108,12 @@ export interface BusOnLine {
   off: number;
 }
 
-export interface Pedestrian {
-  id: number;
-  crossing: CrossingJson;
-  /** position across the road: -1 kerb A … +1 kerb B */
-  t: number;
-  dir: number;
-  state: 'wait' | 'cross' | 'gone';
-  waited: number;
-  x: number;
-  y: number;
-  z: number;
-  yaw: number;
-  phase: number;
-  speed: number;
-  /** half length of the walk (m): road half width + sidewalk */
-  half: number;
-  colour: number;
-}
+/**
+ * One of the people on foot in the town (src/sim/pedestrians.ts): whoever
+ * waits at a crossing or walks over it (`state`, `crossing`, `waited`) is
+ * what the cars and the instructor go by.
+ */
+export type Pedestrian = Walker;
 
 /** A vehicle that drives itself: where it is on its path, for asking the traffic what is around it. */
 export interface SelfDriving {
@@ -155,6 +151,8 @@ export interface PlayerState {
   own?: boolean;
   /** the player is on foot (then x, z are where they stand and yaw where they look) */
   onFoot?: boolean;
+  /** the horn sounds (the people near it start) */
+  horn?: boolean;
 }
 
 /** the style of a traffic car that is a city bus (12 m, it calls at the stops) */
@@ -198,7 +196,8 @@ export class Traffic {
   readonly graph: LaneGraph;
   readonly signals: SignalSystem;
   readonly cars: TrafficCar[] = [];
-  readonly peds: Pedestrian[] = [];
+  /** the people on foot in the town (src/sim/pedestrians.ts; `crowd.target` says how many) */
+  readonly crowd: Crowd;
   /** people on bicycles (src/sim/cyclists.ts) */
   readonly cyclists: Cyclists;
   /** cars currently on each lane / connector, unsorted */
@@ -218,10 +217,13 @@ export class Traffic {
   busShare = 0.08;
   /** the lines of the city buses (setBusLines) */
   private lines: BusLines | null = null;
-  private pedTimer = 0;
   targetCount = 24;
   spawnRadius = 330;
   events: TrafficEvent[] = [];
+  /** emergency vehicles on their calls, and how the others make way for them (src/sim/emergency.ts – null: none come) */
+  emergency: Emergencies | null = null;
+  /** the roadworks and closures of the day: where cars wait, move over and keep out (src/sim/roadevents.ts – null: none) */
+  roadEvents: RoadEvents | null = null;
 
   constructor(world: World, graph: LaneGraph, signals: SignalSystem) {
     this.world = world;
@@ -229,7 +231,13 @@ export class Traffic {
     this.signals = signals;
     this.cyclists = new Cyclists(world, graph, signals);
     this.cyclists.lanesAt = (x, z) => this.spawnGrid.get(Traffic.cellKey(x, z));
+    this.crowd = new Crowd(world, signals);
     this.addRoads(world.allEdges);
+  }
+
+  /** The people on foot (src/sim/pedestrians.ts): those at a crossing are what the cars stop for. */
+  get peds(): Pedestrian[] {
+    return this.crowd.people;
   }
 
   /** Roads that are part of the network now (it comes in pieces): cars may appear on their lanes. */
@@ -261,10 +269,7 @@ export class Traffic {
         this.cars.splice(i, 1);
       }
     }
-    for (let i = this.peds.length - 1; i >= 0; i--) {
-      const e = this.world.edges[this.peds[i].crossing.e];
-      if (!e || gone.has(e)) this.peds.splice(i, 1);
-    }
+    this.crowd.removeRoads(gone);
     for (const e of gone) {
       const el = this.graph.edgeLanes[e.id];
       if (!el) continue;
@@ -317,7 +322,7 @@ export class Traffic {
     const w: number[] = [];
     for (const c of outs) {
       let weight = 0;
-      if (LaneGraph.drivable(c.to.edge, true)) {
+      if (LaneGraph.drivable(c.to.edge, true) && !this.roadEvents?.closed(c.to)) {
         weight = c.turn === TURN.STRAIGHT ? 4 : c.turn === TURN.UTURN ? 0.02 : 1.4;
         weight *= 0.5 + c.to.edge.tier * 0.5;
         if (c.to.edge.cls <= CLS.MOTORWAY_LINK && lane.edge.cls > CLS.MOTORWAY_LINK) weight *= 0.35;
@@ -360,6 +365,8 @@ export class Traffic {
       const d = Math.hypot(tmp.x - player.x, tmp.z - player.z);
       if (d < 150 || d > this.spawnRadius) continue;
       if (Math.abs(tmp.y - player.y) > 60) continue;
+      // (not on a road closed today, nor in or just before a work zone)
+      if (this.roadEvents?.blocked(lane, s)) continue;
       // not right in front of the player's nose
       const fx = -Math.sin(player.yaw);
       const fz = -Math.cos(player.yaw);
@@ -534,6 +541,9 @@ export class Traffic {
    * its way (`off`).
    */
   private nextFor(on: BusOnLine | null | undefined, lane: Lane, car?: TrafficCar): Connector | null {
+    // (an emergency vehicle on its call takes its own way: src/sim/emergency.ts)
+    const way = car?.em?.route;
+    if (way && way.length > 0 && way[0].from === lane) return way.shift() as Connector;
     if (!on || !this.lines || lane.out.length === 0) return this.chooseNext(lane);
     if (on.off === 0) {
       const ahead = this.ahead(on, 4);
@@ -792,7 +802,7 @@ export class Traffic {
   clear(): void {
     this.cyclists.clear();
     this.cars.length = 0;
-    this.peds.length = 0;
+    this.crowd.clear();
     this.onLane.clear();
     this.onConn.clear();
   }
@@ -1134,6 +1144,8 @@ export class Traffic {
     let next = car.next;
     let at = car.s;
     const step = 1.5;
+    // (a car off the middle of its lane – making way, or passing those that do: its way runs beside the lane's)
+    const side = car.side ?? 0;
     for (let n = 0; n < 60 && dist < horizon; n++) {
       at += step;
       dist += step;
@@ -1153,8 +1165,15 @@ export class Traffic {
         lane = null;
       }
       if (conn) samplePolyline(conn.pl, at, tmp2);
-      else if (lane) lanePoint(lane, at, tmp2);
-      else return Infinity;
+      else if (lane) {
+        lanePoint(lane, at, tmp2);
+        // (where a side of the road is closed for roadworks, the way runs over the oncoming lane)
+        this.roadEvents?.offset(lane, at, tmp2);
+      } else return Infinity;
+      if (side !== 0) {
+        tmp2.x += tmp2.tz * side;
+        tmp2.z -= tmp2.tx * side;
+      }
       // into the player's frame: forward = (-s, -c), right = (c, -s)
       const px = tmp2.x - player.x;
       const pz = tmp2.z - player.z;
@@ -1268,10 +1287,13 @@ export class Traffic {
   // --- main update -----------------------------------------------------------------
   update(dt: number, player: PlayerState): void {
     this.events.length = 0;
+    // the roadworks and closures of the day: who is in or before each zone – and their fences, barriers and crowds are in the way, too
+    this.roadEvents?.step(dt, this.cars, player);
+    const obstacles = this.roadEvents ? this.roadEvents.withBlocks(this.obstacles, player) : this.obstacles;
     // what is in the cars' way besides each other: what the game names, and the people on bicycles
     const blocks = this.blocks;
     blocks.length = 0;
-    for (const o of this.obstacles) blocks.push(o);
+    for (const o of obstacles) blocks.push(o);
     let n = 0;
     for (const c of this.cyclists.list) {
       const b = (this.cycleBoxes[n++] ??= { x: 0, y: 0, z: 0, yaw: 0, speed: 0, length: CYCLE_LENGTH, width: CYCLE_WIDTH });
@@ -1282,11 +1304,15 @@ export class Traffic {
       b.speed = c.v;
       blocks.push(b);
     }
+    // … and the people on foot who are on the carriageway
+    this.crowd.addBlocks(blocks);
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && this.cars.length < this.targetCount) {
       this.spawn(player);
       this.spawnTimer = 0.12;
     }
+    // emergency vehicles: their calls, and how the others make way for them (src/sim/emergency.ts)
+    this.emergency?.update(dt, player);
     for (let i = this.cars.length - 1; i >= 0; i--) {
       const car = this.cars[i];
       const d = Math.hypot(car.x - player.x, car.z - player.z);
@@ -1296,10 +1322,11 @@ export class Traffic {
       }
       this.drive(car, dt, player);
     }
-    this.updatePedestrians(dt, player);
+    // the people on foot: along the pavements, over the streets (src/sim/pedestrians.ts)
+    this.crowd.update(dt, player, this.cars, this.cyclists.list, obstacles, this.events);
     // people on bicycles: a few where there is traffic at all
     this.cyclists.target = this.targetCount > 0 ? Math.max(1, Math.min(4, Math.round(this.targetCount / 12))) : 0;
-    this.cyclists.update(dt, player, this.obstacles, this.cars, this.events);
+    this.cyclists.update(dt, player, obstacles, this.cars, this.events);
   }
 
   private drive(car: TrafficCar, dt: number, player: PlayerState): void {
@@ -1322,10 +1349,15 @@ export class Traffic {
       return;
     }
     if (bus && bus.pullOut > 0) bus.pullOut -= dt;
+    // roadworks and closures (src/sim/roadevents.ts): a site light, the oncoming traffic at a narrowing, a lane or a road closed ahead
+    const works = this.roadEvents?.gateCar(car) ?? null;
+    if (works?.move && !car.merge) car.merge = works.move;
+    if (works?.reroute && lane) car.next = this.chooseNext(lane);
     // --- desired speed ---
     let limit = lane ? lane.limit : conn!.to.limit;
     if (!Number.isFinite(limit)) limit = 36; // Richtgeschwindigkeit 130 km/h
     let v0 = limit * car.temper;
+    if (works && works.cap < v0) v0 = works.cap;
     if (lane && lane.edge.zone === 7) v0 = Math.min(v0, 2.2);
     if ((lane && lane.edge.flags & EF.ROUNDABOUT) || (conn && conn.node.ctrl === CTRL.ROUNDABOUT)) v0 = Math.min(v0, 7.2);
     if (conn) {
@@ -1333,6 +1365,8 @@ export class Traffic {
       const turnV = conn.turn === TURN.STRAIGHT ? 14 : conn.turn === TURN.UTURN ? 2.5 : clamp(Math.sqrt(1.9 * Math.max(conn.len, 4) * 0.7), 3, 9);
       v0 = Math.min(v0, turnV);
     }
+    // an emergency vehicle on its call goes faster; whoever makes way for one slows down (src/sim/emergency.ts)
+    if (this.emergency) v0 = this.emergency.desired(car, v0, limit);
     const A = 1.7;
     const B = 2.4;
     let acc = A * (1 - (car.v / Math.max(v0, 0.5)) ** 4);
@@ -1345,7 +1379,8 @@ export class Traffic {
     };
 
     // --- car ahead ---
-    const lead = this.leader(car, 90);
+    // (an emergency vehicle on its call passes those that make way for it: it sees past them)
+    const lead = car.em?.call && this.emergency ? this.emergency.lead(car) : this.leader(car, 90);
     if (lead.gap < Infinity) brakeFor(lead.gap, lead.v, 2.3);
 
     // --- the player's car ---
@@ -1439,6 +1474,12 @@ export class Traffic {
         if (!mustStop && next.turn === TURN.RIGHT && distToLine > -1.5 && distToLine < 20 && this.cyclists.blocksRightTurn(lane, car.s, car.length / 2)) mustStop = true;
         // … and lets the people on foot who cross the road it turns into go first (§ 9 Abs. 3 StVO)
         if (!mustStop && (next.turn === TURN.RIGHT || next.turn === TURN.LEFT) && distToLine > -1.5 && distToLine < 25 && this.peopleCrossing(next.to, player)) mustStop = true;
+        // an emergency vehicle on its call: past red lights and the others' right of way – slowly, and only once the way is clear
+        if (car.em?.call && this.emergency) {
+          const care = this.emergency.through(car, next, distToLine, mustStop);
+          mustStop = care < 0;
+          if (care >= 0 && car.v > care) acc = Math.min(acc, (care - car.v) / 0.5);
+        }
         if (mustStop && distToLine > -1.5) stopDist = Math.max(0, distToLine);
         void reason;
       }
@@ -1468,7 +1509,7 @@ export class Traffic {
     }
     if (conn) {
       // turning: wait in the junction while somebody crosses the road it turns into
-      if ((conn.turn === TURN.RIGHT || conn.turn === TURN.LEFT) && this.peopleCrossing(conn.to, player)) stopDist = Math.min(stopDist, Math.max(0, conn.len - car.s - car.length / 2 - 0.5));
+      if ((conn.turn === TURN.RIGHT || conn.turn === TURN.LEFT) && this.peopleCrossing(conn.to, player)) stopDist = Math.min(stopDist, Math.max(0, conn.len - car.s - car.length / 2 - 1.8));
       for (const k of conn.conflicts) {
         const dSelf = k.sSelf - car.s - car.length / 2;
         if (dSelf < -1) continue; // already past the conflict point
@@ -1506,6 +1547,13 @@ export class Traffic {
         if (st.here && st.d < 45) car.blinker = 1;
       }
       if (bus.pullOut > 0) car.blinker = -1;
+    }
+    // making way for an emergency vehicle: stopping at the side, or before the junction it crosses (src/sim/emergency.ts)
+    if (this.emergency) stopDist = Math.min(stopDist, this.emergency.stopFor(car));
+    if (works && works.stop < stopDist) {
+      stopDist = Math.max(0, works.stop);
+      // (waiting at a site light or for the oncoming traffic is not being stuck: a red there may last a minute or two)
+      if (works.why === 'light' || works.why === 'oncoming') car.stuck = 0;
     }
     if (stopDist < Infinity) {
       brakeFor(stopDist + 0.4, 0, 0.6);
@@ -1596,6 +1644,22 @@ export class Traffic {
       tmp.z -= tmp.tx * car.slide;
       if (car.slide !== 0) yaw -= Math.sign(car.slide) * Math.atan2(1.2, Math.max(car.v, 3));
     }
+    if (car.side) {
+      // off the middle of its lane: making way for an emergency vehicle, or one passing the others (src/sim/emergency.ts)
+      tmp.x += tmp.tz * car.side;
+      tmp.z -= tmp.tx * car.side;
+    }
+    // passing a side of the road closed for roadworks: over on the oncoming lane, turned a little while it moves across
+    const re = this.roadEvents;
+    const pl = car.lane;
+    if (re && pl) {
+      const pass = re.shift(pl, car.s);
+      if (pass !== 0) {
+        tmp.x += tmp.tz * pass;
+        tmp.z -= tmp.tx * pass;
+        yaw += Math.atan2(re.shift(pl, car.s + 0.5) - re.shift(pl, car.s - 0.5), 1);
+      }
+    }
     // slope from the height change since the last frame
     if (ds > 0.01) car.pitch += (Math.atan2(tmp.y - car.y, ds) - car.pitch) * Math.min(1, dt * 6);
     car.x = tmp.x;
@@ -1633,102 +1697,7 @@ export class Traffic {
     return true;
   }
 
-  // --- pedestrians ---------------------------------------------------------------
-  private updatePedestrians(dt: number, player: PlayerState): void {
-    this.pedTimer -= dt;
-    if (this.pedTimer <= 0) {
-      this.pedTimer = 1.2;
-      // someone turns up at a crossing near the player now and then
-      for (const c of this.world.crossings) {
-        if (c.k !== XING.ZEBRA && c.k !== XING.SIGNAL) continue;
-        // (a light that is out of order: nobody is sent across there – they would wait for a green that never comes)
-        if (c.k === XING.SIGNAL && c.sc !== undefined && this.signals.isDark(c.sc)) continue;
-        if (this.peds.some((p) => p.crossing === c)) continue;
-        const e = this.world.edges[c.e];
-        samplePolyline(e.pl, c.s, tmp);
-        const d = Math.hypot(tmp.x - player.x, tmp.z - player.z);
-        if (d > 130 || d < 22) continue;
-        if (hash01(Math.floor(this.signals.time / 1.2) * 31 + c.e * 7 + Math.round(c.s)) > 0.16) continue;
-        const dir = this.rand() < 0.5 ? 1 : -1;
-        const half = e.width / 2 + 1.4;
-        const ped: Pedestrian = {
-          id: this.nextId++,
-          crossing: c,
-          t: -dir,
-          dir,
-          state: 'wait',
-          waited: 0,
-          x: 0,
-          y: 0,
-          z: 0,
-          yaw: 0,
-          phase: this.rand() * 6,
-          speed: 1.15 + this.rand() * 0.4,
-          half,
-          colour: [0x2f4f7f, 0x7a2f2f, 0x2f6a45, 0x444444, 0x8a6a2f, 0x5a3a7a][Math.floor(this.rand() * 6)],
-        };
-        this.placePed(ped);
-        this.peds.push(ped);
-      }
-    }
-    for (let i = this.peds.length - 1; i >= 0; i--) {
-      const p = this.peds[i];
-      const c = p.crossing;
-      if (p.state === 'wait') {
-        p.waited += dt;
-        let go = p.waited > 0.8;
-        if (c.k === XING.SIGNAL && c.sc !== undefined) {
-          // press the button, and walk on the pedestrians' green
-          this.signals.request(c.sc);
-          go = this.signals.pedestrian(c.sc, c.g ?? 0) === 'green';
-        } else {
-          // zebra: step out when approaching traffic can still stop comfortably (or has stopped)
-          const dp = Math.hypot(player.x - p.x, player.z - p.z);
-          const closing = player.speed > 1.5 && dp < player.speed * 2.2 + 4 && this.playerFacing(player, p);
-          if (closing) go = false;
-          for (const car of this.cars) {
-            const dc = Math.hypot(car.x - p.x, car.z - p.z);
-            if (car.v > 1.5 && dc < car.v * 2 + 4 && Math.abs(car.y - p.y) < 3) go = false;
-          }
-        }
-        if (go) p.state = 'cross';
-      } else if (p.state === 'cross') {
-        p.t += (p.dir * p.speed * dt) / p.half;
-        p.phase += dt * 7.5;
-        // nearly run over?
-        const dx = player.x - p.x;
-        const dz = player.z - p.z;
-        if (Math.hypot(dx, dz) < 2.4 && player.speed > 1.2) {
-          this.events.push({ type: 'pedestrianEndangered', ped: p });
-        }
-        if (p.t * p.dir >= 1) p.state = 'gone';
-      }
-      this.placePed(p);
-      if (p.state === 'gone' || Math.hypot(p.x - player.x, p.z - player.z) > 220) this.peds.splice(i, 1);
-    }
-  }
-
-  private playerFacing(player: PlayerState, p: Pedestrian): boolean {
-    const fx = -Math.sin(player.yaw);
-    const fz = -Math.cos(player.yaw);
-    return (p.x - player.x) * fx + (p.z - player.z) * fz > 0;
-  }
-
-  private placePed(p: Pedestrian): void {
-    const e = this.world.edges[p.crossing.e];
-    samplePolyline(e.pl, p.crossing.s, tmp);
-    const off = p.t * p.half;
-    // left of the edge direction is (tz, -tx)
-    p.x = tmp.x + tmp.tz * off;
-    p.z = tmp.z - tmp.tx * off;
-    const onWalk = Math.abs(off) > e.width / 2;
-    p.y = this.world.edgeY(e, p.crossing.s, p.x, p.z) + (onWalk && (off > 0 ? e.swL : e.swR) > 0 ? 0.12 : 0);
-    // walking direction: towards +left when dir > 0
-    const wx = tmp.tz * p.dir;
-    const wz = -tmp.tx * p.dir;
-    p.yaw = Math.atan2(-wx, -wz);
-  }
-
+  // --- pedestrians (src/sim/pedestrians.ts) ---------------------------------------
   /**
    * Somebody walking across the road `lane` leads into, on a crossing within
    * 20 m of the junction – one of the traffic's pedestrians, or the player on
@@ -1742,7 +1711,8 @@ export class Traffic {
       for (const p of this.peds) if (p.crossing === x && p.state === 'cross') return true;
       if (player.onFoot && this.onCrossing(x, player)) return true;
     }
-    return false;
+    // (people crossing it at the junction's mouth, where no crossing is drawn)
+    return this.crowd.crossingLane(lane);
   }
 
   /** Is the player standing on the road at this crossing (between the kerbs, on its strip)? */

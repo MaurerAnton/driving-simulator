@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * People on foot at the stops of trams and buses: waiting, sitting on a
- * bench, walking to the doors, getting off and walking away.
+ * bench, walking to the doors, getting off and walking away – and the
+ * people of the town on the pavements (sim/pedestrians.ts): looking out
+ * for the traffic, starting at a car, under an umbrella in the rain.
  *
  * There may be a few hundred of them, so each part of the body is one
  * instanced mesh for everybody – thighs, lower legs, torso, arms, the head
@@ -37,6 +39,14 @@ export interface PersonPose {
   look: number;
   /** sitting on a seat SEAT_HEIGHT above y (a bench, the bench in a shelter) */
   sit?: boolean;
+  /** the head turned (rad, + to the left): looking out for the traffic – standing, instead of looking about now and then */
+  head?: number;
+  /** a start (0 … 1): a horn, a car too close – the arms up, the body back */
+  startle?: number;
+  /** leaning into the walk more (rad): in a hurry, in the rain */
+  lean?: number;
+  /** an umbrella up (not with a walking stick or a suitcase in the hand that would hold it) */
+  umbrella?: boolean;
 }
 
 /** How high the seats are that people sit on (m): the benches of render/stopmodels.ts have this height. */
@@ -98,6 +108,7 @@ const SHOPPING_BAG = 5;
 const BRIEFCASE = 6;
 const SUITCASE = 7;
 const STICK = 8;
+const UMBRELLA = 9;
 
 // ------------------------------------------------------------------------------------ shapes
 type V3 = [number, number, number];
@@ -370,6 +381,10 @@ function itemShape(): THREE.BufferGeometry {
     piece(tube([0, -0.8, 0], [0, 0, 0], 0.011, 0.012, 6), A, [STICK]),
     piece(tube([0, 0, 0], [0, 0.015, -0.1], 0.012, 0.012, 5), A, [STICK]),
     piece(limb(0.014, 0.014, 0.04, -0.76), OWN, [STICK], 0x1a1a1a),
+    // an umbrella, from its handle (the origin) up the shaft to the canopy, and the canopy's underside
+    piece(tube([0, -0.1, 0], [0, 1.05, 0], 0.009, 0.009, 5), OWN, [UMBRELLA], 0x2b2b2e),
+    piece(loft([{ y: 0.86, rx: 0.5, rz: 0.5 }, { y: 0.97, rx: 0.33, rz: 0.33 }, { y: 1.05, rx: 0.03, rz: 0.03 }], 8, false), A, [UMBRELLA]),
+    piece(loft([{ y: 0.855, rx: 0.495, rz: 0.495 }, { y: 0.965, rx: 0.325, rz: 0.325 }, { y: 1.045, rx: 0.025, rz: 0.025 }], 8, false, true), A, [UMBRELLA], 0x8a8a8a),
   ];
   for (const side of [-1, 1]) {
     pieces.push(
@@ -571,6 +586,20 @@ export function lookOf(id: number): Look {
   };
 }
 
+/**
+ * Somebody at work in a depot or a yard (render/loading.ts): navy work
+ * trousers and safety boots, a high-visibility vest over the jacket
+ * (yellow or orange), a cap or short hair, nothing carried.  `id` settles
+ * the person (height, face, skin) as for anybody else; give it to the
+ * renderer with `wear` before showing a person with this id.
+ */
+export function workerLook(id: number, vest: 'yellow' | 'orange'): Look {
+  const L = lookOf(id);
+  const top = new THREE.Color(vest === 'yellow' ? 0xd7ec2c : 0xff7a18);
+  const legs = new THREE.Color(0x2a3244);
+  return { ...L, torso: JACKET, sleeve: LONG_SLEEVE, hair: L.seed < 0.5 ? CAP : SHORT, shoe: BOOTS, top, second: legs.clone(), legs, shoes: new THREE.Color(0x1b1b1d), hairColour: L.seed < 0.5 ? new THREE.Color(0x26324a) : L.hairColour, item: NOTHING, bow: 0, stoop: 0.02 };
+}
+
 /** How far a knee is bent at a point of the walking cycle (0: the leg straight up, π/2: it strikes the ground ahead). */
 function kneeBend(phase: number): number {
   const w = phase - Math.floor(phase / (Math.PI * 2)) * Math.PI * 2;
@@ -711,12 +740,12 @@ export class PeopleRenderer {
     this.torso = new Part(s.torso, n, 'people: torsos');
     this.arm = new Part(s.arm, n * 2, 'people: arms');
     this.head = new Part(s.head, n, 'people: heads');
-    // (a bag and its strap are two items)
-    this.item = new Part(s.item, n * 2, 'people: things they carry');
+    // (a bag and its strap are two items – and an umbrella a third)
+    this.item = new Part(s.item, n * 3, 'people: things they carry');
     this.slots = new Array<Look | null>(n).fill(null);
     this.torsoShown = new Int8Array(n).fill(-1);
-    this.itemLooks = new Array<Look | null>(n * 2).fill(null);
-    this.itemKinds = new Int16Array(n * 2).fill(-1);
+    this.itemLooks = new Array<Look | null>(n * 3).fill(null);
+    this.itemKinds = new Int16Array(n * 3).fill(-1);
     this.group.name = 'people';
     this.group.add(this.thigh.mesh, this.shin.mesh, this.torso.mesh, this.arm.mesh, this.head.mesh, this.item.mesh);
   }
@@ -770,6 +799,11 @@ export class PeopleRenderer {
   dispose(): void {
     for (const part of [this.thigh, this.shin, this.torso, this.arm, this.head, this.item]) part.dispose();
     this.group.clear();
+  }
+
+  /** People with this look's id wear it (a worker's clothes: workerLook) instead of the look their number gives. */
+  wear(look: Look): void {
+    this.cache.set(look.id, look);
   }
 
   private lookFor(id: number): Look {
@@ -861,6 +895,29 @@ export class PeopleRenderer {
       armL = 0.03 + 0.025 * Math.sin(t * 0.7 + 2);
       hip = THIGH + LOWER_LEG;
     }
+    // the people of the town (sim/pedestrians.ts): looking out for the traffic, a start, in a hurry, an umbrella
+    if (p.head !== undefined && !sitting) {
+      headYaw = walking ? headYaw + p.head : p.head;
+      // (a look to the side lifts the head – and turns the shoulders a little with it)
+      if (!walking && Math.abs(p.head) > 0.25) headBow = Math.min(headBow, 0.05);
+      twist += p.head * 0.15;
+    }
+    if (p.lean) lean += p.lean;
+    const start = sitting ? 0 : (p.startle ?? 0);
+    if (start > 0.01) {
+      armR += 0.9 * start;
+      armL += 0.9 * start;
+      outR += 0.2 * start;
+      outL += 0.2 * start;
+      lean -= 0.14 * start;
+      headBow -= 0.12 * start;
+    }
+    const brolly = p.umbrella === true && !sitting && L.item !== STICK && L.item !== SUITCASE;
+    if (brolly) {
+      // (the right hand holds it up in front)
+      armR = 0.62;
+      outR = 0.08;
+    }
 
     // ---- the frames, in the person's own measure: the world matrix scales them to the height
     this.world.compose(_p.set(p.x, p.y, p.z), _q.setFromAxisAngle(UP, p.yaw), _s.set(s, s, s));
@@ -880,6 +937,8 @@ export class PeopleRenderer {
     this.put(this.shin, i * 2 + 1, joint(this.m, this.thighL, 0, -THIGH, 0, -kneeL, 0, 0));
 
     // ---- what they carry (bags hang from their top, things in the hand from the grip)
+    // (the umbrella from the right hand, its top tipped back over the head)
+    if (brolly && k < this.itemKinds.length) k = this.carry(k, L, UMBRELLA, joint(this.m, this.body, 0.18 * L.wide, 0.02, -0.42, 0.22, 0, 0));
     if (L.item === NOTHING || k + 2 > this.itemKinds.length) return k;
     switch (L.item) {
       case SHOULDER_BAG:

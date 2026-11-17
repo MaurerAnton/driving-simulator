@@ -13,10 +13,14 @@
  */
 import * as THREE from 'three';
 import { hash01, newPolySample, samplePolyline } from '../core/geom.ts';
+import { gameNow } from '../game/clock.ts';
 import { carLayout } from '../sim/rail.ts';
 import type { RailTraffic, RailVehicle } from '../sim/rail.ts';
 import { SIG } from '../sim/signals.ts';
 import type { SignalSystem } from '../sim/signals.ts';
+import { boardRows, clockText, displayAt, servedAt } from '../sim/stopboards.ts';
+import { serviceTime } from '../sim/timetable.ts';
+import type { ServiceTime, Timetable } from '../sim/timetable.ts';
 import type { TrafficCar } from '../sim/traffic.ts';
 import type { StopPlace, Stops } from '../world/stops.ts';
 import { CTRL, RAIL, STOP_FLAG } from '../world/types.ts';
@@ -41,6 +45,8 @@ interface Waiter {
   tx: number;
   tz: number;
   speed: number;
+  /** on the way to a seat: sits down there */
+  seat?: boolean;
 }
 
 interface PlaceView {
@@ -98,6 +104,18 @@ export class TransitScene {
     this.places.clear();
   }
 
+  /**
+   * The timetables of the trams and buses (null: none): the departure
+   * displays show what leaves next by them, and stand at every stop where a
+   * tram or bus of them calls – so the stops are built again (one a frame).
+   */
+  setTimetable(tt: Timetable | null): void {
+    if (tt === this.timetable) return;
+    this.timetable = tt;
+    for (const v of this.places.values()) this.dropPlace(v);
+    this.places.clear();
+  }
+
   /** The tracks (they are read a while after the map). */
   setRail(rail: RailTraffic): void {
     if (rail === this.rail) return;
@@ -128,11 +146,8 @@ export class TransitScene {
   update(x: number, z: number, time: number, dt: number, signals: SignalSystem, buses: readonly TrafficCar[]): void {
     if (!this.group.visible) return;
     let budget = 1;
-    // the departure boards count down (a new picture now and then)
-    if (time - this.boardsAt > 20) {
-      this.boardsAt = time;
-      for (const v of this.places.values()) if (v.boards.length > 0) for (const b of v.boards) b.set(this.departures(v.place, time));
-    }
+    // the departure displays: those near enough to be read awake, counting down
+    this.updateBoards(x, z, time);
     // ---- the stops
     if (this.stops) {
       const want = new Set<number>();
@@ -207,6 +222,8 @@ export class TransitScene {
     root.name = `stop ${place.name}`;
     const view: PlaceView = { place, root, signs: [], boards: [], people: [], spots: [], seats: [], served: new Set(), nextArrival: time + 10 };
     const tram = (place.kind & STOP_FLAG.TRAM) !== 0;
+    // (does a tram or bus of the timetables call here? then it gets departure displays)
+    const served = this.timetable !== null && servedAt(this.timetable, place);
     const statics = new THREE.Group();
     for (const pole of place.poles) {
       const y = this.ground(pole.x, pole.z, 400);
@@ -249,12 +266,12 @@ export class TransitScene {
         }
       }
       if (pole.flags & STOP_FLAG.BIN) put(bin(), 0.9, 0.5);
-      if (pole.flags & STOP_FLAG.BOARD) {
-        const b = new DepartureBoard(true);
-        b.group.position.set(...((): [number, number, number] => {
-          const [px, pz] = at(-0.9, 0.6);
-          return [px, this.groundOr(px, pz, y + 2, y), pz];
-        })());
+      // the departure display: a board where the map has one, at a shelter and at the trams' stops, a small one at a simple pole (stopboards.ts) – asleep until the camera comes near
+      const display = displayAt(pole.flags, place.kind, served);
+      if (display) {
+        const b = new DepartureBoard(true, display, false);
+        const [px, pz] = at(-0.9, 0.6);
+        b.group.position.set(px, this.groundOr(px, pz, y + 2, y), pz);
         b.group.rotation.y = yaw;
         root.add(b.group);
         view.boards.push(b);
@@ -285,9 +302,9 @@ export class TransitScene {
       for (let i = 1; i < pts.length; i += 2) view.spots.push({ x: pts[i][0], z: pts[i][2], yaw });
     }
     // the tram's stops: the board where its front stops, and a platform beside the track where the map draws none
-    if (tram && this.rail) this.addTramStops(view, statics);
+    if (tram && this.rail) this.addTramStops(view, statics, served);
     if (statics.children.length > 0) root.add(mergeStatic(statics));
-    for (const b of view.boards) b.set(this.departures(place, time));
+    // (the displays get what they show when they wake: updateBoards)
     this.group.add(root);
     // the people already there
     const n = Math.floor(hash01(place.id * 7919 + Math.floor(time / 600)) * (tram ? 7 : 4));
@@ -295,8 +312,8 @@ export class TransitScene {
     return view;
   }
 
-  /** The Sh 7 board at each mark of the tram's stops of this place, and a platform where the map has none and the track runs off the road. */
-  private addTramStops(view: PlaceView, statics: THREE.Group): void {
+  /** The Sh 7 board at each mark of the tram's stops of this place (and a departure board, where trams of the timetables call), and a platform where the map has none and the track runs off the road. */
+  private addTramStops(view: PlaceView, statics: THREE.Group, served = false): void {
     const rail = this.rail;
     if (!rail) return;
     const place = view.place;
@@ -324,6 +341,7 @@ export class TransitScene {
           board.position.set(smp.x + rx * side * 1.85, smp.y - 0.1, smp.z + rz * side * 1.85);
           board.rotation.y = Math.atan2(smp.tx * dir, smp.tz * dir);
           statics.add(board);
+          if (served) this.addTramBoard(view, path, mark, dir, side);
           if (hasPlatform) return;
           // a platform along the 32 m behind the mark – not where the track runs in the road (people get on from the pavement there)
           const pts: Array<[number, number, number]> = [];
@@ -361,12 +379,71 @@ export class TransitScene {
     return 0;
   }
 
-  /** the real departures at a stop by its name, from the timetables (set by the game; null where there are none) */
+  /** the real departures at a stop by its name (set by the game; null where there are none) – asked only without the timetables of setTimetable */
   departuresFor: ((name: string) => Array<{ line: string; destination: string; minutes: number | string }> | null) | null = null;
   private boardsAt = 0;
+  private boardMinute = -1;
+  private timetable: Timetable | null = null;
+  /** the moment the departure displays show (the game's clock, which need not be the real one) */
+  now: () => ServiceTime = () => serviceTime(gameNow());
 
-  /** What the departure board of a stop shows: the trams of the timetables – or, without them, the lines of the map that call there, every ten or fifteen minutes. */
-  private departures(place: StopPlace, time: number): Array<{ line: string; destination: string; minutes: number | string }> {
+  /** A tram stop's departure board: on its platform half a tram's length behind where the front stops, 3 m from the track (off the road: where the trams stop in the street, on the pavement beyond), across the track – read along the platform and from the tram coming in. */
+  private addTramBoard(view: PlaceView, path: number, mark: number, dir: number, side: number): void {
+    const rail = this.rail;
+    if (!rail) return;
+    const p = rail.net.paths[path];
+    const smp = { x: 0, y: 0, z: 0, tx: 0, tz: 0, cap: 0 };
+    rail.net.sample(path, Math.max(0, Math.min(p.len, mark - 14 * dir)), smp);
+    const rx = -smp.tz * dir * side;
+    const rz = smp.tx * dir * side;
+    for (const off of [3, 4.8]) {
+      const x = smp.x + rx * off;
+      const z = smp.z + rz * off;
+      if (this.world.surfaceAt(x, z, smp.y + 2, hit) && hit.zone === 0) continue;
+      const b = new DepartureBoard(true, 'board', false);
+      b.group.position.set(x, this.groundOr(x, z, smp.y + 2, smp.y - 0.1), z);
+      b.group.rotation.y = Math.atan2(smp.tx * dir, smp.tz * dir);
+      view.root.add(b.group);
+      view.boards.push(b);
+      return;
+    }
+  }
+
+  /**
+   * The departure displays: near (x, z) – near enough to be read – awake,
+   * with a picture of their own, the others asleep (a dark screen); what the
+   * awake ones show anew every 20 s of the game and whenever the clock shows
+   * another minute (it may run faster than the real one), and at once when
+   * one wakes.
+   */
+  private updateBoards(x: number, z: number, time: number): void {
+    const at = this.now();
+    const minute = Math.floor(at.s / 60);
+    const refresh = time - this.boardsAt > 20 || time < this.boardsAt || minute !== this.boardMinute;
+    if (refresh) {
+      this.boardsAt = time;
+      this.boardMinute = minute;
+    }
+    for (const v of this.places.values()) {
+      let rows: Array<{ line: string; destination: string; minutes: number | string }> | null = null;
+      for (const b of v.boards) {
+        const near = Math.hypot(b.group.position.x - x, b.group.position.z - z) < (b.size === 'board' ? 130 : 80);
+        if (!near) {
+          if (b.awake) b.wake(false);
+          continue;
+        }
+        if (b.awake && !refresh) continue;
+        rows ??= this.departures(v.place, time, at);
+        // (what it shows is given before it wakes: drawn once)
+        b.set(rows, clockText(at.s));
+        b.wake(true);
+      }
+    }
+  }
+
+  /** What the departure displays of a stop show: the trams and buses of the timetables – or, without them, the lines of the map that call there, every ten or fifteen minutes. */
+  private departures(place: StopPlace, time: number, at: ServiceTime = this.now()): Array<{ line: string; destination: string; minutes: number | string }> {
+    if (this.timetable) return boardRows(this.timetable, place, at) ?? [];
     const real = this.departuresFor?.(place.name);
     if (real) return real;
     const rows: Array<{ line: string; destination: string; minutes: number | string }> = [];
@@ -505,6 +582,50 @@ export class TransitScene {
     });
   }
 
+  /** Where the people at the stops stand and walk now (the town's people on foot walk round them). */
+  get waiting(): readonly PersonPose[] {
+    return this.poses;
+  }
+
+  /**
+   * Somebody gets off a tram or a bus at (x, y, z): one of the town's people
+   * on foot from now on (sim/pedestrians.ts: Crowd.adopt) – true if they were
+   * taken (else they walk away from the stop as before).  Set by the game.
+   */
+  onAlight: ((x: number, y: number, z: number, look: number) => boolean) | null = null;
+
+  /**
+   * Somebody of the town's people on foot (sim/pedestrians.ts) has come to a
+   * stop at (x, y, z): from here on they wait there with the others – at one
+   * of its places, or on its bench – and get on what comes.  False where no
+   * stop is drawn, or it is full: they stay with the town's people then.
+   */
+  join(x: number, y: number, z: number, look: number): boolean {
+    let best: PlaceView | null = null;
+    let bd = 35;
+    for (const v of this.places.values()) {
+      for (const s of v.spots) {
+        const d = Math.hypot(s.x - x, s.z - z);
+        if (d < bd) {
+          bd = d;
+          best = v;
+        }
+      }
+    }
+    const v = best as PlaceView | null;
+    if (!v || v.spots.length === 0) return false;
+    let waiting = 0;
+    for (const p of v.people) if (p.state !== 'board') waiting++;
+    if (waiting >= 12) return false;
+    const seat = v.seats.length > 0 && hash01(look + 11) < 0.45 ? v.seats.find((s) => !v.people.some((p) => (p.sit || p.seat) && Math.hypot(p.tx - s.x, p.tz - s.z) < 0.3)) : undefined;
+    const spot = seat ?? v.spots[Math.floor(hash01(look + 13) * v.spots.length)];
+    const jitter = seat ? 0 : (hash01(look + 7) - 0.5) * 1.2;
+    const tx = spot.x + Math.cos(spot.yaw) * jitter;
+    const tz = spot.z - Math.sin(spot.yaw) * jitter;
+    v.people.push({ x, y, z, yaw: Math.atan2(-(tx - x), -(tz - z)), look, sit: false, seat: !!seat, walk: 0, state: 'leave', tx, tz, speed: 1.25 });
+    return true;
+  }
+
   /** Somebody comes to the stop (or is there already): standing at one of its spots, or sitting down. */
   private arrive(v: PlaceView, i: number, time: number, already: boolean): void {
     const look = Math.floor(hash01(v.place.id * 104729 + i * 31 + Math.floor(time)) * 100000);
@@ -538,7 +659,8 @@ export class TransitScene {
     const rail = this.rail;
     if (rail) {
       for (const rv of rail.vehicles) {
-        if (rv.player || rv.dwell <= 0.5 || Math.abs(rv.speed) > 0.05) continue;
+        // (any tram with its doors open – the player's one too: the people waiting get on it as well)
+        if ((rv.doors ?? 0) < 0.9 || Math.abs(rv.speed) > 0.05) continue;
         const c0 = rv.cars[0];
         if (Math.hypot(c0.x - px, c0.z - pz) > 120) continue;
         for (const door of this.tramDoors(rv)) out.push({ id: rv.id * 16 + out.length, x: door.x, z: door.z });
@@ -587,7 +709,9 @@ export class TransitScene {
           if (hash01(d.id + Math.floor(time)) < 0.35) {
             const look = Math.floor(hash01(d.id * 3 + time) * 100000);
             const a = hash01(look) * Math.PI * 2;
-            v.people.push({ x: d.x, y: this.groundOr(d.x, d.z, 400, this.ground(v.place.x, v.place.z, 400)), z: d.z, yaw: 0, look, sit: false, walk: 0, state: 'leave', tx: d.x + Math.cos(a) * 25, tz: d.z + Math.sin(a) * 25, speed: 1.3 });
+            const y = this.groundOr(d.x, d.z, 400, this.ground(v.place.x, v.place.z, 400));
+            // (one of the town's people on foot from here on – or away from the stop)
+            if (!this.onAlight?.(d.x, y, d.z, look)) v.people.push({ x: d.x, y, z: d.z, yaw: 0, look, sit: false, walk: 0, state: 'leave', tx: d.x + Math.cos(a) * 25, tz: d.z + Math.sin(a) * 25, speed: 1.3 });
           }
         }
         for (const p of v.people) {
@@ -633,6 +757,7 @@ export class TransitScene {
               p.state = 'wait';
               p.walk = -1;
               p.yaw = v.spots[0]?.yaw ?? p.yaw;
+              if (p.seat) p.sit = true;
             } else {
               v.people.splice(i, 1);
               continue;

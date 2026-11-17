@@ -34,8 +34,8 @@ for (const kind of ROAD_VEHICLE_KINDS) {
       for (let i = 0; i < secs / DT; i++) v.step(DT, input({ throttle, brake, gear: 1 }));
     };
     go(6, 0.6, 0);
-    // (a moped built for 45 km/h takes its time, and so does a 125 with its weakest engine)
-    const brisk = def.governed > 0 && def.governed < 50 ? 10 : power < 20 ? 15 : 20;
+    // (a moped built for 45 km/h takes its time, and so does a 125 with its weakest engine – and a 37-tonne crane)
+    const brisk = def.governed > 0 && def.governed < 50 ? 10 : power < 20 || spec.mass > 30000 ? 15 : 20;
     assert.ok(v.speed * 3.6 > brisk, `under way (${(v.speed * 3.6).toFixed(0)} km/h)`);
     go(6, 0, 0.6);
     assert.ok(Math.abs(v.speed) < 0.1, `stopped (${v.speed.toFixed(2)} m/s)`);

@@ -25,13 +25,15 @@ export interface Graphics {
   propShadows: boolean;
   /** how far the ground beyond the map is drawn – the hills on the horizon (m; 0: not at all) */
   farView: number;
+  /** the player's vehicles in finer detail, outside and in the cockpit (render/cardetail.ts, render/fleetdetail.ts) */
+  vehicleDetail: boolean;
 }
 
 export const GRAPHICS_PRESETS: Record<Exclude<Quality, 'custom'>, Graphics> = {
-  low: { shadows: 'off', viewDistance: 700, propDensity: 0.35, facades: false, propShadows: false, farView: 0 },
-  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false, farView: 8000 },
-  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true, farView: 12000 },
-  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true, farView: 20000 },
+  low: { shadows: 'off', viewDistance: 700, propDensity: 0.35, facades: false, propShadows: false, farView: 0, vehicleDetail: false },
+  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false, farView: 8000, vehicleDetail: false },
+  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true, farView: 12000, vehicleDetail: false },
+  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true, farView: 20000, vehicleDetail: true },
 };
 export const VIEW_DISTANCES = [500, 700, 1000, 1250, 1600, 2000, 2500, 3000];
 /** the ground beyond the map: off, or so far (m) */
@@ -68,14 +70,26 @@ export interface Settings {
   powers: Partial<Record<VehicleKind, number>>;
   /** with keys or pedals on the screen the throttle eases off at the current speed limit */
   limiter: boolean;
+  /** the autopilot lets the player take over for a moment and drives on to its places when let go (else taking over ends it) */
+  autopilotAssist: boolean;
+  /** the light of day: the game's fair afternoon always, or the sun as it stands at the time (night at night) */
+  daylight: 'day' | 'clock';
+  /** the weather: the real one where the vehicle is (Open-Meteo), none, or one chosen – and the season: by the date, or one chosen */
+  weather: 'off' | 'real' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'storm';
+  season: 'real' | 'spring' | 'summer' | 'autumn' | 'winter';
+  /** flying by hand with help (sim/autopilot.ts FlightAssist): none, a little (softer stick, balanced turns, no stall), or the most (wings level when let go, too) */
+  flightAssist: 'off' | 'light' | 'beginner';
+  /** music, made as it plays (audio/music.ts): none, a piece now and then, or more often – and how loud (0…1) */
+  music: 'off' | 'quiet' | 'on';
+  musicVolume: number;
   /** how fast one runs on foot (km/h), one of RUN_SPEEDS */
   runSpeed: number;
   /** on foot: through one's own eyes, or seen from behind (the camera key switches) */
   footView: 'eyes' | 'behind';
   /** the tram the player drives: one unit, two coupled units, or one with a trailer car */
   tramSet: TramSet;
-  /** the main menu: rows of cards over the 3D scene, or the simple list of before */
-  menuStyle: 'carousel' | 'classic';
+  /** the main menu: the vehicle large in the 3D picture with icons round it (the default since 1.4.0), rows of cards over the 3D scene, or the simple list of before */
+  menuStyle: 'stage' | 'carousel' | 'classic';
   /** what a tour is to lead along (the map's tour planner) */
   tourPrefs: TourPrefs;
   view: View;
@@ -96,6 +110,8 @@ export interface Settings {
   mirrors: 'off' | 'alternate' | 'full';
   /** show the current speed limit and the next priority sign in the HUD */
   hudRules: boolean;
+  /** small timers over the traffic lights near by (a tap switches the light on; not in lessons and tests) */
+  signalTimers: boolean;
   /** show the engaged gear in the instrument cluster */
   hudGear: boolean;
   /** spoken instructor (browser speech synthesis) */
@@ -111,7 +127,7 @@ export interface Settings {
    * pictures of the place the car is at.  All off until the player says so –
    * a request tells the service the player's IP address and the place.
    */
-  reality: { panoramax: boolean; kartaview: boolean; mapillary: boolean; mapillaryToken: string; /** aerial photographs of the land survey under the map */ aerial: boolean };
+  reality: { panoramax: boolean; kartaview: boolean; mapillary: boolean; mapillaryToken: string; /** aerial photographs of the land survey under the maps – the big one, the corner one, the car's screen (on since 1.4.0) */ aerial: boolean };
   /**
    * Driving controls on the screen (steering bar, pedals, buttons):
    * 'auto' shows them while the screen is being touched and hides them as soon
@@ -128,7 +144,12 @@ export interface Settings {
   startOutside: boolean;
   /** in the driver's seat: the map on the vehicle's own screen (where it has one) instead of the corner */
   mapOnScreen: boolean;
+  /** what the stored settings were written by (SETTINGS_VERSION): older ones are brought up to date once, in merge */
+  version: number;
 }
+
+/** 2 (1.4.0): the map on the vehicle's screen became the default – before, a stored `false` was only the old default */
+export const SETTINGS_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Settings = {
   // the first of the browser's languages that the simulator speaks
@@ -138,10 +159,18 @@ export const DEFAULT_SETTINGS: Settings = {
   transmission: 'automatic',
   powers: {},
   limiter: true,
+  autopilotAssist: true,
+  daylight: 'day',
+  weather: 'real',
+  season: 'real',
+  flightAssist: 'beginner',
+  music: 'off',
+  musicVolume: 1,
   runSpeed: 12,
   footView: 'eyes',
   tramSet: 'single',
-  menuStyle: 'carousel',
+  // (new players get the stage; a list chosen before stays – the rows, 1.3.0's default, become the stage once)
+  menuStyle: 'stage',
   tourPrefs: { ...DEFAULT_TOUR_PREFS },
   view: 'chase',
   cabinOpacity: 1,
@@ -153,6 +182,7 @@ export const DEFAULT_SETTINGS: Settings = {
   render3d: 1,
   mirrors: 'alternate',
   hudRules: true,
+  signalTimers: true,
   hudGear: true,
   voice: false,
   volume: 0.7,
@@ -160,13 +190,14 @@ export const DEFAULT_SETTINGS: Settings = {
   drawDistance: 1300,
   wheel: { steerAxis: 0, throttleAxis: 2, brakeAxis: 5, clutchAxis: 1, pedalsInverted: true, wheelRange: 900, shifter: [12, 13, 14, 15, 16, 17, 18] },
   invertLookY: false,
-  reality: { panoramax: false, kartaview: false, mapillary: false, mapillaryToken: '', aerial: false },
+  reality: { panoramax: false, kartaview: false, mapillary: false, mapillaryToken: '', aerial: true },
   touchControls: 'auto',
   touchOpacity: 0.55,
   keyHints: true,
   showFps: false,
   startOutside: false,
-  mapOnScreen: false,
+  mapOnScreen: true,
+  version: SETTINGS_VERSION,
 };
 
 const KEY = 'fahrsim-baunatal.settings.v2';
@@ -193,7 +224,7 @@ function merge(parsed: Partial<Settings>): Settings {
   if (!RUN_SPEEDS.includes(s.runSpeed)) s.runSpeed = d.runSpeed;
   if (s.footView !== 'eyes' && s.footView !== 'behind') s.footView = d.footView;
   if (s.tramSet !== 'single' && s.tramSet !== 'double' && s.tramSet !== 'trailer') s.tramSet = d.tramSet;
-  if (s.menuStyle !== 'carousel' && s.menuStyle !== 'classic') s.menuStyle = d.menuStyle;
+  if (s.menuStyle !== 'stage' && s.menuStyle !== 'carousel' && s.menuStyle !== 'classic') s.menuStyle = d.menuStyle;
   s.tourPrefs = { ...DEFAULT_TOUR_PREFS, ...(typeof parsed.tourPrefs === 'object' && parsed.tourPrefs ? parsed.tourPrefs : {}) };
   if (!['any', 'small', 'town', 'country'].includes(s.tourPrefs.mostly)) s.tourPrefs.mostly = 'any';
   // (stored before there was a far view: the one of the preset chosen then)
@@ -215,13 +246,30 @@ function merge(parsed: Partial<Settings>): Settings {
   if (!(g.propDensity >= 0 && g.propDensity <= 1)) g.propDensity = d.graphics.propDensity;
   if (typeof g.facades !== 'boolean') g.facades = d.graphics.facades;
   if (typeof g.propShadows !== 'boolean') g.propShadows = d.graphics.propShadows;
+  // (stored before there were finer vehicles: as the preset of then gives them – on "very high" only)
+  if (typeof (parsed.graphics as Partial<Graphics> | undefined)?.vehicleDetail !== 'boolean') g.vehicleDetail = s.quality === 'ultra';
   if (!(s.uiScale >= 0.7 && s.uiScale <= 1.6)) s.uiScale = d.uiScale;
   if (![1, 1.5, 3].includes(s.pixelCap)) s.pixelCap = d.pixelCap;
   if (!(s.render3d >= 0.5 && s.render3d <= 1)) s.render3d = d.render3d;
   if (!(s.cabinOpacity >= 0.2 && s.cabinOpacity <= 1)) s.cabinOpacity = d.cabinOpacity;
   if (typeof s.showFps !== 'boolean') s.showFps = d.showFps;
+  if (typeof s.signalTimers !== 'boolean') s.signalTimers = d.signalTimers;
   if (typeof s.startOutside !== 'boolean') s.startOutside = d.startOutside;
   if (typeof s.mapOnScreen !== 'boolean') s.mapOnScreen = d.mapOnScreen;
+  // settings written before 1.4.0 stored the map's old default (not on the screen) as if chosen: the new default, once
+  if (!(Number(parsed.version) >= 2)) s.mapOnScreen = true;
+  // (the same for the aerial photographs under the maps: before 1.4.0 they had to be asked for)
+  if (!(Number(parsed.version) >= 2)) s.reality.aerial = true;
+  // (and for the main menu: the rows were 1.3.0's default – the stage is 1.4.0's; a list chosen stays a list)
+  if (!(Number(parsed.version) >= 2) && s.menuStyle === 'carousel') s.menuStyle = 'stage';
+  s.version = SETTINGS_VERSION;
+  if (typeof s.autopilotAssist !== 'boolean') s.autopilotAssist = d.autopilotAssist;
+  if (s.daylight !== 'day' && s.daylight !== 'clock') s.daylight = d.daylight;
+  if (s.music !== 'off' && s.music !== 'quiet' && s.music !== 'on') s.music = d.music;
+  if (s.flightAssist !== 'off' && s.flightAssist !== 'light' && s.flightAssist !== 'beginner') s.flightAssist = d.flightAssist;
+  if (!['off', 'real', 'cloudy', 'fog', 'drizzle', 'rain', 'snow', 'storm'].includes(s.weather)) s.weather = d.weather;
+  if (!['real', 'spring', 'summer', 'autumn', 'winter'].includes(s.season)) s.season = d.season;
+  if (!(s.musicVolume >= 0 && s.musicVolume <= 1)) s.musicVolume = d.musicVolume;
   if (!Number.isInteger(s.lastStart.spawn) || s.lastStart.spawn < 0) s.lastStart.spawn = 0;
   const a = s.lastStart.address;
   if (a && !(typeof a.label === 'string' && Number.isFinite(a.x) && Number.isFinite(a.z))) s.lastStart.address = null;

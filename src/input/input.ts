@@ -33,7 +33,12 @@ export interface Controls {
 }
 
 /** door: get out of the vehicle, or in again (on foot beside it) */
-export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto';
+/** scrolled on and on, the camera behind the vehicle goes this many times further back than usual: a view from high above */
+const ZOOM_FAR = 5;
+
+/** mirror: look into the next mirror, large over the picture (ui/mirrorzoom.ts) */
+/** service: fill up at a pump, wash at a car wash, call for help with an empty tank, skip the loading of a truck (game/serviceworld.ts) */
+export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto' | 'mirror' | 'service';
 
 /** Lateral acceleration (m/s²) the steering keys may ask for: brisk in town, gentle on the motorway. */
 const keyLateral = (v: number): number => 2.4 + 3.4 / (1 + (v / 15) * (v / 15));
@@ -118,6 +123,11 @@ export class Input {
   /** suspend driving input (menus) */
   enabled = true;
   lastGamepadId = '';
+  /**
+   * A crane is being worked (game/craneplay.ts): its controls (ui/cranepanel.ts) take the keys and the
+   * gamepad – only the camera (V), the map (M) and the door key (G: back to driving) stay the game's.
+   */
+  crane = false;
 
   constructor(canvas: HTMLCanvasElement, settings: Settings) {
     this.settings = settings;
@@ -202,7 +212,7 @@ export class Input {
           this.cam.right -= dx * k;
           this.cam.fwd += dy * k;
           this.cam.dolly += Math.log(scale);
-        } else if (this.orbit) this.c.lookZoom = clamp(this.c.lookZoom / scale, 3.5, this.zoomMax);
+        } else if (this.orbit) this.c.lookZoom = clamp(this.c.lookZoom / scale, 3.5, this.zoomMax * ZOOM_FAR);
       } else if (e.pointerId === this.lookId) {
         // a thumb travels less than a mouse: a third of the screen is a full shoulder check
         const k = 5.4 / Math.max(320, window.innerWidth);
@@ -217,7 +227,7 @@ export class Input {
         e.preventDefault();
         const step = clamp(e.deltaY, -120, 120) * 0.0016;
         if (this.freeCam) this.cam.dolly -= step;
-        else this.c.lookZoom = clamp(this.c.lookZoom * Math.exp(step), 3.5, this.zoomMax);
+        else this.c.lookZoom = clamp(this.c.lookZoom * Math.exp(step), 3.5, this.zoomMax * ZOOM_FAR);
       },
       { passive: false },
     );
@@ -342,6 +352,7 @@ export class Input {
 
   /** The car that is being steered (for how much lock the keys may ask for at speed). */
 /** how far the outside camera can be moved away (m) – more for a truck with a trailer */
+  /** how far the camera behind the vehicle goes back as usual (the vehicle's own measure) – scrolled on, ZOOM_FAR times that */
   zoomMax = 18;
 
   setSteering(wheelbase: number, maxWheelAngle: number): void {
@@ -376,6 +387,18 @@ export class Input {
 
   private fire(a: Action): void {
     for (const f of this.actions) f(a);
+  }
+
+  /**
+   * One step up (+1) or down (−1) of the gear lever.  A manual gearbox counts
+   * R N 1 … 6.  The selector of an automatic is P (−2) R (−1) N (0) D (1),
+   * but up from P or R goes towards D – what one wants nearly every time –
+   * and down from D through N to R, then P: drive comes before reverse.
+   */
+  private shift(g: number, dir: 1 | -1): number {
+    if (this.gearMin !== -2) return dir > 0 ? Math.min(this.gearMax, g + 1) : Math.max(this.gearMin, g - 1);
+    if (dir > 0) return g === -1 ? 0 : 1;
+    return g === 1 ? 0 : g === 0 ? -1 : -2;
   }
 
   setAutomatic(auto: boolean): void {
@@ -413,13 +436,17 @@ export class Input {
         e.preventDefault();
         return;
       }
+      if (this.crane && code !== 'KeyV' && code !== 'KeyM' && code !== 'KeyG') {
+        if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
+        return;
+      }
       const c = this.c;
       switch (code) {
         case 'KeyE':
-          c.gear = Math.min(this.gearMax, c.gear + 1);
+          c.gear = this.shift(c.gear, 1);
           break;
         case 'KeyQ':
-          c.gear = Math.max(this.gearMin, c.gear - 1);
+          c.gear = this.shift(c.gear, -1);
           break;
         case 'KeyR':
           c.gear = -1;
@@ -470,8 +497,14 @@ export class Input {
         case 'KeyM':
           this.fire('map');
           break;
+        case 'KeyY':
+          this.fire('mirror');
+          break;
         case 'KeyT':
           this.fire('reset');
+          break;
+        case 'Digit9':
+          this.fire('service');
           break;
         default:
           if (/^Digit[1-6]$/.test(code) && this.gearMax === 6) c.gear = Number(code.slice(5));
@@ -565,7 +598,13 @@ export class Input {
       c.clutch = clutch ? approach(c.clutch, 1, dt * 7) : approach(c.clutch, 0, dt * (c.clutch > 0.3 && c.clutch < 0.78 ? 0.55 : 2.2));
     }
 
-    if (pad) {
+    if (pad && this.crane) {
+      // (the sticks and buttons work the crane: only the camera and the pause stay the game's)
+      const b = pad.buttons;
+      if (b[8] && !this.prevButtons[8]) this.fire('view');
+      if (b[16] && !this.prevButtons[16]) this.fire('pause');
+      this.prevButtons = b;
+    } else if (pad) {
       this.applyPadButtons(pad.buttons, pad.kind === 'wheel');
       if (Math.abs(pad.lookX) > 0.15) this.mouseLookYaw = -pad.lookX * 1.9;
       else if (pad.kind === 'standard' && Math.abs(this.mouseLookYaw) > 0 && !this.dragging) this.mouseLookYaw = approach(this.mouseLookYaw, 0, dt * 6);
@@ -691,16 +730,16 @@ export class Input {
       const hadShifter = sh.some((i) => this.prevButtons[i]);
       if (any || hadShifter) c.gear = gear;
       // paddles
-      if (pressed(4)) c.gear = Math.min(this.gearMax, c.gear + 1);
-      if (pressed(5)) c.gear = Math.max(this.gearMin, c.gear - 1);
+      if (pressed(4)) c.gear = this.shift(c.gear, 1);
+      if (pressed(5)) c.gear = this.shift(c.gear, -1);
       if (pressed(0)) c.indicator = c.indicator === -1 ? 0 : -1;
       if (pressed(2)) c.indicator = c.indicator === 1 ? 0 : 1;
       if (pressed(3)) c.hazard = !c.hazard;
       if (pressed(1)) c.handbrake = c.handbrake > 0.5 ? 0 : 1;
       if (pressed(8)) this.fire('view');
     } else {
-      if (pressed(5)) c.gear = Math.min(this.gearMax, c.gear + 1); // RB
-      if (pressed(4)) c.gear = Math.max(this.gearMin, c.gear - 1); // LB
+      if (pressed(5)) c.gear = this.shift(c.gear, 1); // RB
+      if (pressed(4)) c.gear = this.shift(c.gear, -1); // LB
       if (pressed(0)) c.handbrake = c.handbrake > 0.5 ? 0 : 1; // A
       if (pressed(2)) c.indicator = c.indicator === -1 ? 0 : -1; // X
       if (pressed(1)) c.indicator = c.indicator === 1 ? 0 : 1; // B

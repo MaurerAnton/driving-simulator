@@ -12,6 +12,7 @@ import type { Arm, Edge, Node, World } from '../world/world.ts';
 import { SIG } from './signals.ts';
 import type { SignalSystem } from './signals.ts';
 import type { Traffic, TrafficCar, TrafficEvent } from './traffic.ts';
+import type { TimedRules } from '../world/extrasigns.ts';
 
 export type Severity = 'hint' | 'minor' | 'major' | 'fail';
 
@@ -55,6 +56,8 @@ export interface PlayerSnapshot {
 export interface RuleContext {
   /** speed limit in km/h, 0 = none (Autobahn), -1 = unknown/off-road */
   limit: number;
+  /** the limit is that of a sign with a time on it: what its panel says ("22–6 h") – '' otherwise */
+  limitWhen: string;
   zone: number;
   urban: boolean;
   roadName: string;
@@ -83,12 +86,14 @@ export class RuleMonitor {
   readonly signals: SignalSystem;
   readonly traffic: Traffic;
   readonly log: Violation[] = [];
-  readonly context: RuleContext = { limit: -1, zone: 0, urban: false, roadName: '', junction: null, onRoad: false, wrongWay: false };
+  readonly context: RuleContext = { limit: -1, limitWhen: '', zone: 0, urban: false, roadName: '', junction: null, onRoad: false, wrongWay: false };
   onViolation: ((v: Violation) => void) | null = null;
   /** exam mode judges more strictly (hints become faults) */
   strict = false;
   /** roads the navigation sends us through: "residents only" does not count against the driver there */
   allowed: Set<Edge> | null = null;
+  /** the signs with a time on them (world/extrasigns.ts): which hold now, by the game's clock */
+  timed: TimedRules | null = null;
   time = 0;
 
   private readonly hit = newSurfaceHit();
@@ -261,6 +266,7 @@ export class RuleMonitor {
     this.lastZ = p.z;
     const world = this.world;
     const ctx = this.context;
+    ctx.limitWhen = '';
     if (this.yard) {
       ctx.limit = -1;
       ctx.zone = 0;
@@ -318,10 +324,13 @@ export class RuleMonitor {
     }
 
     if (edge && (hit.zone === 0 || near)) {
-      const limit = dir > 0 ? edge.maxF : edge.maxB;
+      // a sign with a time on it ("22–6 h") counts only then, in place of the road's own limit (world/extrasigns.ts)
+      const timed = this.timed?.limit(edge.id, dir, this.heavy) ?? null;
+      const limit = timed ? timed.v : dir > 0 ? edge.maxF : edge.maxB;
       // car parks, driveways and tracks have no signed limit: nothing to show
-      const unsigned = edge.cls >= CLS.SERVICE && edge.zone === 0;
+      const unsigned = edge.cls >= CLS.SERVICE && edge.zone === 0 && !timed;
       ctx.limit = edge.zone === 7 ? 7 : unsigned ? -1 : limit;
+      if (timed && edge.zone !== 7) ctx.limitWhen = timed.when;
       // what the signs allow, but never more than this vehicle may drive there
       let capped = false;
       if (this.caps && edge.zone !== 7 && !unsigned) {
@@ -329,6 +338,15 @@ export class RuleMonitor {
         if (cap > 0 && (ctx.limit === 0 || ctx.limit > cap)) {
           ctx.limit = cap;
           capped = true;
+        }
+      }
+      // roadworks of the day (src/sim/roadevents.ts): their own limit, from its sign to the end of the zone
+      const works = this.traffic.roadEvents;
+      if (works && !unsigned && edge.zone !== 7) {
+        const zl = works.limitAt(edge, hit.s, dir, ctx.limit);
+        if (zl !== ctx.limit) {
+          ctx.limit = zl;
+          capped = false;
         }
       }
       // a tractor on the motorway (or its slip road): not allowed at all
@@ -349,7 +367,8 @@ export class RuleMonitor {
       } else this.wrongWayT = 0;
 
       // --- keep right ---
-      if (lane && !oneWayAgainst && !inJunctionZone && Math.abs(headingCos) > 0.8 && edge.lanesF > 0 && edge.lanesB > 0 && edge.laneW >= 2.5 && moving && p.speed > 3) {
+      // (not where a side closed for roadworks is passed on the oncoming lane)
+      if (lane && !oneWayAgainst && !inJunctionZone && Math.abs(headingCos) > 0.8 && edge.lanesF > 0 && edge.lanesB > 0 && edge.laneW >= 2.5 && moving && p.speed > 3 && !works?.passing(edge, hit.s, dir)) {
         const myOff = hit.off * dir; // + = left of our direction
         const centre = (dir > 0 ? -edge.width / 2 + edge.margin + edge.lanesF * edge.laneW : edge.width / 2 - edge.margin - edge.lanesB * edge.laneW) * dir;
         // car centre beyond the middle of the road
@@ -373,17 +392,27 @@ export class RuleMonitor {
         } else this.speedOver = Math.max(0, this.speedOver - dt * 2);
       }
 
+      // (the time shows only while the limit of the timed sign is the one that holds)
+      if (timed && ctx.limit !== timed.v) ctx.limitWhen = '';
+
       // --- restricted roads ---
       if (edge !== this.lastEdge) {
         if (edge.access === ACCESS.PRIVATE && edge.tier >= 1) this.report('accessPrivate', 'minor', p, {}, 30);
         else if (edge.access === ACCESS.AGRICULTURAL) this.report('accessAgricultural', 'minor', p, {}, 30);
         else if (edge.access === ACCESS.DESTINATION && !this.allowed?.has(edge)) this.report('accessDestination', 'hint', p, {}, 60);
+        else if (!this.allowed?.has(edge)) {
+          // shut at this time by a sign with a time on it – to motor vehicles, or to lorries
+          const shut = this.timed?.shut(edge.id, dir, this.heavy) ?? '';
+          if (shut) this.report('accessTimed', 'minor', p, { when: shut }, 30);
+        }
         this.lastEdge = edge;
       }
 
       // --- lane tracking: stop lines, signals, entering the junction ---
       if (lane && p.speed >= -0.5) this.trackLane(lane, hit.s, dt, p, fx, fz);
       else if (!lane) this.lane = null;
+      // the site light, the narrowing (Zeichen 208), the fenced strip, a road closed for a march
+      works?.judge(this, p, edge, hit.s, hit.off, dir, dt);
     } else {
       ctx.limit = -1;
       this.wrongWayT = 0;
@@ -439,6 +468,9 @@ export class RuleMonitor {
       else if (ev.type === 'forcedBrake') this.judgePriority(ev.car, p, ev.cutIn);
     }
     if (p.hitScenery > 1.2) this.report('crashObject', p.hitScenery > 4 ? 'fail' : 'major', p, { speed: Math.round(p.hitScenery * 3.6) }, 5);
+
+    // --- blue lights and siren: make way at once, the corridor, not into the junction (§ 38 Abs. 1, § 11 Abs. 2 StVO; src/sim/emergency.ts) ---
+    for (const f of this.traffic.emergency?.judge(dt, p) ?? []) this.report(f.id, f.severity, p, {}, 30);
 
     // --- small things ---
     if (p.stalled) this.report('stall', 'hint', p, {}, 3);

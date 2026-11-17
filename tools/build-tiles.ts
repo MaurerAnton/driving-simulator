@@ -141,6 +141,8 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
     }
     return null;
   };
+  // (the ways the roads were made of – the times on their signs – and the signs mapped beside the roads)
+  signs.osm = osm;
   signs.build({ edgeFeatures: info.edgeFeatures, nodeOsm: info.nodeOsm }, cover);
   const bmask = buildingMask(tiles, cover);
   const extra = addBarriersAndRails(osm, world, cover, terrain, tiles, inWorld, inLane);

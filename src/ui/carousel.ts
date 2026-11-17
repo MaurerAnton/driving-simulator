@@ -68,6 +68,9 @@ const ICONS: Record<VehicleKind, string> = {
   tractor: '🚜',
   tram: '🚊',
   plane: '🛩️',
+  mobileCrane: '🏗️',
+  loaderCrane: '🏗️',
+  towerCrane: '🏗️',
   pedestrian: '🚶',
 };
 
@@ -126,7 +129,7 @@ export function carouselMenu(c: CarouselContext): HTMLElement {
   const top = el('div', 'cm-top');
   const title = el('div', 'cm-title');
   title.innerHTML = 'Fahrsim <span>Baunatal</span>';
-  title.append(el('small', '', c.version));
+  title.append(el('small', '', c.version), el('small', 'cm-loading'));
   const tools = el('div', 'cm-tools');
   tools.append(c.language);
   for (const [label, run] of c.tools) {
@@ -351,6 +354,8 @@ export function carouselMenu(c: CarouselContext): HTMLElement {
     mode(c.t('demo'), c.t('demoDesc'), 'demo');
     mode(c.t('tourTitle'), c.t('tourDesc'), 'tour');
   }
+  // the theory lessons: difficult situations shown on the practice yard (game/theorymode.ts)
+  if (kind !== 'plane' && c.hasYard) mode(c.t('theory.title'), c.t('theory.desc'), 'theory');
   // the test place: every model of the game on the practice yard
   if (kind !== 'tram' && kind !== 'plane' && c.hasYard) mode(c.t('showTitle'), c.t('showDesc'), 'show');
   const rank = (k: string): number => (k === 'yard' ? 0 : k === 'exam' ? 2 : 1);

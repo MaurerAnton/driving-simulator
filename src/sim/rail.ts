@@ -177,7 +177,12 @@ export interface RailVehicle {
   panto?: number;
   /** the trip of the timetable it runs (the schedule's own name for it), if it runs one */
   trip?: string;
+  /** its passenger doors: 0 shut … 1 open (shut if not said) – they take DOOR_TIME to open or close */
+  doors?: number;
 }
+
+/** how long the doors of a tram take to open or to close (s) */
+export const DOOR_TIME = 1.6;
 
 /**
  * The timetable, as the traffic of the trams asks it (the game answers from
@@ -452,6 +457,17 @@ export class RailTraffic {
     this.fresh = true;
   }
 
+  /**
+   * The world's clock jumped (another moment, or back to the real time):
+   * the trams of the traffic go, and come again at once where the timetable
+   * has them now (the player's own stays).
+   */
+  resync(): void {
+    for (let i = this.vehicles.length - 1; i >= 0; i--) if (!this.vehicles[i].player) this.vehicles.splice(i, 1);
+    this.fresh = true;
+    this.spawnT = 0;
+  }
+
   /** the timetable the trams of the traffic keep to (null: they come at random, every line as often) */
   schedule: RailSchedule | null = null;
   /** nothing on the tracks yet (a new drive, a jump): the trips are put where they are, also close to the player */
@@ -723,6 +739,10 @@ export class RailTraffic {
 
   private step(v: RailVehicle, dt: number, obstacles: readonly RailObstacle[]): void {
     const c = v.consist;
+    // the doors: open while it stands at a stop – from a moment after it stops until a little before it leaves
+    const open = v.dwell > 2.5 && v.speed === 0 && v.noStop > 0;
+    const d = v.doors ?? 0;
+    if (open !== d > 0.5 || (d > 0 && d < 1)) v.doors = open ? Math.min(1, d + dt / DOOR_TIME) : Math.max(0, d - dt / DOOR_TIME);
     // (the regional trams run on their engine where there is no wire: the pantographs come down there)
     if (v.kind !== RAIL.TRAIN) {
       const want = this.wired(v.path) ? 1 : 0;

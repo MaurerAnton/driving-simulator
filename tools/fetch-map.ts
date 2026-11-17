@@ -31,7 +31,7 @@ const repo = pkg.repository.url.replace(/\.git$/, '');
 const url = `${repo}/releases/download/${tag}/map.tar`;
 const target = resolve(root, 'public');
 /** files a release may have beside map.tar, put into the map folder */
-const EXTRA = ['timetable.json.gz', 'buslines.json.gz'];
+const EXTRA = ['timetable.json.gz', 'buslines.json.gz', 'signs.json.gz', 'services.json.gz'];
 
 console.log(`[map] ${url}`);
 mkdirSync(target, { recursive: true });

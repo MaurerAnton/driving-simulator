@@ -19,6 +19,13 @@ import type { World } from '../world/world.ts';
 import type { AddressHit, AddressIndex } from '../game/address.ts';
 import type { TourPlan } from '../game/tour.ts';
 import { addressPicker } from './addresspicker.ts';
+import { loadPlaces, loadWays, savePlace, saveWay } from '../game/history.ts';
+import { TransitLayer } from './transitmap.ts';
+import type { TransitSource, WatchRequest } from './transitmap.ts';
+import { PathDrawer } from './pathdraw.ts';
+import type { RoadSource } from './pathdraw.ts';
+import { addGrip, foldButton } from './mapwindow.ts';
+import type { RoadEventInfo } from '../sim/roadevents.ts';
 
 export interface BigMapHost {
   world: World;
@@ -33,6 +40,10 @@ export interface BigMapHost {
   /** may the car be put somewhere else (a free drive)? */
   canTeleport(): boolean;
   teleport(spot: SpawnJson): void;
+  /** opened from the main menu, before a drive: a place tapped is offered as where the drive is to begin (`teleport`) – nothing to plan there yet */
+  menu?(): boolean;
+  /** the roadworks and demonstrations of the day (sim/roadevents.ts) – drawn with their icons, the march's way in red */
+  events?(): readonly RoadEventInfo[];
   /** the address list, for adding a place by its address */
   loadAddresses(): Promise<AddressIndex | null>;
   /** the place on the road in front of an address, or null */
@@ -67,6 +78,15 @@ export interface BigMapHost {
   /** aerial photographs under the roads: has the player switched them on? (they come from a server of the land survey) */
   aerial(): boolean;
   setAerial(on: boolean): void;
+  /** the trams and buses of the timetables and the stops, for the map (src/ui/transitmap.ts) – null: none */
+  transit?(): TransitSource | null;
+  /** watch one of them: the camera goes with it (in a free drive) */
+  watch?(v: WatchRequest): void;
+  /** the roads as the route planner sees them, for laying a way drawn on the map onto them (null: not read yet) */
+  roads?(): RoadSource | null;
+  /** the aeroplane is flown: it is put somewhere in the air, `height` metres above the ground there */
+  flying?(): boolean;
+  teleportAir?(spot: SpawnJson, height: number): void;
   close(): void;
 }
 
@@ -131,11 +151,48 @@ export class BigMap {
   private moved = 0;
   private pinch = 0;
   private readonly photos = new AerialCache(() => this.redraw());
+  /** the trams and buses and the stops (transitmap.ts), drawing a way (pathdraw.ts), the grip of the panel for planning */
+  private readonly transit: TransitLayer;
+  private readonly drawer: PathDrawer;
+  private ungrip: (() => void) | null = null;
+  /** the height the aeroplane is put at (m above the ground) */
+  private airHeight = 600;
   private readonly onResize = (): void => this.redraw();
   private readonly onKey = (e: KeyboardEvent): void => this.key(e);
 
   constructor(host: BigMapHost) {
     this.host = host;
+    this.transit = new TransitLayer({
+      lang: () => host.lang(),
+      source: () => host.transit?.() ?? null,
+      canWatch: () => !!host.watch && host.canTeleport(),
+      watch: (v) => host.watch?.(v),
+      redraw: () => this.redraw(),
+    });
+    this.drawer = new PathDrawer({
+      lang: () => host.lang(),
+      roads: () => host.roads?.() ?? null,
+      toWorld: (px, py) => {
+        const r = this.canvas.getBoundingClientRect();
+        return [this.cx + (px - r.left - r.width / 2) / this.scale, this.cz + (py - r.top - r.height / 2) / this.scale];
+      },
+      pan: (dx, dy) => {
+        this.cx -= dx / this.scale;
+        this.cz -= dy / this.scale;
+        this.redraw();
+      },
+      zoom: (f, px, py) => this.zoom(f, px, py),
+      redraw: () => this.redraw(),
+      // (while drawing, the map is free: the panel for planning and the small windows step aside)
+      mode: (on) => {
+        this.planBox.hidden = on;
+        this.spot = null;
+        this.spotBar.hidden = true;
+        this.transit.closePopup();
+        if (!on) this.fillPlan();
+      },
+      drive: (way, self) => this.host.startTrip([], self, way),
+    });
   }
 
   get isOpen(): boolean {
@@ -160,7 +217,7 @@ export class BigMap {
     this.canvas.tabIndex = 0;
     const top = el('div', 'bm-top');
     const title = el('div', 'bm-title');
-    title.append(el('b', '', this.t('mapTitle')), el('small', '', this.t(this.host.canTeleport() ? 'mapHint' : 'mapHintLesson')));
+    title.append(el('b', '', this.t('mapTitle')), el('small', '', this.t(this.host.canTeleport() || this.host.menu?.() ? 'mapHint' : 'mapHintLesson')));
     const tools = el('div', 'bm-tools');
     const button = (label: string, title2: string, fn: () => void, cls = ''): HTMLButtonElement => {
       const b = el('button', `btn ghost ${cls}`.trim(), label);
@@ -223,6 +280,7 @@ export class BigMap {
     this.credit = el('small');
     scale.append(this.scaleText, this.scaleBar, this.credit);
     bottom.append(scale, aerialToggle, pathToggle, clear);
+    if (this.host.transit) bottom.append(this.transit.toggle());
     // a drive is planned here: places by a tap on the map or by their address, or a tour of the streets
     this.planBox = el('div', 'bm-plan');
     this.planBox.hidden = true;
@@ -244,6 +302,10 @@ export class BigMap {
     o.append(this.canvas, ui);
     parent.append(o);
     this.node = o;
+    // the small window of a tram, a bus or a stop (before the switches); the bar for drawing a way (under the title)
+    this.transit.attach(ui, bottom);
+    this.drawer.attach(o, this.canvas, ui, top);
+    this.ungrip = addGrip(this.planBox, this.t('winResize'));
 
     const c = this.canvas;
     c.addEventListener('pointerdown', (e) => {
@@ -317,6 +379,7 @@ export class BigMap {
     };
     const head = el('div', 'bm-head');
     head.append(el('b', '', this.t('planTitle')), close);
+    foldButton(box, head, (folded) => this.t(folded ? 'winUnfold' : 'winFold'));
     box.append(head, el('small', '', this.t('planHint')));
     if (this.host.tripActive()) {
       // a drive is under way: it can be ended here (starting another one ends it, too)
@@ -344,6 +407,8 @@ export class BigMap {
       pick: (hit) => {
         const spot = this.host.spotOf(hit);
         if (!spot) return;
+        // (kept: offered again at the next visit)
+        savePlace({ name: spot.name || hit.label, x: spot.x, z: spot.z, yaw: spot.yaw });
         this.stops.push(spot);
         this.cx = spot.x;
         this.cz = spot.z;
@@ -353,7 +418,46 @@ export class BigMap {
       },
     });
     box.append(picker.node);
-    if (this.stops.length === 0) box.append(el('small', 'bm-none', this.t('demoNone')));
+    if (this.stops.length === 0) {
+      box.append(el('small', 'bm-none', this.t('demoNone')));
+      // what was looked for before: the places picked, the ways driven – a tap sets them again
+      const places = loadPlaces();
+      const ways = loadWays();
+      if (places.length > 0) {
+        const recent = el('details', 'bm-tours');
+        recent.append(el('summary', '', this.t('recentPlaces')));
+        for (const p of places) {
+          const b = el('button', 'bm-tour', p.name);
+          b.type = 'button';
+          b.onclick = () => {
+            this.stops.push({ name: p.name, x: p.x, z: p.z, yaw: p.yaw, kind: 'street', rough: true });
+            this.cx = p.x;
+            this.cz = p.z;
+            if (this.scale < 0.5) this.scale = 0.5;
+            changed();
+          };
+          recent.append(b);
+        }
+        box.append(recent);
+      }
+      if (ways.length > 0) {
+        const recent = el('details', 'bm-tours');
+        recent.append(el('summary', '', this.t('recentWays')));
+        const loc = localeOf(lang);
+        for (const w of ways) {
+          const d = new Date(w.date);
+          const b = el('button', 'bm-tour', `${d.toLocaleDateString(loc)} · ${w.stops.map((p) => p.name).join(' → ')}`);
+          b.type = 'button';
+          b.onclick = () => {
+            this.stops.length = 0;
+            for (const p of w.stops) this.stops.push({ name: p.name, x: p.x, z: p.z, yaw: p.yaw, kind: 'street', rough: true });
+            changed();
+          };
+          recent.append(b);
+        }
+        box.append(recent);
+      }
+    }
     else {
       const list = el('ol');
       this.stops.forEach((stop, i) => {
@@ -481,6 +585,8 @@ export class BigMap {
       tourBox.append(list);
     }
     box.append(tourBox);
+    // --- a way drawn on the map with a finger or the mouse, laid onto the roads ---
+    if (this.host.roads) box.append(this.drawer.section());
 
     // --- go: the car drives, or the player ---
     // (what the panel is for stays in view however long the list above it grows)
@@ -489,6 +595,7 @@ export class BigMap {
     const start = (self: boolean): void => {
       const stops = [...this.stops];
       const tour = this.tour;
+      if (stops.length > 0) saveWay(stops.map((p) => ({ name: p.name, x: p.x, z: p.z, yaw: p.yaw })), self);
       this.stops.length = 0;
       this.tour = null;
       this.host.startTrip(stops, self, tour);
@@ -538,6 +645,10 @@ export class BigMap {
     if (!this.node) return;
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKey, true);
+    this.transit.detach();
+    this.drawer.detach();
+    this.ungrip?.();
+    this.ungrip = null;
     cancelAnimationFrame(this.frame);
     this.frame = 0;
     this.pointers.clear();
@@ -580,6 +691,29 @@ export class BigMap {
   /** A tap at a point of the screen: the nearest place on a road. */
   private choose(px: number, py: number): void {
     const r = this.canvas.getBoundingClientRect();
+    // a tram, a bus or a stop there: its small window instead
+    if (this.transit.tap(px - r.left, py - r.top)) {
+      this.spot = null;
+      this.spotBar.hidden = true;
+      return;
+    }
+    this.transit.closePopup();
+    // roadworks or a demonstration there: what it is, where, until when
+    const ev = this.eventAt(px - r.left, py - r.top, r.width, r.height);
+    if (ev) {
+      this.spot = null;
+      const bar = this.spotBar;
+      bar.replaceChildren();
+      bar.hidden = false;
+      const text = el('div');
+      const loc = localeOf(this.host.lang());
+      const hm = (ms: number): string => new Date(ms).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+      if (ev.kind === 'works') text.append(el('b', '', this.t(ev.detail === 'lane' ? 'eventWorksLane' : ev.detail === 'light' ? 'eventWorksLight' : ev.detail === 'signs' ? 'eventWorksSigns' : 'eventWorks')), el('small', '', ev.street));
+      else text.append(el('b', '', ev.active ? this.t('eventDemoNow', { place: ev.detail, until: hm(ev.until) }) : this.t('eventDemo', { place: ev.detail, from: hm(ev.from), until: hm(ev.until) })), el('small', '', ev.street));
+      bar.append(text);
+      this.redraw();
+      return;
+    }
     const x = this.cx + (px - r.left - r.width / 2) / this.scale;
     const z = this.cz + (py - r.top - r.height / 2) / this.scale;
     this.spot = this.host.spotAt(x, z);
@@ -595,9 +729,11 @@ export class BigMap {
       text.append(el('b', '', spot.name || this.t('mapPlace')), el('small', '', `${lat.toFixed(5)}, ${lon.toFixed(5)}`));
       bar.append(text);
       if (this.host.canTeleport()) {
-        const go = el('button', 'btn', this.t('mapTeleport'));
+        // (the aeroplane: in the air there, at the height chosen beside the button)
+        const air = this.host.flying?.() === true && !!this.host.teleportAir;
+        const go = el('button', 'btn', this.t(air ? 'mapTeleportPlane' : 'mapTeleport'));
         go.type = 'button';
-        go.onclick = () => this.host.teleport(spot);
+        go.onclick = () => (air ? this.host.teleportAir?.(spot, this.airHeight) : this.host.teleport(spot));
         // … or drive there (or have the car drive there by itself)
         const add = el('button', 'btn ghost', this.t('planAdd'));
         add.type = 'button';
@@ -611,10 +747,88 @@ export class BigMap {
           this.fillPlan();
           this.redraw();
         };
-        bar.append(go, add);
+        if (air) {
+          const h = el('label', 'bm-height');
+          const sel = el('select');
+          for (const m of [150, 300, 600, 1000, 1500, 2000, 3000]) {
+            const op = el('option', '', `${m} m (${Math.round((m * 3.28084) / 50) * 50} ft)`);
+            op.value = String(m);
+            sel.append(op);
+          }
+          sel.value = String(this.airHeight);
+          sel.onchange = () => (this.airHeight = Number(sel.value));
+          h.append(el('span', '', this.t('planeHeight')), sel);
+          bar.append(h, go);
+        } else bar.append(go, add);
+      } else if (this.host.menu?.()) {
+        // (from the main menu: the drive is to begin there)
+        const go = el('button', 'btn', this.t('mapTeleport'));
+        go.type = 'button';
+        go.onclick = () => this.host.teleport(spot);
+        bar.append(go);
       }
     }
     this.redraw();
+  }
+
+  /** The roadworks (an orange sign) and demonstrations (a red one, the march's way in red dashes) in view. */
+  private drawEvents(g: CanvasRenderingContext2D, W: number, H: number, s: number): void {
+    const list = this.host.events?.() ?? [];
+    if (list.length === 0) return;
+    const sx = (x: number): number => W / 2 + (x - this.cx) * s;
+    const sy = (z: number): number => H / 2 + (z - this.cz) * s;
+    g.save();
+    for (const e of list) {
+      if (e.kind !== 'demo' || e.line.length < 4) continue;
+      g.strokeStyle = e.active ? 'rgba(230, 40, 40, 0.9)' : 'rgba(230, 40, 40, 0.45)';
+      g.lineWidth = Math.max(3, Math.min(8, 6 * s));
+      g.setLineDash([8, 6]);
+      g.beginPath();
+      for (let i = 0; i + 1 < e.line.length; i += 2) {
+        if (i === 0) g.moveTo(sx(e.line[i]), sy(e.line[i + 1]));
+        else g.lineTo(sx(e.line[i]), sy(e.line[i + 1]));
+      }
+      g.stroke();
+    }
+    g.setLineDash([]);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    for (const e of list) {
+      const x = sx(e.x);
+      const y = sy(e.z);
+      if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue;
+      // (a warning triangle: orange for works, red for a demonstration – faded when it is not on now)
+      g.globalAlpha = e.active || e.kind === 'works' ? 1 : 0.55;
+      g.fillStyle = e.kind === 'works' ? '#ff9f1a' : '#e62828';
+      g.strokeStyle = '#1b1208';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(x, y - 11);
+      g.lineTo(x + 11, y + 8);
+      g.lineTo(x - 11, y + 8);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.fillStyle = e.kind === 'works' ? '#1b1208' : '#ffffff';
+      g.font = '700 11px system-ui, sans-serif';
+      g.fillText(e.kind === 'works' ? '⚒' : '!', x, y + 2);
+    }
+    g.restore();
+  }
+
+  /** The roadworks or demonstration whose sign is under a point of the map (null: none). */
+  private eventAt(px: number, py: number, W: number, H: number): RoadEventInfo | null {
+    const list = this.host.events?.() ?? [];
+    let best: RoadEventInfo | null = null;
+    let bestD = 18;
+    for (const e of list) {
+      const d = Math.hypot(W / 2 + (e.x - this.cx) * this.scale - px, H / 2 + (e.z - this.cz) * this.scale - py);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    return best;
   }
 
   private redraw(): void {
@@ -858,6 +1072,14 @@ export class BigMap {
       g.fillStyle = r === 3 ? '#ffffff' : '#d5dde4';
       g.fillText(p.name, x, y);
     }
+
+    // the roadworks and demonstrations of the day
+    this.drawEvents(g, W, H, s);
+    // the trams and buses with their stops, and a way drawn on the map
+    this.transit.draw(g, W, H, s, this.cx, this.cz);
+    this.drawer.draw(g, W, H, s, this.cx, this.cz);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
 
     // the places of a demonstration drive, numbered in their order
     this.stops.forEach((stop, i) => {

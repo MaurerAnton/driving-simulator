@@ -81,11 +81,12 @@ test('nobody walks through the vehicle, a wall – or away from the vehicle for 
   const z0 = w.z;
   walk(w, 2, { fwd: 1, turn: 0, run: false }, (x) => x < -6);
   assert.ok(w.z - z0 > 1, 'along the wall');
-  // the tether: not further than a few dozen metres from the vehicle
+  // away from the vehicle as far as one likes: beyond TETHER the hint says how far it is
   const far = new OnFoot(car());
   far.yaw = Math.PI / 2;
   walk(far, 60, { fwd: 1, turn: 0, run: true });
-  assert.ok(Math.hypot(far.x, far.z) <= TETHER + 0.01, 'held at the tether');
+  assert.ok(Math.hypot(far.x, far.z) > TETHER + 20, `walked on (${Math.hypot(far.x, far.z).toFixed(0)} m)`);
+  assert.equal(far.tooFar, true, 'the hint');
   assert.equal(far.tooFar, true, 'and told so');
 });
 

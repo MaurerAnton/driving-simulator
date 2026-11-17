@@ -70,8 +70,8 @@ const RADIUS = 0.28;
 export const WALK = 1.45;
 /** running, unless the settings say otherwise (m/s: 12 km/h) */
 export const RUN = 3.3;
-/** how far from the vehicle one may walk (m) */
-export const TETHER = 45;
+/** from this far away the vehicle is behind one (m): the world loads round the person, the hint says how far it is */
+export const TETHER = 60;
 /** how long something has to be looked at (s) */
 const LOOK = 0.45;
 
@@ -246,11 +246,9 @@ export class OnFoot {
         const ny = ground(nx, nz, this.y + 0.6);
         // (a step up of a kerb, not up a wall)
         if (!Number.isFinite(ny) || ny > this.y + 0.45 || blocked(nx, ny, nz, RADIUS)) continue;
-        // not too far from the vehicle (on foot alone: anywhere)
+        // (as far from the vehicle as one likes – the hint only says how far it is now)
         const u = v?.units[0];
-        const far = !!u && Math.hypot(nx - u.x, nz - u.z) > TETHER;
-        this.tooFar = far;
-        if (far) break;
+        this.tooFar = !!u && Math.hypot(nx - u.x, nz - u.z) > TETHER;
         this.walked += Math.hypot(mx, mz);
         this.x = nx;
         this.z = nz;

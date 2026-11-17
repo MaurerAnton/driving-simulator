@@ -15,6 +15,10 @@ import type { VehicleSpec } from '../sim/vehicle/index.ts';
 import type { CarVisualState } from './car.ts';
 import { InstrumentPanel } from './instruments.ts';
 import { Mirror } from './mirrors.ts';
+import { NavScreen } from './navscreen.ts';
+import { truckDetail } from './fleetdetail.ts';
+import type { FleetDetail } from './fleetdetail.ts';
+import { BoxBody } from './boxbody.ts';
 
 export const WHITE = new THREE.MeshLambertMaterial({ color: 0xeef0ee });
 export const CAB = new THREE.MeshLambertMaterial({ color: 0x1f5fa8 });
@@ -97,8 +101,8 @@ export function lettering(text: string, width: number, height: number): THREE.Me
   return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshLambertMaterial({ map: tex }));
 }
 
-/** The plates with the lettering on both sides and on the rear doors of a box body. */
-function letterBox(group: THREE.Group, text: string, hw: number, yMid: number, zMid: number, zRear: number, sideLen: number): void {
+/** The plates with the lettering on both sides and on the rear doors of a box body (returned: the one on the doors). */
+function letterBox(group: THREE.Group, text: string, hw: number, yMid: number, zMid: number, zRear: number, sideLen: number): THREE.Mesh {
   for (const side of [-1, 1]) {
     const plate = lettering(text, sideLen, sideLen * 0.16);
     plate.position.set(side * (hw + 0.012), yMid, zMid);
@@ -108,6 +112,7 @@ function letterBox(group: THREE.Group, text: string, hw: number, yMid: number, z
   const rear = lettering(text, hw * 1.7, hw * 1.7 * 0.16);
   rear.position.set(0, yMid, zRear + 0.012);
   group.add(rear);
+  return rear;
 }
 
 export const BRAND = 'maureranton.com';
@@ -121,6 +126,10 @@ export class PlayerTruck {
   /** the truck it is the picture of (the 12-tonner of class C/CE, or the 7.5-tonner of C1) */
   private readonly spec: VehicleSpec;
   readonly mirrors: Mirror[] = [];
+  /** the box with its rear doors (render/boxbody.ts: opened while goods are loaded) */
+  readonly body: BoxBody;
+  /** the screen with the map on the dashboard (render/navscreen.ts) */
+  readonly navScreen: NavScreen;
   private readonly wheels: THREE.Group[] = [];
   private readonly trailerWheels: THREE.Group[] = [];
   private readonly steering = new THREE.Group();
@@ -133,6 +142,8 @@ export class PlayerTruck {
   private readonly lining = new THREE.MeshLambertMaterial({ color: 0x565b63, side: THREE.BackSide });
   private readonly fittings = new THREE.MeshLambertMaterial({ color: 0x30343a });
   private readonly off = new THREE.MeshLambertMaterial({ color: 0x3a2d2a });
+  /** the finer model of the "very high" graphics (render/fleetdetail.ts): made the first time it is asked for */
+  private detail: FleetDetail | null = null;
 
   constructor(spec: VehicleSpec = TRUCK) {
     const s = spec;
@@ -193,9 +204,12 @@ export class PlayerTruck {
     wall('y-', -cx, cx, cz0, cz1, cy0);
     root.add(cab);
     const bodyFront = front + 2.0;
-    root.add(box(-hw, hw, 1.12, 3.6, bodyFront, rear, WHITE));
+    this.body = new BoxBody(hw, 1.12, 3.6, bodyFront, rear, WHITE);
+    root.add(this.body.group);
     root.add(box(-hw + 0.05, hw - 0.05, 0.5, 0.62, rear - 0.12, rear, FRAME)); // underrun bar
-    letterBox(root, BRAND, hw, 2.55, (bodyFront + rear) / 2, rear, rear - bodyFront - 0.8);
+    this.body.rearPlate = letterBox(root, BRAND, hw, 2.55, (bodyFront + rear) / 2, rear, rear - bodyFront - 0.8);
+    // (on the outside of the doors, which stand a little behind the box)
+    this.body.rearPlate.position.z = rear + 0.07;
     // tail lamps and indicators
     for (const side of [-1, 1]) {
       const stop = box(side * (hw - 0.3) - 0.14, side * (hw - 0.3) + 0.14, 0.78, 0.98, rear - 0.02, rear + 0.02, TAIL, false);
@@ -249,6 +263,8 @@ export class PlayerTruck {
       cabin.add(box(x - 0.26, x + 0.26, 1.3, 1.46, cz1 - 0.72, cz1 - 0.2, fit, false)); // seat
       cabin.add(box(x - 0.26, x + 0.26, 1.46, 2.32, cz1 - 0.3, cz1 - 0.16, fit, false)); // its back
     }
+    // the screen with the map, standing on the dashboard right of the instruments
+    this.navScreen = new NavScreen(0.27).place(cabin, new THREE.Vector3(ex + 0.62, wy0 + 0.13, cz0 + 0.3), this.eye, new THREE.Vector3(ex + 0.62, wy0 - 0.02, cz0 + 0.33));
     root.add(cabin);
 
     // ---- mirrors: one large one at each door, showing the side of the body and of the trailer
@@ -336,6 +352,13 @@ export class PlayerTruck {
     const on = s.blinkOn && s.ignition;
     for (const ind of this.indicators) ind.mesh.material = on && (s.hazard || s.indicator === ind.side) ? AMBER : this.off;
     this.panel.update(s, now);
+    this.detail?.update();
+  }
+
+  /** The finer model (true) or the plain one. */
+  setDetail(on: boolean): void {
+    if (on && !this.detail) this.detail = truckDetail({ root: this.root, trailer: this.trailer, spec: this.spec, wheels: this.wheels, trailerWheels: this.trailerWheels });
+    this.detail?.show(on);
   }
 
   /** Where the trailer is (the middle of its axle group on the ground), and whether it stands on its leg. */

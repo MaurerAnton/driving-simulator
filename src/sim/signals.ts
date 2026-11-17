@@ -22,6 +22,14 @@
  *    is allowed although the main light is red (§ 37 Abs. 2 Nr. 1 StVO).
  *    Which approaches have one is worked out from the paths through the
  *    junction (sim/arrows.ts).
+ *
+ *  - How long a light still shows what it shows (`change`, for the small
+ *    timers over the heads: ui/signaltimers.ts) – and, on a tap on such a
+ *    timer, the programme put forward to the end of the phase that runs
+ *    (`skip`).  Only a main phase is cut short, never an amber, a red-amber
+ *    or the moment of red for all between them, and none to less than a few
+ *    seconds: the light goes on through its sequence as always, and whoever
+ *    has just got green still gets going.
  */
 import { hash01 } from '../core/geom.ts';
 import type { SignalControllerJson } from '../world/types.ts';
@@ -41,6 +49,17 @@ export const PED_CLEAR = 1.5;
 const ARROW_AMBER = 3;
 /** a stream must have had red for this long before an arrow that crosses it comes on (s) */
 const ARROW_CLEAR = 1.5;
+
+/** a phase cut short by a tap on its timer still runs this long from its start (s): the first car gets going, people on foot get across */
+export const SKIP_LEAST = 6;
+/** phases this short or shorter are the change between two main phases (all red), never cut short (s) */
+const CLEARANCE = 2;
+
+/** What a light is going to do: in how many seconds, and what it shows then (SIG; −1: dark, for an arrow). */
+export interface SignalChange {
+  left: number;
+  next: number;
+}
 
 /**
  * Which controllers are out of order: a `share` of them, picked by their
@@ -93,10 +112,18 @@ export class SignalSystem {
   private readonly since: Float32Array[] = [];
   /** out of order */
   private readonly dark: boolean[] = [];
-  /** a pedestrian crossing's own clock in its programme (it stands still at rest), and whether the button was pressed */
+  /**
+   * A pedestrian crossing's own clock in its programme (it stands still at
+   * rest) – for the other controllers, how far a tap on a timer has put their
+   * programme forward (`skip`) –, and whether the button was pressed.
+   */
   private readonly local: number[] = [];
   private readonly asked: boolean[] = [];
   private readonly lightsOut: (controller: number) => boolean;
+  /** when each green arrow is going to change next (worked out once, again after it changed or a programme was put forward) */
+  private readonly arrowNext = new Map<Arm, { state: number; at: number; next: number; epoch: number }>();
+  /** counts every skip and restore: what was worked out ahead before is out of date */
+  private epoch = 0;
   time = 0;
 
   constructor(controllers: SignalControllerJson[], lightsOut: (controller: number) => boolean = () => false) {
@@ -121,7 +148,7 @@ export class SignalSystem {
       // (the light of a pedestrian crossing is never out: people could not cross there otherwise)
       this.dark[i] = !c.ped && this.lightsOut(i);
       // (… and it begins at rest: green for the vehicles, long enough that a press is served soon)
-      if (c.ped) this.local[i] = Math.min(PED_LEAST_GREEN, c.phases[0]?.d ?? 0);
+      this.local[i] = c.ped ? Math.min(PED_LEAST_GREEN, c.phases[0]?.d ?? 0) : 0;
       this.asked[i] = false;
       fresh = true;
     });
@@ -131,7 +158,7 @@ export class SignalSystem {
   /** What group `g` of a controller shows `ahead` seconds from now (by its programme). */
   private programmed(i: number, g: number, ahead: number): number {
     const c = this.controllers[i];
-    let t = ((c.ped ? this.local[i] : this.time + c.off) + ahead) % this.cycle[i];
+    let t = ((c.ped ? this.local[i] : this.time + c.off + this.local[i]) + ahead) % this.cycle[i];
     if (t < 0) t += this.cycle[i];
     let phase = c.phases[c.phases.length - 1];
     for (const p of c.phases) {
@@ -277,6 +304,7 @@ export class SignalSystem {
   /** Put back what `snapshot` took (controllers no longer loaded are left out). */
   restore(s: SignalSnapshot): void {
     this.time = s.time;
+    this.epoch++;
     let k = 0;
     for (let n = 0; n < s.ids.length; n++) {
       const i = s.ids[n];
@@ -353,5 +381,169 @@ export class SignalSystem {
       if (ok) lit += step;
     }
     return lit;
+  }
+
+  /** Where a controller's programme stands: the phase (its index), how long it has run, how long it has left. */
+  private phaseAt(i: number): { k: number; into: number; left: number } {
+    const c = this.controllers[i];
+    const cycle = this.cycle[i];
+    let t = (((c.ped ? this.local[i] : this.time + c.off + this.local[i]) % cycle) + cycle) % cycle;
+    for (let k = 0; k < c.phases.length; k++) {
+      const d = c.phases[k].d;
+      if (t < d) return { k, into: t, left: d - t };
+      t -= d;
+    }
+    const k = c.phases.length - 1;
+    return { k, into: c.phases[k].d, left: 0 };
+  }
+
+  /** What group `g` shows in phase `k` of controller `i`'s programme. */
+  private codeOf(i: number, k: number, g: number): number {
+    const s = this.controllers[i].phases[k].s;
+    return CODE[s[Math.min(g, s.length - 1)]] ?? SIG.RED;
+  }
+
+  /**
+   * When group `group` of a controller changes next, and to what.  Infinity
+   * while a pedestrian crossing's light rests on the vehicles' green with
+   * nobody asking (it waits for the button).  Null where there is nothing to
+   * count: no such controller running, or it is out of order.
+   */
+  change(controller: number, group: number): SignalChange | null {
+    const c = this.controllers[controller];
+    if (!c || !this.state[controller] || this.dark[controller] || c.phases.length === 0) return null;
+    const n = c.phases.length;
+    const { k, into, left } = this.phaseAt(controller);
+    const now = this.codeOf(controller, k, group);
+    let sum = left;
+    if (c.ped && k === 0) {
+      // at rest until somebody asks – then after the least green
+      if (!this.asked[controller]) return { left: Infinity, next: this.codeOf(controller, 1 % n, group) };
+      sum = Math.max(0, PED_LEAST_GREEN - into);
+    }
+    for (let j = 1; j <= n; j++) {
+      const kk = (k + j) % n;
+      const s = this.codeOf(controller, kk, group);
+      if (s !== now) return { left: sum, next: s };
+      // (round to the resting phase of a pedestrian crossing: there it waits for the button)
+      if (c.ped && kk === 0) return { left: Infinity, next: this.codeOf(controller, 1 % n, group) };
+      sum += c.phases[kk].d;
+    }
+    return { left: Infinity, next: now };
+  }
+
+  /** In how many seconds group `group` begins to show `want` (0: it shows it now) – Infinity where it does not before a crossing's light rests. */
+  private until(i: number, group: number, want: number): number {
+    const c = this.controllers[i];
+    const n = c.phases.length;
+    const { k, into, left } = this.phaseAt(i);
+    if (this.codeOf(i, k, group) === want) return 0;
+    let sum = left;
+    if (c.ped && k === 0) {
+      if (!this.asked[i]) return Infinity;
+      sum = Math.max(0, PED_LEAST_GREEN - into);
+    }
+    for (let j = 1; j <= n; j++) {
+      const kk = (k + j) % n;
+      if (this.codeOf(i, kk, group) === want) return sum;
+      if (c.ped && kk === 0) return Infinity;
+      sum += c.phases[kk].d;
+    }
+    return Infinity;
+  }
+
+  /**
+   * When the pedestrians' light at a crossing whose vehicles have group
+   * `group` changes next: `next` is SIG.GREEN or SIG.RED – of the people on
+   * foot.  Null where the light is out of order.
+   */
+  pedestrianChange(controller: number, group: number): SignalChange | null {
+    const veh = this.change(controller, group);
+    if (!veh) return null;
+    if (this.get(controller, group) === SIG.RED) {
+      const age = this.age(controller, group);
+      // (green for them a moment after the vehicles got red; red again when the vehicles get red-amber)
+      return age > PED_CLEAR ? { left: veh.left, next: SIG.RED } : { left: PED_CLEAR - age, next: SIG.GREEN };
+    }
+    return { left: this.until(controller, group, SIG.RED) + PED_CLEAR, next: SIG.GREEN };
+  }
+
+  /**
+   * When the green arrow of an approach changes next: `next` is SIG.GREEN,
+   * SIG.AMBER or −1 (dark).  Null where there is none, or its light is out of
+   * order.  (Looked for in the programme a quarter of a second at a time –
+   * once, and again after the arrow changed or a programme was put forward.)
+   */
+  arrowChange(arm: Arm): SignalChange | null {
+    const a = this.arrows.get(arm);
+    if (!a || !this.state[a.controller] || this.dark[a.controller]) return null;
+    if (a.state === SIG.AMBER) {
+      // amber for its seconds – or until the main light turns green, which says the same and more
+      const main = this.change(a.controller, a.own);
+      let left = Math.max(0, ARROW_AMBER - a.since);
+      if (main && main.next === SIG.GREEN) left = Math.min(left, main.left);
+      return { left, next: -1 };
+    }
+    let known = this.arrowNext.get(arm);
+    if (!known || known.state !== a.state || known.epoch !== this.epoch || known.at < this.time - 0.5) {
+      const i = a.controller;
+      const at = (g: number, d: number): number => this.programmed(i, g, d);
+      const lit = (d: number): boolean => {
+        const mine = at(a.own, d);
+        if (!(mine === SIG.RED_AMBER || (mine === SIG.RED && at(a.own, d - ARROW_CLEAR) === SIG.RED))) return false;
+        for (const g of a.foes) {
+          if (g === a.own) continue;
+          if (at(g, d) !== SIG.RED || at(g, d - ARROW_CLEAR) !== SIG.RED || at(g, d + ARROW_AMBER + 1) !== SIG.RED) return false;
+        }
+        for (const g of a.friends) if (at(g, d) !== SIG.GREEN) return false;
+        return true;
+      };
+      // lit now: when does it go out – dark now: when does it come on
+      const want = a.state !== SIG.GREEN;
+      let found = Infinity;
+      for (let d = 0.25; d <= this.cycle[i] + 1; d += 0.25) {
+        if (lit(d) === want) {
+          found = d;
+          break;
+        }
+      }
+      // (going out while the main light turns green, it goes dark at once)
+      const next = want ? SIG.GREEN : found < Infinity && at(a.own, found) === SIG.GREEN ? -1 : SIG.AMBER;
+      known = { state: a.state, at: this.time + found, next, epoch: this.epoch };
+      this.arrowNext.set(arm, known);
+    }
+    return { left: Math.max(0, known.at - this.time), next: known.next };
+  }
+
+  /**
+   * A tap on a timer: the controller goes on to the end of the main phase
+   * that runs – at once, or once that phase has run SKIP_LEAST seconds – and
+   * from there through amber, the moment of red for all and red-amber as its
+   * programme has them.  A pedestrian crossing's light at rest is asked as by
+   * its button (served after the least green for the vehicles).  An amber, a
+   * red-amber or a clearance phase runs as it is.  Returns whether anything
+   * was put forward.
+   */
+  skip(controller: number): boolean {
+    const c = this.controllers[controller];
+    if (!c || !this.state[controller] || this.dark[controller] || c.phases.length < 2) return false;
+    const { k, into, left } = this.phaseAt(controller);
+    const p = c.phases[k];
+    if (p.d <= CLEARANCE || /[AY]/.test(p.s)) return false;
+    if (c.ped && k === 0) {
+      if (this.asked[controller] && into >= PED_LEAST_GREEN) return false;
+      this.asked[controller] = true;
+      this.epoch++;
+      return true;
+    }
+    // (how long the phase has really been showing: since the last of its lights changed – a tap before
+    // may have put the programme's clock forward)
+    let shown = into;
+    for (const s of this.since[controller]) shown = Math.min(shown, s);
+    const jump = left - Math.max(0, SKIP_LEAST - shown);
+    if (jump <= 0.05) return false;
+    this.local[controller] += jump;
+    this.epoch++;
+    return true;
   }
 }

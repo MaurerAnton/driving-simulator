@@ -24,7 +24,7 @@
  */
 import type { SignalSystem } from './signals.ts';
 import { SIG } from './signals.ts';
-import { consistMass } from './rail.ts';
+import { DOOR_TIME, consistMass } from './rail.ts';
 import type { RailTraffic, RailVehicle } from './rail.ts';
 import { CTRL, RAIL } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
@@ -295,6 +295,9 @@ export class TramDriver {
       v.plan.length = 0;
       if (next) v.plan.push(next);
     }
+    // --- the doors, as the door key has them (they take a moment to open and to shut)
+    const doors = v.doors ?? 0;
+    if (this.doorsOpen ? doors < 1 : doors > 0) v.doors = this.doorsOpen ? Math.min(1, doors + dt / DOOR_TIME) : Math.max(0, doors - dt / DOOR_TIME);
     // --- the pantograph: rising or coming down; where the wire ends it must be down
     const want = this.pantoUp ? 1 : 0;
     if (this.panto !== want) this.panto = want > this.panto ? Math.min(1, this.panto + dt / PANTO_UP_TIME) : Math.max(0, this.panto - dt / PANTO_DOWN_TIME);

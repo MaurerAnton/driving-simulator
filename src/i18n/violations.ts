@@ -66,6 +66,8 @@ export const VIOLATION_REFS: Record<string, string> = {
   accessPrivate: 'Anlage 2 StVO, Zeichen 250',
   accessAgricultural: 'Anlage 2 StVO, Zeichen 250/260',
   accessDestination: 'Zusatzzeichen 1020-30',
+  // a road shut at certain times: Zeichen 250, 251, 253, 260 with a time panel (Zusatzzeichen 1040/1042)
+  accessTimed: 'Anlage 2 StVO, Zeichen 250/260 mit Zusatzzeichen 1040-30',
   distance: '§ 4 Abs. 1 StVO',
   crash: '§ 1 Abs. 2 StVO',
   crashObject: '§ 3 Abs. 1 StVO',
@@ -83,9 +85,28 @@ export const VIOLATION_REFS: Record<string, string> = {
   ceFast: 'Anlage 7 FeV, Nr. 2.1.3',
   truckRightTurn: '§ 9 Abs. 6 StVO',
   truckSpeed: '§ 3 Abs. 3, § 18 Abs. 5 StVO',
+  // roadworks and the closures for demonstrations (src/sim/roadevents.ts)
+  worksLane: 'Anlage 4 StVO, Zeichen 600, 605',
+  worksYield: 'Anlage 2 StVO, Zeichen 208',
+  closedRoad: '§ 36 Abs. 1 StVO; Anlage 2 StVO, Zeichen 250',
+  // emergency vehicles with blue lights and siren: make way at once (§ 38 Abs. 1), the corridor in slow traffic on a road
+  // with two or more lanes in a direction (§ 11 Abs. 2) – src/sim/emergency.ts
+  emergencyBlock: '§ 38 Abs. 1 StVO',
+  emergencyCorridor: '§ 11 Abs. 2 StVO',
+  emergencyJunction: '§ 38 Abs. 1 StVO',
   stall: '@ref.vehicle',
   seatbelt: '§ 21a Abs. 1 StVO',
   handbrakeOn: '@ref.vehicle',
+  // working a crane (game/cranetasks.ts): its load chart and operating manual, the accident prevention regulation for cranes
+  craneOverload: '@ref.crane',
+  craneLoadHit: '@ref.crane',
+  craneHookHit: '@ref.crane',
+  craneHardLanding: '@ref.crane',
+  craneSwing: '@ref.crane',
+  craneWind: '@ref.crane',
+  craneDiagonalPull: '@ref.crane',
+  craneNotLevel: '@ref.crane',
+  craneTipped: '@ref.crane',
 };
 
 /** Where the regulations can be read: the official collection of federal law (gesetze-im-internet.de). */

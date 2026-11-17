@@ -17,6 +17,7 @@ import type { CarDims, CarShell, Vec3 } from './carBody.ts';
 import { InstrumentPanel } from './instruments.ts';
 import type { DashState } from './instruments.ts';
 import { Mirror, mirrorNormal } from './mirrors.ts';
+import { CarDetail } from './cardetail.ts';
 
 export interface CarVisualState extends DashState {
   /** steering wheel angle in rad, + = clockwise / right */
@@ -290,16 +291,18 @@ export class CarExterior {
   readonly dims: CarDims;
   readonly shell: CarShell;
   readonly wheels: THREE.Group[] = [];
-  private readonly wheelSpinners: THREE.Group[] = [];
+  readonly wheelSpinners: THREE.Group[] = [];
   readonly paint: THREE.MeshPhongMaterial;
   readonly glass: THREE.Material;
   /** the opaque body and what is fixed to it (not wheels, glass, plates, lettering) */
   readonly solids: THREE.Mesh[] = [];
-  private readonly head: THREE.MeshBasicMaterial;
-  private readonly tail: THREE.MeshBasicMaterial;
-  private readonly reverse: THREE.MeshBasicMaterial;
-  private readonly blinkL: THREE.MeshBasicMaterial;
-  private readonly blinkR: THREE.MeshBasicMaterial;
+  /** the lamps as plain blocks (the finer model of render/cardetail.ts has its own, lit by the same materials) */
+  readonly lampMeshes: THREE.Mesh[] = [];
+  readonly head: THREE.MeshBasicMaterial;
+  readonly tail: THREE.MeshBasicMaterial;
+  readonly reverse: THREE.MeshBasicMaterial;
+  readonly blinkL: THREE.MeshBasicMaterial;
+  readonly blinkR: THREE.MeshBasicMaterial;
 
   constructor(color: number, opts: CarExteriorOptions = {}) {
     const d = (this.dims = opts.dims ?? COMPACT_DIMS);
@@ -359,7 +362,7 @@ export class CarExterior {
       // mirror housings (the player's car builds its own, aligned with the working glass)
       if (!opts.noMirrorHousings) g.add(new THREE.Mesh(box(0.2, 0.13, 0.09, side * (hw + 0.1), sh.beltY + 0.06, sh.zCowl + 0.4), this.paint));
     }
-    for (const [geo, mat] of lamps) solid(geo, mat);
+    for (const [geo, mat] of lamps) this.lampMeshes.push(solid(geo, mat));
     // grille and number plates
     solid(box(0.86, 0.14, 0.04, 0, 0.5, sh.zFront + 0.05), trim);
     if (opts.plate) {
@@ -448,7 +451,7 @@ export class CarExterior {
  * self-lit share keeps it readable instead of a black hole (what your eyes do
  * when they adapt).  `hex` is roughly the colour the part shows in daylight.
  */
-function cabinMaterial(hex: number, shine = 0): THREE.MeshLambertMaterial | THREE.MeshPhongMaterial {
+export function cabinMaterial(hex: number, shine = 0): THREE.MeshLambertMaterial | THREE.MeshPhongMaterial {
   const c = new THREE.Color(hex);
   const color = c.clone().multiplyScalar(0.6);
   const emissive = c.clone().multiplyScalar(0.42);
@@ -855,6 +858,8 @@ export class PlayerCar {
   private readonly handbrake = new THREE.Group();
   private readonly pedals: THREE.Group[] = [];
   private readonly stalk = new THREE.Group();
+  /** the finer model of the "very high" graphics (render/cardetail.ts): made the first time it is asked for */
+  private detail: CarDetail | null = null;
   private leverX = 0;
   private leverZ = 0;
   private gate = 0;
@@ -1292,6 +1297,20 @@ export class PlayerCar {
     this.pedals[0].rotation.x = -0.5 + s.clutch * 0.32;
     this.pedals[1].rotation.x = -0.5 + s.brake * 0.22;
     this.pedals[2].rotation.x = -0.5 + s.throttle * 0.28;
+    this.detail?.update(s);
+  }
+
+  /** The finer model, outside and in the cockpit (true), or the plain one. */
+  setDetail(on: boolean): void {
+    if (on && !this.detail) {
+      this.detail = new CarDetail({ exterior: this.exterior, cockpit: this.cockpit, mirrors: this.mirrors, steering: this.steering, lever: this.lever, handbrake: this.handbrake, pedals: this.pedals, stalk: this.stalk, eye: this.eye });
+      for (const [mesh, layer] of this.detail.ghosts) this.ghost(mesh, layer);
+      // (the see-through cabin takes the new parts in at once)
+      const o = this.cabinOpacity;
+      this.cabinOpacity = 1;
+      this.setCabinOpacity(o);
+    }
+    this.detail?.show(on);
   }
 
   dispose(): void {

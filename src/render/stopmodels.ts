@@ -1600,32 +1600,43 @@ export interface DepartureRow {
   minutes: number | string;
 }
 
-const BOARD_W = 1.0;
-const BOARD_H = 0.42;
-const BOARD_TOP = 2.72;
+/** The sizes of display: the departure board on a post of its own (three rows and the clock), and the small one beside a simple pole (two rows). */
+export type BoardSize = 'board' | 'small';
 
-function departurePost(pole: boolean): THREE.BufferGeometry {
+/** The housing (width, height, top edge in m), the rows it shows, and its picture (pixels, about the shape of its screens). */
+const BOARD_DIMS: Record<BoardSize, { w: number; h: number; top: number; rows: number; cw: number; ch: number }> = {
+  board: { w: 1.0, h: 0.42, top: 2.72, rows: 3, cw: 512, ch: 192 },
+  small: { w: 0.62, h: 0.25, top: 2.25, rows: 2, cw: 384, ch: 128 },
+};
+
+/** What a display shows while it sleeps (too far away to be read): a dark screen, one material for all of them. */
+const DARK_SCREEN = new THREE.MeshBasicMaterial({ color: 0x070707, toneMapped: false });
+
+function departurePost(pole: boolean, size: BoardSize): THREE.BufferGeometry {
+  const { w, h, top } = BOARD_DIMS[size];
   const kit = new Kit();
-  const y0 = BOARD_TOP - BOARD_H;
-  if (pole) kit.cyl(0, 0, 0, y0 + 0.05, 0.05, 0.05, ANTHRACITE);
+  const y0 = top - h;
+  const r = size === 'board' ? 0.05 : 0.04;
+  if (pole) kit.cyl(0, 0, 0, y0 + 0.05, r, r, ANTHRACITE);
   const d = 0.07;
   const b = 0.04;
   // the housing: a frame round the two screens, a little roof on top
-  kit.box(-BOARD_W / 2, BOARD_W / 2, BOARD_TOP - b, BOARD_TOP, -d, d, ANTHRACITE);
-  kit.box(-BOARD_W / 2, BOARD_W / 2, y0, y0 + b, -d, d, ANTHRACITE);
-  kit.box(-BOARD_W / 2, -BOARD_W / 2 + b, y0 + b, BOARD_TOP - b, -d, d, ANTHRACITE);
-  kit.box(BOARD_W / 2 - b, BOARD_W / 2, y0 + b, BOARD_TOP - b, -d, d, ANTHRACITE);
-  kit.box(-BOARD_W / 2 + b, BOARD_W / 2 - b, y0 + b, BOARD_TOP - b, -d + 0.02, d - 0.02, 0x101112);
-  kit.box(-BOARD_W / 2 - 0.03, BOARD_W / 2 + 0.03, BOARD_TOP, BOARD_TOP + 0.025, -d - 0.04, d + 0.04, ANTHRACITE);
+  kit.box(-w / 2, w / 2, top - b, top, -d, d, ANTHRACITE);
+  kit.box(-w / 2, w / 2, y0, y0 + b, -d, d, ANTHRACITE);
+  kit.box(-w / 2, -w / 2 + b, y0 + b, top - b, -d, d, ANTHRACITE);
+  kit.box(w / 2 - b, w / 2, y0 + b, top - b, -d, d, ANTHRACITE);
+  kit.box(-w / 2 + b, w / 2 - b, y0 + b, top - b, -d + 0.02, d - 0.02, 0x101112);
+  kit.box(-w / 2 - 0.03, w / 2 + 0.03, top, top + 0.025, -d - 0.04, d + 0.04, ANTHRACITE);
   return kit.geometry();
 }
 
-function departureScreens(): THREE.BufferGeometry {
+function departureScreens(size: BoardSize): THREE.BufferGeometry {
+  const { w, h, top } = BOARD_DIMS[size];
   const parts: THREE.BufferGeometry[] = [];
   for (const front of [true, false]) {
-    const g = new THREE.PlaneGeometry(BOARD_W - 0.08, BOARD_H - 0.08);
+    const g = new THREE.PlaneGeometry(w - 0.08, h - 0.08);
     if (front) g.rotateY(Math.PI);
-    g.translate(0, BOARD_TOP - BOARD_H / 2, front ? -0.0705 : 0.0705);
+    g.translate(0, top - h / 2, front ? -0.0705 : 0.0705);
     parts.push(g.toNonIndexed());
     g.dispose();
   }
@@ -1633,70 +1644,114 @@ function departureScreens(): THREE.BufferGeometry {
 }
 
 /**
- * A small departure display (both faces) on a pole: up to three rows of line,
- * destination and minutes, amber on black, and a clock.  Drawn again only
- * when what it shows changes.  `group` faces −z; call `dispose` (or
- * `releaseModel`) when it is taken away.
+ * A departure display (both faces) on a post: rows of line, destination and
+ * minutes, amber on black – the big board three of them and a clock, the
+ * small one two.  Its picture is a canvas of its own only while it is awake
+ * (`wake`): asleep – too far from the camera to be read – it shows a dark
+ * screen and holds no texture, so that a town full of displays costs a phone
+ * little.  Drawn again only when what it shows changes.  `group` faces −z;
+ * call `dispose` (or `releaseModel`) when it is taken away.
  */
 export class DepartureBoard {
   readonly group = new THREE.Group();
-  private readonly canvas = document.createElement('canvas');
-  private readonly ctx: CanvasRenderingContext2D;
-  private readonly texture: THREE.CanvasTexture;
-  private readonly material: THREE.MeshBasicMaterial;
+  readonly size: BoardSize;
+  private readonly screen: THREE.Mesh;
+  private canvas: HTMLCanvasElement | null = null;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private texture: THREE.CanvasTexture | null = null;
+  private material: THREE.MeshBasicMaterial | null = null;
+  private rows: readonly DepartureRow[] = [];
+  private clock = '';
   private shown = '';
 
-  constructor(pole = true) {
-    this.canvas.width = 512;
-    this.canvas.height = 192;
-    this.ctx = this.canvas.getContext('2d')!;
-    this.texture = canvasTexture(this.canvas);
-    this.material = new THREE.MeshBasicMaterial({ map: this.texture, toneMapped: false });
-    this.group.name = 'departure board';
+  constructor(pole = true, size: BoardSize = 'board', awake = true) {
+    this.size = size;
+    this.group.name = size === 'board' ? 'departure board' : 'small departure display';
     this.group.userData.dynamic = true;
     this.group.userData.release = (): void => this.dispose();
-    this.group.add(meshOf(shared(`departure-post:${pole}`, () => departurePost(pole)), PAINT));
-    this.group.add(meshOf(shared('departure-screens', departureScreens), this.material, false, false));
-    this.draw([], '');
+    this.group.add(meshOf(shared(`departure-post:${pole}:${size}`, () => departurePost(pole, size)), PAINT));
+    this.screen = meshOf(shared(`departure-screens:${size}`, () => departureScreens(size)), DARK_SCREEN, false, false);
+    this.group.add(this.screen);
+    if (awake) this.wake(true);
   }
 
-  /** What it shows: the next departures (three at most) and the time of day ("12:34"). */
+  /** Whether it has its picture (it is near enough to be read). */
+  get awake(): boolean {
+    return this.material !== null;
+  }
+
+  /** Give it its picture (near the camera), or take it away (far: a dark screen then). */
+  wake(on: boolean): void {
+    if (on === this.awake) return;
+    if (on) {
+      const { cw, ch } = BOARD_DIMS[this.size];
+      this.canvas = document.createElement('canvas');
+      this.canvas.width = cw;
+      this.canvas.height = ch;
+      this.ctx = this.canvas.getContext('2d');
+      this.texture = canvasTexture(this.canvas);
+      this.material = new THREE.MeshBasicMaterial({ map: this.texture, toneMapped: false });
+      this.screen.material = this.material;
+      this.shown = '\u0000';
+      this.set(this.rows, this.clock);
+      return;
+    }
+    this.screen.material = DARK_SCREEN;
+    this.texture?.dispose();
+    this.material?.dispose();
+    this.canvas = null;
+    this.ctx = null;
+    this.texture = null;
+    this.material = null;
+  }
+
+  /** What it shows: the next departures (as many as it has rows for) and the time of day ("12:34" – the small one has no clock). */
   set(rows: readonly DepartureRow[], clock = ''): void {
-    let key = clock;
-    for (const r of rows.slice(0, 3)) key += `\n${r.line}\t${r.destination}\t${r.minutes}`;
+    this.rows = rows;
+    this.clock = clock;
+    if (!this.awake) return;
+    const n = BOARD_DIMS[this.size].rows;
+    let key = this.size === 'board' ? clock : '';
+    for (const r of rows.slice(0, n)) key += `\n${r.line}\t${r.destination}\t${r.minutes}`;
     if (key === this.shown) return;
     this.shown = key;
-    this.draw(rows, clock);
+    this.draw(rows.slice(0, n), clock);
   }
 
   dispose(): void {
-    this.texture.dispose();
-    this.material.dispose();
+    this.wake(false);
   }
 
   private draw(rows: readonly DepartureRow[], clock: string): void {
     const c = this.ctx;
-    const W = this.canvas.width;
-    const H = this.canvas.height;
+    const canvas = this.canvas;
+    if (!c || !canvas || !this.texture) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    const big = this.size === 'board';
     c.fillStyle = '#050505';
     c.fillRect(0, 0, W, H);
     const amber = '#ffb02e';
     c.fillStyle = amber;
     c.textBaseline = 'middle';
-    c.font = `bold 30px ${FONT}`;
-    c.textAlign = 'right';
-    c.fillText(clock, W - 14, 26);
-    rows.slice(0, 3).forEach((r, i) => {
-      const y = 76 + i * 46;
+    if (big) {
+      c.font = `bold 30px ${FONT}`;
+      c.textAlign = 'right';
+      c.fillText(clock, W - 14, 26);
+    }
+    // (columns: the line, where it goes, the minutes)
+    const [first, step, size, edge, lineW, destX, minW] = big ? [76, 46, 34, 14, 70, 96, 120] : [34, 60, 36, 10, 62, 80, 92];
+    rows.forEach((r, i) => {
+      const y = first + i * step;
       c.fillStyle = amber;
       c.textAlign = 'left';
-      c.font = `bold 34px ${FONT}`;
-      c.fillText(r.line, 14, y, 70);
+      c.font = `bold ${size}px ${FONT}`;
+      c.fillText(r.line, edge, y, lineW);
       const minutes = typeof r.minutes === 'number' ? (r.minutes <= 0 ? 'sofort' : `${Math.round(r.minutes)} min`) : r.minutes;
       c.textAlign = 'right';
-      c.fillText(minutes, W - 14, y, 120);
+      c.fillText(minutes, W - edge, y, minW);
       c.textAlign = 'left';
-      c.fillText(r.destination, 96, y, W - 96 - 150);
+      c.fillText(r.destination, destX, y, W - destX - minW - 2 * edge - 2);
     });
     // the grid of the light-emitting diodes
     c.fillStyle = 'rgba(0, 0, 0, 0.55)';

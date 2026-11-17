@@ -33,6 +33,11 @@ export class FarTerrain {
   /** the colours of the cover classes, a little greyer than near by (seen through the air) */
   private readonly colours: Array<[number, number, number]>;
 
+  /** The season on the far hills (game/outdoors.ts). */
+  setSeason(patch: (m: THREE.Material, kind: 'far') => void): void {
+    patch(this.material, 'far');
+  }
+
   constructor() {
     this.group.name = 'far ground';
     // (both sides: the skirts that close the gaps between chunks of other steps face either way)

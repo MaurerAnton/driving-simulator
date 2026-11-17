@@ -89,9 +89,61 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   oder dem Ergebnis **1:1 noch einmal ansehen** – das eigene Fahrzeug, der Verkehr, die Bahnen und die Ampeln,
   wie sie waren; von hinten, vom Fahrersitz oder frei um das Fahrzeug, langsamer oder schneller, mit den
   Hinweisen des Fahrlehrers als Marken auf der Zeitleiste.
-- **Hauptmenü in Reihen:** Fahrzeug, Ort und Startpunkt, die Optionen des Fahrzeugs und die Art der Fahrt als
-  Reihen von Karten zum Wischen über dem 3D-Bild – dahinter steht das gewählte Fahrzeug dort, wo die Fahrt
-  beginnt. Das einfache Menü von früher lässt sich in den Einstellungen wählen.
+- **Drei Hauptmenüs:** die **Bühne** (Voreinstellung) – das gewählte Fahrzeug groß in 3D an seinem Startort,
+  zum Wischen, runde Symbole für die Fahrzeugarten, ein großer Startknopf, wenig Text –, die **Reihen** von
+  Karten über dem 3D-Bild oder die einfache **Liste**; gewählt in den Einstellungen.
+- **Kräne:** ein **Turmdrehkran** auf einer Baustelle am Übungsplatz, ein **Autokran** (40 t, Klasse C), der auf
+  der Straße fährt und sich am Einsatzort aufstellt – Ausleger der Abstützung heraus, Stützen mit Platten auf
+  Unterleghölzer, nivellieren –, und ein **Lkw-Ladekran**. Gezeichnet und gerechnet ist alles, was einen Kran
+  standsicher macht: Fundament und Ballast, Gegengewicht, Drehkranz, Kipplinien zwischen den Stützen,
+  Traglasttabellen nach Ausladung, Auslegerlänge und Abstützung, ein **Lastmomentbegrenzer** (Warnung bei
+  90 %, bei 100 % stehen die Bewegungen, die das Lastmoment erhöhen), Wind, Neigung, eine Last, die am Seil
+  pendelt. Eine geführte Einweisung, dann echte Aufgaben („Bring diesen Stahlträger aufs Dach“) mit Bewertung;
+  gesteuert wie mit den zwei Meisterschaltern eines Krans – Tastatur, Gamepad oder zwei Joysticks auf dem Bildschirm.
+- **Theoriestunden:** 13 schwierige Situationen in 3D auf dem Übungsplatz – rechts vor links, abknickende
+  Vorfahrt, Linksabbiegen, Zebrastreifen, Straßenbahn, Rettungsgasse, Schulbus, Radfahrer überholen, toter
+  Winkel, Reißverschluss, Autobahnauffahrt, Kreisverkehr, Grünpfeil: Die Szene hält im entscheidenden
+  Moment, eine Frage – per Tipp auf ein Fahrzeug beantwortet –, die Antwort mit dem Paragraphen der StVO,
+  dann läuft sie richtig weiter.
+- **Leben auf der Straße:** **Polizei, Rettungswagen, Notarzt und Feuerwehr** mit Blaulicht und Martinshorn –
+  der Verkehr fährt rechts heran, bildet die **Rettungsgasse** und wartet an der Kreuzung; der Fahrlehrer
+  achtet darauf (§ 38, § 11 Abs. 2 StVO). **Baustellen**, jeden Tag andere: Baken, Absperrschranken,
+  Baustellenampel oder Vorrangschilder (Zeichen 208/308), Bagger und Arbeiter. Manchmal eine
+  **Demonstration** in der Innenstadt mit Polizeisperre und Umleitung. **Fußgänger** mit eigenem Ziel –
+  Geschäfte, Haltestellen, ein Spaziergang –, die an der Ampel drücken und warten, vor dem Überqueren
+  schauen, einander ausweichen und auf Autos und die Hupe reagieren; nachts sind es wenige, bei Regen eilen sie.
+- **Wetter und Jahreszeiten:** das **echte Wetter** am Ort des Fahrzeugs (Open-Meteo) – Regen, Schnee, Nebel,
+  Gewitter, nasse Straßen mit weniger Haftung – oder ein gewähltes; die **Jahreszeit** nach dem Datum oder
+  gewählt: Schnee mit Reifenspuren im Winter, buntes Laub im Herbst, Blüten im Frühling.
+- **Arcade** (Pausenmenü): die Welt zu einer anderen Zeit sehen – mit ihren Fahrplänen, ihrem Licht und
+  Wetter –, Jahreszeit und Wetter wählen und die Zeit bis zu 8-mal schneller laufen lassen, während der
+  Autopilot fährt; „Zurück zu jetzt“ holt die echte Zeit zurück.
+- **Tankstellen und Waschanlagen** an ihren echten Orten (289 und 141, aus OpenStreetMap): Jedes Fahrzeug hat
+  einen Tank und verbraucht Kraftstoff nach Motor und Last; an der Zapfsäule tanken (`9`), in der Waschstraße
+  den Schmutz abwaschen. Lkw der Klassen C1 und C werden vor der Fahrt am Lager mit Paletten beladen – Gabelstapler,
+  Hubwagen, Arbeiter –, und die Ladung zählt in der Fahrphysik.
+- **Ampel-Uhren und mehr Schilder:** über jeder Ampel eine kleine Anzeige mit den Sekunden bis zum nächsten
+  Wechsel (ein Tipp schaltet sie sicher weiter; nicht in Fahrstunden und Prüfung); rund 150 Zusatzzeichen und
+  viele weitere Verkehrszeichen, auch **zeitlich begrenzte** („22–6 h“, „Mo–Fr 7–16 h“, „bei Nässe“), die nur
+  dann gelten; **Ortstafeln** überall, wo eine Straße in einen Ort hinein- oder hinausführt.
+- **Autopilot im Flugzeug** (`T`): Start, Platzrunde und Landung, Höhe und Kurs halten oder zu einem Ort der
+  Karte; beim Fliegen von Hand hilft eine Unterstützung (kein Strömungsabriss, die Tragflächen gehen
+  gerade, wenn man loslässt); auf der Karte lässt sich die Höhe für einen Start in der Luft wählen.
+- **Karten:** Luftbilder von Anfang an; die kleine Karte lässt sich ziehen (umsehen) und verschieben; einen
+  **Weg auf die Karte zeichnen**, den der Autopilot genau so fährt; **jede Straßenbahn und jeder Bus** nach
+  Fahrplan auf der Karte, in der Farbe seiner Linie – antippen, um **zuzusehen** oder ihn zu **übernehmen**;
+  Haltestellen mit den nächsten Abfahrten; Baustellen und Demonstrationen; die zuletzt gesuchten Orte und
+  gefahrenen Wege; Fenster ohne Bildlaufleisten, die sich verkleinern lassen.
+- **Cockpit:** die Karte auf dem eigenen Bildschirm jedes Fahrzeugs (die Ecke ist dann frei); auf „Sehr hoch“
+  ein viel feineres Auto außen und innen, feinere Lkw, Busse und Traktoren; `Y` zeigt einen Spiegel groß und
+  vergrößert – fürs Einparken in die Garage.
+- **Klänge und Musik:** jedes Fahrzeug klingt wie es selbst – Benziner, Diesel, Moped, Motorräder, Traktoren,
+  Straßenbahn, Propeller, Druckluftbremsen und Türen –, dazu Musik, die beim Spielen entsteht (aus, bis man sie
+  einschaltet).
+- **Autopilot mit Übernahme:** Wer lenkt oder bremst, fährt einen Moment selbst – lässt man los, fährt der
+  Autopilot weiter zu seinen Zielen; was ihm im Weg steht, umfährt er.
+- **Unfall:** gegen eine Hauswand mit 70 km/h oder mehr geht das Fahrzeug in Flammen auf – zu Fuß weiter, ein
+  Knopf (oder `G`) holt ein neues.
 - **Jedes Modell:** ein Testplatz auf dem Übungsplatz mit allen Fahrzeugen des Spiels nebeneinander (jede
   Führerscheinklasse, mit und ohne Anhänger), den Autos, Radfahrern und Leuten des Verkehrs, zwei Straßenbahnen
   und dem Flugzeug – zu Fuß oder mit dem eigenen Fahrzeug zwischen ihnen.
@@ -403,7 +455,8 @@ muss man zum Spielen und Entwickeln nicht.
 ### Tests
 
 ```bash
-npm test             # 305 Tests: Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
+npm test             # 587 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
+                     # Tank und Waschanlage, Wetter, Jahreszeiten, Ampel-Uhren, Autopilot des Flugzeugs, Karten, Klänge; Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
                      # Klassen mit jeder Motorleistung (77), Flugphysik (25), Flugplätze (3), Straßenbahn fahren, ihr
                      # Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne im Verkehr (10), Fahrpläne
                      # aus GTFS (21), Buslinien aus OpenStreetMap (9), Wiederholung (4), Bus auf der Linie (2), zu Fuß an Ampel und Zebrastreifen (5), Fernsicht (2), Realansicht (15), Adresssuche, Hinweise, Fehlerprotokoll, Karte (16), Straßenbahnen (9),
@@ -452,6 +505,9 @@ src/world              Straßennetz-Modell: Knoten, Kanten, Kreuzungsgeometrie, 
 src/sim/vehicle        Fahrdynamik von Pkw und Lkw (ohne Abhängigkeiten, deterministisch)
 src/sim                Verkehr, Ampeln, Regelwächter, Kollisionen, Anhänger, Straßenbahnen und Züge mit
                        ihren Linien, die eigene Bahn (tramdrive.ts), Flugphysik (flight.ts) und Flugplätze,
+                       Autopilot des Flugzeugs (autopilot.ts), Kranphysik (crane.ts), Einsatzfahrzeuge
+                       (emergency.ts), Baustellen und Demonstrationen (roadevents.ts), Fußgänger
+                       (pedestrians.ts), Tank (fuel.ts), Fahrpläne (timetable.ts),
                        der regeltreue Fahrer der Vorführfahrten (autodriver.ts), „nichts steht im
                        Fahrstreifen“ (clearlanes.ts)
 src/render             three.js: Kacheln, Fernsicht, Gebäude, Schilder, Fahrzeuge, Flugzeug, Cockpit,
@@ -459,7 +515,11 @@ src/render             three.js: Kacheln, Fernsicht, Gebäude, Schilder, Fahrzeu
 src/i18n               Texte: eine Datei je Sprache, Tastenbeschriftung nach Tastaturbelegung
 src/reality            Realansicht: Bild-Metadaten (EXIF/XMP), eigene Bilder, freie Bilddienste, Luftbilder
 src/game, src/ui       Spielablauf, Fahrstunden, Aufgaben der Klasse CE, Navigation, Rundfahrten (tour.ts),
-                       HUD, Menüs, große Karte
+                       HUD, Menüs (stage.ts, carousel.ts), große Karte mit Bahnen und Bussen (transitmap.ts),
+                       gezeichnete Wege (pathdraw.ts), die Uhr des Spiels und Arcade (clock.ts, arcade.ts),
+                       Wetter und Jahreszeiten (weather.ts, outdoors.ts), Kräne (craneplay.ts, cranetasks.ts),
+                       Theoriestunden (theory*.ts), Tankstellen und Beladen (services.ts, serviceworld.ts)
+src/audio              Klänge jedes Fahrzeugs, Martinshorn, Explosion und Musik (Web Audio, erzeugt)
 tools/                 Kartenpipeline: Geodaten laden und verkleinern (fetch-geodata.py), OSM-PBF-Leser,
                        Straßennetz des Gebiets (build-graph.ts), Kacheln je Block (build-tiles.ts), Kontrolle
                        (check-lanes.ts), Haltestellen und Flugplätze (build-stops.ts), Linien der Bahnen
@@ -473,10 +533,12 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 305 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
+- **Automatisch geprüft:** 587 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
   Straßenbahn mit Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne, Buslinien, die Wiederholung, Bus auf der Linie, zu Fuß an Fußgängerampel und Zebrastreifen, Fernsicht, Anhänger, Aufgaben der Klasse CE,
   Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
-  Umgebungsverkehrs, eine Kontrolle der gebauten Karte (ein wagenbreiter Kreis fährt jeden Fahrstreifen
+  Umgebungsverkehrs (seit 1.4.0 auch Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen und Demonstrationen,
+  Fußgänger, Tank und Waschanlage, Wetter und Jahreszeiten, Ampel-Uhren, zeitlich begrenzte Schilder, Autopilot
+  des Flugzeugs, Karten, Klänge und Musik), eine Kontrolle der gebauten Karte (ein wagenbreiter Kreis fährt jeden Fahrstreifen
   ab: nichts steht darin) und ein „virtueller Fahrschüler“, der alle Fahrstunden und die Prüfungsfahrt
   (zusammen rund 56 km) regelkonform abfährt, ohne dass der Regelwächter einen Fehler meldet – ebenso mit
   Lkw und Anhänger die Prüfungsfahrt der Klasse CE. Derselbe Fahrer fährt die Vorführfahrten.
@@ -491,8 +553,9 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   nach den Grundregeln der StVO ergänzt und kann von der Wirklichkeit abweichen. Ampeln laufen mit
   plausiblen Festzeiten, nicht mit der echten Schaltung.
 - **Umgebungsverkehr:** beachtet Vorfahrt, Ampeln und Abstand, ist an großen Knotenpunkten aber nicht
-  fehlerfrei – vereinzelt blockieren sich Fahrzeuge oder kommen sich zu nahe. Fußgänger gibt es nur an
-  Überwegen. Radfahrer fahren nur innerorts an Straßen mit Gehweg, immer geradeaus oder nach rechts und nie
+  fehlerfrei – vereinzelt blockieren sich Fahrzeuge oder kommen sich zu nahe. Fußgänger gehen auf den Gehwegen
+  der Straßen (nicht auf eigenen Fußwegen und in Fußgängerzonen). Einsatzfahrzeuge machen Platz, indem
+  die anderen zur Seite rücken, nicht durch einen Spurwechsel; zeitlich begrenzte Schilder beachtet der Verkehr nicht. Radfahrer fahren nur innerorts an Straßen mit Gehweg, immer geradeaus oder nach rechts und nie
   auf der Fahrbahn; sie kommen nur dort, wo Verkehr eingeschaltet ist.
 - **Darstellung:** Gebäude haben echte Form und Höhe, aber keine Fototexturen; Fahrzeuge und Cockpit sind
   vollständig prozedural erzeugt.
@@ -516,12 +579,18 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   wenn sie in den Umkreis von gut einem halben Kilometer kommt.
 - **Buslinien:** Abbiegeverbote der Karte gelten auch für Busse, Busspuren und Busstraßen fehlen – dort weicht ein
   Bus vom echten Weg ab; ein Drittel der Linien ist nur teilweise auf der Karte (sie führen aus Nordhessen hinaus).
-- **Zu Fuß:** Die eigene Figur sieht immer gleich aus (wählen lässt sie sich noch nicht). Fußgänger des
-  Verkehrs gehen nur an Überwegen über die Straße.
+- **Zu Fuß:** Die eigene Figur sieht immer gleich aus (wählen lässt sie sich noch nicht).
+- **Kräne:** Die Wiederholung zeigt den Kran in seiner letzten Stellung; die Last dreht sich nicht am Haken;
+  der Turmdrehkran lässt sich nicht aufbauen oder klettern; der dreiachsige Autokran fährt auf dem Vierrad-Modell.
+- **Theoriestunden:** auf dem Übungsplatz nachgestellt, nicht an echten Kreuzungen; die Szenen haben keinen Ton.
+- **Tankstellen:** 37 Tankstellen und 15 Waschanlagen ohne Dach in den Daten und ohne Platz werden nicht
+  gezeichnet; gewaschen werden nur Pkw; Lkw mit Anhänger fahren unbeladen.
+- **Wetter:** keine Regentropfen auf der Scheibe, keine Scheibenwischer; die Nacht ist dunkel, Straßenlaternen
+  leuchten aber nicht.
 - **Wiederholung:** Sie zeigt, was gezeichnet war – Fahrzeuge, Leute, Bahnen und die Ampeln im Umkreis von
   600 m; die Haltestellen und ihre Leute laufen nicht mit. Gespeichert wird sie nicht: sie gilt für die
   laufende Fahrt.
-- **Flugzeug:** frei fliegen, ohne Funk, Flugverkehr, Navigationshilfen und Wetter; wer zu hart aufsetzt oder
+- **Flugzeug:** frei fliegen oder mit dem Autopiloten, ohne Funk, Flugverkehr und Navigationshilfen; wer zu hart aufsetzt oder
   mit der Fläche den Boden berührt, beendet den Flug. Was jenseits der Kacheln liegt, zeigt die Fernsicht
   ohne Gebäude und Bäume.
 - **Größe der Karte:** Geladen wird immer nur die Umgebung – Kacheln im Sichtbereich, das Straßennetz im
@@ -625,9 +694,37 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
 - **Replays:** every drive is recorded (the last half hour) and can be **watched again 1:1** from the pause menu
   or the result – your vehicle, the traffic, the trams and the lights as they were; from behind, from the
   driver's seat or freely round it, slower or faster, with the instructor's notes as marks on the timeline.
-- **A main menu in rows:** the vehicle, the town and the place, its options and the kind of drive as rows of
-  cards to swipe over the 3D picture, with the chosen vehicle standing where the drive begins. The simple
-  menu of before can be chosen in the settings.
+- **Three main menus:** the **stage** (the default) – the chosen vehicle large in 3D at its start place, swipe to
+  change it, round icons for the kinds, one big start button –, rows of cards over the 3D picture, or the
+  simple list (settings).
+- **Cranes (new in 1.4.0):** a tower crane on a building site, a 40 t mobile crane (class C) that drives on the
+  road and sets up with its outriggers (beams, jacks, pads, levelling), and a truck-mounted loader crane – with
+  ballast, counterweight, tipping lines, load charts, a load moment limiter (warning at 90 %, cut-off at 100 %),
+  wind, a load swinging on the rope, a guided start and real lifting tasks with scores.
+- **Theory lessons:** 13 difficult situations in 3D on the practice yard (right before left, the tram, the
+  emergency corridor, the school bus, the blind spot, the zip merge, the roundabout …) – the scene stops,
+  a question, the answer with its paragraph of the StVO, then it plays on the right way.
+- **Life on the roads:** police, ambulances and fire engines with blue lights and sirens (the traffic makes
+  way and forms the emergency corridor; the instructor watches you do it), roadworks with temporary lights or
+  priority signs that change every day, now and then a demonstration in town, and pedestrians with places to
+  go who wait at lights, look before they cross and react to cars and the horn.
+- **Weather and seasons:** the real weather where you drive (Open-Meteo) or a chosen one – rain, snow, fog,
+  thunderstorms, wet roads with less grip; the season by the date or chosen: snow with wheel tracks,
+  autumn leaves, spring blossom. **Arcade** (pause menu): the world at another day and hour, the season and
+  the weather, time up to 8× faster while the autopilot drives.
+- **Fuel stations and car washes** where they really are (289 and 141 from OpenStreetMap): every vehicle uses
+  fuel; fill up, wash the dirt off. Trucks of classes C1 and C are loaded with pallets by forklift before they set off.
+- **Timers over the traffic lights** (tap one to switch it on), about 150 more supplementary panels and many
+  more signs – also those valid only at times, like 30 from 22 to 6 h – and town signs wherever a road enters a town.
+- **The aeroplane flies by itself** (`T`): take-off, circuit and landing, holding height and heading, or to a
+  place on the map; flying by hand is helped; on the map you choose the height to start in the air.
+- **Maps:** aerial photos from the start, a corner map you can drag; draw the way the autopilot is to drive;
+  every tram and bus on the map in its line's colour – watch it or take it over; stops with their departures;
+  buses run to their real timetables too, with departure boards at the stops; the places looked for before.
+- **Cockpit and sound:** the live map on every vehicle's own screen, a much finer car on "Very high", mirror
+  zoom (`Y`); every vehicle sounds like itself, and there is music made as it plays (off by default).
+- **The autopilot** lets you take the wheel for a moment and drives on when you let go; hit a wall at 70 km/h
+  or more and the vehicle goes up in flames – walk on and take a new one.
 - **Every model:** a test place on the practice yard with every vehicle of the game side by side, the cars,
   cyclists and people of the traffic, two trams and the aeroplane – walk or drive among them.
 - **Flying:** a light two-seat high-wing aeroplane (100 to 180 PS) takes off from the 21 airfields of
@@ -691,7 +788,8 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 305 unit tests (vehicle dynamics of every vehicle with every engine power, the tram with its pantograph and
+Verified automatically by 587 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
+fuel and car washes, weather and seasons, signal timers, the aeroplane's autopilot, maps and sounds; vehicle dynamics of every vehicle with every engine power, the tram with its pantograph and
 coupled units, the trailer, the class-CE tasks, cyclists, traffic lights, on foot and the pedestrian lights, trams with their lines and
 timetables, bus lines, replays, the bus line, flight physics, airfields, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
 a check of the built map (a car-wide circle is driven along every lane: nothing stands in one) and a

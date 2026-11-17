@@ -369,7 +369,12 @@ function mergeByPosition(g: THREE.BufferGeometry): THREE.BufferGeometry {
   return m;
 }
 
-export function buildCarShell(d: CarDims): CarShell {
+/**
+ * The key cross-sections of a body and how to find the one at any z – what
+ * the shell is lofted through (buildCarShell), and what parts fixed to its
+ * surface are placed by (bodyProfile).
+ */
+function layout(d: CarDims) {
   const hw = d.width / 2;
   const zF = -(d.wheelbase / 2 + d.frontOverhang);
   const zR = zF + d.length;
@@ -422,22 +427,8 @@ export function buildCarShell(d: CarDims): CarShell {
     noCabin(zR, hw * 0.72, 0.33, bootY - 0.2, 0.005),
   ];
 
-  // dense station list: key sections, pillar edges and wheel-arch samples
-  const zs = new Set<number>();
-  for (const k of keys) zs.add(k.z);
   const Ra = d.wheelRadius + 0.075;
-  for (const za of [zAF, zAR]) {
-    for (const f of [-1, -0.92, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 0.92, 1]) zs.add(za + f * Ra);
-  }
   const zB = (zRoofF + zRoofR) / 2 - 0.02; // B pillar
-  for (const z of [zB - 0.045, zB + 0.045, zRoofR - 0.17]) zs.add(z);
-  for (let i = 1; i < keys.length; i++) {
-    const a = keys[i - 1].z;
-    const b = keys[i].z;
-    const n = Math.ceil((b - a) / 0.22);
-    for (let k = 1; k < n; k++) zs.add(a + ((b - a) * k) / n);
-  }
-  const zList = [...zs].filter((z) => z >= zF - 1e-6 && z <= zR + 1e-6).sort((p, q) => p - q);
   /** The cross-section at any z, blended between the key sections around it. */
   const sectionAt = (z: number): Section => {
     let i = 1;
@@ -448,17 +439,6 @@ export function buildCarShell(d: CarDims): CarShell {
     s.z = z;
     return s;
   };
-  const stations: Section[] = [];
-  const keyZ = new Set(keys.map((k) => k.z));
-  for (const z of zList) {
-    if (stations.length && z - stations[stations.length - 1].z < 0.012) {
-      // two stations nearly on top of each other: keep the key section (glass
-      // and pillars start exactly there), otherwise the first one
-      if (keyZ.has(z) && !keyZ.has(stations[stations.length - 1].z)) stations.pop();
-      else continue;
-    }
-    stations.push(sectionAt(z));
-  }
 
   /** Right-hand profile points of a station, bottom centre → roof centre. */
   const profile = (s: Section): number[][] => {
@@ -480,6 +460,49 @@ export function buildCarShell(d: CarDims): CarShell {
       [0, s.yc, s.z],
     ];
   };
+  return { hw, zF, zR, zAF, zAR, H, belt, zCowl, zRoofF, zRoofR, zTailTop, cowlTop, cowlCrown, keys, Ra, zB, sectionAt, profile };
+}
+
+/**
+ * The outline of a body across the car at z, as its shell is built: the
+ * right-hand points [x, y] from the middle of the floor out over the sill,
+ * the flank, the belt line and the edge of the roof (or of the bonnet and
+ * the boot) to the middle of the top – for what is fixed to the surface
+ * (render/cardetail.ts).  Straight between the points; the left side is the
+ * mirror image.
+ */
+export function bodyProfile(d: CarDims): (z: number) => number[][] {
+  const { sectionAt, profile } = layout(d);
+  return (z) => profile(sectionAt(z)).map((q) => [q[0], q[1]]);
+}
+
+export function buildCarShell(d: CarDims): CarShell {
+  const { hw, zF, zR, zAF, zAR, H, belt, zCowl, zRoofF, zRoofR, zTailTop, cowlTop, cowlCrown, keys, Ra, zB, sectionAt, profile } = layout(d);
+  // dense station list: key sections, pillar edges and wheel-arch samples
+  const zs = new Set<number>();
+  for (const k of keys) zs.add(k.z);
+  for (const za of [zAF, zAR]) {
+    for (const f of [-1, -0.92, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 0.92, 1]) zs.add(za + f * Ra);
+  }
+  for (const z of [zB - 0.045, zB + 0.045, zRoofR - 0.17]) zs.add(z);
+  for (let i = 1; i < keys.length; i++) {
+    const a = keys[i - 1].z;
+    const b = keys[i].z;
+    const n = Math.ceil((b - a) / 0.22);
+    for (let k = 1; k < n; k++) zs.add(a + ((b - a) * k) / n);
+  }
+  const zList = [...zs].filter((z) => z >= zF - 1e-6 && z <= zR + 1e-6).sort((p, q) => p - q);
+  const stations: Section[] = [];
+  const keyZ = new Set(keys.map((k) => k.z));
+  for (const z of zList) {
+    if (stations.length && z - stations[stations.length - 1].z < 0.012) {
+      // two stations nearly on top of each other: keep the key section (glass
+      // and pillars start exactly there), otherwise the first one
+      if (keyZ.has(z) && !keyZ.has(stations[stations.length - 1].z)) stations.pop();
+      else continue;
+    }
+    stations.push(sectionAt(z));
+  }
 
   const paint = new Geo();
   const glass = new Geo();

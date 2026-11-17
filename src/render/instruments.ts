@@ -191,6 +191,17 @@ export class InstrumentPanel {
     lamp(W - 300, 232, lit && s.abs, '#ffb020', text('ABS', 14));
     lamp(262, 208, lit && !s.engineRunning, '#ff3b30', text('⚠', 20));
     lamp(W - 262, 208, lit && !s.seatbelt, '#ff3b30', text('🔔', 16));
+    // the fuel lamp, right of the fuel bar: the reserve is reached
+    lamp(cx + 78, 214, lit && s.fuel < 0.12, '#ffb020', () => {
+      c.fillRect(-8, -8, 9, 16);
+      c.fillRect(-10, 8, 13, 2.5);
+      c.beginPath();
+      c.moveTo(1, -5);
+      c.lineTo(6, -1);
+      c.lineTo(6, 5);
+      c.lineWidth = 2;
+      c.stroke();
+    });
     this.texture.needsUpdate = true;
   }
 }

@@ -18,6 +18,8 @@ import { COMPACT_CAR, COMPACT_CAR_AUTOCLUTCH, COMPACT_CAR_AUTOMATIC, TRUCK, atPo
 import type { VehicleSpec } from '../sim/vehicle/index.ts';
 import { COMPACT_DIMS } from '../render/carBody.ts';
 import { TRAINER } from '../sim/flightspec.ts';
+import { LOADER_TRUCK_SPEC, MOBILE_CRANE_SPEC } from '../sim/crane.ts';
+import type { CraneType } from '../sim/crane.ts';
 
 export type VehicleKind =
   | 'car'
@@ -38,14 +40,17 @@ export type VehicleKind =
   | 'tractor'
   | 'tram'
   | 'plane'
+  | 'mobileCrane'
+  | 'loaderCrane'
+  | 'towerCrane'
   | 'pedestrian';
-/** in the order of the licence classes: B, BE, AM, A1, A2, A, C1, C1E, C, CE, D1, D1E, D, DE, L, T – the tram, the aeroplane, and on foot */
-export const VEHICLE_KINDS: readonly VehicleKind[] = ['car', 'carTrailer', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'minibus', 'minibusTrailer', 'bus', 'busTrailer', 'tractorSlow', 'tractor', 'tram', 'plane', 'pedestrian'];
+/** in the order of the licence classes: B, BE, AM, A1, A2, A, C1, C1E, C, CE, D1, D1E, D, DE, L, T – the tram, the aeroplane, the cranes, and on foot */
+export const VEHICLE_KINDS: readonly VehicleKind[] = ['car', 'carTrailer', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'minibus', 'minibusTrailer', 'bus', 'busTrailer', 'tractorSlow', 'tractor', 'tram', 'plane', 'mobileCrane', 'loaderCrane', 'towerCrane', 'pedestrian'];
 
-/** the kinds of vehicle that are driven on the road (not the tram on its tracks, not the aeroplane, not on foot) */
-export const ROAD_VEHICLE_KINDS: readonly VehicleKind[] = VEHICLE_KINDS.filter((k) => k !== 'tram' && k !== 'pedestrian' && k !== 'plane');
+/** the kinds of vehicle that are driven on the road (not the tram on its tracks, not the aeroplane, not the tower crane on its base, not on foot) */
+export const ROAD_VEHICLE_KINDS: readonly VehicleKind[] = VEHICLE_KINDS.filter((k) => k !== 'tram' && k !== 'pedestrian' && k !== 'plane' && k !== 'towerCrane');
 
-export type ModelKind = 'car' | 'truck' | 'truckLight' | 'bus' | 'minibus' | 'tractor' | 'motorcycle' | 'tram' | 'walker' | 'plane';
+export type ModelKind = 'car' | 'truck' | 'truckLight' | 'bus' | 'minibus' | 'tractor' | 'motorcycle' | 'tram' | 'walker' | 'plane' | 'towerCrane' | 'mobileCrane' | 'loaderCrane';
 
 export interface VehicleDef {
   kind: VehicleKind;
@@ -87,6 +92,8 @@ export interface VehicleDef {
   long: boolean;
   /** the instruments are small or missing in its cockpit: the dashboard strip stays on */
   dash: boolean;
+  /** a crane (game/craneplay.ts): its free drive is the work on the construction site */
+  crane?: CraneType;
 }
 
 const carFront = COMPACT_DIMS.wheelbase / 2 + COMPACT_DIMS.frontOverhang;
@@ -412,6 +419,86 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     noMotorway: true,
     long: false,
     dash: true,
+  },
+  // The cranes (sim/crane.ts, game/craneplay.ts): the mobile crane and the loader crane are trucks of class C,
+  // driven like any to their stand on the construction site and worked there; the tower crane stands on its
+  // base – nothing to drive (what is given for it is what the rest of the game needs: the camera, its size).
+  mobileCrane: {
+    ...truck,
+    kind: 'mobileCrane',
+    licence: 'C',
+    name: 'vehMobileCrane',
+    model: 'mobileCrane',
+    spec: () => MOBILE_CRANE_SPEC,
+    powers: [503],
+    power: 503,
+    trailer: null,
+    caps: { rural: 60, motorway: 80 },
+    capFault: 'classSpeed',
+    // (the boom's head reaches over the front)
+    outline: { front: 6.6, rear: 4.6, hw: 1.28 },
+    axles: [1.75, -0.95, -2.55],
+    track: 1.04,
+    door: 3.1,
+    doorSide: -1,
+    circles: [-5.4, -3.4, -1.3, 0.8, 2.9, 3.35],
+    radius: 1.28,
+    zoom: 16,
+    zoomMax: 40,
+    governed: 80,
+    crane: 'mobile',
+  },
+  loaderCrane: {
+    ...truck,
+    kind: 'loaderCrane',
+    licence: 'C',
+    name: 'vehLoaderCrane',
+    model: 'loaderCrane',
+    spec: () => LOADER_TRUCK_SPEC,
+    powers: [286],
+    power: 286,
+    trailer: null,
+    caps: { rural: 60, motorway: 80 },
+    capFault: 'classSpeed',
+    outline: { front: 3.9, rear: 5.25, hw: 1.28 },
+    axles: [2.4, -2.4],
+    track: 1.1,
+    door: 3.0,
+    doorSide: -1,
+    circles: [-2.9, -1.0, 1.0, 2.9, 3.97],
+    radius: 1.28,
+    zoom: 14,
+    zoomMax: 34,
+    crane: 'loader',
+  },
+  towerCrane: {
+    ...car,
+    kind: 'towerCrane',
+    licence: '',
+    name: 'vehTowerCrane',
+    model: 'towerCrane',
+    spec: () => TRUCK,
+    powers: [],
+    power: 0,
+    trailer: null,
+    caps: null,
+    capFault: 'speed',
+    // (its jib and counter-jib, and its base)
+    outline: { front: 50, rear: 15, hw: 2.5 },
+    axles: [0, 0],
+    track: 2.5,
+    door: 0,
+    doorSide: 0,
+    circles: [0],
+    radius: 2.6,
+    zoom: 30,
+    zoomMax: 90,
+    governed: 0,
+    heavy: true,
+    noMotorway: true,
+    long: false,
+    dash: true,
+    crane: 'tower',
   },
   // On foot there is no vehicle at all (game.ts walks with OnFoot, game/onfoot.ts): what is given here is
   // what the rest of the game needs of "the vehicle" – the camera keeps to the person, the motorway is not

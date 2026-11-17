@@ -16,6 +16,10 @@ import { CAR_TRAILER } from '../sim/trailer.ts';
 import type { CarVisualState } from './car.ts';
 import { InstrumentPanel } from './instruments.ts';
 import { Mirror } from './mirrors.ts';
+import { NavScreen } from './navscreen.ts';
+import type { VehicleScreen } from './navscreen.ts';
+import { busDetail, tractorDetail } from './fleetdetail.ts';
+import type { FleetDetail } from './fleetdetail.ts';
 import { AMBER, BRAND, DARK, FRAME, GLASS, LAMP, LAMP_STOP, TAIL, box, lettering, panel, wheel } from './truck.ts';
 import type { Facing } from './truck.ts';
 
@@ -25,7 +29,11 @@ export interface VehicleModel {
   /** the driver's eyes (model coordinates) */
   readonly eye: THREE.Vector3;
   readonly mirrors: Mirror[];
+  /** the screen in the cockpit the live map can be shown on (render/navscreen.ts) – none: the map stays in the corner */
+  readonly navScreen?: VehicleScreen;
   setCabinOpacity(opacity: number): void;
+  /** the finer model of the "very high" graphics (true) or the plain one – for the models that have one */
+  setDetail?(on: boolean): void;
   update(s: CarVisualState, dt: number, now: number): void;
 }
 
@@ -177,6 +185,7 @@ export class PlayerBus implements VehicleModel {
   readonly root = new THREE.Group();
   readonly eye = new THREE.Vector3(-0.72, 2.02, -4.75);
   readonly mirrors: Mirror[] = [];
+  readonly navScreen: NavScreen;
   private readonly wheels: THREE.Group[] = [];
   private readonly steering: THREE.Group;
   private readonly lamps = new Lamps();
@@ -189,6 +198,8 @@ export class PlayerBus implements VehicleModel {
   private readonly body: { hw: number; top: number; roof: number; zf: number; zr: number; long: boolean };
   /** the destination display at the front, on the right side and at the back (made when a line is first shown) */
   private display: { dest: Destination; plates: THREE.Mesh[] } | null = null;
+  /** the finer model of the "very high" graphics (render/fleetdetail.ts): made the first time it is asked for */
+  private detail: FleetDetail | null = null;
 
   /** `spec`: the bus (12 m, class D) or the minibus (class D1) – its length, height and doors follow from it. */
   constructor(spec: VehicleSpec = BUS) {
@@ -313,6 +324,9 @@ export class PlayerBus implements VehicleModel {
     this.steering = steeringWheel(inside, new THREE.Vector3(ex, 1.38, zf + 0.82), 1.05, 0.26, fit);
     inside.add(box(ex - 0.28, ex + 0.28, 0.95, 1.12, zf + 1.1, zf + 1.65, fit, false)); // seat
     inside.add(box(ex - 0.28, ex + 0.28, 1.12, 2.0, zf + 1.55, zf + 1.69, fit, false));
+    // the screen with the map, on an arm from the dashboard right of the wheel – low in the driver's view
+    const sy = Math.max(1.42, this.eye.y - 0.445 * (this.eye.z - zf - 0.18));
+    this.navScreen = new NavScreen(0.26).place(inside, new THREE.Vector3(-0.1, sy, zf + 0.18), this.eye, new THREE.Vector3(-0.1, 1.32, zf + 0.22));
     root.add(inside);
     // --- mirrors on arms in front of the windscreen
     for (const side of [-1, 1]) {
@@ -375,6 +389,13 @@ export class PlayerBus implements VehicleModel {
     this.steering.rotation.z = -s.steerWheel;
     this.lamps.update(s);
     this.panelTex.update(s, now);
+    this.detail?.update();
+  }
+
+  /** The finer model (true) or the plain one. */
+  setDetail(on: boolean): void {
+    if (on && !this.detail) this.detail = busDetail({ root: this.root, spec: this.spec, wheels: this.wheels });
+    this.detail?.show(on);
   }
 }
 
@@ -387,6 +408,7 @@ export class PlayerTractor implements VehicleModel {
   readonly root = new THREE.Group();
   readonly eye = new THREE.Vector3(0, 2.42, 0.62);
   readonly mirrors: Mirror[] = [];
+  readonly navScreen: NavScreen;
   private readonly wheels: THREE.Group[] = [];
   /** the visible wheels are of two sizes (the physics use one): their centres stand at their own radius */
   private readonly radii = [0.56, 0.56, 0.8, 0.8];
@@ -394,6 +416,8 @@ export class PlayerTractor implements VehicleModel {
   private readonly lamps = new Lamps();
   private readonly shell = new Shell(TRACTOR_PAINT);
   private readonly panelTex = new InstrumentPanel();
+  /** the finer model of the "very high" graphics (render/fleetdetail.ts): made the first time it is asked for */
+  private detail: FleetDetail | null = null;
 
   constructor() {
     const s = TRACTOR;
@@ -467,6 +491,8 @@ export class PlayerTractor implements VehicleModel {
     inside.add(box(-0.18, 0.18, floor, 2.0, z0 + 0.02, z0 + 0.32, fit, false)); // the console before the wheel
     dial(inside, this.panelTex.texture, new THREE.Vector3(0, 2.02, z0 + 0.36), 0.36, 0.55);
     this.steering = steeringWheel(inside, new THREE.Vector3(0, 2.0, 0.02), 0.62, 0.21, fit);
+    // the screen with the map, on an arm from the right front post of the cab
+    this.navScreen = new NavScreen(0.22).place(inside, new THREE.Vector3(0.47, 2.16, z0 + 0.22), this.eye, new THREE.Vector3(cx - 0.04, 2.16, z0 + 0.03));
     root.add(inside);
     // --- mirrors on arms at the front corners of the cab
     for (const side of [-1, 1]) {
@@ -493,6 +519,13 @@ export class PlayerTractor implements VehicleModel {
     this.steering.rotation.z = -s.steerWheel;
     this.lamps.update(s);
     this.panelTex.update(s, now);
+    this.detail?.update();
+  }
+
+  /** The finer model (true) or the plain one. */
+  setDetail(on: boolean): void {
+    if (on && !this.detail) this.detail = tractorDetail({ root: this.root, wheels: this.wheels, radii: this.radii });
+    this.detail?.show(on);
   }
 }
 
@@ -568,6 +601,7 @@ export class TramCab implements VehicleModel {
   readonly root = new THREE.Group();
   readonly eye = new THREE.Vector3(0, 2.15, -3.35);
   readonly mirrors: Mirror[] = [];
+  readonly navScreen: NavScreen;
   private readonly shell = new Shell(FRAME);
   private readonly panelTex = new InstrumentPanel();
   /** the controller's handle: forwards for power, back for the brake */
@@ -616,6 +650,8 @@ export class TramCab implements VehicleModel {
     // the seat
     root.add(box(-0.28, 0.28, floor + 0.55, floor + 0.68, zf + 1.05, zf + 1.6, fit, false));
     root.add(box(-0.28, 0.28, floor + 0.68, floor + 1.45, zf + 1.52, zf + 1.66, fit, false));
+    // the screen with the map, on the desk right of the instruments
+    this.navScreen = new NavScreen(0.26).place(root, new THREE.Vector3(0.6, 1.8, zf + 0.42), this.eye, new THREE.Vector3(0.6, 1.62, zf + 0.46));
   }
 
   setCabinOpacity(opacity: number): void {

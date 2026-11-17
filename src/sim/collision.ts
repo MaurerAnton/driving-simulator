@@ -185,12 +185,16 @@ export class SceneryCollider {
     return false;
   }
 
+  /** the largest impact speed (m/s) into the wall of a building in the last `resolve` */
+  lastBuilding = 0;
+
   /**
    * Push the car out of anything it penetrates and take the velocity into
    * the obstacle away.  Returns the largest impact speed (m/s) of this call.
    */
   resolve(v: Vehicle): number {
     let impact = 0;
+    this.lastBuilding = 0;
     const mo = v.modelOrigin;
     const R = this.radius;
     for (let c = 0; c < this.offsets.length; c++) {
@@ -243,6 +247,8 @@ export class SceneryCollider {
             v.translate(ux * depth, 0, uz * depth);
             if (vn < 0) {
               impact = Math.max(impact, -vn);
+              // (into the wall of a building – a footprint, not a fence or a post)
+              if (p.kind === 0 && Number.isNaN(p.y)) this.lastBuilding = Math.max(this.lastBuilding, -vn);
               // inelastic hit with a little bounce; applied at centre-of-mass height so the car does not flip
               const m = v.spec.mass * 0.55;
               const j = -(1.15 * vn) * m;

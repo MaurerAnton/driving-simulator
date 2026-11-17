@@ -74,12 +74,21 @@ interface TileProps {
 export class PropRenderer {
   private readonly geos = treeGeometries();
   private readonly lampGeo = lampGeometry();
-  private readonly treeMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  /** one material for each kind of tree (broadleaf, conifer, …): the season colours and strips them each in its own way */
+  private readonly treeMats = [0, 1, 2, 3].map(() => new THREE.MeshLambertMaterial({ vertexColors: true }));
   private readonly lampMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   private readonly perTile = new Map<string, TileProps>();
   /** global multiplier for how many trees are drawn (quality setting) */
   density = 1;
   private shadows = false;
+
+  /** The season on the trees: broadleaf and the other deciduous kind, conifers, fruit trees (game/outdoors.ts). */
+  setSeason(patch: (m: THREE.Material, kind: 'deciduous' | 'evergreen' | 'orchard') => void): void {
+    patch(this.treeMats[0], 'deciduous');
+    patch(this.treeMats[1], 'evergreen');
+    patch(this.treeMats[2], 'deciduous');
+    patch(this.treeMats[3], 'orchard');
+  }
 
   /** Trees throw shadows (the highest quality only: there are many of them). */
   setShadows(on: boolean): void {
@@ -111,7 +120,7 @@ export class PropRenderer {
       const col = new THREE.Color();
       for (let kind = 0; kind < 4; kind++) {
         if (!counts[kind]) continue;
-        const mesh = new THREE.InstancedMesh(this.geos.hi[kind], this.treeMat, counts[kind]);
+        const mesh = new THREE.InstancedMesh(this.geos.hi[kind], this.treeMats[kind], counts[kind]);
         let k = 0;
         for (let oi = 0; oi < n; oi++) {
           const i = order[oi];

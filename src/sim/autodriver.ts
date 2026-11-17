@@ -38,7 +38,7 @@ export interface AutoDriverOptions {
 }
 
 /** Why the driver does what it is doing – for telling a learner who watches. */
-export type AutoRemark = '' | 'red' | 'stop' | 'yield' | 'zebra' | 'follow' | 'turn' | 'lane' | 'rbl' | 'roundabout' | 'ringExit' | 'halt' | 'deadEnd' | 'cyclist' | 'arrow' | 'lightsOut';
+export type AutoRemark = '' | 'red' | 'stop' | 'yield' | 'zebra' | 'follow' | 'turn' | 'lane' | 'rbl' | 'roundabout' | 'ringExit' | 'halt' | 'deadEnd' | 'cyclist' | 'arrow' | 'lightsOut' | 'closed';
 
 export interface AutoCommand {
   /** -1 … 1, positive = to the right */
@@ -221,6 +221,20 @@ export class AutoDriver {
         } else next = lane.out.length === 1 ? lane.out[0] : null;
       }
     }
+    // roadworks (src/sim/roadevents.ts): a lane closed ahead – over to the open one in good time, and not back before its end
+    const works = traffic?.roadEvents ?? null;
+    if (works && lane) {
+      if (path && path !== lane && !works.laneOpen(path, laneS)) {
+        path = lane;
+        change = 0;
+        laneBlocked = false;
+      }
+      const open = works.laneOpen(lane, laneS) ? null : works.openLane(lane);
+      if (open) {
+        change = (open.off - lane.off) * lane.dir > 0 ? -1 : 1;
+        path = traffic && (!traffic.roomOn(open, laneS - FRONT, Math.max(0, v.speed), this.me.length) || this.changeT < 1) ? lane : open;
+      }
+    }
     if (next) this.lastNext = next;
     else if (!lane) next = this.lastNext;
     // pure pursuit target point: lookahead along lane → connector → next lane
@@ -392,7 +406,10 @@ export class AutoDriver {
       aim((d) => {
         const sj = at + d;
         if (sj <= on.len) samplePolyline(on.pl, sj, smp);
-        else lanePoint(on.to, Math.min(on.to.len, sj - on.len), smp);
+        else {
+          lanePoint(on.to, Math.min(on.to.len, sj - on.len), smp);
+          works?.offset(on.to, Math.min(on.to.len, sj - on.len), smp);
+        }
       });
       tx = smp.x;
       tz = smp.z;
@@ -414,15 +431,33 @@ export class AutoDriver {
       const onward = next;
       aim((d) => {
         const sl = centre + d;
-        if (sl <= lane.len || !onward) lanePoint(here, Math.min(lane.len, sl), smp);
-        else if (sl - lane.len <= onward.len) samplePolyline(onward.pl, sl - lane.len, smp);
-        else lanePoint(onward.to, Math.min(onward.to.len, sl - lane.len - onward.len), smp);
+        // (where a side closed for roadworks is passed on the oncoming lane: over there)
+        if (sl <= lane.len || !onward) {
+          lanePoint(here, Math.min(lane.len, sl), smp);
+          works?.offset(here, Math.min(lane.len, sl), smp);
+        } else if (sl - lane.len <= onward.len) samplePolyline(onward.pl, sl - lane.len, smp);
+        else {
+          lanePoint(onward.to, Math.min(onward.to.len, sl - lane.len - onward.len), smp);
+          works?.offset(onward.to, Math.min(onward.to.len, sl - lane.len - onward.len), smp);
+        }
       });
       if (centre + la <= lane.len || next) {
         tx = smp.x;
         tz = smp.z;
       }
       limit = preview(next, Math.max(0, lane.len - laneS), limit);
+      // roadworks and closures (src/sim/roadevents.ts): their limit; the site light, the oncoming traffic at a narrowing, the end of a closed lane, a closed road
+      if (works) {
+        const g = works.gate(lane, laneS, speed, next);
+        if (g.cap < limit) limit = g.cap;
+        // (the end of a closed lane does not hold up a car that is moving over already)
+        if (obey && g.stop < Infinity && !(g.why === 'lane' && path !== lane)) {
+          const dd = Math.max(0, g.stop - 1.2);
+          limit = Math.min(limit, Math.sqrt(2 * DECEL * dd));
+          if (dd < 0.6) crossStop = true;
+          remark = g.why === 'light' ? 'red' : g.why === 'oncoming' ? 'yield' : g.why === 'closed' ? 'closed' : 'lane';
+        }
+      }
       distToLine = lane.stopAt - laneS;
       const node = lane.to;
       const arm = lane.armTo;

@@ -21,10 +21,10 @@ License 1.0** – © OpenStreetMap-Mitwirkende, <https://www.openstreetmap.org/c
 Geländehöhen (DGM1) und Gebäude (3D-Gebäudemodelle LoD2): Hessische Verwaltung für Bodenmanagement und
 Geoinformation, offene Geobasisdaten nach § 18 HVGG („jede Nutzung ohne Einschränkung oder Bedingung“).
 
-Fahrpläne der Straßenbahnen und RegioTrams (`timetable.json.gz`): gtfs.de – GTFS für Deutschland
+Fahrpläne der Straßenbahnen, RegioTrams und Busse (`timetable.json.gz`): gtfs.de – GTFS für Deutschland
 (<https://gtfs.de>), Daten bereitgestellt von DELFI e.V. (<https://www.delfi.de>), mit Beiträgen von
 OpenStreetMap-Mitwirkenden; Lizenz **CC BY 4.0** (<https://creativecommons.org/licenses/by/4.0/>) – für das
-Spiel auf die Straßenbahnen und RegioTrams in Kassel gekürzt und umgerechnet.
+Spiel auf die Straßenbahnen und RegioTrams in Kassel und die Busse in Nordhessen gekürzt und umgerechnet.
 
 Die Herleitung beschreibt [docs/MAP_DATA.md](docs/MAP_DATA.md).
 
@@ -48,12 +48,31 @@ und zeigt sie mit Urheber, Lizenz und Link zum Original an. Eigene Bilder der Nu
 gespeicherte Street-View-Panoramen) werden nur lokal im Browser gelesen; für deren Rechte sind die Nutzer
 selbst verantwortlich. Der Ordner `public/panos/` ist deshalb von der Versionsverwaltung ausgenommen.
 
-## Luftbilder auf der großen Karte
+## Luftbilder auf den Karten
 
-Das Projekt enthält und verteilt keine Luftbilder. Wer auf der großen Karte „Luftbilder“ anhakt, lässt sie
-direkt im eigenen Browser vom WMS-Dienst der Hessischen Verwaltung für Bodenmanagement und Geoinformation
-laden (Digitale Orthophotos DOP20, <https://hvbg.hessen.de>): offene Geobasisdaten, „jede Nutzung … ohne
-Einschränkung oder Bedingung erlaubt“ (§ 24 HVGG). Die Karte nennt die Herkunft der Bilder.
+Das Projekt enthält und verteilt keine Luftbilder. Die große Karte, die runde Karte in der Ecke und der
+Bildschirm im Auto zeigen sie (seit 1.4.0 von Anfang an, abschaltbar in den Einstellungen und auf der großen
+Karte); sie werden dann direkt im eigenen Browser vom WMS-Dienst der Hessischen Verwaltung für
+Bodenmanagement und Geoinformation geladen (Digitale Orthophotos DOP20, <https://hvbg.hessen.de>): offene
+Geobasisdaten, „jede Nutzung … ohne Einschränkung oder Bedingung erlaubt“ (§ 24 HVGG). Der Server erfährt
+dabei die IP-Adresse und den gezeigten Ausschnitt – das sagen auch die Einstellungen. Die große Karte nennt
+die Herkunft der Bilder.
+
+## Wetter
+
+Das Projekt enthält und verteilt keine Wetterdaten. Mit der Einstellung „Wetter: echt“ (Voreinstellung)
+fragt das Spiel im Browser der Spielerin oder des Spielers bei Open-Meteo nach dem Wetter des Ortes, an dem
+das Fahrzeug ist (auf 0,1° gerundet, also etwa 10 km), und – wenn im Arcade-Modus eine andere Zeit gewählt
+ist – nach der Vorhersage für diese Stunde: **Weather data by Open-Meteo.com** (<https://open-meteo.com/>),
+Lizenz **CC BY 4.0** (<https://creativecommons.org/licenses/by/4.0/>) – umgesetzt in Regen, Schnee, Nebel,
+Wolken, Wind, nasse Straßen und Licht des Simulators. Der Dienst erfährt dabei die IP-Adresse; die
+Einstellungen sagen das und nennen die Quelle. Mit einem anderen Wetter als „echt“ wird nichts abgefragt.
+
+## Musik und Klänge
+
+Alle Klänge (Motoren, Straßenbahn, Flugzeug, Hupen, Türen, Explosion) und die Musik werden im Browser
+erzeugt (Web Audio) – es gibt keine Aufnahmen. Die Musikstücke entstehen beim Abspielen aus Regeln des
+Programms (`src/audio/music.ts`) und stehen wie das Programm unter der AGPL-3.0.
 
 ## Verweise auf Rechtsvorschriften
 

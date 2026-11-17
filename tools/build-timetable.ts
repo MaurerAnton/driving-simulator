@@ -1,27 +1,37 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * The timetables of the trams: when the trips of each line of the map
- * (lines.json.gz) leave and how long they take from stop to stop – from a
- * GTFS feed, the form in which public transport publishes its timetables –
- * so that the trams of the game keep to their real times and the departure
- * boards at the stops show them.
+ * The timetables of the trams and buses: when the trips of each line of the
+ * map (lines.json.gz, buslines.json.gz) leave and how long they take from
+ * stop to stop – from a GTFS feed, the form in which public transport
+ * publishes its timetables – so that the trams and buses of the game keep to
+ * their real times and the departure boards at the stops show them.
  *
  *   node --max-old-space-size=1536 tools/build-timetable.ts [feed.zip …]
  *
  * Without a feed it fetches the current ones of gtfs.de into data/raw/gtfs/,
- * each into a folder of its own: local transport, which has the trams of
- * the KVG, and regional rail, which has the RegioTrams (the two come from
- * the national timetable data of DELFI, under CC BY 4.0).  Nothing is
- * unpacked – stop_times.txt is two gigabytes for the whole of Germany: it
- * is streamed out of the zip (`unzip -p`) and only the rows of the trips
- * wanted are kept.  A folder holding a feed's .txt files works as well.
+ * each into a folder of its own: local transport, which has the trams and
+ * buses of the KVG and the buses of the NVV, and regional rail, which has
+ * the RegioTrams (the two come from the national timetable data of DELFI,
+ * under CC BY 4.0).  Nothing is unpacked – stop_times.txt is two gigabytes
+ * for the whole of Germany: it is streamed out of the zip (`unzip -p`), once
+ * for the trams and buses together, and only the rows of the trips wanted
+ * are kept.  A folder holding a feed's .txt files works as well.
  *
- * Reads lines.json.gz, rails.json.gz and stops.json.gz of the map (MAP_OUT,
- * default public/map) and writes timetable.json.gz there (TimetableJson in
- * src/world/types.ts).  Settings by environment: GTFS_AGENCY (the operators
+ * The trams' trips go to the lines of lines.json.gz by their number and the
+ * names of their stops; the buses' to the lines of buslines.json.gz by their
+ * number and their stops – paired by where they are and by name (a bus stop
+ * name is in every town), a trip that runs two lines of the map (a loop that
+ * OpenStreetMap splits in two) on both.
+ *
+ * Reads lines.json.gz, rails.json.gz, stops.json.gz and buslines.json.gz of
+ * the map (MAP_OUT, default public/map) and writes timetable.json.gz there
+ * (TimetableJson in src/world/types.ts; without buslines.json.gz the trams
+ * alone).  Settings by environment: GTFS_AGENCY (the operators of the trams
  * to take, a regular expression – by default the KVG, the RegioTram and the
- * NVV), GTFS_WEEK (the Monday of the week to take, YYYY-MM-DD) and
- * GTFS_ATTRIBUTION (the credit, for a feed this tool does not know).
+ * NVV), GTFS_BUS_AGENCY (those of the buses – by default the KVG of Kassel
+ * and the NVV, not its shared taxis), GTFS_BUSES=0 (no buses), GTFS_WEEK
+ * (the Monday of the week to take, YYYY-MM-DD) and GTFS_ATTRIBUTION (the
+ * credit, for a feed this tool does not know).
  */
 import { execFileSync, spawn } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -30,8 +40,10 @@ import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { DAY, dayTypeOf } from '../src/sim/timetable.ts';
-import type { LinesJson, RailJson, StopsJson, TimetableJson, TimetableLineJson, TimetablePatternJson } from '../src/world/types.ts';
+import { latLonToWorld } from '../src/geo/utm.ts';
+import { DAY, TIMETABLE_VERSION, dayTypeOf } from '../src/sim/timetable.ts';
+import { BusLines } from '../src/world/buslines.ts';
+import type { BusLinesJson, LinesJson, RailJson, StopsJson, TimetableBusJson, TimetableBusPatternJson, TimetableJson, TimetableLineJson, TimetablePatternJson } from '../src/world/types.ts';
 
 // ---------------------------------------------------------------------------
 // Reading a feed: CSV, and where its files come from
@@ -450,8 +462,9 @@ export function nameMatcher(towns: string[]): (a: string, b: string) => number {
  * The best pairing of two lists of names that keeps both in order (the
  * longest common subsequence, weighted by how alike the paired names are,
  * pairs below `min` not counted): the pairs [i, j, likeness] and their sum.
+ * (The buses pair stops by name and place: then the lists hold those.)
  */
-export function align(a: string[], b: string[], sim: (x: string, y: string) => number, min = 0.75): { score: number; pairs: Array<[number, number, number]> } {
+export function align<A, B>(a: A[], b: B[], sim: (x: A, y: B) => number, min = 0.75): { score: number; pairs: Array<[number, number, number]> } {
   const n = a.length;
   const m = b.length;
   const w = m + 1;
@@ -493,6 +506,22 @@ export interface MapLine {
   from: string;
   to: string;
   stops: string[];
+  /** its colour in OpenStreetMap ('' or missing: none) */
+  colour?: string;
+}
+
+/** A line's colour: OpenStreetMap's where it has one (it tells the lines apart, as the map draws them), else the one the feed's trips of it give most often, else none (''). */
+function lineColour(osm: string | undefined, feed: Map<string, number> | undefined): string {
+  if (osm) return osm;
+  let best = '';
+  let most = 0;
+  for (const [c, n] of feed ?? []) {
+    if (n > most) {
+      most = n;
+      best = c;
+    }
+  }
+  return best;
 }
 
 /** A trip of the feed, as far as the timetables need it. */
@@ -506,6 +535,17 @@ export interface FeedTrip {
   dep: number[];
   /** repeated every so often, where frequencies.txt says so: [from, to, every] in seconds */
   every?: Array<[number, number, number]>;
+  /** its line's colour, where the feed gives one (route_color: "#8A1478") */
+  colour?: string;
+  /**
+   * a bus (readFeed was asked for buses): then also its stops by the feed's
+   * ids, where they are (world x, z of each in turn; NaN where the feed does
+   * not say) and what its front says at each (stop_headsign, '' where none)
+   */
+  bus?: boolean;
+  ids?: string[];
+  xz?: number[];
+  heads?: string[];
 }
 
 export interface FeedData {
@@ -521,6 +561,8 @@ export interface FeedData {
   trips: FeedTrip[];
   /** lines of the operators asked for that run on rails but are not on the map */
   otherRefs: string[];
+  /** bus lines of the operators asked for whose numbers the map's bus lines have not got (where buses were asked for) */
+  otherBusRefs?: string[];
 }
 
 /** A line's number as the map writes it: "RT 1" → "RT1", "Tram 4" → "4". */
@@ -528,67 +570,122 @@ export function refOf(shortName: string): string {
   return shortName.toUpperCase().replace(/\s+/g, '').replace(/^(TRAM|STR)(?=\d)/, '');
 }
 
+/** A bus line's number as the map writes it: "Bus 52" → "52", "n 3" → "N3". */
+export function busRefOf(shortName: string): string {
+  return shortName.toUpperCase().replace(/\s+/g, '').replace(/^BUS(?=[A-Z]*\d)/, '');
+}
+
 /** Route types that run on rails: tram, metro, rail, cable tram, monorail, and the extended railway, urban rail and tram types. */
 export function onRails(type: number): boolean {
   return type === 0 || type === 1 || type === 2 || type === 5 || type === 12 || (type >= 100 && type < 200) || (type >= 400 && type < 500) || (type >= 900 && type < 1000);
 }
 
+/** Route types of buses: bus and trolleybus, and the extended bus types (700–799, 800) – not coaches (200–299): the map's lines are city and regional buses. */
+export function isBus(type: number): boolean {
+  return type === 3 || type === 11 || (type >= 700 && type <= 800);
+}
+
 export const DEFAULT_AGENCY = '^KVG\\b|Kassel|RegioTram|^NVV\\b|Nordhessischer';
 
-/** Reads what the timetables need out of one feed: the trips of the operators asked for on the lines the map has (by their number). */
-export async function readFeed(src: FeedSource, refs: Set<string>, agency: RegExp, log: (msg: string) => void = () => {}, url = ''): Promise<FeedData> {
+/**
+ * The operators whose buses are taken: those of the NVV, the transport
+ * association of northern Hesse, as gtfs.de names them – the city buses of
+ * Kassel ("KVG M": its trams and buses; not the KVGs of Offenbach, the
+ * Main-Kinzig district or the Salzland, which share the letters) and the
+ * regional buses ("NVV - Faisy").  Not the "NVV … AST": shared taxis that
+ * only run when called, which no bus of the traffic should stand in for.
+ */
+export const DEFAULT_BUS_AGENCY = '^KVG M$|^NVV\\b(?!.*\\bAST\\b)|Nordhessischer';
+
+/** Which buses readFeed takes: those of these operators whose line numbers the map's bus lines have (as busRefOf writes them). */
+export interface BusWanted {
+  agency: RegExp;
+  refs: Set<string>;
+}
+
+/**
+ * Reads what the timetables need out of one feed: the trips of the
+ * operators asked for on the lines the map has (by their number) – the
+ * trams, and with `bus` given the buses as well, in the same pass through
+ * stop_times.txt (the one that takes the time).
+ */
+export async function readFeed(src: FeedSource, refs: Set<string>, agency: RegExp, log: (msg: string) => void = () => {}, url = '', bus?: BusWanted): Promise<FeedData> {
   const info = (await readTable(src, 'feed_info.txt'))[0] ?? {};
   const agencies = await readTable(src, 'agency.txt');
   const agencyName = new Map(agencies.map((a) => [a.agency_id ?? '', a.agency_name ?? '']));
   const onlyAgency = agencies.length === 1 ? (agencies[0].agency_name ?? '') : '';
   const otherRefs = new Set<string>();
+  const otherBusRefs = new Set<string>();
   const used = new Set<string>();
-  const routes = new Map<string, string>();
+  const routes = new Map<string, { ref: string; bus: boolean; colour: string }>();
   for (const r of await readTable(src, 'routes.txt')) {
     const name = agencyName.get(r.agency_id ?? '') ?? onlyAgency;
-    if (!agency.test(name) || !onRails(Number(r.route_type))) continue;
-    const ref = refOf(r.route_short_name || r.route_long_name || '');
-    if (refs.has(ref)) {
-      routes.set(r.route_id, ref);
-      used.add(name);
-    } else if (ref) otherRefs.add(ref);
+    const type = Number(r.route_type);
+    const colour = /^[0-9a-f]{6}$/i.test(r.route_color ?? '') ? `#${r.route_color.toUpperCase()}` : '';
+    if (agency.test(name) && onRails(type)) {
+      const ref = refOf(r.route_short_name || r.route_long_name || '');
+      if (refs.has(ref)) {
+        routes.set(r.route_id, { ref, bus: false, colour });
+        used.add(name);
+      } else if (ref) otherRefs.add(ref);
+    } else if (bus && bus.agency.test(name) && isBus(type)) {
+      const ref = busRefOf(r.route_short_name || r.route_long_name || '');
+      if (bus.refs.has(ref)) {
+        routes.set(r.route_id, { ref, bus: true, colour });
+        used.add(name);
+      } else if (ref) otherBusRefs.add(ref);
+    }
   }
   const services = readServices(await readTable(src, 'calendar.txt'), await readTable(src, 'calendar_dates.txt'));
-  const trips = new Map<string, { ref: string; service: string }>();
+  const trips = new Map<string, { ref: string; service: string; bus: boolean; colour: string }>();
   await scanTable(src, 'trips.txt', 'route_id', new Set(routes.keys()), (f, head) => {
     const at = (c: string): string => (f[head.indexOf(c)] ?? '').trim();
-    trips.set(at('trip_id'), { ref: routes.get(at('route_id')) ?? '', service: at('service_id') });
+    const route = routes.get(at('route_id'));
+    trips.set(at('trip_id'), { ref: route?.ref ?? '', service: at('service_id'), bus: route?.bus ?? false, colour: route?.colour ?? '' });
   });
-  log(`${src.label}: ${routes.size} routes of ${[...new Set(routes.values())].sort().join(', ') || 'none'} – ${trips.size} trips`);
+  const railRefs = [...new Set([...routes.values()].filter((r) => !r.bus).map((r) => r.ref))].sort();
+  const busRoutes = [...routes.values()].filter((r) => r.bus);
+  log(`${src.label}: ${routes.size - busRoutes.length} routes of ${railRefs.join(', ') || 'none'}${bus ? `, ${busRoutes.length} of buses (${new Set(busRoutes.map((r) => r.ref)).size} line numbers)` : ''} – ${trips.size} trips`);
   const every = new Map<string, Array<[number, number, number]>>();
   for (const f of await readTable(src, 'frequencies.txt', (f) => trips.has(f.trip_id))) {
     const list = every.get(f.trip_id) ?? [];
     list.push([parseTime(f.start_time), parseTime(f.end_time), Number(f.headway_secs)]);
     every.set(f.trip_id, list);
   }
-  // their stops and times, out of the big file
-  const rows = new Map<string, Array<[number, string, number, number]>>();
+  // their stops and times, out of the big file (the ids and headsigns kept once each: a bus trip has twenty stops, and there are tens of thousands)
+  const rows = new Map<string, Array<[number, string, number, number, string]>>();
+  const shared = new Map<string, string>();
+  const intern = (s: string): string => {
+    const v = shared.get(s);
+    if (v !== undefined) return v;
+    shared.set(s, s);
+    return s;
+  };
   let iTrip = -1;
   let iStop = -1;
   let iSeq = -1;
   let iArr = -1;
   let iDep = -1;
+  let iHead = -1;
   const lines = await scanTable(src, 'stop_times.txt', 'trip_id', new Set(trips.keys()), (f, head) => {
-    if (iTrip < 0) [iTrip, iStop, iSeq, iArr, iDep] = ['trip_id', 'stop_id', 'stop_sequence', 'arrival_time', 'departure_time'].map((c) => head.indexOf(c));
+    if (iTrip < 0) [iTrip, iStop, iSeq, iArr, iDep, iHead] = ['trip_id', 'stop_id', 'stop_sequence', 'arrival_time', 'departure_time', 'stop_headsign'].map((c) => head.indexOf(c));
     const id = f[iTrip].trim();
     const list = rows.get(id) ?? [];
-    list.push([Number(f[iSeq]), (f[iStop] ?? '').trim(), parseTime(f[iArr] ?? ''), parseTime(f[iDep] ?? '')]);
+    list.push([Number(f[iSeq]), intern((f[iStop] ?? '').trim()), parseTime(f[iArr] ?? ''), parseTime(f[iDep] ?? ''), iHead >= 0 ? intern((f[iHead] ?? '').trim()) : '']);
     rows.set(id, list);
   });
   log(`${src.label}: ${lines} rows of stop_times.txt read, ${rows.size} trips found in them`);
-  // the names of their stops: the station's name where a stop is one platform of a station
+  // the names of their stops: the station's name where a stop is one platform of a station (and where each is, for the buses)
   const want = new Set<string>();
   for (const list of rows.values()) for (const r of list) want.add(r[1]);
-  const stops = new Map<string, { name: string; parent: string }>();
+  const stops = new Map<string, { name: string; parent: string; x: number; z: number }>();
   const readStops = (ids: Set<string>): Promise<number> =>
     scanTable(src, 'stops.txt', 'stop_id', ids, (f, head) => {
       const at = (c: string): string => (f[head.indexOf(c)] ?? '').trim();
-      stops.set(at('stop_id'), { name: at('stop_name'), parent: at('parent_station') });
+      const lat = Number(at('stop_lat') || NaN);
+      const lon = Number(at('stop_lon') || NaN);
+      const [x, z] = Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0) ? latLonToWorld(lat, lon) : [NaN, NaN];
+      stops.set(at('stop_id'), { name: intern(at('stop_name')), parent: at('parent_station'), x, z });
     });
   await readStops(want);
   const parents = new Set([...stops.values()].map((s) => s.parent).filter((p) => p && !stops.has(p)));
@@ -598,6 +695,12 @@ export async function readFeed(src: FeedSource, refs: Set<string>, agency: RegEx
     if (!s) return id;
     return (s.parent && stops.get(s.parent)?.name) || s.name;
   };
+  // (a platform without a place of its own is where its station is)
+  const placeOf = (id: string): [number, number] => {
+    const s = stops.get(id);
+    const p = s?.parent ? stops.get(s.parent) : undefined;
+    return s && Number.isFinite(s.x) ? [s.x, s.z] : p ? [p.x, p.z] : [NaN, NaN];
+  };
   const out: FeedTrip[] = [];
   for (const [id, list] of rows) {
     const t = trips.get(id);
@@ -606,8 +709,17 @@ export async function readFeed(src: FeedSource, refs: Set<string>, agency: RegEx
     const arr = list.map((r) => (Number.isNaN(r[2]) ? r[3] : r[2]));
     const dep = list.map((r) => (Number.isNaN(r[3]) ? r[2] : r[3]));
     if (!fillTimes(arr, dep)) continue;
-    out.push({ ref: t.ref, service: services.get(t.service), names: list.map((r) => nameOf(r[1])), arr, dep, every: every.get(id) });
+    const trip: FeedTrip = { ref: t.ref, service: services.get(t.service), names: list.map((r) => nameOf(r[1])), arr, dep, every: every.get(id) };
+    if (t.colour) trip.colour = t.colour;
+    if (t.bus) {
+      trip.bus = true;
+      trip.ids = list.map((r) => r[1]);
+      trip.xz = list.flatMap((r) => placeOf(r[1]));
+      trip.heads = list.map((r) => r[4]);
+    }
+    out.push(trip);
   }
+  rows.clear();
   // the days it is valid for: as feed_info.txt says, else as far as its services reach
   let start = Number(info.feed_start_date) || 0;
   let end = Number(info.feed_end_date) || 0;
@@ -621,7 +733,9 @@ export async function readFeed(src: FeedSource, refs: Set<string>, agency: RegEx
     if (!Number.isFinite(start)) start = 0;
   }
   const orgs = (await readTable(src, 'attributions.txt')).map((a) => a.organization_name ?? '').filter((o) => o.length > 0);
-  return { label: src.label, name: info.feed_publisher_name || [...used].join(', ') || src.label, version: info.feed_version ?? '', url: url || info.feed_publisher_url || '', start, end, orgs, trips: out, otherRefs: [...otherRefs].sort() };
+  const data: FeedData = { label: src.label, name: info.feed_publisher_name || [...used].join(', ') || src.label, version: info.feed_version ?? '', url: url || info.feed_publisher_url || '', start, end, orgs, trips: out, otherRefs: [...otherRefs].sort() };
+  if (bus) data.otherBusRefs = [...otherBusRefs].sort();
+  return data;
 }
 
 /** Times missing at some stops (GTFS allows that between timed stops): spread evenly between those either side.  False where none is known. */
@@ -674,9 +788,10 @@ export interface BuildOptions {
 /**
  * The credit to give for the feeds: gtfs.de with its licence (CC BY 4.0, and
  * whoever else its attributions.txt names – it lists the OpenStreetMap
- * contributors besides DELFI), the others as they name themselves.
+ * contributors besides DELFI), the others as they name themselves – and
+ * what was made of them (with `buses`: the buses' timetables as well).
  */
-export function attributionFor(feeds: Array<{ name: string; url: string; orgs: string[] }>, given?: string): string {
+export function attributionFor(feeds: Array<{ name: string; url: string; orgs: string[] }>, given?: string, buses = false): string {
   if (given) return given;
   const parts = new Set<string>();
   for (const f of feeds) {
@@ -685,7 +800,7 @@ export function attributionFor(feeds: Array<{ name: string; url: string; orgs: s
       parts.add(`Fahrplandaten: gtfs.de – GTFS für Deutschland (https://gtfs.de), Daten bereitgestellt von DELFI e.V. (https://www.delfi.de)${others.length > 0 ? `, mit Beiträgen von: ${others.join(', ')}` : ''}, Lizenz CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)`);
     } else parts.add(`Fahrplandaten: ${[f.name, ...f.orgs.filter((o) => !f.name.includes(o))].join(', ')}${f.url ? ` (${f.url})` : ''}`);
   }
-  return `${[...parts].join('; ')} – für das Spiel auf die Straßenbahnen und RegioTrams in Kassel gekürzt und umgerechnet`;
+  return `${[...parts].join('; ')} – für das Spiel auf die Straßenbahnen und RegioTrams in Kassel${buses ? ' und die Busse in Nordhessen' : ''} gekürzt und umgerechnet`;
 }
 
 interface PatternAcc {
@@ -699,11 +814,14 @@ export function buildTimetable(feeds: FeedData[], lines: MapLine[], opts: BuildO
   const sim = nameMatcher(opts.towns ?? []);
   const known = feeds.filter((f) => f.start > 0 && f.end > 0);
   const valid: [number, number] = known.length > 0 ? [Math.max(...known.map((f) => f.start)), Math.min(...known.map((f) => f.end))] : [0, 0];
-  const trips = feeds.flatMap((f) => f.trips);
-  // what a day looks like: how many trips of each line run on it
+  // (the buses, where the feeds were read with them, get a timetable of their own – buildBusTimes – on the days chosen here)
+  const all = feeds.flatMap((f) => f.trips);
+  const trips = all.filter((t) => !t.bus);
+  // what a day looks like: how many trips of each line run on it – of the trams (with the buses' hundred and fifty lines one school trip more or less would make every week look like no other; a feed of buses alone: theirs)
+  const telling = trips.length > 0 ? trips : all;
   const describe = (d: number): { sig: string; lines: number } => {
     const per = new Map<string, number>();
-    for (const t of trips) if (serviceRuns(t.service, d)) per.set(t.ref, (per.get(t.ref) ?? 0) + 1);
+    for (const t of telling) if (serviceRuns(t.service, d)) per.set(t.ref, (per.get(t.ref) ?? 0) + 1);
     return { sig: [...per].sort((x, y) => (x[0] < y[0] ? -1 : 1)).map(([r, n]) => `${r}:${n}`).join(' '), lines: per.size };
   };
   const choice = chooseWeek(valid, describe, opts.week);
@@ -789,12 +907,14 @@ export function buildTimetable(feeds: FeedData[], lines: MapLine[], opts: BuildO
     }
     return i;
   };
+  // (the colours the feed gives the trips of each line)
+  const colours = new Map<number, Map<string, number>>();
   choice.days.forEach((date, type) => {
     if (!date) return;
     for (const t of trips) {
       if (!serviceRuns(t.service, date)) continue;
       const f = fit(t);
-      const reps = t.every ? t.every.flatMap(([a, b, h]) => (h > 0 ? Array.from({ length: Math.max(0, Math.ceil((b - a) / h)) }, (_, k) => a + k * h - t.dep[0]) : [])) : [0];
+      const reps = repeats(t);
       if (!f) {
         const k = `${t.ref}|${t.names[0]}|${t.names[t.names.length - 1]}`;
         const u = unplaced.get(k) ?? { ref: t.ref, first: t.names[0], last: t.names[t.names.length - 1], count: 0 };
@@ -803,6 +923,11 @@ export function buildTimetable(feeds: FeedData[], lines: MapLine[], opts: BuildO
         continue;
       }
       const { line, pairs } = f;
+      if (t.colour) {
+        const c = colours.get(line.index) ?? new Map<string, number>();
+        c.set(t.colour, (c.get(t.colour) ?? 0) + reps.length);
+        colours.set(line.index, c);
+      }
       const g0 = pairs[0][0];
       const g1 = pairs[pairs.length - 1][0];
       // what the feed calls at between the line's stops that the line has not got, and names paired loosely
@@ -874,19 +999,20 @@ export function buildTimetable(feeds: FeedData[], lines: MapLine[], opts: BuildO
       continue;
     }
     list.sort((x, y) => y.json.t.reduce((n, t) => n + t.length, 0) - x.json.t.reduce((n, t) => n + t.length, 0));
-    outLines.push({ line: line.index, ref: line.ref, patterns: list.map((p) => p.json) });
+    const colour = lineColour(line.colour, colours.get(line.index));
+    outLines.push({ line: line.index, ref: line.ref, ...(colour ? { colour } : {}), patterns: list.map((p) => p.json) });
     const served = new Set(list.flatMap((p) => p.json.s.map((i) => stopNames[i])));
     const trips = [0, 1, 2].map((k) => list.reduce((n, p) => n + p.json.t[k].length, 0)) as [number, number, number];
     reportLines.push({ index: line.index, ref: line.ref, to: line.to, patterns: list.length, trips, unserved: line.stops.filter((n) => !served.has(n)), beyond: [...(beyond.get(line.index) ?? [])] });
   }
   const json: TimetableJson = {
-    version: 1,
+    version: TIMETABLE_VERSION,
     generated: opts.generated ?? new Date().toISOString(),
     feeds: feeds.map((f) => ({ name: f.name, version: f.version, url: f.url, start: isoDate(f.start), end: isoDate(f.end) })),
     valid: [isoDate(valid[0]), isoDate(valid[1])],
     week: [isoDate(choice.week[0]), isoDate(choice.week[1])],
     days: choice.days.map(isoDate) as [string, string, string],
-    attribution: attributionFor(feeds, opts.attribution),
+    attribution: attributionFor(feeds, opts.attribution, all.some((t) => t.bus)),
     stops: stopNames,
     lines: outLines,
   };
@@ -922,7 +1048,447 @@ export function mapLines(doc: LinesJson, rails: RailJson[]): MapLine[] {
       const k = r?.st?.indexOf(mark) ?? -1;
       return k >= 0 ? (r.sn?.[k] ?? '') : '';
     }),
+    colour: l.colour ?? '',
   }));
+}
+
+/** Where a point `s` metres along a path of x, y, z triples lies: x, z. */
+function pointAlong(p: number[], s: number): [number, number] {
+  let left = s;
+  for (let i = 3; i + 2 < p.length; i += 3) {
+    const len = Math.hypot(p[i] - p[i - 3], p[i + 2] - p[i - 1]);
+    if (left <= len && len > 0) {
+      const f = left / len;
+      return [p[i - 3] + (p[i] - p[i - 3]) * f, p[i - 1] + (p[i + 2] - p[i - 1]) * f];
+    }
+    left -= len;
+  }
+  return p.length >= 3 ? [p[p.length - 3], p[p.length - 1]] : [NaN, NaN];
+}
+
+/**
+ * For each stop name of the trams' timetable, the stop places of
+ * stops.json.gz that are that stop: places of that very name within 300 m
+ * of a stop of that name on the tracks.  So a departure board asked by its
+ * place shows the trams that call there – and not those of a stop of the
+ * same name somewhere else (there is a "Rathaus" in every town).
+ */
+export function tramStopPlaces(names: string[], rails: RailJson[], stops: StopsJson): number[][] {
+  const spots = new Map<string, number[]>();
+  for (const r of rails) {
+    if (!r.st || !r.sn) continue;
+    for (let k = 0; k < r.st.length; k++) {
+      const name = r.sn[k];
+      if (!name) continue;
+      const list = spots.get(name) ?? [];
+      list.push(...pointAlong(r.p, r.st[k]));
+      spots.set(name, list);
+    }
+  }
+  const byName = new Map<string, number[]>();
+  stops.places.forEach(([name], i) => {
+    const list = byName.get(name) ?? [];
+    list.push(i);
+    byName.set(name, list);
+  });
+  return names.map((name) => {
+    const at = spots.get(name) ?? [];
+    return (byName.get(name) ?? []).filter((i) => {
+      const [, , , x, z] = stops.places[i];
+      for (let s = 0; s + 1 < at.length; s += 2) if (Math.hypot(at[s] - x, at[s + 1] - z) < 300) return true;
+      return false;
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The buses
+// ---------------------------------------------------------------------------
+
+/** A stop of a bus line of the map: its stop place (its number in stops.json.gz), name and town, and where the place and its poles are (x, z, …). */
+export interface MapBusStop {
+  place: number;
+  name: string;
+  town: string;
+  pts: number[];
+}
+
+/** A bus line of the map – one direction of it: its place in buslines.json.gz, its number(s), ends, operator, route relation, and its stops. */
+export interface MapBusLine {
+  index: number;
+  ref: string;
+  /** the numbers it goes by, as busRefOf writes them ("100/300": both) */
+  refs: string[];
+  from: string;
+  to: string;
+  operator: string;
+  osm: number;
+  /** its colour in OpenStreetMap ('' or missing: none) */
+  colour?: string;
+  stops: MapBusStop[];
+}
+
+/**
+ * The bus lines of the map (buslines.json.gz) with their stops (stops.json.gz).
+ * The stops come in the order BusLines (src/world/buslines.ts) keeps them –
+ * along the line's ways, which is not always the order of the relation –
+ * because the timetable names a stop by its place in that list, and the
+ * game looks it up there.
+ */
+export function mapBusLines(doc: BusLinesJson, stops: StopsJson): MapBusLine[] {
+  const pts: number[][] = stops.places.map(([, , , x, z]) => [x, z]);
+  for (const [p, x, z] of stops.poles) pts[p]?.push(x, z);
+  return new BusLines(doc).lines.map((l) => ({
+    index: l.index,
+    ref: l.ref,
+    refs: [...new Set(l.ref.split('/').map(busRefOf).filter((r) => r.length > 0))],
+    from: l.from,
+    to: l.to,
+    operator: l.operator,
+    osm: l.osm,
+    colour: l.colour,
+    stops: l.stops.map((s) => {
+      const p = stops.places[s.place];
+      return { place: s.place, name: p?.[0] ?? '', town: (p && stops.towns[p[1]]) || '', pts: pts[s.place] ?? [] };
+    }),
+  }));
+}
+
+/** A stop of a trip of the feed as the buses are paired: its name, and where it is (world x, z; NaN where the feed does not say). */
+export interface FeedStop {
+  name: string;
+  x: number;
+  z: number;
+}
+
+/**
+ * How alike a stop of the feed and a stop of a bus line of the map are, 0 … 1
+ * – by name and by place.  Bus stops are named alike all over the region
+ * ("Rathaus", "Schule", "Bahnhof" are in every town), so where they are comes
+ * first: a few dozen metres apart they are the same stop whatever the two
+ * call it ("Schule" and "Grundschule"); a few hundred metres apart the names
+ * must agree, as the trams' do (`nameMatcher` – the place's town in front of
+ * its name counting as well, since the feed writes "Baunatal Rathaus"); up
+ * to 1.5 km apart only the very name will do (the middle of a big bus
+ * station may lie far from where a line stands), and beyond that nothing.
+ */
+export function busStopMatcher(towns: string[]): (g: FeedStop, p: MapBusStop) => number {
+  const sim = nameMatcher(towns);
+  const named = (g: FeedStop, p: MapBusStop): number => Math.max(sim(g.name, p.name), p.town ? sim(g.name, `${p.town} ${p.name}`) : 0);
+  return (g, p) => {
+    if (!Number.isFinite(g.x) || !Number.isFinite(g.z)) {
+      const n = named(g, p);
+      return n >= 0.9 ? n : 0;
+    }
+    let d = Infinity;
+    for (let i = 0; i + 1 < p.pts.length; i += 2) d = Math.min(d, Math.hypot(p.pts[i] - g.x, p.pts[i + 1] - g.z));
+    if (d > 1500) return 0;
+    const n = named(g, p);
+    if (d <= 50) return Math.max(n, 0.8);
+    if (d <= 400) return n;
+    return n >= 0.95 ? n - 0.15 : 0;
+  };
+}
+
+/**
+ * What the front of a bus says, as a departure board shows it: the feed's
+ * headsign without the remarks the KVG writes after two spaces or in
+ * brackets – where the line goes on to ("Ri. Am Kirschrain"), where it comes
+ * from ("von …"), its stand ("Steig H", "(Bussteig)", "(Endpunkt Bus)").
+ */
+export function cleanHeadsign(h: string): string {
+  const s = (h.split(/\s{2,}/)[0] ?? '')
+    .replace(/\s*\([^)]*\)/g, ' ')
+    .replace(/\s+(Ri\.|Richtung\s|Li\.\s*\d).*$/i, '')
+    .replace(/\s+(Bus)?(Steig|Bstg\.?)\s+\S+$/i, '')
+    .replace(/\s+AST-Haltestelle$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s || h.replace(/\s+/g, ' ').trim();
+}
+
+/** When the trips of a trip of the feed leave, counted from its own first departure: [0], or one for each time frequencies.txt repeats it. */
+function repeats(t: FeedTrip): number[] {
+  return t.every ? t.every.flatMap(([a, b, h]) => (h > 0 ? Array.from({ length: Math.max(0, Math.ceil((b - a) / h)) }, (_, k) => a + k * h - t.dep[0]) : [])) : [0];
+}
+
+/** A list that counts up, as the steps from one number to the next (the first as it is) – the form the bus timetables keep lists in, which packs small. */
+export function steps(list: number[]): number[] {
+  return list.map((v, k) => (k === 0 ? v : v - list[k - 1]));
+}
+
+export interface BusBuildOptions {
+  towns?: string[];
+  /** the dates the day types are taken from (Monday–Friday, Saturday, Sunday; 20261125 …): the trams' – the two must agree */
+  days: [number, number, number];
+  /** the build of the bus lines (buslines.json.gz `map`) and how many stop places stops.json.gz had */
+  map?: string;
+  places?: number;
+}
+
+export interface BusBuildReport {
+  /** per bus line of the map that got a timetable: patterns, trips by day type, its stops and how many of them no trip calls at */
+  lines: Array<{ index: number; ref: string; to: string; patterns: number; trips: [number, number, number]; stops: number; unserved: number }>;
+  /** bus lines of the map without a timetable, and why */
+  missing: Array<{ index: number; ref: string; to: string; operator: string; why: string }>;
+  /** trips of the feed that fit no bus line of the map: their number, first and last stop, how many (on the three days) */
+  unplaced: Array<{ ref: string; first: string; last: string; count: number }>;
+  /** the trips of the three days, and how many of them found a line */
+  trips: number;
+  placed: number;
+}
+
+interface BusPatternAcc {
+  line: MapBusLine;
+  /** the line's stops it calls at, the departures from them and the arrivals there (seconds after the first departure), where it goes from which of them on */
+  j: number[];
+  d: number[];
+  a: number[];
+  to: Array<[number, string]>;
+  pre: boolean;
+  post: boolean;
+  starts: [Set<number>, Set<number>, Set<number>];
+}
+
+/**
+ * The timetables of the buses: each bus trip of the feeds goes to the bus
+ * line of the map with its number whose stops it calls at most of, in their
+ * order – the stops paired by place and name (busStopMatcher), the ends
+ * counting extra – and the trips of each line that call at the same stops
+ * at the same intervals and say the same on their fronts become one
+ * pattern, with its departures on the three days.
+ */
+export function buildBusTimes(feeds: FeedData[], lines: MapBusLine[], opts: BusBuildOptions): { json: TimetableBusJson; report: BusBuildReport } {
+  const like = busStopMatcher(opts.towns ?? []);
+  const trips = feeds.flatMap((f) => f.trips).filter((t) => t.bus);
+  const byRef = new Map<string, MapBusLine[]>();
+  for (const l of lines) {
+    for (const r of l.refs) {
+      const list = byRef.get(r) ?? [];
+      list.push(l);
+      byRef.set(r, list);
+    }
+  }
+
+  // (how alike a stop of the feed and a stop place are, worked out once for each pair: the same stops come in many trips)
+  const stopNo = new Map<string, number>();
+  const likeness = new Map<number, number>();
+  const pairLike = (g: FeedStop & { no: number }, p: MapBusStop): number => {
+    const key = g.no * 1048576 + p.place;
+    let v = likeness.get(key);
+    if (v === undefined) likeness.set(key, (v = like(g, p)));
+    return v;
+  };
+  // (where each line's stops lie, with the 1.5 km beyond which no stop pairs: a trip elsewhere need not be paired with it – there is a line 1 in a dozen towns)
+  const reach = new Map<number, [number, number, number, number]>();
+  for (const l of lines) {
+    const b: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const s of l.stops) {
+      for (let i = 0; i + 1 < s.pts.length; i += 2) {
+        b[0] = Math.min(b[0], s.pts[i] - 1500);
+        b[1] = Math.min(b[1], s.pts[i + 1] - 1500);
+        b[2] = Math.max(b[2], s.pts[i] + 1500);
+        b[3] = Math.max(b[3], s.pts[i + 1] + 1500);
+      }
+    }
+    reach.set(l.index, b);
+  }
+
+  // ---- which line of the map a stretch of a trip runs: of those with its number, the one whose stops it calls at most of, in their order ----
+  type Fit = { line: MapBusLine; pairs: Array<[number, number, number]> };
+  const fits = new Map<string, Fit | null>();
+  const fit = (ref: string, stops: Array<FeedStop & { no: number }>): Fit | null => {
+    const key = `${ref}|${stops.map((s) => s.no).join(',')}`;
+    let f = fits.get(key);
+    if (f !== undefined) return f;
+    f = null;
+    // (the stretch's extent: where all its stops have a place)
+    const box = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const s of stops) {
+      box[0] = Math.min(box[0], s.x);
+      box[1] = Math.min(box[1], s.z);
+      box[2] = Math.max(box[2], s.x);
+      box[3] = Math.max(box[3], s.z);
+    }
+    const placed = box.every((v) => Number.isFinite(v));
+    let best = 0;
+    for (const line of byRef.get(ref) ?? []) {
+      if (line.stops.length < 2) continue;
+      const r = reach.get(line.index);
+      if (placed && r && (r[0] > box[2] || box[0] > r[2] || r[1] > box[3] || box[1] > r[3])) continue;
+      const al = align(stops, line.stops, pairLike);
+      if (al.pairs.length < 2) continue;
+      // (where it begins and ends where the line does, the more so: a line and its short working share most stops)
+      let score = al.score - 0.01 * (line.stops.length - al.pairs.length);
+      if (pairLike(stops[0], line.stops[0]) >= 0.8) score += 1.5;
+      if (pairLike(stops[stops.length - 1], line.stops[line.stops.length - 1]) >= 0.8) score += 1.5;
+      if (score > best) {
+        best = score;
+        f = { line, pairs: al.pairs };
+      }
+    }
+    fits.set(key, f);
+    return f;
+  };
+  /**
+   * The lines of the map a trip runs, in its order: the best line for the
+   * whole trip, then the best for what that leaves before and after it, and
+   * so on – a loop that OpenStreetMap splits into two relations, or a line
+   * that goes on as another, runs on both.  Each part's pairs count the
+   * trip's stops from its first.
+   */
+  const parts = (t: FeedTrip): Fit[] => {
+    // (a stop is what the pairing sees of it: its name and place – two feeds may give one id to different stops)
+    const stops = t.names.map((name, i) => {
+      const x = t.xz?.[2 * i] ?? NaN;
+      const z = t.xz?.[2 * i + 1] ?? NaN;
+      const id = `${name}|${x}|${z}`;
+      let no = stopNo.get(id);
+      if (no === undefined) stopNo.set(id, (no = stopNo.size));
+      return { name, x, z, no };
+    });
+    const out: Fit[] = [];
+    const walk = (lo: number, hi: number, depth: number): void => {
+      if (hi - lo < 1) return;
+      const f = fit(t.ref, stops.slice(lo, hi + 1));
+      if (!f) return;
+      const pairs = f.pairs.map(([g, j, s]): [number, number, number] => [g + lo, j, s]);
+      // (the stretches either side begin and end at the stop this one begins and ends at: one line may hand over to the next there)
+      if (depth < 3) walk(lo, pairs[0][0], depth + 1);
+      out.push({ line: f.line, pairs });
+      if (depth < 3) walk(pairs[pairs.length - 1][0], hi, depth + 1);
+    };
+    walk(0, stops.length - 1, 0);
+    return out;
+  };
+
+  // ---- the trips of each day type, as patterns ----
+  const acc = new Map<string, BusPatternAcc>();
+  const unplaced = new Map<string, { ref: string; first: string; last: string; count: number }>();
+  const colours = new Map<number, Map<string, number>>();
+  const partsOf = new Map<FeedTrip, Fit[]>();
+  let total = 0;
+  let placed = 0;
+  opts.days.forEach((date, type) => {
+    if (!date) return;
+    for (const t of trips) {
+      if (!serviceRuns(t.service, date)) continue;
+      const reps = repeats(t);
+      total += reps.length;
+      const last = t.names.length - 1;
+      let runs = partsOf.get(t);
+      if (!runs) partsOf.set(t, (runs = parts(t)));
+      if (runs.length === 0) {
+        const k = `${t.ref}|${t.names[0]}|${t.names[last]}`;
+        const u = unplaced.get(k) ?? { ref: t.ref, first: t.names[0], last: t.names[last], count: 0 };
+        u.count += reps.length;
+        unplaced.set(k, u);
+        continue;
+      }
+      placed += reps.length;
+      runs.forEach(({ line, pairs }, part) => {
+        if (t.colour) {
+          const c = colours.get(line.index) ?? new Map<string, number>();
+          c.set(t.colour, (c.get(t.colour) ?? 0) + reps.length);
+          colours.set(line.index, c);
+        }
+        const g0 = pairs[0][0];
+        const g1 = pairs[pairs.length - 1][0];
+        const t0 = t.dep[g0];
+        const d: number[] = [];
+        const a: number[] = [];
+        for (const [g] of pairs) {
+          let ak = t.arr[g] - t0;
+          let dk = t.dep[g] - t0;
+          // (times never run backwards along a trip)
+          if (d.length > 0) ak = Math.max(ak, d[d.length - 1]);
+          else ak = Math.min(ak, 0);
+          dk = d.length === 0 ? 0 : Math.max(dk, ak);
+          a.push(ak);
+          d.push(dk);
+        }
+        // where it goes, as its front says at each stop: a loop names its far end, then where it ends
+        const to: Array<[number, string]> = [];
+        pairs.forEach(([g], k) => {
+          const dest = cleanHeadsign(t.heads?.[g] ?? '') || t.names[last];
+          if (to.length === 0 || to[to.length - 1][1] !== dest) to.push([k, dest]);
+        });
+        const j = pairs.map(([, jj]) => jj);
+        const pre = g0 > 0;
+        // (where the next part begins at this one's last stop, the bus leaves from there as that part – this one ends there, or the board would show it twice)
+        const next = runs[part + 1];
+        const post = g1 < last && !(next && next.pairs[0][0] === g1);
+        const key = `${line.index}|${j.join(',')}|${d.join(',')}|${a.join(',')}|${to.map(([k, s]) => `${k}:${s}`).join('|')}|${pre ? 1 : 0}${post ? 1 : 0}`;
+        let p = acc.get(key);
+        if (!p) acc.set(key, (p = { line, j, d, a, to, pre, post, starts: [new Set(), new Set(), new Set()] }));
+        for (const r of reps) p.starts[type].add(t0 + r);
+      });
+    }
+  });
+
+  // ---- the section of the file ----
+  const byLine = new Map<number, BusPatternAcc[]>();
+  for (const p of acc.values()) {
+    const list = byLine.get(p.line.index) ?? [];
+    list.push(p);
+    byLine.set(p.line.index, list);
+  }
+  const dests: string[] = [];
+  const destIndex = new Map<string, number>();
+  const destOf = (s: string): number => {
+    let i = destIndex.get(s);
+    if (i === undefined) {
+      destIndex.set(s, (i = dests.length));
+      dests.push(s);
+    }
+    return i;
+  };
+  const count = (p: BusPatternAcc): number => p.starts[0].size + p.starts[1].size + p.starts[2].size;
+  const names = new Map<number, string>();
+  const json: TimetableBusJson = { map: opts.map ?? '', places: opts.places ?? 0, stops: [], dests, lines: [] };
+  const reportLines: BusBuildReport['lines'] = [];
+  const missing: BusBuildReport['missing'] = [];
+  const feedRefs = new Set(trips.map((t) => t.ref));
+  const dayRefs = new Set(trips.filter((t) => opts.days.some((d) => d > 0 && serviceRuns(t.service, d))).map((t) => t.ref));
+  for (const line of lines) {
+    const list = byLine.get(line.index);
+    if (!list) {
+      const refs = line.refs.join(', ');
+      const why =
+        line.refs.length === 0
+          ? 'the line has no number'
+          : line.stops.length < 2
+            ? 'the map knows fewer than two of its stops'
+            : !line.refs.some((r) => feedRefs.has(r))
+              ? `the feed has no buses of line ${refs} (of the operators asked for)`
+              : !line.refs.some((r) => dayRefs.has(r))
+                ? `line ${refs} does not run on the days taken`
+                : `none of the trips of line ${refs} calls at its stops in their order (they run elsewhere, or other variants of the line took them)`;
+      missing.push({ index: line.index, ref: line.ref, to: line.to, operator: line.operator, why });
+      continue;
+    }
+    // (the busiest first: the game looks at them first)
+    list.sort((x, y) => count(y) - count(x));
+    const patterns = list.map((p): TimetableBusPatternJson => {
+      const w = p.d.map((v, k) => v - p.a[k]);
+      return {
+        j: steps(p.j),
+        d: steps(p.d),
+        ...(w.some((v) => v !== 0) ? { w } : {}),
+        to: p.to.flatMap(([k, s]) => [k, destOf(s)]),
+        ...(p.pre ? { pre: 1 } : {}),
+        ...(p.post ? { post: 1 } : {}),
+        t: [0, 1, 2].map((k) => steps([...p.starts[k]].sort((x, y) => x - y))) as [number[], number[], number[]],
+      };
+    });
+    const colour = lineColour(line.colour, colours.get(line.index));
+    json.lines.push({ line: line.index, ref: line.ref, osm: line.osm, ...(colour ? { colour } : {}), s: line.stops.map((s) => s.place), patterns });
+    for (const s of line.stops) names.set(s.place, s.name);
+    const served = new Set(list.flatMap((p) => p.j));
+    reportLines.push({ index: line.index, ref: line.ref, to: line.to, patterns: list.length, trips: [0, 1, 2].map((k) => list.reduce((n, p) => n + p.starts[k].size, 0)) as [number, number, number], stops: line.stops.length, unserved: line.stops.length - served.size });
+  }
+  json.stops = [...names].sort((x, y) => x[0] - y[0]);
+  return { json, report: { lines: reportLines, missing, unplaced: [...unplaced.values()].sort((x, y) => y.count - x.count), trips: total, placed } };
 }
 
 // ---------------------------------------------------------------------------
@@ -997,10 +1563,16 @@ async function main(): Promise<void> {
   const t0 = Date.now();
   const lap = (msg: string): void => console.log(`[${((Date.now() - t0) / 1000).toFixed(0).padStart(4)}s] ${msg}`);
   const mapDir = resolve(root, process.env.MAP_OUT ?? 'public/map');
-  const lines = mapLines(readGz<LinesJson>(resolve(mapDir, 'lines.json.gz')), readGz<{ rails: RailJson[] }>(resolve(mapDir, 'rails.json.gz')).rails);
+  const rails = readGz<{ rails: RailJson[] }>(resolve(mapDir, 'rails.json.gz')).rails;
+  const lines = mapLines(readGz<LinesJson>(resolve(mapDir, 'lines.json.gz')), rails);
   const stopsPath = resolve(mapDir, 'stops.json.gz');
-  const towns = existsSync(stopsPath) ? readGz<StopsJson>(stopsPath).towns.filter((t) => t.length > 0) : [];
-  lap(`${lines.length} lines on the map (${[...new Set(lines.map((l) => l.ref))].join(', ')}), ${towns.length} towns`);
+  const stops = existsSync(stopsPath) ? readGz<StopsJson>(stopsPath) : null;
+  const towns = stops ? stops.towns.filter((t) => t.length > 0) : [];
+  // the bus lines (they name their stops by their number in stops.json.gz) – GTFS_BUSES=0 leaves the buses out
+  const busPath = resolve(mapDir, 'buslines.json.gz');
+  const busDoc = process.env.GTFS_BUSES !== '0' && stops && existsSync(busPath) ? readGz<BusLinesJson>(busPath) : null;
+  const busLines = busDoc && stops ? mapBusLines(busDoc, stops) : [];
+  lap(`${lines.length} lines on the map (${[...new Set(lines.map((l) => l.ref))].join(', ')}), ${busLines.length} bus lines, ${towns.length} towns`);
 
   const sources: Array<{ src: FeedSource; url: string; drop: string }> = [];
   const args = process.argv.slice(2);
@@ -1014,11 +1586,17 @@ async function main(): Promise<void> {
   }
   const agency = new RegExp(process.env.GTFS_AGENCY ?? DEFAULT_AGENCY, 'i');
   const refs = new Set(lines.map((l) => l.ref));
+  // (the buses are read in the same pass as the trams: a pass through stop_times.txt is what takes the time)
+  const bus: BusWanted | undefined = busLines.length > 0 ? { agency: new RegExp(process.env.GTFS_BUS_AGENCY ?? DEFAULT_BUS_AGENCY, 'i'), refs: new Set(busLines.flatMap((l) => l.refs)) } : undefined;
   const feeds: FeedData[] = [];
-  for (const s of sources) feeds.push(await readFeed(s.src, refs, agency, lap, s.url));
+  for (const s of sources) feeds.push(await readFeed(s.src, refs, agency, lap, s.url, bus));
 
   const week = process.env.GTFS_WEEK ? dateOf(process.env.GTFS_WEEK) : undefined;
   const { json, report } = buildTimetable(feeds, lines, { towns, week, attribution: process.env.GTFS_ATTRIBUTION });
+  if (stops) json.stopPlaces = tramStopPlaces(json.stops, rails, stops);
+  // the buses: on the same days as the trams
+  const busBuilt = busDoc && busLines.length > 0 ? buildBusTimes(feeds, busLines, { towns, days: json.days.map(dateOf) as [number, number, number], map: busDoc.map, places: busDoc.places }) : null;
+  if (busBuilt) json.bus = busBuilt.json;
   const bytes = gzipSync(JSON.stringify(json), { level: 9 });
   writeFileSync(resolve(mapDir, 'timetable.json.gz'), bytes);
 
@@ -1034,6 +1612,21 @@ async function main(): Promise<void> {
   if (report.unmatched.length > 0) console.log(`stops of the feed between the stops of a line that the map's line has not got:\n${report.unmatched.map((u) => `  ${u.name} (line ${u.refs.join(', ')}; ${u.count}×) – ${u.known ? `other lines of the map have it, as "${u.known}"` : 'no line of the map has it'}`).join('\n')}`);
   if (report.loose.length > 0) console.log(`names paired that are not quite the same:\n${report.loose.map((p) => `  ${p.feed} = ${p.map} (${p.sim})`).join('\n')}`);
   if (report.otherRefs.length > 0) console.log(`lines of the operators on rails that the map has not got: ${report.otherRefs.join(', ')}`);
+  if (json.stopPlaces) {
+    const lost = json.stops.filter((_, i) => (json.stopPlaces?.[i].length ?? 0) === 0);
+    if (lost.length > 0) console.log(`stops of the trams without a stop place of their name nearby (their boards are found by name only): ${lost.join(', ')}`);
+  }
+  if (busBuilt) {
+    const b = busBuilt.report;
+    console.log('buses:');
+    for (const l of b.lines) console.log(`  #${l.index} ${l.ref} → ${l.to}: ${l.patterns} patterns, trips ${l.trips.join(' / ')} (Mon–Fri / Sat / Sun)${l.unserved > 0 ? `, ${l.unserved} of its ${l.stops} stops no trip calls at` : ''}`);
+    for (const m of b.missing) console.log(`  #${m.index} ${m.ref} → ${m.to}${m.operator ? ` (${m.operator})` : ''}: NO timetable – ${m.why}`);
+    if (b.unplaced.length > 0) console.log(`bus trips that fit no bus line of the map (the 40 most frequent of ${b.unplaced.length}):\n${b.unplaced.slice(0, 40).map((u) => `  ${u.count}× ${u.ref}: ${u.first} → ${u.last}`).join('\n')}`);
+    const others = [...new Set(feeds.flatMap((f) => f.otherBusRefs ?? []))].sort();
+    if (others.length > 0) console.log(`bus lines of the operators that the map has not got: ${others.join(', ')}`);
+    const busBytes = gzipSync(JSON.stringify(busBuilt.json), { level: 9 }).length;
+    lap(`buses: ${b.placed} of ${b.trips} trips of the three days on a line of the map; ${busBuilt.json.lines.length} of ${busLines.length} bus lines with a timetable, ${busBuilt.json.lines.reduce((n, l) => n + l.patterns.length, 0)} patterns (${(busBytes / 1024).toFixed(0)} KB of the file)`);
+  }
   lap(`timetable.json.gz: ${json.lines.length} of ${lines.length} lines, ${json.lines.reduce((n, l) => n + l.patterns.length, 0)} patterns, ${json.stops.length} stops, ${(bytes.length / 1024).toFixed(0)} KB`);
   for (const s of sources) {
     if (!s.drop) continue;

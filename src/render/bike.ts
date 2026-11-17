@@ -14,6 +14,11 @@
  * steering axis, the rider's arms follow the grips, and fork and swing arm
  * follow the heights of the wheels in the physics.
  *
+ * The rider moves as a rider does (RiderMotion): he looks through the bend,
+ * leans into it a little more than the machine, tucks in on the throttle,
+ * braces himself on the brakes, looks over his shoulder when an indicator
+ * comes on and puts a foot down when he stops.
+ *
  * Seen through the rider's own eyes his helmet is not drawn: it leaves itself
  * out of any picture taken from inside it (its shadow stays, and the mirrors,
  * whose cameras stand elsewhere, still show it).
@@ -737,12 +742,23 @@ function ownHead(mesh: THREE.Mesh, centre: THREE.Vector3, reach: number): void {
 }
 
 interface Arm {
-  /** the shoulder in the torso's frame, the wrist in the front's; which way the elbow bends */
+  /** −1 left, 1 right; the shoulder in the torso's frame, the wrist in the front's */
+  side: number;
   shoulder: THREE.Vector3;
   wrist: THREE.Vector3;
-  pole: THREE.Vector3;
   upper: THREE.Mesh;
   fore: THREE.Group;
+}
+
+interface Leg {
+  /** −1 left, 1 right; the hip joint in the frame of the hips, the ankle on its peg in the motorcycle's */
+  side: number;
+  hip: THREE.Vector3;
+  peg: THREE.Vector3;
+  /** the thigh, the shin with the boot's shaft (both along +y from the joint above), the foot about the ankle */
+  thigh: THREE.Mesh;
+  shin: THREE.Group;
+  foot: THREE.Group;
 }
 
 interface Shock {
@@ -755,8 +771,239 @@ interface Shock {
 
 const UPPER_ARM = 0.29;
 const FOREARM = 0.26;
+/** how far an arm reaches, just short of straight (a straight arm would look locked) */
+const ARM_REACH = (UPPER_ARM + FOREARM) * 0.998;
 const THIGH = 0.45;
 const SHIN = 0.44;
+/** how high the ankle stands above the boot's sole */
+const ANKLE = 0.088;
+
+// ------------------------------------------------------------------------- the rider's movements
+// What the rider does is worked out from a handful of numbers (RiderMotion, plain arithmetic that the
+// tests can drive), then put on the model in PlayerBike.update.
+
+/** What the rider's movements are made from: the visual state and the lean, boiled down. */
+export interface RiderInput {
+  /** speed (km/h, not below 0); whether it goes backwards (a motorcycle is pushed back: he paddles with his feet) */
+  speedKmh: number;
+  reversing: boolean;
+  /** the front wheel's angle on the road (rad, + = to the right) and the wheelbase (m): the curve it rides */
+  steer: number;
+  wheelbase: number;
+  /** the handlebar's turn about the steering axis (rad, + = to the right): the grips his hands follow */
+  bar: number;
+  /** how far the motorcycle leans as drawn (rad, + = to the right) */
+  lean: number;
+  /** throttle and brake, 0 … 1 */
+  throttle: number;
+  brake: number;
+  /** the indicator: −1 left, 0 off, 1 right */
+  indicator: number;
+}
+
+/**
+ * The rider's pose.  Each angle (rad) is relative to the part it hangs from: + is to the right for a
+ * turn or a tilt, forwards (down) for a bend; shifts in m.
+ */
+export interface RiderPose {
+  /** the hips: across the seat (+ = to the right) and forwards along it; how they roll, bend and turn on it */
+  hipShift: number;
+  hipSlide: number;
+  hipRoll: number;
+  hipPitch: number;
+  hipYaw: number;
+  /** the upper body, relative to the motorcycle (the hips' turns included: the waist bends by the difference) */
+  torsoRoll: number;
+  torsoPitch: number;
+  torsoYaw: number;
+  /**
+   * … and the same without his looking round (glances, the shoulder check) and without his breathing and
+   * shifting while he waits: what the camera of his eyes goes with – it moves as he rides, never as he looks
+   */
+  eyeRoll: number;
+  eyePitch: number;
+  eyeYaw: number;
+  /** the head relative to the upper body (the neck takes part of the bend and the tilt) */
+  headYaw: number;
+  headPitch: number;
+  headRoll: number;
+  /** the elbows: + out (tucked in), − in and down (braced) */
+  elbows: number;
+  /** each foot from its peg (0) to the road (1); each knee from the tank (0) to opened out (1) */
+  footL: number;
+  footR: number;
+  kneeL: number;
+  kneeR: number;
+  /** how far the motorcycle settles on to a foot on the road (rad, + = to the right) */
+  tilt: number;
+}
+
+/** how far ahead the rider looks through a bend – far, as he is taught: this many seconds of his way, but no nearer and no further than … (m) */
+const LOOK_AHEAD = 3;
+const LOOK_NEAR = 6;
+const LOOK_FAR = 80;
+/** the furthest he turns to look through a bend (rad): a turn at full lock at walking pace */
+const LOOK_MAX = 0.9;
+/** the shoulder check: how far he looks round, head and shoulders together (rad), and how long it takes (s) */
+const CHECK_TURN = 1.45;
+const CHECK_TIME = 1.2;
+/** how far the motorcycle settles on to his foot on the road (rad) */
+const FOOT_TILT = 0.035;
+
+const finite = (x: number): number => (Number.isFinite(x) ? x : 0);
+const smoothstep = (e0: number, e1: number, x: number): number => {
+  const t = clamp((x - e0) / (e1 - e0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+/** x on its way to `to`, at `rate` (1/s) over dt – the same however the frames fall */
+const follow = (x: number, to: number, rate: number, dt: number): number => x + (to - x) * (1 - Math.exp(-rate * dt));
+
+/** A number 0 … 1 that looks random – always the same for the same n. */
+function hash(n: number): number {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/**
+ * Now and then a glance, worked out from the clock alone (nothing else to remember): time is cut into
+ * slots of `slot` s, and in a slot, by the chance `p`, comes one glance of `len` s at a moment of its
+ * own.  Its strength −1 … 1, the sign the side; smooth, and 0 between glances.
+ */
+function glance(now: number, slot: number, p: number, len: number, seed: number): number {
+  const n = Math.floor(now / slot);
+  if (hash(n + seed) > p) return 0;
+  const u = (now - n * slot - hash(n + seed + 0.37) * (slot - len)) / len;
+  if (u <= 0 || u >= 1) return 0;
+  const side = hash(n + seed + 0.71);
+  return (side < 0.5 ? -1 : 1) * (0.55 + 0.9 * Math.abs(side - 0.5)) * smoothstep(0, 0.22, u) * (1 - smoothstep(0.68, 1, u));
+}
+
+/**
+ * How the rider moves: one step a frame from what the motorcycle does, into `pose` (the same object
+ * every time – nothing is made per frame).  It keeps its own clock, which runs only with the steps:
+ * no time passing, no movement.
+ *
+ * - He looks through the bend: at the point of his way some 3 s ahead, on the arc the front wheel's
+ *   angle draws – half the turn of that arc lies in front of him.  The angle of the wheel turns his
+ *   head before the machine leans: he looks first, as he should.  At a standstill only half of it (the
+ *   bar may be left turned), pushed backwards over the shoulder.
+ * - His upper body leans into the bend a little more than the machine, and from about 11° his hips
+ *   slide across the seat towards the inside; from about 17° the inside knee opens.  Half of what
+ *   riding asks of his body – the lean, tucking in, turning with the bar – is in his hips, the rest in
+ *   his back.  His head keeps the
+ *   eyes nearer the horizon than his shoulders are (it takes back half their lean) – as riders do.
+ * - Hard on the throttle (or very fast) he tucks in, elbows out; on the brakes he braces himself on
+ *   the bar: upper body back, arms straight, elbows in, hips slid forwards.
+ * - When an indicator comes on, a shoulder check to that side (head and shoulders, 1.2 s).
+ * - Standing he puts the left foot on the road (the right stays on the brake pedal; both when pushed
+ *   back) and the machine settles a little on to it; he breathes, shifts his weight and looks round
+ *   now and then.  Riding straight on, now and then a glance into a mirror.
+ */
+export class RiderMotion {
+  readonly pose: RiderPose = { hipShift: 0, hipSlide: 0, hipRoll: 0, hipPitch: 0, hipYaw: 0, torsoRoll: 0, torsoPitch: 0, torsoYaw: 0, eyeRoll: 0, eyePitch: 0, eyeYaw: 0, headYaw: 0, headPitch: 0, headRoll: 0, elbows: 0, footL: 1, footR: 0, kneeL: 0, kneeR: 0, tilt: -FOOT_TILT };
+  /** where he looks through the bend, and where he looks with the glances (rad, + = right of straight ahead); how far down; smoothed */
+  private through = 0;
+  private view = 0;
+  private nod = 0;
+  private tuck = 0;
+  private brace = 0;
+  /** whether it stands: the foot comes down below 3 km/h and goes up again above 6; smoothed (1 standing) */
+  private stopped = true;
+  private still = 1;
+  /** the shoulder check: the indicator last seen, the side looked to, the time since it began */
+  private lastIndicator = 0;
+  private checkSide = 0;
+  private checkT = CHECK_TIME;
+  /** his clock (s): the beat of his breathing, his shifting and his glances */
+  private clock = 0;
+
+  step(i: RiderInput, dt: number): RiderPose {
+    const p = this.pose;
+    const h = Number.isFinite(dt) && dt > 0 ? Math.min(dt, 60) : 0;
+    const t = (this.clock += h);
+    const kmh = Math.abs(finite(i.speedKmh));
+    const lean = clamp(finite(i.lean), -0.8, 0.8);
+    const bar = clamp(finite(i.bar), -0.8, 0.8);
+    const steer = clamp(finite(i.steer), -0.7, 0.7);
+    if (kmh < 3) this.stopped = true;
+    else if (kmh > 6) this.stopped = false;
+    this.still = follow(this.still, this.stopped ? 1 : 0, 2, h);
+    const s = this.still;
+    const moving = smoothstep(1, 6, kmh);
+
+    // where he looks: through the bend to a point of his way ahead (half the turn of the arc up to it)
+    let look: number;
+    if (i.reversing) look = steer > 0.05 ? 1.2 : -1.2; // over the shoulder to where the rear goes
+    else {
+      const ahead = clamp((kmh / 3.6) * LOOK_AHEAD, LOOK_NEAR, LOOK_FAR);
+      const curve = Math.tan(steer) / Math.max(0.5, finite(i.wheelbase));
+      look = clamp(curve * ahead * 0.5, -LOOK_MAX, LOOK_MAX) * (0.5 + 0.5 * moving);
+    }
+    // now and then a glance: round about while it stands (or down at the instruments; not while he pushes it
+    // back, looking over his shoulder), into a mirror riding straight on
+    const round = i.reversing ? 0 : glance(t, 4.5, 0.55, 1.6, 11);
+    const down = i.reversing ? 0 : Math.abs(glance(t, 5.3, 0.3, 1.3, 29)) * (1 - Math.abs(round));
+    const mirror = glance(t, 8, 0.35, 0.9, 47) * (1 - smoothstep(0.08, 0.25, Math.abs(look)));
+    this.through = follow(this.through, look, 5, h);
+    this.view = follow(this.view, look + s * 0.6 * round + (1 - s) * 0.38 * mirror, 5, h);
+    this.nod = follow(this.nod, s * 0.35 * down + (1 - s) * 0.2 * Math.abs(mirror), 5, h);
+
+    // a shoulder check when an indicator comes on (or changes side); c: how far into it, 0 … 1
+    const ind = Math.sign(finite(i.indicator));
+    if (ind !== 0 && ind !== this.lastIndicator) {
+      this.checkSide = ind;
+      this.checkT = 0;
+    } else this.checkT = Math.min(CHECK_TIME, this.checkT + h);
+    this.lastIndicator = ind;
+    const c = smoothstep(0, 0.3, this.checkT) * (1 - smoothstep(0.75, CHECK_TIME, this.checkT));
+
+    // hard on the throttle he tucks in (and very fast out of the wind); braking he braces himself on the bar
+    const thr = clamp(finite(i.throttle), 0, 1);
+    const brk = clamp(finite(i.brake), 0, 1);
+    const hard = brk < 0.05 ? smoothstep(0.45, 0.95, thr) : 0;
+    this.tuck = follow(this.tuck, moving * Math.max(hard, clamp((kmh - 90) / 70, 0, 0.6)), 3, h);
+    this.brace = follow(this.brace, moving * smoothstep(0.1, 0.7, brk), 5, h);
+
+    // the feet: the left one on the road while it stands (the right stays on the brake pedal), both pushed backwards
+    p.footL = follow(p.footL, this.stopped || i.reversing ? 1 : 0, 4, h);
+    p.footR = follow(p.footR, i.reversing ? 1 : 0, 4, h);
+    p.tilt = FOOT_TILT * (p.footR - p.footL);
+
+    // the body: into the bend a little more than the machine, the hips across the seat, the inside knee out
+    const side = Math.sign(lean);
+    const hang = smoothstep(0.2, 0.6, Math.abs(lean));
+    const open = smoothstep(0.3, 0.62, Math.abs(lean));
+    p.hipShift = side * hang * 0.055;
+    p.hipSlide = 0.025 * this.brace;
+    p.kneeL = lean < 0 ? open : 0;
+    p.kneeR = lean > 0 ? open : 0;
+    // (upright while the machine settles on to his foot; the shoulders follow the bar – reaching for the
+    // grip ahead – and a little the look through the bend)
+    p.eyeRoll = 0.15 * lean + side * hang * 0.08 - p.tilt;
+    p.eyePitch = 0.22 * Math.abs(bar) + 0.13 * this.tuck - 0.1 * this.brace;
+    p.eyeYaw = 0.42 * bar + 0.12 * this.through;
+    // (and besides: the shoulders go a little with a glance and with the shoulder check; breathing, and
+    // shifting his weight while he waits)
+    p.torsoRoll = p.eyeRoll + s * 0.015 * Math.sin(t * 0.23 + 2);
+    p.torsoPitch = p.eyePitch + 0.008 * Math.sin(t * 1.55);
+    p.torsoYaw = p.eyeYaw + 0.12 * (this.view * (1 - c) - this.through) + 0.15 * this.checkSide * c + s * 0.03 * Math.sin(t * 0.31 + 0.7);
+    // (half of what riding asks of his body is in the hips – rolling on the seat on to the inside buttock, tipping
+    // forwards to tuck in, turning with the bar –, the back bends the rest; his looking round is all in the back)
+    p.hipRoll = 0.5 * p.eyeRoll;
+    p.hipPitch = 0.5 * p.eyePitch;
+    p.hipYaw = 0.5 * p.eyeYaw;
+    p.elbows = this.tuck - 0.6 * this.brace;
+
+    // the head: where he looks less the turn of his shoulders – the shoulder check takes over while it lasts;
+    // half the lean of the shoulders taken back, a little tilt into a turn he looks into; still looking ahead
+    // when the upper body bends forwards or back
+    const turn = this.view + (CHECK_TURN * this.checkSide - this.view) * c;
+    p.headYaw = clamp(turn - p.torsoYaw, -1.35, 1.35);
+    p.headRoll = -0.5 * (lean + p.tilt + p.torsoRoll) + 0.12 * this.view * (1 - c) + s * 0.03 * Math.sin(t * 0.37 + 1);
+    p.headPitch = -0.85 * p.torsoPitch + this.nod + 0.06 * c;
+    return p;
+  }
+}
 
 /**
  * A motorcycle with its rider.  It leans into the bend (`setLean`) – the
@@ -783,10 +1030,24 @@ export class PlayerBike implements VehicleModel {
   /** the swing arm about its pivot, and the rear wheel in it */
   private readonly swing = new THREE.Group();
   private readonly rearWheel = new THREE.Group();
-  /** the rider's upper body: it turns a little with the handlebar */
+  /** the rider: his hips on the seat, the upper body about the waist, the neck on it, the head on the neck */
+  private readonly pelvis = new THREE.Group();
   private readonly torso = new THREE.Group();
+  private readonly neck = new THREE.Group();
+  private readonly head = new THREE.Group();
   private readonly rider: THREE.Object3D[] = [];
   private readonly arms: Arm[] = [];
+  private readonly legs: Leg[] = [];
+  /** how he moves, and what it is worked out from (the same objects every frame) */
+  private readonly motion = new RiderMotion();
+  private readonly input: RiderInput = { speedKmh: 0, reversing: false, steer: 0, wheelbase: 1.45, bar: 0, lean: 0, throttle: 0, brake: 0, indicator: 0 };
+  /** where his hips sit at rest */
+  private readonly hipRest: THREE.Vector3;
+  /** the wheels' axles along the motorcycle (z, m): between them the road under a foot put down */
+  private readonly zFront: number;
+  private readonly zRear: number;
+  /** whether he sits on it */
+  private riderOn = true;
   private readonly shocks: Shock[] = [];
   private readonly lamps = new Lamps();
   private readonly panel = new InstrumentPanel();
@@ -796,10 +1057,19 @@ export class PlayerBike implements VehicleModel {
   /** the swing arm: length, and its height difference from the pivot to the axle at rest */
   private readonly armLength: number;
   private readonly armDrop: number;
-  /** the eye in the frame of the upper body: it moves with the shoulders (the game reads `eye` every frame) */
+  /**
+   * The eye in the frame of the upper body: it moves with the hips and the shoulders, smoothly and a
+   * few centimetres (the game reads `eye` every frame) – not with the head: the head's own turns (the
+   * look through a bend, the shoulder check, glances) are seen from outside and in the mirrors, while
+   * the camera of the eyes looks where the player turns it.
+   */
   private readonly eyeRest: THREE.Vector3;
+  /** the frame of the upper body the eye goes with (RiderPose eye…), made anew every frame in these */
+  private readonly eyeFrame = { euler: new THREE.Euler(), q: new THREE.Quaternion(), m: new THREE.Matrix4(), one: V(1, 1, 1) };
+  /** the lean the game asks for, and the lean as drawn (following it smoothly) */
   private lean = 0;
-  private readonly tmp = { a: V(), b: V(), c: V(), d: V() };
+  private leanDrawn = 0;
+  private readonly tmp = { a: V(), b: V(), c: V(), d: V(), e: V() };
 
   /** `variant`: the class's build – 'moped' (AM), 'light' (A1), 'mid' (A2), 'big' (A). */
   constructor(variant: BikeVariant = 'big') {
@@ -808,8 +1078,9 @@ export class PlayerBike implements VehicleModel {
     const root = this.root;
     root.name = 'motorcycle';
     const R = (this.radius = b.spec.wheelRadius);
-    const zF = -b.spec.wheelbase / 2;
-    const zR = b.spec.wheelbase / 2;
+    const zF = (this.zFront = -b.spec.wheelbase / 2);
+    const zR = (this.zRear = b.spec.wheelbase / 2);
+    this.input.wheelbase = b.spec.wheelbase;
     const rake = (this.rake = b.rake);
     const tanRake = Math.tan(rake);
     const axis = (this.axis = V(0, Math.cos(rake), Math.sin(rake)));
@@ -1308,22 +1579,30 @@ export class PlayerBike implements VehicleModel {
     }
 
     // ---------------------------------------------------------------- the rider
-    const rider = new Parts();
+    // Built in the pose he sits in on a straight road.  Hips, upper body, neck and head are each a group
+    // about their joint (moved in update()); arms and legs are bent there towards grips, pegs or the road.
+    const hips = new Parts();
     const upperBody = new Parts();
+    const collar = new Parts();
+    const neck = new Parts();
     const helmet = new Parts();
     const waist = hip.clone().addScaledVector(up, 0.14);
+    // where the neck bends on the shoulders, where the head turns on the neck
+    const neckBase = shoulders.clone().addScaledVector(up, -0.03);
+    const skull = head.clone().add(V(0, -0.07, 0.015));
     const hipFrame = (s: number, a: number, d: number, shift: number): THREE.Vector3[] => ring(hip.clone().addScaledVector(up, s).addScaledVector(fwd, shift), X, fwd, oval(a, d, 18, 0.82));
     // the seat of the trousers and the hips, sitting on the seat
-    rider.add(TROUSERS, loft([hipFrame(-0.105, 0.06, 0.04, -0.01), hipFrame(-0.09, 0.14, 0.1, -0.005), hipFrame(-0.04, 0.17, 0.125, 0.0), hipFrame(0.06, 0.172, 0.12, 0.005), hipFrame(0.13, 0.16, 0.112, 0.01)]));
-    // the jacket from the waist to the shoulders
-    upperBody.add(JACKET, loft([hipFrame(0.06, 0.168, 0.118, 0.008), hipFrame(0.18, 0.163, 0.112, 0.014), hipFrame(0.3, 0.178, 0.122, 0.028), hipFrame(0.4, 0.195, 0.124, 0.03), hipFrame(0.46, 0.2, 0.11, 0.022), hipFrame(0.51, 0.175, 0.088, 0.008), hipFrame(0.545, 0.1, 0.062, -0.004)]));
+    hips.add(TROUSERS, loft([hipFrame(-0.105, 0.06, 0.04, -0.01), hipFrame(-0.09, 0.14, 0.1, -0.005), hipFrame(-0.04, 0.17, 0.125, 0.0), hipFrame(0.06, 0.162, 0.112, 0.005), hipFrame(0.13, 0.152, 0.105, 0.01)]));
+    // the jacket from the waist to the shoulders, its hem well over the trousers (they turn against each other
+    // at the waist: a clean edge, not two skins crossing)
+    upperBody.add(JACKET, loft([hipFrame(0.05, 0.182, 0.138, 0.007), hipFrame(0.18, 0.163, 0.112, 0.014), hipFrame(0.3, 0.178, 0.122, 0.028), hipFrame(0.4, 0.195, 0.124, 0.03), hipFrame(0.46, 0.2, 0.11, 0.022), hipFrame(0.51, 0.175, 0.088, 0.008), hipFrame(0.545, 0.1, 0.062, -0.004)]));
     // a band of the bike's colour across chest and back, and the shoulders
     upperBody.add(paint, loft([hipFrame(0.31, 0.181, 0.125, 0.028), hipFrame(0.355, 0.189, 0.127, 0.03)], false));
     const shoulderAt = (s: number): THREE.Vector3 => hip.clone().addScaledVector(up, 0.475).add(V(s * 0.175, 0, 0));
     for (const s of [-1, 1]) upperBody.add(JACKET, blob(shoulderAt(s).add(V(-s * 0.01, 0.004, 0.005)), 0.058, 0.056, 0.064));
     // neck, collar and helmet: the parts the rider's own eyes are inside of
-    helmet.add(JACKET, limb(shoulders.clone().addScaledVector(up, -0.03), head.clone().add(V(0, -0.07, 0.015)), 0.058, 0.052, 12));
-    helmet.add(JACKET, turned([[0.07, 0.0], [0.085, 0.012], [0.082, 0.05], [0.07, 0.056]], shoulders.clone().addScaledVector(up, -0.035), up, 18));
+    neck.add(JACKET, limb(neckBase, skull, 0.058, 0.052, 12));
+    collar.add(JACKET, turned([[0.07, 0.0], [0.085, 0.012], [0.082, 0.05], [0.07, 0.056]], shoulders.clone().addScaledVector(up, -0.035), up, 18));
     helmet.add(HELMET, blob(head, 0.128, 0.142, 0.158, undefined, 24, 16));
     // the chin bar of a full-face helmet
     helmet.add(HELMET, blob(head.clone().add(V(0, -0.07, -0.06)), 0.105, 0.072, 0.1, new THREE.Euler(0.25, 0, 0), 18, 10));
@@ -1339,22 +1618,20 @@ export class PlayerBike implements VehicleModel {
       st.scale(0.131, 0.145, 0.161).translate(head.x, head.y, head.z);
       helmet.add(paint, bare(st));
     }
-    // legs: thighs along the tank, knees bent, boots on the pegs
+    // legs: thighs along the tank, knees bent, boots on the pegs – thigh and shin (with the boot's shaft)
+    // are posed in update(), each along +y from its upper joint; the foot is a part of its own about the ankle
     for (const s of [-1, 1]) {
-      const hj = hip.clone().add(V(s * 0.095, 0, 0));
-      const ankle = V(s * px, py + 0.085, pz + 0.085);
-      const knee = bend(hj, ankle, THIGH, SHIN, V(s * 0.45, 0.15, -1).normalize(), V());
-      rider.add(TROUSERS, limb(hj, knee, 0.08, 0.062));
-      rider.add(TROUSERS, limb(knee, ankle, 0.058, 0.046));
-      const shinDir = knee.clone().sub(ankle).normalize();
-      rider.add(BOOTS, limb(ankle.clone().addScaledVector(shinDir, 0.2), ankle, 0.056, 0.05));
-      const heel = ankle.clone().add(V(0, -0.04, 0.06));
-      const toe = V(s * (px + 0.01), py + 0.045, pz - 0.13);
+      const thigh = new THREE.Mesh(limb(V(), V(0, THIGH, 0), 0.08, 0.062), TROUSERS);
+      const shin = new THREE.Group();
+      shin.add(new THREE.Mesh(limb(V(), V(0, SHIN, 0), 0.058, 0.046), TROUSERS), new THREE.Mesh(limb(V(0, SHIN - 0.2, 0), V(0, SHIN, 0), 0.056, 0.05), BOOTS));
+      // (flat on the peg, the sole as low as the peg's top: heel and toe 4 cm below the ankle)
+      const heel = V(0, -0.04, 0.06);
+      const toe = V(s * 0.01, -0.04, -0.215);
       const fd = toe.clone().sub(heel);
       const fl = fd.length();
       fd.normalize();
       const fu = Y.clone().addScaledVector(fd, -fd.y).normalize();
-      const foot: THREE.Vector3[][] = [];
+      const sole: THREE.Vector3[][] = [];
       for (const [t, w, h] of [
         [-0.04, 0.0, 0.0],
         [0.0, 0.035, 0.035],
@@ -1363,8 +1640,13 @@ export class PlayerBike implements VehicleModel {
         [0.85, 0.042, 0.03],
         [1.0, 0.03, 0.02],
         [1.03, 0.0, 0.0],
-      ]) foot.push(ring(heel.clone().addScaledVector(fd, t * fl), X, fu, oval(w, h, 14, 0.8)));
-      rider.add(BOOTS, loft(foot, false));
+      ]) sole.push(ring(heel.clone().addScaledVector(fd, t * fl), X, fu, oval(w, h, 14, 0.8)));
+      const foot = new THREE.Group();
+      foot.add(new THREE.Mesh(loft(sole, false), BOOTS));
+      for (const m of [thigh, ...shin.children, ...foot.children]) m.castShadow = true;
+      this.body.add(thigh, shin, foot);
+      this.rider.push(thigh, shin, foot);
+      this.legs.push({ side: s, hip: V(s * 0.095, 0, 0), peg: V(s * px, py + 0.085, pz + 0.085), thigh, shin, foot });
     }
     // the hands round the grips (they turn with the bar)
     const gloves = new Parts();
@@ -1381,15 +1663,13 @@ export class PlayerBike implements VehicleModel {
       for (const m of [upper, ...fore.children]) m.castShadow = true;
       this.body.add(upper, fore);
       this.rider.push(upper, fore);
-      // (the elbows out and down)
-      this.arms.push({ shoulder: shoulderAt(s).sub(waist), wrist: wrist.sub(P), pole: V(s * 0.55, -1, 0.2).normalize(), upper, fore });
+      this.arms.push({ side: s, shoulder: shoulderAt(s).sub(waist), wrist: wrist.sub(P), upper, fore });
     }
 
     // ---------------------------------------------------------------- assemble
     const group = this.body;
     root.add(group);
     body.into(group);
-    this.rider.push(...rider.into(group));
     // the front about the steering axis, the sliding part of the fork with the wheel in it
     this.front.position.copy(P);
     group.add(this.front);
@@ -1410,15 +1690,24 @@ export class PlayerBike implements VehicleModel {
     const rel = axleR.clone().sub(pivot);
     this.armLength = rel.length();
     this.armDrop = rel.y;
-    // the upper body about the waist, with neck and helmet
-    this.torso.position.copy(waist);
-    group.add(this.torso);
+    // the rider: the hips on the seat, the upper body about the waist, the neck on the shoulders, the head
+    // on the neck (neck, collar and helmet keep out of the picture taken from his own eyes)
+    this.hipRest = hip.clone();
+    this.pelvis.position.copy(hip);
+    group.add(this.pelvis);
+    this.rider.push(this.pelvis);
+    hips.into(this.pelvis, hip);
+    this.torso.position.copy(waist).sub(hip);
+    this.pelvis.add(this.torso);
+    upperBody.into(this.torso, waist);
+    for (const m of collar.into(this.torso, waist)) ownHead(m, head.clone().sub(waist), 0.3);
+    this.neck.position.copy(neckBase).sub(waist);
+    this.torso.add(this.neck);
+    for (const m of neck.into(this.neck, neckBase)) ownHead(m, head.clone().sub(neckBase), 0.3);
+    this.head.position.copy(skull).sub(neckBase);
+    this.neck.add(this.head);
+    for (const m of helmet.into(this.head, skull)) ownHead(m, head.clone().sub(skull), 0.3);
     this.eyeRest = this.eye.clone().sub(waist);
-    this.rider.push(...upperBody.into(this.torso, waist));
-    const heads = helmet.into(this.torso, waist);
-    this.rider.push(...heads);
-    const headLocal = head.clone().sub(waist);
-    for (const m of heads) ownHead(m, headLocal, 0.3);
     for (const m of [...this.lamps.indicators.map((i) => i.mesh), ...this.lamps.brake]) m.castShadow = false;
     this.update(standingState(R), 1, 0);
   }
@@ -1434,19 +1723,34 @@ export class PlayerBike implements VehicleModel {
 
   /** Whether the rider sits on it (not while he walks round it). */
   setRider(on: boolean): void {
+    this.riderOn = on;
     for (const o of this.rider) o.visible = on;
-    this.torso.visible = on;
+    // (without him no foot holds it tilted: it stands upright)
+    this.body.rotation.z = -(this.leanDrawn + (on ? this.motion.pose.tilt : 0));
   }
 
   update(s: CarVisualState, dt: number, now: number): void {
     const t = this.tmp;
+    const h = Number.isFinite(dt) && dt > 0 ? dt : 0;
     // the lean follows the bend smoothly
-    const z = -this.lean;
-    this.body.rotation.z += (z - this.body.rotation.z) * Math.min(1, dt * 6);
+    this.leanDrawn += (this.lean - this.leanDrawn) * Math.min(1, h * 6);
     // the handlebar turns about the raked axis: for the wheel's angle on the road a little more
     const steer = ((s.wheelSteer[0] ?? 0) + (s.wheelSteer[1] ?? 0)) / 2;
     const bar = clamp(steer / Math.cos(this.rake), -0.7, 0.7);
     this.front.quaternion.setFromAxisAngle(this.axis, -bar);
+    // how the rider moves, from what the motorcycle does
+    const inp = this.input;
+    inp.speedKmh = s.speedKmh;
+    inp.reversing = s.reversing;
+    inp.steer = steer;
+    inp.bar = bar;
+    inp.lean = this.leanDrawn;
+    inp.throttle = s.throttle;
+    inp.brake = s.brake;
+    inp.indicator = s.hazard ? 0 : s.indicator;
+    const p = this.motion.step(inp, h);
+    // (standing, it settles a little on to his foot on the road – not without him)
+    const roll = (this.body.rotation.z = -(this.leanDrawn + (this.riderOn ? p.tilt : 0)));
     // the suspension: the fork slides along the axis, the swing arm swings about its pivot
     const R = this.radius;
     const dive = clamp(((s.wheelY[0] ?? R) + (s.wheelY[1] ?? R)) / 2 - R, -0.06, 0.12);
@@ -1465,15 +1769,31 @@ export class PlayerBike implements VehicleModel {
       k.mesh.quaternion.setFromUnitVectors(Y, d.normalize());
       k.mesh.scale.set(1, len / k.length, 1);
     }
-    // the rider turns his shoulders a little with the bar; his arms reach for the grips
-    this.torso.rotation.set(-0.22 * Math.abs(bar), -0.42 * bar, 0, 'YXZ');
+    // the rider: the hips on the seat, the upper body about the waist (each rolled, bent, then twisted), the
+    // neck and the head on it (tilted, then turned, then nodding); the eye goes with the upper body as he rides
+    const hr = this.hipRest;
+    this.pelvis.position.set(hr.x + p.hipShift, hr.y - 0.25 * Math.abs(p.hipShift), hr.z - p.hipSlide);
+    this.pelvis.rotation.set(-p.hipPitch, -p.hipYaw, -p.hipRoll, 'ZXY');
+    this.torso.rotation.set(p.hipPitch - p.torsoPitch, p.hipYaw - p.torsoYaw, p.hipRoll - p.torsoRoll, 'ZXY');
+    this.neck.rotation.set(-0.4 * p.headPitch, 0, -0.4 * p.headRoll, 'ZYX');
+    this.head.rotation.set(-0.6 * p.headPitch, -p.headYaw, -0.6 * p.headRoll, 'ZYX');
+    this.pelvis.updateMatrix();
     this.torso.updateMatrix();
-    this.eye.copy(this.eyeRest).applyMatrix4(this.torso.matrix);
+    const f = this.eyeFrame;
+    f.q.setFromEuler(f.euler.set(p.hipPitch - p.eyePitch, p.hipYaw - p.eyeYaw, p.hipRoll - p.eyeRoll, 'ZXY'));
+    f.m.compose(this.torso.position, f.q, f.one);
+    this.eye.copy(this.eyeRest).applyMatrix4(f.m).applyMatrix4(this.pelvis.matrix);
+    // his arms reach for the grips: the elbows out and down, further out when he tucks in, in when he braces himself
     this.front.updateMatrix();
     for (const a of this.arms) {
-      const sh = t.a.copy(a.shoulder).applyMatrix4(this.torso.matrix);
+      const sh = t.a.copy(a.shoulder).applyMatrix4(this.torso.matrix).applyMatrix4(this.pelvis.matrix);
       const wr = t.b.copy(a.wrist).applyMatrix4(this.front.matrix);
-      const el = bend(sh, wr, UPPER_ARM, FOREARM, a.pole, t.c);
+      // (a hand never lets go: with the grip out of reach – hanging off the inside, braking, looking back over the
+      // outside shoulder at once – the shoulder reaches forwards for it, a centimetre or two inside the round of it)
+      const gap = sh.distanceTo(wr) - ARM_REACH;
+      if (gap > 0) sh.lerp(wr, gap / (gap + ARM_REACH));
+      const pole = t.e.set(a.side * (0.55 + 0.35 * p.elbows), -1, 0.2).normalize();
+      const el = bend(sh, wr, UPPER_ARM, FOREARM, pole, t.c);
       const d = t.d.subVectors(el, sh);
       a.upper.position.copy(sh);
       a.upper.scale.set(1, d.length() / UPPER_ARM, 1);
@@ -1483,13 +1803,51 @@ export class PlayerBike implements VehicleModel {
       a.fore.scale.set(1, d.length() / FOREARM, 1);
       a.fore.quaternion.setFromUnitVectors(Y, d.normalize());
     }
+    // his legs from the hips to the pegs, the knees forwards and a little out – the inside one further
+    // out at a strong lean; a foot put down goes (lifted on its way) to the road beside the motorcycle,
+    // a little ahead of its peg: found in the upright frame (the wheels' heights give the road), turned
+    // into the leaning one
+    const cr = Math.cos(roll);
+    const sr = Math.sin(roll);
+    for (const g of this.legs) {
+      const side = g.side;
+      const down = side < 0 ? p.footL : p.footR;
+      const knee = side < 0 ? p.kneeL : p.kneeR;
+      const e = down * down * (3 - 2 * down);
+      const hj = t.a.copy(g.hip).applyMatrix4(this.pelvis.matrix);
+      const ank = t.b.copy(g.peg);
+      if (e > 1e-3) {
+        const gx = side * (Math.abs(g.peg.x) + 0.14);
+        const gz = g.peg.z - 0.055;
+        const gy = dive + ((squat - dive) * (gz - this.zFront)) / (this.zRear - this.zFront) + ANKLE;
+        ank.lerp(t.c.set(gx * cr + gy * sr, gy * cr - gx * sr, gz), e);
+        ank.y += 0.05 * Math.sin(Math.PI * e);
+        // (never further than the leg reaches)
+        const d = t.c.subVectors(ank, hj);
+        const reach = (THIGH + SHIN) * 0.995;
+        if (d.lengthSq() > reach * reach) ank.copy(hj).addScaledVector(d.normalize(), reach);
+      }
+      const pole = t.e.set(side * (0.45 + 0.5 * knee + 0.2 * e), 0.15, -1).normalize();
+      const kn = bend(hj, ank, THIGH, SHIN, pole, t.c);
+      const d = t.d.subVectors(kn, hj);
+      g.thigh.position.copy(hj);
+      g.thigh.scale.set(1, d.length() / THIGH, 1);
+      g.thigh.quaternion.setFromUnitVectors(Y, d.normalize());
+      d.subVectors(ank, kn);
+      g.shin.position.copy(kn);
+      g.shin.scale.set(1, d.length() / SHIN, 1);
+      g.shin.quaternion.setFromUnitVectors(Y, d.normalize());
+      // the foot: on its peg the toe turns out a little as the knee opens; on the road flat on it, toe out
+      g.foot.position.copy(ank);
+      g.foot.rotation.set(0, -side * (0.3 * e + 0.25 * knee), -roll * e, 'ZYX');
+    }
     this.lamps.update(s);
     this.panel.update(s, now);
     // (the mirrors are drawn in the frame of the front before the scene updates its matrices)
     if (this.body.parent) this.body.updateMatrixWorld(true);
   }
 
-  /** The lean as drawn right now (for the camera of the rider's eyes). */
+  /** The lean as drawn right now, with the little settling on to his foot (for the camera of the rider's eyes). */
   get leaning(): number {
     return -this.body.rotation.z;
   }

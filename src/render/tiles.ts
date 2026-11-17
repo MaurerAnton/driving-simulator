@@ -56,6 +56,18 @@ export class TileManager {
   private readonly structMat = makeStructMaterial();
   private readonly bldgMat = makeBuildingMaterial();
   private readonly plainMat = makeBuildingMaterial(true);
+  /** what teaches the materials the season and the wet (game/outdoors.ts) – each tile's terrain gets it, too */
+  private materialHook: ((m: THREE.Material, kind: 'terrain' | 'ground' | 'paint' | 'struct' | 'building') => void) | null = null;
+
+  /** The season and the weather on the tiles' materials: the shared ones now, each tile's terrain as it loads. */
+  setMaterialHook(hook: (m: THREE.Material, kind: 'terrain' | 'ground' | 'paint' | 'struct' | 'building') => void): void {
+    this.materialHook = hook;
+    hook(this.groundMat, 'ground');
+    hook(this.paintMat, 'paint');
+    hook(this.structMat, 'struct');
+    hook(this.bldgMat, 'building');
+    hook(this.plainMat, 'building');
+  }
   /** buildings with windows, doors and roof tiles (false: plain walls and roofs) */
   private facades = true;
   private readonly listeners: TileListener[] = [];
@@ -264,6 +276,7 @@ export class TileManager {
     coverTex.generateMipmaps = true;
     coverTex.needsUpdate = true;
     const terrainMat = makeTerrainMaterial(coverTex);
+    this.materialHook?.(terrainMat, 'terrain');
     disposables.push(coverTex, terrainMat);
     const lod = new THREE.LOD();
     const strides = (n - 1) % 4 === 0 ? [1, 2, 4] : [1];

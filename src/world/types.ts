@@ -303,13 +303,17 @@ export interface BusLinesJson {
 }
 
 /**
- * The timetables of the trams (timetable.json.gz, tools/build-timetable.ts,
- * read by src/sim/timetable.ts): for each line of lines.json.gz that has one,
- * the ways its trips run – the stops in their order and the seconds between
- * them – and when they leave, on a working day, a Saturday and a Sunday.
- * Taken from a GTFS feed, from one ordinary week of it.
+ * The timetables of the trams and buses (timetable.json.gz,
+ * tools/build-timetable.ts, read by src/sim/timetable.ts): for each line of
+ * lines.json.gz that has one, the ways its trips run – the stops in their
+ * order and the seconds between them – and when they leave, on a working
+ * day, a Saturday and a Sunday.  Taken from a GTFS feed, from one ordinary
+ * week of it.  Version 2 adds the buses (`bus`) and where the trams' stops
+ * are among the stop places (`stopPlaces`); version 1 files have the trams
+ * alone and are read as well.
  */
 export interface TimetableJson {
+  /** 1: the trams only; 2: with `stopPlaces` and `bus` (both may be missing) */
   version: number;
   /** when the file was made (ISO 8601) */
   generated: string;
@@ -326,6 +330,56 @@ export interface TimetableJson {
   /** the names of the stops, as the tracks have them (rails.json.gz `sn`): the patterns refer to them by their place here */
   stops: string[];
   lines: TimetableLineJson[];
+  /** for each of `stops`: the stop places of stops.json.gz the trams call at under that name (by their number there; none where the build found none) */
+  stopPlaces?: number[][];
+  /** the timetables of the buses (version 2) */
+  bus?: TimetableBusJson;
+}
+
+/**
+ * The timetables of the buses: for each line of buslines.json.gz that has
+ * one, the ways its trips run – which of the line's stops they call at, and
+ * the seconds between them – and when they leave.  Lists that count up are
+ * kept as the steps from one number to the next, which packs small.
+ */
+export interface TimetableBusJson {
+  /** the bus lines the timetables belong to: their build (buslines.json.gz `map`) and how many stop places their stops count on */
+  map: string;
+  places: number;
+  /** the names of the stop places the buses call at: [number in stops.json.gz, name] */
+  stops: Array<[number, string]>;
+  /** where the buses go, as their fronts say it: the patterns name them by their place here */
+  dests: string[];
+  lines: TimetableBusLineJson[];
+}
+
+export interface TimetableBusLineJson {
+  /** the line's place in buslines.json.gz `lines`, its ref and its route relation there (to see that the two files belong together) */
+  line: number;
+  ref: string;
+  osm: number;
+  /** its colour: OpenStreetMap's, else the feed's route_color – missing where neither has one */
+  colour?: string;
+  /** the stop places of the line's stops, in the order BusLines (src/world/buslines.ts) keeps them – the patterns name the stops by their place here */
+  s: number[];
+  patterns: TimetableBusPatternJson[];
+}
+
+/** One way the trips of a bus line run: the same stops at the same intervals. */
+export interface TimetableBusPatternJson {
+  /** the line's stops it calls at, in order, by their place in the line's `s`: the first as it is, each next as the step from the one before */
+  j: number[];
+  /** the departure from each stop, as the seconds since the departure from the one before (the first: 0) */
+  d: number[];
+  /** how long it stands at each stop before it leaves (its arrival is that much before its departure), seconds – only where it stands somewhere */
+  w?: number[];
+  /** where it goes as its front says, and from which stop on: [k, index into `dests`], … – the first for k = 0 */
+  to: number[];
+  /** 1: its trips come from further back than its first stop / go on beyond its last (beyond the line's stops on the map) */
+  pre?: number;
+  post?: number;
+  /** when its trips leave the first stop – Monday–Friday, Saturday, Sunday and holidays: the first in seconds after midnight (past 86 400: the night after), each next as the step from the one before */
+  t: [number[], number[], number[]];
 }
 
 export interface TimetableFeedJson {
@@ -341,6 +395,8 @@ export interface TimetableLineJson {
   /** the line's place in lines.json.gz `lines`, and its ref there (to see that the two files belong together) */
   line: number;
   ref: string;
+  /** its colour ("#00954B", or a name OpenStreetMap uses: "red"): OpenStreetMap's, else the feed's route_color – missing where neither has one (version 2) */
+  colour?: string;
   patterns: TimetablePatternJson[];
 }
 

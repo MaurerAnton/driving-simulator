@@ -16,6 +16,11 @@ import { CarExterior } from './car.ts';
 import { COMPACT_DIMS } from './carBody.ts';
 import type { CarDims } from './carBody.ts';
 import { CyclistModel } from './cyclist.ts';
+import { PeopleRenderer } from './people.ts';
+import type { PersonPose } from './people.ts';
+import { CROWD_MAX } from '../sim/pedestrians.ts';
+import { emKind } from '../sim/emergency.ts';
+import { EmergencyFleet } from './emergency.ts';
 
 const STYLES: CarDims[] = [
   COMPACT_DIMS,
@@ -27,33 +32,39 @@ export class TrafficRenderer {
   readonly group = new THREE.Group();
   private readonly cars = new Map<number, CarExterior>();
   private readonly pool: CarExterior[][] = [[], [], []];
-  private readonly peds = new Map<number, THREE.Group>();
+  /** the people on foot (sim/pedestrians.ts), drawn like those at the stops */
+  readonly people = new PeopleRenderer(CROWD_MAX);
+  /** the camera: those far off, or far behind it, are left out (null: everybody is drawn) */
+  view: THREE.Camera | null = null;
+  private readonly poses: PersonPose[] = [];
+  private readonly shown: PersonPose[] = [];
+  private readonly look = new THREE.Vector3();
   private readonly cyclists = new Map<number, CyclistModel>();
   private readonly cyclistPool: CyclistModel[] = [];
   /** the city buses of the traffic (the bus one learns with, seen from outside) */
   private readonly buses = new Map<number, PlayerBus>();
   private readonly busPool: PlayerBus[] = [];
+  /** the emergency vehicles – police, ambulance, fire engine, the doctor's car (render/emergency.ts) */
+  private readonly emergency = new EmergencyFleet();
   private readonly busState: CarVisualState = {
     speedKmh: 0, rpm: 800, gear: 1, indicator: 0, hazard: false, blinkOn: false, lowBeam: true, highBeam: false, handbrake: false, ignition: true, engineRunning: true, abs: false, seatbelt: true, fuel: 0.6, automatic: true, showGear: false, odometerKm: 0,
     steerWheel: 0, wheelSteer: [0, 0, 0, 0], wheelSpin: [0, 0, 0, 0], wheelY: [0.48, 0.48, 0.48, 0.48], clutch: 0, brake: 0, throttle: 0, handbrakeLever: 0, braking: false, reversing: false,
   };
-  private readonly pedGeo: { body: THREE.BufferGeometry; leg: THREE.BufferGeometry; head: THREE.BufferGeometry };
-  private readonly skin = new THREE.MeshLambertMaterial({ color: 0xd9a989 });
-  private readonly trousers = new THREE.MeshLambertMaterial({ color: 0x2a2d33 });
 
   constructor() {
     this.group.name = 'traffic';
-    const body = new THREE.BoxGeometry(0.4, 0.62, 0.24).translate(0, 1.13, 0);
-    const leg = new THREE.BoxGeometry(0.14, 0.82, 0.16).translate(0, -0.41, 0);
-    const head = new THREE.SphereGeometry(0.115, 10, 8).translate(0, 1.58, 0);
-    this.pedGeo = { body, leg, head };
+    this.group.add(this.emergency.group);
+    this.group.add(this.people.group);
   }
 
   update(cars: TrafficCar[], peds: Pedestrian[], time: number, cyclists: readonly Cyclist[] = []): void {
     const seen = new Set<number>();
     const blinkOn = Math.floor(time * 3) % 2 === 0;
     const seenB = new Set<number>();
+    // (the emergency vehicles have their own models: render/emergency.ts)
+    this.emergency.update(cars, time);
     for (const c of cars) {
+      if (emKind(c.style) >= 0) continue;
       if (c.style === BUS_STYLE) {
         // a city bus: the lamps say where it is going (to the stop, out of it)
         seenB.add(c.id);
@@ -107,33 +118,7 @@ export class TrafficRenderer {
       this.busPool.push(b);
       this.buses.delete(id);
     }
-    const seenP = new Set<number>();
-    for (const p of peds) {
-      seenP.add(p.id);
-      let g = this.peds.get(p.id);
-      if (!g) {
-        g = new THREE.Group();
-        const shirt = new THREE.MeshLambertMaterial({ color: p.colour });
-        g.add(new THREE.Mesh(this.pedGeo.body, shirt), new THREE.Mesh(this.pedGeo.head, this.skin));
-        for (const side of [-1, 1]) {
-          const leg = new THREE.Mesh(this.pedGeo.leg, this.trousers);
-          leg.position.set(side * 0.1, 0.83, 0);
-          g.add(leg);
-        }
-        this.peds.set(p.id, g);
-        this.group.add(g);
-      }
-      g.position.set(p.x, p.y, p.z);
-      g.rotation.y = p.yaw;
-      const swing = p.state === 'cross' ? Math.sin(p.phase) * 0.55 : 0;
-      (g.children[2] as THREE.Mesh).rotation.x = swing;
-      (g.children[3] as THREE.Mesh).rotation.x = -swing;
-    }
-    for (const [id, g] of this.peds) {
-      if (seenP.has(id)) continue;
-      this.group.remove(g);
-      this.peds.delete(id);
-    }
+    this.drawPeople(peds, time);
     const seenC = new Set<number>();
     for (const c of cyclists) {
       seenC.add(c.id);
@@ -154,6 +139,52 @@ export class TrafficRenderer {
       this.cyclistPool.push(m);
       this.cyclists.delete(id);
     }
+  }
+
+  /**
+   * The people on foot (as the traffic has them, or as a replay recorded
+   * them: the look number as their colour, metres walked as the step – −1
+   * standing): drawn like those at the stops.  Those more than 220 m off are
+   * left out, and those further than 45 m behind the camera (a mirror may
+   * show the nearer ones).
+   */
+  private drawPeople(peds: readonly Pedestrian[], time: number): void {
+    const cam = this.view;
+    let cx = 0;
+    let cz = 0;
+    let fx = 0;
+    let fz = 0;
+    if (cam) {
+      cx = cam.position.x;
+      cz = cam.position.z;
+      cam.getWorldDirection(this.look);
+      const l = Math.hypot(this.look.x, this.look.z) || 1;
+      fx = this.look.x / l;
+      fz = this.look.z / l;
+    }
+    const shown = this.shown;
+    shown.length = 0;
+    for (const p of peds) {
+      if (cam) {
+        const dx = p.x - cx;
+        const dz = p.z - cz;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > 220 * 220 || (d2 > 45 * 45 && dx * fx + dz * fz < -0.2 * Math.sqrt(d2))) continue;
+      }
+      const q = (this.poses[shown.length] ??= { x: 0, y: 0, z: 0, yaw: 0, walk: -1, look: 0 });
+      q.x = p.x;
+      q.y = p.y;
+      q.z = p.z;
+      q.yaw = p.yaw;
+      q.walk = p.phase >= 0 ? p.phase : -1;
+      q.look = p.colour;
+      q.head = p.head;
+      q.startle = p.startle;
+      q.lean = p.lean;
+      q.umbrella = p.umbrella;
+      shown.push(q);
+    }
+    this.people.update(shown, time);
   }
 }
 
@@ -199,6 +230,8 @@ export class SignalRenderer {
   private arrowHousing: THREE.InstancedMesh | null = null;
   /** positions of the poles for the collision system: x, y, z, radius */
   readonly poles: number[] = [];
+  /** where each head stands, which way it faces and which light it shows (the timers over them: ui/signaltimers.ts) */
+  spots: ReadonlyArray<{ x: number; y: number; z: number; yaw: number; controller: number; group: number; arrow: Arm | null }> = [];
 
   constructor(world: World, signals?: SignalSystem) {
     this.group.name = 'signals';
@@ -264,6 +297,7 @@ export class SignalRenderer {
       if (e.lanesB > 0) place(e, c.s - c.w / 2 - 0.8, -1, c.sc, c.g ?? 0, 1);
     }
 
+    this.spots = placements;
     const n = placements.length;
     const pole = new THREE.CylinderGeometry(0.055, 0.065, 3.5, 8, 1, true).translate(0, 1.75, 0);
     const box = new THREE.BoxGeometry(0.3, 0.92, 0.22).translate(0, 3.0, 0.02);

@@ -20,8 +20,19 @@ import { VIOLATION_REFS, citationParts } from '../i18n/violations.ts';
 import type { FaultLog } from '../game/faultlog.ts';
 import type { ReplayNote } from '../game/replay.ts';
 import { carouselMenu } from './carousel.ts';
+import { MiniMap } from './minimap.ts';
+import { stageMenu, startFromSpot } from './stage.ts';
+import { arcadePanel, type ArcadeHost } from './arcade.ts';
+import { WEATHER_ATTRIBUTION } from '../game/weather.ts';
+
+/** the weathers and seasons one may choose, and the names of each */
+export const WEATHER_CHOICES: ReadonlyArray<Settings['weather']> = ['real', 'off', 'cloudy', 'fog', 'drizzle', 'rain', 'snow', 'storm'];
+export const WEATHER_KEYS: Record<Settings['weather'], string> = { real: 'weatherReal', off: 'weatherOff', cloudy: 'weatherCloudy', fog: 'weatherFog', drizzle: 'weatherDrizzle', rain: 'weatherRain', snow: 'weatherSnow', storm: 'weatherStorm' };
+export const SEASON_CHOICES: ReadonlyArray<Settings['season']> = ['real', 'spring', 'summer', 'autumn', 'winter'];
+export const SEASON_KEYS: Record<Settings['season'], string> = { real: 'seasonReal', spring: 'seasonSpring', summer: 'seasonSummer', autumn: 'seasonAutumn', winter: 'seasonWinter' };
 import type { MenuPreview } from './carousel.ts';
 import type { Lang } from '../i18n/index.ts';
+import { FuelGauge } from './fuelgauge.ts';
 
 export interface HudState {
   speedKmh: number;
@@ -31,6 +42,8 @@ export interface HudState {
   gear: string;
   /** km/h; 0 = no limit; -1 = unknown */
   limit: number;
+  /** the limit is one of a sign with a time on it: what its panel says ("22–6 h") – shown under the roundel */
+  limitWhen?: string;
   zone: number;
   /** the next junction (as the rule monitor tells it: RuleContext.junction) */
   junction: null | { dist: number; role: number; ctrl: number; signal: number; arrow: number; dark: boolean };
@@ -61,6 +74,9 @@ export interface HudState {
   x: number;
   z: number;
   yaw: number;
+  /** how full the tank is (0 … 1; none: a vehicle without one) and whether the reserve is reached (game/serviceworld.ts) */
+  fuel?: number;
+  fuelLow?: boolean;
 }
 
 export interface StartRequest {
@@ -120,6 +136,8 @@ export interface ResultSummary {
   points: number;
   distanceKm: number;
   minutes: number;
+  /** more to show under the summary (the crane's tasks as they went: game/craneplay.ts) */
+  extra?: HTMLElement | null;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = ''): HTMLElementTagNameMap[K] {
@@ -170,6 +188,8 @@ export class Hud {
   private dashV!: HTMLElement;
   private lampBrake!: HTMLElement;
   private lampBelt!: HTMLElement;
+  /** the fuel gauge of the dashboard strip (ui/fuelgauge.ts) */
+  private fuelGauge!: FuelGauge;
   private dashG!: HTMLElement;
   private dashRpm!: HTMLElement;
   private indL!: HTMLElement;
@@ -178,7 +198,18 @@ export class Hud {
   private tipAction = '';
   private score!: HTMLElement;
   private mapCanvas!: HTMLCanvasElement;
+  /** the corner map's photographs, looking round on it and moving it (minimap.ts) */
+  private mini!: MiniMap;
   private fpsBox!: HTMLElement;
+  /** the world's moment when the arcade mode set another one or runs the time faster (a tap opens the arcade panel) */
+  private clockBox!: HTMLButtonElement;
+  /** the arcade mode's panel: another moment, faster time (set by the game for free drives) */
+  arcade: ArcadeHost | null = null;
+  /** the clock in the HUD was tapped: the game pauses and shows the arcade panel */
+  onArcade: () => void = () => {};
+  /** after the vehicle went up in flames: the button for a new one */
+  private wreckBtn!: HTMLButtonElement;
+  onNewVehicle: () => void = () => {};
   private keysBox!: HTMLElement;
   private keysFor = '';
   private input: Input | null = null;
@@ -328,6 +359,14 @@ export class Hud {
 
   private loadingBar: { bar: HTMLElement; pct: HTMLElement } | null = null;
 
+  /** Behind the menu of rows: how far the surroundings of the start place are loaded (null: done). */
+  setMenuLoading(share: number | null): void {
+    const e = this.root.querySelector<HTMLElement>('.cm-loading');
+    if (!e) return;
+    const text = share === null ? '' : `${this.t('loadingTiles')} ${Math.round(Math.max(0, Math.min(1, share)) * 100)} %`;
+    if (e.textContent !== text) e.textContent = text;
+  }
+
   showError(text: string): void {
     const o = el('div', 'overlay solid');
     const p = el('div', 'panel narrow');
@@ -337,6 +376,10 @@ export class Hud {
   }
 
   showMenu(spawns: SpawnJson[]): void {
+    if (this.settings.menuStyle === 'stage') {
+      this.showStage(spawns);
+      return;
+    }
     if (this.settings.menuStyle === 'carousel') {
       this.showCarousel(spawns);
       return;
@@ -573,6 +616,8 @@ export class Hud {
       card(this.t('demo'), this.t('demoDesc'), 'demo');
       card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
     }
+    // the theory lessons: difficult situations shown on the practice yard (game/theorymode.ts)
+    if (def.kind !== 'plane' && this.world.json.yard) card(this.t('theory.title'), this.t('theory.desc'), 'theory');
     // the test place: every model of the game on the practice yard – on foot or with a vehicle of the road
     if (def.kind !== 'tram' && def.kind !== 'plane' && this.world.json.yard) card(this.t('showTitle'), this.t('showDesc'), 'show');
     // the lessons of the chosen vehicle: the practice yard first, the test last
@@ -641,6 +686,55 @@ export class Hud {
     );
     this.setOverlay(o);
     this.menuRedraw = redraw;
+  }
+
+  /** The main menu as a stage: the vehicle large in the 3D picture, icons round it (ui/stage.ts). */
+  private showStage(spawns: SpawnJson[]): void {
+    const o = el('div', 'overlay clear');
+    const redraw = (): void => this.showMenu(spawns);
+    o.append(
+      stageMenu({
+        lang: this.lang,
+        t: (k, vars) => this.t(k, vars),
+        settings: this.settings,
+        spawns,
+        tramStops: this.tramStops,
+        runways: this.runways,
+        hasYard: !!this.world.json.yard,
+        language: this.languagePicker(redraw),
+        address: (pick) =>
+          addressPicker({
+            placeholder: this.t('addressPlaceholder'),
+            loading: this.t('realityLoading'),
+            none: this.t('addressNone'),
+            load: () => this.loadAddresses(),
+            near: () => spawns[this.settings.lastStart.spawn] ?? null,
+            pick,
+          }).node,
+        pages: {
+          settings: () => this.showSettings(redraw),
+          news: () => this.showNews(redraw),
+          map: () => this.onMap(),
+          controls: () => this.showControls(redraw),
+          log: () => this.showLog(redraw),
+          about: () => this.showAbout(redraw),
+        },
+        // the theory lessons: difficult situations shown on the practice yard (game/theorymode.ts) – for everything but the aeroplane
+        extraModes: [{ id: 'theory', label: this.t('theory.title'), yard: true, kinds: VEHICLE_KINDS.filter((k) => k !== 'plane') }],
+        version: this.t('newsVersion', { v: VERSION }),
+        start: (req) => this.onStart(req),
+        preview: (p) => this.onMenuPreview(p),
+        redraw,
+      }),
+    );
+    this.setOverlay(o);
+    this.menuRedraw = redraw;
+  }
+
+  /** The map opened from the main menu: the drive is to begin at this place of it (the tram at the stop, the aeroplane at the runway nearest to it). */
+  menuStartAt(spot: SpawnJson): void {
+    const kind = (VEHICLES[this.settings.vehicle] ?? VEHICLES.car).kind;
+    if (startFromSpot(kind, this.settings.lastStart, spot, this.tramStops, this.runways, this.t('mapPlace'))) saveSettings(this.settings);
   }
 
   /**
@@ -744,10 +838,15 @@ export class Hud {
     select(this.t('transmission'), s.transmission, [['assist', this.t('trAssist')], ['manual', this.t('trManual')], ['automatic', this.t('trAutomatic')]], (v) => (s.transmission = v as Settings['transmission']));
     p.append(el('p', 'note', this.t('settingsNextDrive')));
     check(this.t('limiter'), s.limiter, (v) => (s.limiter = v));
+    check(this.t('autopilotAssist'), s.autopilotAssist, (v) => (s.autopilotAssist = v));
+    // the aeroplane by hand: how much the help does
+    select(this.t('flightAssist'), s.flightAssist, [['beginner', this.t('flightAssistBeginner')], ['light', this.t('flightAssistLight')], ['off', this.t('flightAssistOff')]], (v) => (s.flightAssist = v as Settings['flightAssist']));
+    // the light: the game's fair afternoon, or the sun as it stands at the time (the arcade mode's chosen time always has its own)
+    select(this.t('daylight'), s.daylight, [['day', this.t('daylightDay')], ['clock', this.t('daylightClock')]], (v) => (s.daylight = v as Settings['daylight']));
     // on foot: how fast running is
     select(this.t('runSpeed'), String(s.runSpeed), RUN_SPEEDS.map((k): [string, string] => [String(k), `${k} km/h`]), (v) => (s.runSpeed = Number(v)));
-    // the main menu: rows over the 3D scene, or the simple list of before
-    select(this.t('menuStyle'), s.menuStyle, [['carousel', this.t('menuCarousel')], ['classic', this.t('menuClassic')]], (v) => (s.menuStyle = v as Settings['menuStyle']));
+    // the main menu: the vehicle large in the 3D picture with icons, rows over the 3D scene, or the simple list of before
+    select(this.t('menuStyle'), s.menuStyle, [['stage', this.t('menuStage')], ['carousel', this.t('menuCarousel')], ['classic', this.t('menuClassic')]], (v) => (s.menuStyle = v as Settings['menuStyle']));
     // the picture
     select(this.t('startView'), s.view, [['chase', this.t('viewChase')], ['cockpit', this.t('viewCockpit')]], (v) => (s.view = v as Settings['view']));
     range(this.t('cabinOpacity'), (s.cabinOpacity - 0.2) / 0.8, (v) => (s.cabinOpacity = 0.2 + 0.8 * v));
@@ -779,6 +878,8 @@ export class Hud {
       check(this.t('gfxPropShadows'), g.propShadows, (v) => custom(() => (g.propShadows = v))());
       // the ground beyond the map: the hills on the horizon
       select(this.t('gfxFar'), String(g.farView), FAR_VIEWS.map((m): [string, string] => [String(m), m === 0 ? this.t('farOff') : `${m / 1000} km`]), (v) => custom(() => (g.farView = Number(v)))());
+      // the player's vehicles in finer detail, outside and in the cockpit (on "very high")
+      check(this.t('gfxVehicleDetail'), g.vehicleDetail, (v) => custom(() => (g.vehicleDetail = v))());
       // (the rows were added to the panel: into the folded box with them)
       while (p.childElementCount > at) box.append(p.children[at]);
       p.append(box);
@@ -786,13 +887,34 @@ export class Hud {
     select(this.t('mirrors'), s.mirrors, [['off', this.t('mOff')], ['alternate', this.t('mAlt')], ['full', this.t('mFull')]], (v) => (s.mirrors = v as Settings['mirrors']));
     range(this.t('traffic'), s.traffic, (v) => (s.traffic = v));
     range(this.t('volume'), s.volume, (v) => (s.volume = v));
+    // music made as it plays: off unless asked for
+    select(this.t('music'), s.music, [['off', this.t('musicOff')], ['quiet', this.t('musicQuiet')], ['on', this.t('musicOn')]], (v) => (s.music = v as Settings['music']));
+    range(this.t('musicVolume'), s.musicVolume, (v) => (s.musicVolume = v));
+    // the weather – the real one comes from Open-Meteo (CC BY 4.0), which learns the IP address and the area – and the season
+    select(this.t('weather'), s.weather, WEATHER_CHOICES.map((k): [string, string] => [k, this.t(WEATHER_KEYS[k])]), (v) => (s.weather = v as Settings['weather']));
+    const credit = el('p', 'note');
+    const link = el('a', '', this.t('weatherCredit'));
+    link.href = WEATHER_ATTRIBUTION.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    const lic = el('a', '', WEATHER_ATTRIBUTION.licence);
+    lic.href = WEATHER_ATTRIBUTION.licenceUrl;
+    lic.target = '_blank';
+    lic.rel = 'noopener';
+    credit.append(link, ' (', lic, ') – ', this.t('weatherNote'));
+    p.append(credit);
+    select(this.t('season'), s.season, SEASON_CHOICES.map((k): [string, string] => [k, this.t(SEASON_KEYS[k])]), (v) => (s.season = v as Settings['season']));
     select(this.t('touchControls'), s.touchControls, [['auto', this.t('tcAuto')], ['on', this.t('tcOn')], ['off', this.t('tcOff')]], (v) => (s.touchControls = v as Settings['touchControls']));
     range(this.t('touchOpacity'), s.touchOpacity, (v) => (s.touchOpacity = Math.max(0.15, v)));
     check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
     check(this.t('showFps'), s.showFps, (v) => (s.showFps = v));
     check(this.t('startOutside'), s.startOutside, (v) => (s.startOutside = v));
     check(this.t('mapOnScreen'), s.mapOnScreen, (v) => (s.mapOnScreen = v));
+    // the aerial photographs under the maps – and where they come from
+    check(this.t('mapAerialSetting'), s.reality.aerial, (v) => (s.reality.aerial = v));
+    p.append(el('p', 'note', this.t('mapAerialNote')));
     check(this.t('hudRules'), s.hudRules, (v) => (s.hudRules = v));
+    check(this.t('signalTimers'), s.signalTimers, (v) => (s.signalTimers = v));
     check(this.t('hudGear'), s.hudGear, (v) => (s.hudGear = v));
     check(this.t('voice'), s.voice, (v) => (s.voice = v));
     // settings live in the browser's storage; say so if this browser keeps none
@@ -820,6 +942,7 @@ export class Hud {
       [[...k('KeyZ', 'KeyC'), ' / ', ...k('KeyX')], 'ctl.indicators'],
       [k('KeyJ', 'KeyK'), 'ctl.look'],
       [k('KeyU'), 'ctl.lookBack'],
+      [k('KeyY'), 'ctl.mirror'],
       [k('KeyB'), 'ctl.belt'],
       [[...k('KeyL'), ' / ', ...k('KeyO')], 'ctl.lights'],
       [k('KeyH'), 'ctl.horn'],
@@ -963,6 +1086,12 @@ export class Hud {
       const demo = el('button', 'btn ghost', this.t('demo'));
       demo.onclick = () => this.onDemo();
       b.append(a, demo);
+      // the arcade mode: the world at another moment, the time faster while the autopilot drives
+      if (this.arcade) {
+        const ar = el('button', 'btn ghost', this.t('arcadeTitle'));
+        ar.onclick = () => this.showArcade();
+        b.append(ar);
+      }
     }
     if (this.onGetOut) {
       const out = el('button', 'btn ghost', this.t('getOut'));
@@ -1018,6 +1147,7 @@ export class Hud {
     const km = formatUnit(r.distanceKm, 'kilometer', this.lang, 1);
     const min = formatUnit(Math.round(r.minutes), 'minute', this.lang);
     p.append(el('p', '', `${this.t('distance')}: ${km} · ${this.t('duration')}: ${min} · ${this.t('points')}: ${r.points}`));
+    if (r.extra) p.append(r.extra);
     if (r.log.length === 0) p.append(el('p', '', this.t('noFaults')));
     // group identical faults
     const groups = new Map<string, { v: Violation; n: number }>();
@@ -1247,6 +1377,8 @@ export class Hud {
       '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="3.2" fill="currentColor"/><path d="M6 22v-6.5a6 6 0 0 1 12 0V22" fill="none" stroke="currentColor" stroke-width="2.3"/><path d="M7.2 11.2 17 21" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg>',
     );
     this.dash.append(this.indL, this.lampBrake, this.dashV, el('span', 'u', 'km/h'), this.dashG, rpm, this.lampBelt, this.indR);
+    this.fuelGauge = new FuelGauge(this.t('hud.fuel'), this.t('hud.fuelLow'));
+    this.dash.insertBefore(this.fuelGauge.el, this.lampBelt);
     this.tip = el('div', 'tip');
     const map = el('div', 'map');
     this.mapCanvas = el('canvas');
@@ -1266,6 +1398,12 @@ export class Hud {
       this.onMap();
     };
     map.append(expand);
+    this.mini = new MiniMap(map, this.mapCanvas, {
+      backLabel: () => this.t('miniBack'),
+      moveLabel: () => this.t('miniMove'),
+      photos: () => this.settings.reality.aerial,
+      meta: this.world.json.meta,
+    });
     this.score = el('div', 'score');
     this.keysBox = el('div', 'keyhelp');
     // the upper left corner: the street-name block and, under it, things to choose from while standing
@@ -1284,8 +1422,16 @@ export class Hud {
     side.append(this.navBox, this.choiceBtn, this.choiceBox);
     // how many pictures a second (only if the settings ask for it): out of the way, in the upper right corner
     this.fpsBox = el('div', 'fps');
+    this.clockBox = el('button', 'clock-badge');
+    this.clockBox.type = 'button';
+    this.clockBox.hidden = true;
+    this.clockBox.onclick = () => this.onArcade();
+    this.wreckBtn = el('button', 'btn new-vehicle');
+    this.wreckBtn.type = 'button';
+    this.wreckBtn.hidden = true;
+    this.wreckBtn.onclick = () => this.onNewVehicle();
     this.fpsBox.hidden = true;
-    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox, this.fpsBox);
+    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox, this.fpsBox, this.clockBox, this.wreckBtn);
     return h;
   }
 
@@ -1349,6 +1495,31 @@ export class Hud {
   }
 
   /** Pictures a second, measured by the game; a negative number hides the display. */
+  /** The world's moment in the HUD (null: the real one – nothing shown). */
+  setClock(text: string | null): void {
+    if (!this.clockBox) return;
+    this.clockBox.hidden = text === null;
+    if (text !== null && this.clockBox.textContent !== `⏱ ${text}`) {
+      this.clockBox.textContent = `⏱ ${text}`;
+      this.clockBox.setAttribute('aria-label', `${this.t('arcadeTitle')}: ${text}`);
+    }
+  }
+
+  /** The vehicle went up in flames (true) – the button for a new one – or there is one again (false). */
+  setWrecked(on: boolean): void {
+    if (!this.wreckBtn) return;
+    this.wreckBtn.hidden = !on;
+    this.wreckBtn.textContent = `🚗 ${this.t('newVehicle')}`;
+  }
+
+  /** The arcade panel (over the paused drive). */
+  showArcade(): void {
+    if (!this.arcade) return;
+    const o = el('div', 'overlay');
+    o.append(arcadePanel(this.arcade));
+    this.setOverlay(o);
+  }
+
   setFps(fps: number): void {
     const show = fps >= 0 && this.settings.showFps;
     if (this.fpsBox.hidden === show) this.fpsBox.hidden = !show;
@@ -1405,8 +1576,8 @@ export class Hud {
           this.roundel.textContent = shown;
           this.roundel.style.fontSize = word ? `${this.fitRoundel(word)}px` : '';
         }
-        this.zone.style.display = s.zone === 30 || s.zone === 20 ? '' : 'none';
-        this.zone.textContent = 'ZONE';
+        this.zone.style.display = s.zone === 30 || s.zone === 20 || s.limitWhen ? '' : 'none';
+        this.zone.textContent = s.limitWhen || 'ZONE';
       } else {
         this.roundel.style.display = 'none';
         this.zone.style.display = 'none';
@@ -1462,6 +1633,7 @@ export class Hud {
         this.lampBrake.className = `lamp${s.handbrake ? ' on' : ''}${s.handbrakeWarn ? ' warn' : ''}`;
         this.lampBrake.title = s.handbrake ? this.t('tbHandbrake') : '';
         this.lampBelt.className = `lamp${s.seatbelt ? '' : ' on'}`;
+        this.fuelGauge.update(s.fuel, s.fuelLow === true);
       }
       this.tip.style.display = s.tip ? '' : 'none';
       this.tip.textContent = s.tip;
@@ -1525,12 +1697,17 @@ export class Hud {
     g.translate(W / 2, cy);
     g.rotate(s.yaw);
     g.scale(scale, scale);
-    g.translate(-s.x, -s.z);
+    // (the middle: the vehicle – or where the map was dragged to, to look round)
+    const [mx, mz] = this.mini.centre(s.x, s.z, s.yaw, scale, c === this.mapCanvas);
+    g.translate(-mx, -mz);
     g.lineCap = 'round';
     g.lineJoin = 'round';
+    // the aerial photographs under the roads (unless switched off): the roads over them only hinted at
+    const photo = this.mini.photos(g, mx, mz, range, scale);
+    g.globalAlpha = photo ? 0.5 : 1;
     const draw = (color: string, minTier: number, maxTier: number, extra: number): void => {
       g.strokeStyle = color;
-      this.world.edgesInBox(s.x - range, s.z - range, s.x + range, s.z + range, (e) => {
+      this.world.edgesInBox(mx - range, mz - range, mx + range, mz + range, (e) => {
         if (e.tier < minTier || e.tier > maxTier) return;
         g.lineWidth = e.width + extra;
         g.beginPath();
@@ -1544,12 +1721,13 @@ export class Hud {
     draw('#aab4bd', 2, 2.9, 1);
     draw('#f1f3f5', 3, 5.5, 2);
     draw('#f5b942', 6, 9, 3);
+    g.globalAlpha = 1;
     if (this.routeLanes.length) {
       g.strokeStyle = '#3d8bff';
       g.lineWidth = 7;
       for (const lane of this.routeLanes) {
         const e = lane.edge;
-        if (e.maxX < s.x - range || e.minX > s.x + range || e.maxZ < s.z - range || e.minZ > s.z + range) continue;
+        if (e.maxX < mx - range || e.minX > mx + range || e.maxZ < mz - range || e.minZ > mz + range) continue;
         g.beginPath();
         const p = e.pl.pts;
         g.moveTo(p[0], p[2]);
@@ -1557,9 +1735,11 @@ export class Hud {
         g.stroke();
       }
     }
-    // the car
+    // the car (off the middle while the map is looked round on)
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.translate(W / 2, cy);
+    const cs = Math.cos(s.yaw);
+    const sn = Math.sin(s.yaw);
+    g.translate(W / 2 + ((s.x - mx) * cs - (s.z - mz) * sn) * scale, cy + ((s.x - mx) * sn + (s.z - mz) * cs) * scale);
     g.scale(Hh / 220, Hh / 220);
     g.fillStyle = '#ffcc00';
     g.strokeStyle = '#111';
@@ -1678,6 +1858,10 @@ export class Hud {
     item(this.t('tbLookBack'), 'KeyU');
     item(this.t('mapTitle'), 'KeyM');
     item(this.t('tbReset'), 'KeyT');
+    // (in the aeroplane the same key is its autopilot: the button says so while flying)
+    more.lastElementChild?.classList.add('road-only');
+    item(this.t('tbAutopilot'), 'KeyT');
+    more.lastElementChild?.classList.add('fly-only');
     const menu = el('button', 'mb', this.t('tbMenu'));
     menu.onclick = () => {
       more.hidden = true;
@@ -1744,7 +1928,7 @@ export class Hud {
       if (tr === 'manual') out.push(item('kr.clutch', ...k('ShiftLeft')));
       out.push(item('kr.gear', ...k('Digit1'), '–', ...k('Digit6')), item('kr.reverse', ...k('KeyR')), item('kr.neutral', ...k('KeyN')), item('kr.upDown', ...k('KeyE', 'KeyQ')));
     }
-    out.push(item('kr.handbrake', ...k('Space')), item('kr.startEngine', ...k('Enter')), item('kr.indicators', ...k('KeyZ', 'KeyC')), item('kr.shoulder', ...k('KeyJ', 'KeyK')), item('kr.camera', ...k('KeyV')), item('kr.map', ...k('KeyM')), item('kr.allKeys', ...k('F1')));
+    out.push(item('kr.handbrake', ...k('Space')), item('kr.startEngine', ...k('Enter')), item('kr.indicators', ...k('KeyZ', 'KeyC')), item('kr.shoulder', ...k('KeyJ', 'KeyK')), item('kr.mirror', ...k('KeyY')), item('kr.camera', ...k('KeyV')), item('kr.map', ...k('KeyM')), item('kr.allKeys', ...k('F1')));
     return out;
   }
 }

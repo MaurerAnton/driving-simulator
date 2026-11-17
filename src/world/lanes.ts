@@ -682,6 +682,8 @@ export class LaneGraph {
   longVehicle = false;
   /** the vehicle may not use the motorway (a tractor): ways do not lead over it */
   noMotorway = false;
+  /** what a way (edge * 2 + 0 a → b, 1 b → a) costs on top (s): Infinity where it is closed today (sim/roadevents.ts) – null: nothing */
+  wayCost: ((way: number) => number) | null = null;
 
   route(start: Lane, goal: Edge, forTraffic = false, goalDir = 0): Connector[] | null {
     const dist = new Map<number, number>();
@@ -702,6 +704,9 @@ export class LaneGraph {
         const next = c.to;
         if (next.edge !== goal && !LaneGraph.drivable(next.edge, forTraffic)) continue;
         if (this.noMotorway && next.edge !== goal && next.edge.cls <= CLS.MOTORWAY_LINK) continue;
+        // (round a road closed today, a little longer through a work zone)
+        const extra = this.wayCost ? this.wayCost(next.edge.id * 2 + (next.dir > 0 ? 0 : 1)) : 0;
+        if (extra === Infinity && next.edge !== goal) continue;
         const v = Math.min(next.limit, 36);
         // Turning round is for when there is no other way: it needs a turning
         // circle or a three-point turn, and where the map ends (often a fast
@@ -715,7 +720,7 @@ export class LaneGraph {
         if (c.turn === TURN.LEFT && lane.len < 15 && prev.get(lane.id)?.turn === TURN.LEFT) turnCost += 150;
         // "Anlieger frei" and car-park shortcuts are not through routes
         const through = next.edge !== goal && (next.edge.access === ACCESS.DESTINATION || (next.edge.flags & EF.MINOR_SERVICE) !== 0) ? 240 : 0;
-        const nd = d + c.len / 6 + next.len / Math.max(v, 2) + turnCost + through;
+        const nd = d + c.len / 6 + next.len / Math.max(v, 2) + turnCost + through + (extra === Infinity ? 0 : extra);
         if (nd < (dist.get(next.id) ?? Infinity)) {
           dist.set(next.id, nd);
           prev.set(next.id, c);

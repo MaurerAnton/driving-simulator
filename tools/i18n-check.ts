@@ -75,7 +75,8 @@ const SCRIPT: Record<string, RegExp> = {
 /** Languages whose letters are as wide as they are high: fewer of them fit. */
 const WIDE = new Set(['zh', 'ja', 'ko']);
 /** How a sentence may end (in any of the scripts). */
-const SENTENCE_END = /[.!?…。！？।؟۔]["”»“’')）」』]*$/;
+// (the Greek question mark is ";" – U+037E, which most keyboards write as the semicolon)
+const SENTENCE_END = /[.!?…。！？।؟۔;;]["”»“’')）」』]*$/;
 /** Digits other than 0–9, and characters that change the writing direction. */
 const FOREIGN_DIGITS = /[٠-٩۰-۹०-९০-৯０-９]/;
 const BIDI_CONTROLS = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/;

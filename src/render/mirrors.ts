@@ -106,6 +106,25 @@ export class Mirror {
    */
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, carMatrix: THREE.Matrix4, eyeWorld: THREE.Vector3, far: number): void {
     if (!this.enabled) return;
+    if (!this.aim(carMatrix, eyeWorld, far)) return;
+    const prevTarget = renderer.getRenderTarget();
+    const prevVisible = this.mesh.visible;
+    this.mesh.visible = false;
+    renderer.setRenderTarget(this.target);
+    renderer.render(scene, this.camera);
+    renderer.setRenderTarget(prevTarget);
+    this.mesh.visible = prevVisible;
+  }
+
+  /**
+   * Point the mirror's camera at what the glass shows the eye.  `zoom` > 1
+   * shows less of it, larger; `aspect` (width : height, 0: the glass's own)
+   * widens the picture in one direction to that shape; `minTan` widens it
+   * until it reaches at least that far up and down (the tangent of the half
+   * angle) – for looking into a mirror far from the eye (render/mirrorzoom.ts).
+   * False: the eye is behind the glass.
+   */
+  aim(carMatrix: THREE.Matrix4, eyeWorld: THREE.Vector3, far: number, zoom = 1, aspect = 0, minTan = 0): boolean {
     const s = this.spec;
     _c.copy(s.centre).applyMatrix4(carMatrix);
     _n.copy(s.normal).transformDirection(carMatrix);
@@ -114,7 +133,7 @@ export class Mirror {
     _eye.copy(eyeWorld);
     // distance of the eye in front of the glass
     const d = _tmp.subVectors(_eye, _c).dot(_n);
-    if (d < 0.02) return; // eye behind the mirror
+    if (d < 0.02) return false; // eye behind the mirror
     // mirror image of the eye
     _virt.copy(_eye).addScaledVector(_n, -2 * d);
     // camera basis: looks along +n (through the glass into the reflected world);
@@ -129,18 +148,21 @@ export class Mirror {
     _rel.subVectors(_c, _virt);
     const cx = _rel.dot(camRight);
     const cy = _rel.dot(_up);
-    const hw = (s.width / 2) * s.convex;
-    const hh = (s.height / 2) * s.convex;
+    let hw = ((s.width / 2) * s.convex) / zoom;
+    let hh = ((s.height / 2) * s.convex) / zoom;
+    if (aspect > 0) {
+      if (hw / hh < aspect) hw = hh * aspect;
+      else hh = hw / aspect;
+    }
+    if (hh < minTan * d) {
+      const k = (minTan * d) / hh;
+      hw *= k;
+      hh *= k;
+    }
     const near = d;
     this.camera.projectionMatrix.makePerspective(cx - hw, cx + hw, cy + hh, cy - hh, near, far);
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
-    const prevTarget = renderer.getRenderTarget();
-    const prevVisible = this.mesh.visible;
-    this.mesh.visible = false;
-    renderer.setRenderTarget(this.target);
-    renderer.render(scene, this.camera);
-    renderer.setRenderTarget(prevTarget);
-    this.mesh.visible = prevVisible;
+    return true;
   }
 
   dispose(): void {

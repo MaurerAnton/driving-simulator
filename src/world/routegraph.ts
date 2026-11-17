@@ -249,8 +249,11 @@ export function quickestToEdge(g: RouteGraph, start: number, edge: number): numb
   return (a ?? b)?.ways ?? null;
 }
 
-/** What the ways are planned for: a vehicle that may not use the motorway (a tractor) is led round it. */
-export const routeFor = { noMotorway: false };
+/**
+ * What the ways are planned for: a vehicle that may not use the motorway (a tractor) is led round it;
+ * `wayCost` adds seconds to a way – Infinity where it is closed today (sim/roadevents.ts).
+ */
+export const routeFor: { noMotorway: boolean; wayCost: ((way: number) => number) | null } = { noMotorway: false, wayCost: null };
 
 function quickestTimed(g: RouteGraph, start: number, goal: number): { ways: number[]; secs: number } | null {
   if (start === goal) return { ways: [], secs: 0 };
@@ -273,8 +276,10 @@ function quickestTimed(g: RouteGraph, start: number, goal: number): { ways: numb
       const t = g.to[k];
       if (t !== goal && (g.kind[t] & RG.NO_ENTRY) !== 0) continue;
       if (routeFor.noMotorway && t !== goal && g.cls[t] <= CLS.MOTORWAY_LINK) continue;
+      const extra = routeFor.wayCost ? routeFor.wayCost(t) : 0;
+      if (extra === Infinity && t !== goal) continue;
       const through = t !== goal && (g.kind[t] & RG.ACCESS_ONLY) !== 0 ? 240 : 0;
-      const nd = d + g.across[k] / 6 + g.secs[t] + turnSeconds(g, w, k) + through;
+      const nd = d + g.across[k] / 6 + g.secs[t] + turnSeconds(g, w, k) + through + (extra === Infinity ? 0 : extra);
       if (nd < dist[t]) {
         dist[t] = nd;
         prev[t] = w;

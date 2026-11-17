@@ -11,8 +11,8 @@ beschreibt, woher die Daten kommen, was daraus abgeleitet wird und wie man die K
 | Gelände | Digitales Geländemodell **DGM1** (1 m Raster), Hessische Verwaltung für Bodenmanagement und Geoinformation (HVBG) | offene Geobasisdaten, Nutzung ohne Einschränkung (§ 18 HVGG) |
 | Gebäude mit Dachformen | 3D-Gebäudemodelle **LoD2** (CityGML), HVBG | wie oben |
 | Verkehrszeichen-Grafiken | Wikimedia Commons, Vektorfassungen der amtlichen Zeichen (StVO / VzKat) | gemeinfrei als amtliche Werke (§ 5 Abs. 1 UrhG) |
-| Luftbilder unter der Karte (nur auf Wunsch, live) | Digitale Orthophotos **DOP20** (20 cm), HVBG, als WMS | wie Gelände und Gebäude: Nutzung ohne Einschränkung (§ 24 HVGG) |
-| Fahrpläne der Straßenbahnen und RegioTrams | [gtfs.de](https://gtfs.de) – GTFS für Deutschland, aus den bundesweiten Sollfahrplandaten von [DELFI e.V.](https://www.delfi.de) (siehe [unten](#fahrpläne-der-straßenbahnen-und-regiotrams)) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) – „gtfs.de, Daten bereitgestellt von DELFI e.V.“ |
+| Luftbilder unter den Karten (live, abschaltbar) | Digitale Orthophotos **DOP20** (20 cm), HVBG, als WMS | wie Gelände und Gebäude: Nutzung ohne Einschränkung (§ 24 HVGG) |
+| Fahrpläne der Straßenbahnen, RegioTrams und Busse | [gtfs.de](https://gtfs.de) – GTFS für Deutschland, aus den bundesweiten Sollfahrplandaten von [DELFI e.V.](https://www.delfi.de) (siehe [unten](#fahrpläne-der-straßenbahnen-und-regiotrams)) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) – „gtfs.de, Daten bereitgestellt von DELFI e.V.“ |
 
 Die Karte umfasst das Gebiet, für das Gelände und Gebäude geladen wurden (siehe unten): **Nordhessen** –
 die kreisfreie Stadt Kassel und die Landkreise Kassel, Schwalm-Eder, Werra-Meißner, Waldeck-Frankenberg und
@@ -28,7 +28,8 @@ Werkzeuge wie *streetview-downloader*, *pano-fetcher* oder *SAS.Planet* laden Bi
 Bilder weiterzugeben – in einem freien Projekt, dessen Daten jeder weiterverwenden dürfen soll, haben sie
 deshalb nichts verloren. Für den Blick von oben gibt es etwas Besseres als Satellitenbilder: die amtlichen
 **Luftbilder** des Landes Hessen (20 cm je Bildpunkt), die jeder frei nutzen darf. Die große Karte im Spiel
-(Taste `M`) legt sie auf Wunsch unter das Straßennetz – sie werden dann live vom Server der
+(Taste `M`), die runde Karte in der Ecke und der Bildschirm im Auto legen sie unter das Straßennetz (in den
+Einstellungen abschaltbar) – sie werden dann live vom Server der
 Landesvermessung geladen und passen genau, weil der Dienst im Koordinatensystem der Karte antwortet
 (`src/reality/aerial.ts`). Wer lieber Google Maps oder Google Earth sieht, öffnet dieselbe Stelle von der
 Realansicht aus mit einem Klick im Browser. *CoMaps* dagegen zeigt OpenStreetMap-Daten: Das ist genau die Quelle, die hier
@@ -141,7 +142,7 @@ npm run map:stops     # Haltestellen (Namen, Masten, Bahnsteige), Namen und Bahn
 npm run map:lines     # die Linien der Straßenbahnen und RegioTrams (Weg über die Gleise, Halte)
 npm run map:buslines  # die Buslinien (Weg über die Straßen, Halte, wo die Linie zurück beginnt) – nach map:build und map:stops
 npm run map:far       # die Fernsicht: Gelände, Bodenbedeckung und Gebäudehöhen alle 100 m (aus den Kacheln)
-npm run map:timetable # die Fahrpläne der Straßenbahnen und RegioTrams (GTFS von gtfs.de, lädt rund 280 MB)
+npm run map:timetable # die Fahrpläne der Straßenbahnen, RegioTrams und Busse (GTFS von gtfs.de, lädt rund 280 MB) – nach map:buslines
 npm run map:check     # prüft: Im gebauten Ergebnis steht nichts in einem Fahrstreifen
 ```
 
@@ -163,7 +164,7 @@ die Karte in einem anderen Ordner und kann am Ende in einem Zug gegen `public/ma
 | `tools/build-lines.ts` | `lines.json.gz`: die Linien der Straßenbahnen und RegioTrams aus den Routen-Relationen von OSM – ihr Weg über die Gleisstücke und ihre Halte in der Reihenfolge (liest nur, was es braucht, aus dem PBF) |
 | `tools/build-buslines.ts` | `buslines.json.gz`: die Buslinien aus den Routen-Relationen von OSM – ihr Weg über die Straßen der Karte, ihre Halte (als Nummern in `stops.json.gz`) und wo an ihrem Ende die Linie zurück beginnt (siehe [unten](#buslinien), rund 200 kB) |
 | `tools/build-far.ts` | `far.bin.gz`: die Fernsicht – Gelände, Bodenbedeckung und Gebäudehöhen des ganzen Gebiets alle 100 m, aus den Kacheln (rund 2 MB) |
-| `tools/build-timetable.ts` | `timetable.json.gz`: die Fahrpläne der Linien aus `lines.json.gz` – je Linie die Fahrtverläufe (Halte, Sekunden dazwischen) und ihre Abfahrten an Werktagen, Samstagen und Sonn- und Feiertagen, aus einem GTFS-Feed (rund 13 kB) |
+| `tools/build-timetable.ts` | `timetable.json.gz`: die Fahrpläne der Linien aus `lines.json.gz` und `buslines.json.gz` – je Linie die Fahrtverläufe (Halte, Sekunden dazwischen, Ziel) und ihre Abfahrten an Werktagen, Samstagen und Sonn- und Feiertagen, aus einem GTFS-Feed (rund 85 kB, davon 70 kB Busse) |
 
 ### Stufen
 
@@ -272,12 +273,47 @@ node --max-old-space-size=1536 tools/build-timetable.ts feed.zip …      # oder
   aber nur von Zeit zu Zeit neu hochgeladen, jedes Mal unter einer anderen Adresse, und der letzte galt nur bis
   zum 31. 10. 2026. Deshalb lädt das Werkzeug von sich aus gtfs.de.
 
+### Busse
+
+Derselbe Lauf macht die Fahrpläne der Buslinien aus `buslines.json.gz` (er braucht sie und `stops.json.gz`, läuft
+also nach `map:buslines`) – im selben Durchgang durch `stop_times.txt`, der die Zeit kostet. Sie stehen in
+`timetable.json.gz` im Abschnitt `bus` (Dateiversion 2; das Spiel liest Dateien der Version 1 weiter).
+
+- **Welche Fahrten:** Busse (`route_type` 3, 11 und 700–800) der KVG Kassel („KVG M“) und des NVV („NVV - Faisy“),
+  nicht die Anruf-Sammel-Taxis („NVV … AST“) und nicht die anderen KVGs im Feed (Offenbach, Main-Kinzig,
+  Salzland) – `GTFS_BUS_AGENCY` (ein regulärer Ausdruck) wählt andere, `GTFS_BUSES=0` lässt die Busse weg.
+- **Zuordnung nach Nummer, Ort und Name:** Haltestellennamen wiederholen sich von Ort zu Ort („Rathaus“,
+  „Bahnhof“), deshalb zählt zuerst, *wo* ein Halt liegt: bis 50 m vom Haltepunkt der Karte ist es derselbe, wie
+  auch immer er heißt („Schule“, „Grundschule“), bis 400 m müssen die Namen passen (wie bei den Bahnen, auch mit
+  dem Ort davor: „Baunatal Rathaus“), bis 1,5 km nur derselbe Name, weiter weg nichts. Jede Fahrt kommt zu der
+  Linie gleicher Nummer, deren Halte sie in derselben Reihenfolge am meisten anfährt; was davor und danach
+  bleibt, zur nächsten – so fährt eine Ringlinie, die OSM in zwei Relationen teilt, auf beiden (an der Stelle des
+  Wechsels fährt sie als die zweite ab, der Anzeiger zeigt sie einmal).
+- **Ziel:** wie die Fahrt es an jedem Halt anzeigt (`stop_headsign`), ohne die Zusätze der KVG („Ri. Am
+  Kirschrain“, „(Endpunkt Bus)“, „Steig H“); ändert es sich unterwegs (eine Ringlinie nennt erst ihren
+  Wendepunkt, dann ihr Ende), ist das je Halt vermerkt.
+- **Farbe:** die der Linie in OSM, sonst die `route_color` des Feeds, sonst keine (auch für die Bahnen).
+- **Klein gehalten:** Je Linie die Haltestellen (als Nummern in `stops.json.gz`, in der Reihenfolge, in der
+  `src/world/buslines.ts` sie führt), je Fahrtverlauf die angefahrenen Halte, die Sekunden zwischen den
+  Abfahrten, Standzeiten und Ziele, und die Abfahrten – alle aufsteigenden Listen als Schritte zur Zahl davor.
+- **Stand November 2026:** 13 985 Busfahrten an den drei Tagen, 12 515 davon auf einer Linie der Karte;
+  457 der 625 Buslinien (je Richtung) haben einen Fahrplan. Ohne: 59, deren Nummer der Feed bei diesen
+  Betreibern nicht hat (meist Linien der Nachbarn, die in die Karte hineinfahren: Westfalen, Marburg und
+  Vogelsberg, Göttingen, Thüringen), 67, deren Fahrten anders fahren als die Relation (oder eine andere Fahrtvariante
+  der Linie passt besser), 42, von denen die Karte keine zwei Halte kennt.
+- **Abfahrten im Spiel:** `src/sim/timetable.ts` fragt Bahnen und Busse zusammen ab – nach dem Haltepunkt
+  (seiner Nummer in `stops.json.gz`; die Halte der Bahnen sind ihm über `stopPlaces` zugeordnet) oder nach dem
+  Namen. Die Anzeiger an den Haltestellen (`src/render/transit.ts`) zeigen das: ein großer an den Halten der
+  Bahn, an Haltestellen mit Wartehalle und wo OSM einen kennt, ein kleiner an einfachen Masten, wo Busse oder
+  Bahnen des Fahrplans halten.
+
 ## Buslinien
 
 `npm run map:buslines` (`tools/build-buslines.ts`) macht aus jeder Routen-Relation von OSM (`route=bus`,
 `route=trolleybus`), die eine Straße der Karte berührt, eine Linie in `buslines.json.gz`: Nummer, Name, Start,
 Ziel, Betreiber und Farbe, den Weg als Folge von Straßen der Karte mit ihrer Fahrtrichtung und die Halte mit
-ihrer Stelle an diesem Weg. Die Busse im Verkehr fahren damit ihre Linie (`src/sim/traffic.ts`).
+ihrer Stelle an diesem Weg. Die Busse im Verkehr fahren damit ihre Linie (`src/sim/traffic.ts`); ihre Fahrpläne
+stehen in `timetable.json.gz` ([oben](#busse)).
 
 - **Was gelesen wird:** die Stücke des Straßennetzes (`w/*.json.gz` – jede Straße nennt den OSM-Weg, aus dem
   sie entstand, jede Kreuzung ihren OSM-Knoten), `net.bin.gz` (welche Straße in welche abbiegen darf),
