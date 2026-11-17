@@ -79,6 +79,7 @@ export type SoundKind =
   | 'minibus'
   | 'lightTruck'
   | 'truck'
+  | 'semi'
   | 'bus'
   | 'tractorSlow'
   | 'tractor'
@@ -86,7 +87,7 @@ export type SoundKind =
   | 'plane'
   | 'onFoot';
 
-export const SOUND_KINDS: readonly SoundKind[] = ['car', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'minibus', 'lightTruck', 'truck', 'bus', 'tractorSlow', 'tractor', 'tram', 'plane', 'onFoot'];
+export const SOUND_KINDS: readonly SoundKind[] = ['car', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'minibus', 'lightTruck', 'truck', 'semi', 'bus', 'tractorSlow', 'tractor', 'tram', 'plane', 'onFoot'];
 
 /** Each vehicle of the game and the sound it has (with a trailer the same as without). */
 const OF_VEHICLE: Record<VehicleKind, SoundKind> = {
@@ -98,8 +99,9 @@ const OF_VEHICLE: Record<VehicleKind, SoundKind> = {
   motorcycle: 'motorcycle',
   lightTruck: 'lightTruck',
   lightTruckTrailer: 'lightTruck',
-  truckSolo: 'truck',
+  truckSolo: 'semi',
   truck: 'truck',
+  semi: 'semi',
   minibus: 'minibus',
   minibusTrailer: 'minibus',
   bus: 'bus',
@@ -112,6 +114,8 @@ const OF_VEHICLE: Record<VehicleKind, SoundKind> = {
   mobileCrane: 'truck',
   loaderCrane: 'truck',
   towerCrane: 'tram',
+  // (the forklift: a small diesel)
+  forklift: 'tractorSlow',
   pedestrian: 'onFoot',
 };
 
@@ -521,6 +525,38 @@ export const PROFILES: Record<SoundKind, SoundProfile> = {
     skid: { f: 700, q: 5, db: -3 },
     horn: { f: [247, 311], wave: 'sawtooth', lp: 1800, db: 8 },
     starter: { f: 50, lfo: 8, depth: 14, db: -3 },
+  },
+  // The heavy trucks' 13 l six (the tractor unit of the articulated lorry, the three-axle rigid): deeper and slower
+  // than the 12-tonner's, a big turbo that whistles and blows off, the exhaust brake's bark; air brakes, an air horn.
+  semi: {
+    ...HEAVY,
+    main: {
+      kind: 'engine',
+      turns: 2,
+      idleRpm: 550,
+      maxRpm: 2100,
+      soft: { kind: 'pulses', firing: I6, rise: 13, decay: 48, spread: 0.12, skew: 2.2 },
+      hard: { kind: 'pulses', firing: I6, rise: 5, decay: 26, spread: 0.07, skew: 1.6 },
+      partials: 1000,
+      db: 4,
+      idle: 0.5,
+      load: 0.5,
+      revs: 0.28,
+      harden: 0.65,
+      lp: [260, 1500, 1000],
+      lpQ: 2.4,
+      body: [72, 1.1, 6],
+      jitter: [7, 0.08],
+      prop: 0,
+    },
+    noise: { f: [1000, 1600], q: 1.1, db: -9, am: 0.8, base: 1, load: 0.45, revs: -0.4, firing: true },
+    turbo: { f: [1400, 3400], db: -10, spool: 1.3 },
+    tones: [{ wave: 'sine', by: 'speed', hz: 19, db: -25, effort: 0.5, fade: [3, 12] }],
+    road: { db: -3, lp: [180, 17], q: 1.1 },
+    wind: { db: -6, bp: [280, 11], q: 0.6 },
+    skid: { f: 650, q: 5, db: -2 },
+    horn: { f: [185, 233], wave: 'sawtooth', lp: 1500, db: 9 },
+    starter: { f: 46, lfo: 7, depth: 15, db: -2 },
   },
   // A city bus: the truck's six, but at the back – heard muffled through the long body, which booms; the
   // gearbox and its retarder whine (louder as it brakes); air brakes and air doors.

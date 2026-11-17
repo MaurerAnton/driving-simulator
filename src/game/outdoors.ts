@@ -23,6 +23,7 @@ import { SeasonLook, seasonFor } from '../render/season.ts';
 import type { SeasonSetting, SeasonState, SeasonTarget } from '../render/season.ts';
 import { WEATHER_PARTICLES, WeatherRenderer } from '../render/weather.ts';
 import type { SkyParts } from '../render/weather.ts';
+import { WaterLook } from '../render/water.ts';
 import type { Connector, Lane } from '../world/lanes.ts';
 
 /** what of the game's clock is needed (game/clock.ts's gameClock fits) */
@@ -45,6 +46,8 @@ export class Outdoors {
   readonly view: WeatherRenderer;
   readonly look = new SeasonLook();
   readonly tracks = new SnowTracks();
+  /** real water in the terrain and the far view (`water.enabled`: the graphics setting) */
+  readonly water = new WaterLook();
   /** the weather and the season shown now */
   weather: WeatherState = CLEAR_WEATHER;
   season: SeasonState;
@@ -65,6 +68,7 @@ export class Outdoors {
     this.season = { ...this.look.state };
     scene.add(this.view.group, this.tracks.mesh);
     this.view.attachSky(sky);
+    this.water.attachSky(sky?.dome);
   }
 
   /**
@@ -75,6 +79,7 @@ export class Outdoors {
   patch(material: THREE.Material, target: SeasonTarget): void {
     this.look.patch(material, target);
     if (target === 'ground' || target === 'paint') this.view.addWetness(material);
+    if (target === 'terrain' || target === 'far') this.water.patch(material, target);
   }
 
   /**
@@ -109,6 +114,7 @@ export class Outdoors {
       if (switched) this.view.jump();
     }
     this.view.update(camera, dt, w);
+    this.water.update(dt);
     if (lanes) this.tracks.update(camera.x, camera.z, lanes.lanes, lanes.connectors);
   }
 

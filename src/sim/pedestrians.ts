@@ -124,7 +124,7 @@ export function rainOf(w: { kind: string; intensity: number } | null | undefined
  * phone on the low preset draws a few dozen, a fast computer up to CROWD_MAX.
  */
 export function crowdTarget(traffic: number, quality: string): number {
-  const base = quality === 'low' ? 40 : quality === 'medium' ? 80 : quality === 'ultra' ? 160 : 120;
+  const base = quality === 'low' ? 24 : quality === 'medium' ? 80 : quality === 'ultra' ? 160 : 120;
   return Math.round(Math.min(CROWD_MAX, base * clamp(traffic / 0.6, 0, 1.4)));
 }
 
@@ -450,6 +450,7 @@ export class Crowd {
   private player: PlayerState | null = null;
   private cyclists: readonly Cyclist[] = [];
   private obstacles: readonly PlayerState[] = [];
+  private playerCar: PlayerState | null = null;
   /** those on the carriageway, and their boxes for the cars */
   private readonly onRoad: Person[] = [];
   private readonly boxes: Block[] = [];
@@ -598,6 +599,8 @@ export class Crowd {
     this.player = player.onFoot ? player : null;
     this.cyclists = cyclists;
     this.obstacles = obstacles;
+    // (the player's own vehicle, standing on their way – on the pavement, on a crossing: they go round it)
+    this.playerCar = player.onFoot ? null : player;
     this.see(dt, player, cars, obstacles);
     this.spawning(dt, player);
     this.grid();
@@ -2035,7 +2038,9 @@ export class Crowd {
       const x = p.bx + p.wx * ahead + rx * d;
       const z = p.bz + p.wz * ahead + rz * d;
       if (this.blocked?.(x, p.y, z, 0.24)) return true;
-      for (const o of this.obstacles) {
+      for (let k = -1; k < this.obstacles.length; k++) {
+        const o = k < 0 ? this.playerCar : this.obstacles[k];
+        if (!o) continue;
         if (Math.abs(o.x - x) > 12 || Math.abs(o.z - z) > 12) continue;
         if (Math.abs(o.speed) > 0.5) continue;
         const fx = -Math.sin(o.yaw);

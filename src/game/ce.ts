@@ -91,6 +91,16 @@ export const TRAILER_OUTLINE = { front: 3.9, rear: 2.5, hw: 1.25, hitch: 5.4 };
 export const TRUCK_AXLES = { at: [2.35, -2.35], hw: 1.25 };
 export const TRAILER_AXLES = { at: [0.65, -0.65], hw: 1.25 };
 
+/** What the judge needs of a combination: the outlines and the axles of the towing vehicle and of the trailer. */
+export interface RigShape {
+  truck: { front: number; rear: number; hw: number };
+  trailer: { front: number; rear: number; hw: number };
+  truckAxles: { at: readonly number[]; hw: number };
+  trailerAxles: { at: readonly number[]; hw: number };
+}
+/** the truck with the drawbar trailer */
+export const DRAWBAR_RIG: RigShape = { truck: TRUCK_OUTLINE, trailer: TRAILER_OUTLINE, truckAxles: TRUCK_AXLES, trailerAxles: TRAILER_AXLES };
+
 const wrap = (a: number): number => a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
 
 /** The outer ends of the axles of a vehicle standing at a pose: x, z pairs. */
@@ -319,6 +329,8 @@ export class ManoeuvreJudge {
   readonly id: 'corner' | 'ramp';
   readonly layout: TaskLayout;
   readonly status: ManoeuvreStatus = { state: 'run', corrections: 0, excursions: 0, faults: [], gap: NaN };
+  /** the combination judged (the articulated lorry has its own: game/semice.ts) */
+  readonly rig: RigShape;
   private outside = false;
   /** metres driven backwards / forwards since the last change of direction */
   private back = 0;
@@ -326,9 +338,10 @@ export class ManoeuvreJudge {
   private reversed = false;
   private held = 0;
 
-  constructor(id: 'corner' | 'ramp') {
+  constructor(id: 'corner' | 'ramp', rig: RigShape = DRAWBAR_RIG) {
     this.id = id;
     this.layout = taskLayout(id);
+    this.rig = rig;
   }
 
   update(rig: RigState, dt: number): ManoeuvreStatus {
@@ -336,11 +349,12 @@ export class ManoeuvreJudge {
     st.faults.length = 0;
     if (st.state !== 'run') return st;
     const lay = this.layout;
-    const tc = corners(rig.truck, TRUCK_OUTLINE.front, TRUCK_OUTLINE.rear, TRUCK_OUTLINE.hw);
-    const rc = corners(rig.trailer, TRAILER_OUTLINE.front, TRAILER_OUTLINE.rear, TRAILER_OUTLINE.hw);
+    const R = this.rig;
+    const tc = corners(rig.truck, R.truck.front, R.truck.rear, R.truck.hw);
+    const rc = corners(rig.trailer, R.trailer.front, R.trailer.rear, R.trailer.hw);
     // ---- staying on the paved area: the lines are kerbs, and a kerb is driven over with a wheel
     // (a hand's width over the line is not yet off it; the body may swing over it)
-    const wheels = wheelPoints(rig.trailer, TRAILER_AXLES, wheelPoints(rig.truck, TRUCK_AXLES));
+    const wheels = wheelPoints(rig.trailer, R.trailerAxles, wheelPoints(rig.truck, R.truckAxles));
     let off = 0;
     for (let i = 0; i < wheels.length; i += 2) off = Math.max(off, offArea(lay, wheels[i], wheels[i + 1]));
     if (off > 0.15 && !this.outside) {
@@ -391,7 +405,7 @@ export class ManoeuvreJudge {
   }
 
   /** Does the combination stand where and how the task wants it? */
-  arrived(rig: RigState, tc = corners(rig.truck, TRUCK_OUTLINE.front, TRUCK_OUTLINE.rear, TRUCK_OUTLINE.hw), rc = corners(rig.trailer, TRAILER_OUTLINE.front, TRAILER_OUTLINE.rear, TRAILER_OUTLINE.hw)): boolean {
+  arrived(rig: RigState, tc = corners(rig.truck, this.rig.truck.front, this.rig.truck.rear, this.rig.truck.hw), rc = corners(rig.trailer, this.rig.trailer.front, this.rig.trailer.rear, this.rig.trailer.hw)): boolean {
     const g = this.layout.goal;
     if (this.id === 'corner') {
       // everything in the side road, both vehicles along it (front towards the main road)
@@ -473,6 +487,12 @@ export class CouplingProcedure {
   /** metres driven since a mark, for the 'do' steps that are distances */
   private run = 0;
   private braked = false;
+  /** where to stop before taking the trailer up: this far from it at least and at most (m – the articulated lorry's: game/semice.ts) */
+  readonly approach: readonly [number, number];
+
+  constructor(approach: readonly [number, number] = [0.25, 1.6]) {
+    this.approach = approach;
+  }
 
   private ready(id: CouplingStepId): boolean {
     const step = COUPLING_STEPS.find((s) => s.id === id)!;
@@ -538,7 +558,7 @@ export class CouplingProcedure {
       }
     } else if (!has('cLatch')) {
       // first back up to about a metre before the eye, in line, and secure the truck …
-      if (!has('cApproach') && has('cCheck') && standing && s.handbrake && s.dist > 0.25 && s.dist < 1.6 && Math.abs(s.angle) < 0.17) finish('cApproach');
+      if (!has('cApproach') && has('cCheck') && standing && s.handbrake && s.dist > this.approach[0] && s.dist < this.approach[1] && Math.abs(s.angle) < 0.17) finish('cApproach');
       // … then, the heights compared, on until the coupling takes the eye
       if (s.dist < 0.2 && Math.abs(s.angle) < 0.26 && s.speed < 0.05) {
         if (!has('cHeight')) {

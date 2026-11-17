@@ -19,6 +19,8 @@ import { CLS, CTRL, EF, ROLE, XING } from '../world/types.ts';
 import type { CrossingJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { Edge, World } from '../world/world.ts';
+import { offsetAt } from './pastblock.ts';
+import type { PastState } from './pastblock.ts';
 import type { RuleMonitor } from './rules.ts';
 import { SIG } from './signals.ts';
 import type { SignalSystem } from './signals.ts';
@@ -85,6 +87,8 @@ export class AutoDriver {
   private lastTurn = 0;
   private lastNext: Connector | null = null;
   private haltLane: Lane | null = null;
+  /** going round something that stands in the way (src/sim/pastblock.ts) */
+  private past: PastState | null = null;
   private readonly proj = { s: 0, off: 0, d2: 0, seg: 0 };
   /** the way ahead as bendCap samples it: which way it runs, every few metres */
   private readonly bendDir = new Float32Array(2 * 48);
@@ -176,6 +180,7 @@ export class AutoDriver {
     this.lastTurn = 0;
     this.lastNext = null;
     this.haltLane = null;
+    this.past = null;
     this.cmd.arrived = false;
     this.cmd.turnRound = null;
   }
@@ -392,6 +397,7 @@ export class AutoDriver {
     me.conn = null;
     me.next = null;
     me.route = route;
+    me.past = this.past;
     let halting = false;
     /** at the place to halt at (not merely standing near it, behind somebody) */
     let atHalt = false;
@@ -644,6 +650,8 @@ export class AutoDriver {
       }
     }
     // --- whoever is ahead on the way: two seconds behind, and never faster than could be stopped ---
+    /** it stands for a reason of the road (a line, a light, a crossing, the place to halt at) – not for what is in its way */
+    const held = mustStop || crossStop || halting;
     let gap = Infinity;
     if (traffic && (me.lane || me.conn)) {
       const lead = traffic.aheadOf(me, Math.min(110, 18 + speed * 4));
@@ -669,6 +677,19 @@ export class AutoDriver {
         if (lead.gap < 2.2) crossStop = true;
       }
     }
+    // --- something standing in the way that does not move: after a while round it, as the traffic does (src/sim/pastblock.ts) ---
+    if (traffic && obey && (me.lane || me.conn)) {
+      traffic.passBy(me, dt, gap, held);
+      const p = (this.past = me.past ?? null);
+      if (p && p.phase !== 'wait') {
+        limit = Math.min(limit, p.cap);
+        // (the point steered at: as far off the middle of the lane as the car will be there)
+        const o = offsetAt(p, la);
+        tx += -Math.cos(v.yaw) * o;
+        tz += Math.sin(v.yaw) * o;
+        if (turn === 0) turn = p.phase === 'back' ? (p.off > 0 ? 1 : -1) : p.to > 0 ? -1 : 1;
+      }
+    } else this.past = null;
     // changing lanes is announced like a turn: indicator on, a look over the shoulder, then over
     this.changeT = change !== 0 ? this.changeT + dt : 0;
     let look = turn !== 0 && Math.min(distToLine, ahead) < 25 ? (turn < 0 ? 1.6 : -1.6) : 0;

@@ -110,7 +110,7 @@ export class Trailer {
   /** how far the wheels have turned (rad), for the picture */
   wheelSpin = 0;
   private accel = 0;
-  private readonly hit = [0, 0, 0];
+  protected readonly hit = [0, 0, 0];
   private readonly sample: GroundSample = { y: 0, nx: 0, ny: 1, nz: 0, grip: 1, rolling: 1 };
 
   constructor(spec: TrailerSpec, ground: Ground) {
@@ -190,7 +190,7 @@ export class Trailer {
   }
 
   /** heights and the place of the coupling eye from where the axle group stands */
-  private settle(hitchY?: number): void {
+  protected settle(hitchY?: number): void {
     const L = this.spec.hitchToAxle;
     this.ground.sample(this.x, this.z, this.y + 1, this.sample);
     this.y = this.sample.y;

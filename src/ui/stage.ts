@@ -53,6 +53,8 @@ export function groupOf(d: Pick<VehicleDef, 'kind' | 'model'>): string {
       return 'moto';
     case 'truck':
     case 'truckLight':
+    case 'truckHeavy':
+    case 'semi':
       return 'truck';
     case 'bus':
     case 'minibus':
@@ -153,7 +155,8 @@ export function stageModes(kind: VehicleKind, hasYard: boolean, lessons: readonl
   const road = ROAD_VEHICLE_KINDS.includes(kind);
   const out: StageMode[] = [{ id: 'free', group: 'drive' }];
   // (the drives the vehicle does by itself and the tours are on the roads – the tram's on its tracks)
-  if (kind === 'tram' || road) out.push({ id: 'demo', group: 'drive' });
+  // (the aeroplane's is a demonstration flight: its autopilot takes off, flies round the field and lands)
+  if (kind === 'tram' || kind === 'plane' || road) out.push({ id: 'demo', group: 'drive' });
   if (road) out.push({ id: 'tour', group: 'drive' });
   // the test place: every model of the game on the practice yard
   if (kind !== 'tram' && kind !== 'plane' && hasYard) out.push({ id: 'show', group: 'drive' });
@@ -323,6 +326,7 @@ const ICONS: Record<string, string> = {
   tram: '<path d="M7 2.5h10M12 2.5L9.5 5.5h5z"/><rect x="5.5" y="5.5" width="13" height="13.5" rx="3"/><path d="M5.5 12h13M8.5 16h.01M15.5 16h.01M8 21.5l1.8-2.5M16 21.5l-1.8-2.5"/>',
   plane: '<path d="M12 2.5c.8 0 1.3.8 1.3 1.8V9l7.2 4.2v2.1l-7.2-2.2v4.6l2.2 1.7v1.7L12 20.2l-3.5.9v-1.7l2.2-1.7v-4.6l-7.2 2.2v-2.1L10.7 9V4.3c0-1 .5-1.8 1.3-1.8z"/>',
   foot: '<circle cx="13.5" cy="4.3" r="2"/><path d="M9.5 21l2.6-6-1.6-3.5.9-4.5 3 2.6 3 1.2M11.4 7.5L8.2 9.3l-1 3.4M12.1 15l3 2.2.9 3.8"/>',
+  forklift: '<path d="M3 17V12h12v5M6 12V6h8v6M17 3.5V19.5M17 19.5h5M17 15h4"/><circle cx="6" cy="18" r="1.8"/><circle cx="12.5" cy="18" r="1.8"/>',
   crane: '<path d="M2.5 17.5V13h12v4.5M14.5 13.5h3.8l2.7 2.4v1.6H2.5M4.5 13L16 4l1.5 1.3L7 13M17.2 5.2V10M16 10h2.4"/><circle cx="5" cy="18" r="1.6"/><circle cx="10" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/>',
   /** (any other vehicle: a steering wheel) */
   wheel: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M3.3 10.4l6.3 1M20.7 10.4l-6.3 1M12 14.5V21"/>',
@@ -389,7 +393,7 @@ function icon(name: string): string {
 }
 
 /** The picture of a kind of vehicle in the strip. */
-const GROUP_ICON: Record<string, string> = { car: 'car', moto: 'moto', truck: 'truck', bus: 'bus', tractor: 'tractor', tram: 'tram', plane: 'plane', foot: 'foot', crane: 'crane' };
+const GROUP_ICON: Record<string, string> = { car: 'car', moto: 'moto', truck: 'truck', bus: 'bus', tractor: 'tractor', tram: 'tram', plane: 'plane', foot: 'foot', crane: 'crane', forklift: 'forklift' };
 /** The name of a kind with several vehicles (a kind with one is named by its vehicle). */
 const GROUP_NAME: Record<string, string> = { car: 'stageCars', moto: 'stageMotorcycles', truck: 'stageTrucks', bus: 'stageBuses', tractor: 'stageTractors', crane: 'stageCranes' };
 /** The picture of a lesson: the sign it is about, or what is done in it. */
@@ -430,6 +434,8 @@ export interface StageContext {
   address: (pick: (hit: AddressHit) => void) => HTMLElement;
   /** the other pages – each comes back to this menu – and the full-screen map */
   pages: { settings(): void; news(): void; map(): void; controls(): void; log(): void; about(): void };
+  /** where the player is now (the browser asks first): a start place there – or why not (a text) */
+  here?(): Promise<{ hit: AddressHit } | { error: string }>;
   /** more ways to play, from other parts of the game */
   extraModes?: readonly StageExtraMode[];
   /** "Version 1.4.0" */
@@ -613,7 +619,7 @@ export function stageMenu(c: StageContext): HTMLElement {
       const hint = t(kind === 'tram' ? 'freeTramDesc' : kind === 'pedestrian' ? 'freeWalkDesc' : kind === 'plane' ? 'freeFlyDesc' : 'freeDesc');
       return { label: t(kind === 'plane' ? 'freeFly' : 'free'), picture: icon(kind === 'plane' ? 'takeoff' : kind === 'pedestrian' ? 'foot' : 'free'), hint };
     }
-    if (id === 'demo') return { label: t('demo'), picture: icon('demo'), hint: t(kind === 'tram' ? 'demoTramDesc' : 'demoDesc') };
+    if (id === 'demo') return { label: t(kind === 'plane' ? 'demoFly' : 'demo'), picture: icon(kind === 'plane' ? 'takeoff' : 'demo'), hint: t(kind === 'tram' ? 'demoTramDesc' : kind === 'plane' ? 'demoFlyDesc' : 'demoDesc') };
     if (id === 'tour') return { label: t('tourTitle'), picture: icon('tour'), hint: t('tourDesc') };
     if (id === 'show') return { label: t('showTitle'), picture: icon('show'), hint: t('showDesc') };
     const l = modes.find((m) => m.id === id)?.lesson;
@@ -869,6 +875,26 @@ export function stageMenu(c: StageContext): HTMLElement {
     map.dataset.k = 'onmap';
     map.onclick = () => away(() => c.pages.map());
     box.append(map);
+    // … or where the player is now
+    const here = c.here;
+    if (here) {
+      const me = el('button', 'st-wide');
+      me.type = 'button';
+      me.innerHTML = icon('pin');
+      const label = el('span', '', t('myLocation'));
+      me.append(label);
+      me.dataset.k = 'here';
+      me.onclick = async () => {
+        me.disabled = true;
+        const r = await here();
+        me.disabled = false;
+        if ('hit' in r) {
+          last.address = r.hit;
+          chosenIn();
+        } else label.textContent = r.error;
+      };
+      box.append(me);
+    }
   }
 
   /** What to do: the drives of one's own, the lessons (a sheet of their own when there are several), the test – and what other parts add. */

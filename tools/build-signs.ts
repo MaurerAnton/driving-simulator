@@ -734,8 +734,11 @@ export function buildSigns(mapDir: string, input: string, lap: (msg: string) => 
   }
   lap(`${stats.timed} rules of signs with a time (${new Set(rules.map((r) => r.e)).size} roads), ${stats.timedPosts} signs where they begin`);
 
-  // ---- the town signs wherever the road changes between inside and outside a built-up area
-  for (const j of net.junctions.values()) {
+  // ---- the town signs wherever the road changes between inside and outside a built-up area – only when asked for
+  // (SIGNS_DERIVED_TOWNS=1): the built-up flag follows the houses, not the legal boundary of a town, and so many of
+  // these signs stood where there is none in reality (playtest of 1.4.0) – the town signs mapped in OpenStreetMap stay
+  const derived = process.env.SIGNS_DERIVED_TOWNS === '1';
+  for (const j of derived ? net.junctions.values() : []) {
     if (j.roads.length < 2) continue;
     const arms = net.arms(j);
     if (arms.length < 2 || arms.some((a) => a.road.a === a.road.b)) continue;

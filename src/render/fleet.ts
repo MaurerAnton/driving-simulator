@@ -20,7 +20,7 @@ import { NavScreen } from './navscreen.ts';
 import type { VehicleScreen } from './navscreen.ts';
 import { busDetail, tractorDetail } from './fleetdetail.ts';
 import type { FleetDetail } from './fleetdetail.ts';
-import { AMBER, BRAND, DARK, FRAME, GLASS, LAMP, LAMP_STOP, TAIL, box, lettering, panel, wheel } from './truck.ts';
+import { AMBER, BRAND, DARK, FRAME, GLASS, LAMP, LAMP_STOP, TAIL, box, lettering, lightLamps, panel, wheel } from './truck.ts';
 import type { Facing } from './truck.ts';
 
 /** What the game asks of the model of the vehicle the player drives. */
@@ -43,9 +43,12 @@ const OFF = new THREE.MeshLambertMaterial({ color: 0x3a2d2a });
 export class Lamps {
   readonly brake: THREE.Mesh[] = [];
   readonly indicators: Array<{ mesh: THREE.Mesh; side: number }> = [];
+  private heads: THREE.Mesh[] | null = null;
 
-  update(s: CarVisualState): void {
-    for (const l of this.brake) l.material = s.braking ? LAMP_STOP : TAIL;
+  /** The brake and tail lamps, the indicators – and, given the model's root, its headlights as the light switch has them. */
+  update(s: CarVisualState, root?: THREE.Object3D): void {
+    if (root) this.heads = lightLamps(root, s, this.brake, this.heads);
+    else for (const l of this.brake) l.material = s.braking ? LAMP_STOP : TAIL;
     const on = s.blinkOn && s.ignition;
     for (const i of this.indicators) i.mesh.material = on && (s.hazard || s.indicator === i.side) ? AMBER : OFF;
   }
@@ -387,7 +390,7 @@ export class PlayerBus implements VehicleModel {
       w.rotation.set(-(s.wheelSpin[i] ?? 0), i < 2 ? -(s.wheelSteer[i] ?? 0) : 0, 0, 'YXZ');
     }
     this.steering.rotation.z = -s.steerWheel;
-    this.lamps.update(s);
+    this.lamps.update(s, this.root);
     this.panelTex.update(s, now);
     this.detail?.update();
   }
@@ -517,7 +520,7 @@ export class PlayerTractor implements VehicleModel {
       w.rotation.set(-spin, i < 2 ? -(s.wheelSteer[i] ?? 0) : 0, 0, 'YXZ');
     }
     this.steering.rotation.z = -s.steerWheel;
-    this.lamps.update(s);
+    this.lamps.update(s, this.root);
     this.panelTex.update(s, now);
     this.detail?.update();
   }
@@ -551,8 +554,12 @@ export class CarTrailerModel {
     const front = -(t.hitchToAxle - t.bodyFront);
     const rear = t.length - t.hitchToAxle;
     const hitchY = t.hitch?.height ?? 0.45;
-    g.add(box(-hw, hw, 0.55, 0.95, front, rear, TRAILER_PAINT)); // the box
-    g.add(box(-hw + 0.02, hw - 0.02, 0.95, t.height, front + 0.02, rear - 0.02, TARP)); // the tarpaulin
+    // (named for the tailgate and the tarpaulin's rear flap that open: render/rearopen.ts)
+    const body = box(-hw, hw, 0.55, 0.95, front, rear, TRAILER_PAINT); // the box
+    body.name = 'trailer box';
+    const tarp = box(-hw + 0.02, hw - 0.02, 0.95, t.height, front + 0.02, rear - 0.02, TARP); // the tarpaulin
+    tarp.name = 'trailer tarp';
+    g.add(body, tarp);
     g.add(box(-0.6, 0.6, 0.42, 0.55, front - 0.1, rear - 0.2, FRAME));
     // the drawbar (an A-frame) up to the coupling head
     for (const side of [-1, 1]) {

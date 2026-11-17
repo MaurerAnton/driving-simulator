@@ -156,7 +156,9 @@ const tint = (hex: number): RGB => {
 const CROWN_SPRING = tint(0x64953a);
 const CROWN_AUTUMN: readonly RGB[] = [tint(0xc9a227), tint(0xc8641e), tint(0xa5321e), tint(0x7a5a2e)];
 const CROWN_BLOSSOM = tint(0xf0dce4);
-const CROWN_TWIGS = tint(0x7a6e66);
+const CROWN_TWIGS = tint(0x8c7f74);
+/** the bare twigs' own colour (linear) – what a bare crown is drawn in, whatever its green was */
+const TWIGS_ABS = lin(0x8c7f74);
 /** how much of a bare crown is drawn: all of it – a soft grey-brown mass of twigs (drawn see-through,
  *  against a bright sky a crown only showed as speckles) */
 const TWIG_COVER = 1;
@@ -362,8 +364,9 @@ function treeVertex(kind: TreeKind): string {
   float fsHere = step(fract(sin(dot(position.xyz, vec3(17.1, 31.7, 11.3)) + fsR1 * 7.0) * 4375.85), 0.65);
   fsT = mix(fsT, ${v3(CROWN_BLOSSOM)}, uFsBlossom * fsBlooms * fsHere);
   float fsHas = clamp(uFsLeaves * 1.3 - fsR1 * 0.3, 0.0, 1.0);
-  fsT = mix(${v3(CROWN_TWIGS)}, fsT, fsHas);
   vColor.rgb *= mix(vec3(1.0), fsT, fsCrown);
+  // what is bare of the crown: the grey-brown of its twigs, whatever green it had (a tint of the green went black)
+  vColor.rgb = mix(vColor.rgb, ${v3(TWIGS_ABS)} * (0.85 + 0.3 * fsR2), (1.0 - fsHas) * fsCrown);
   vFsLeafCover = mix(1.0, ${TWIG_COVER.toFixed(3)} + ${(1 - TWIG_COVER).toFixed(3)} * fsHas, fsCrown);
 }
 `;

@@ -18,6 +18,7 @@ import { InstrumentPanel } from './instruments.ts';
 import type { DashState } from './instruments.ts';
 import { Mirror, mirrorNormal } from './mirrors.ts';
 import { CarDetail } from './cardetail.ts';
+import { CarOpenings } from './caropen.ts';
 
 export interface CarVisualState extends DashState {
   /** steering wheel angle in rad, + = clockwise / right */
@@ -860,6 +861,10 @@ export class PlayerCar {
   private readonly stalk = new THREE.Group();
   /** the finer model of the "very high" graphics (render/cardetail.ts): made the first time it is asked for */
   private detail: CarDetail | null = null;
+  /** the doors, the bonnet and the tailgate as parts that open (render/caropen.ts): made the first time one opens */
+  private opener: CarOpenings | null = null;
+  /** the door panels inside: their material's mesh, the same without them, and each door's own (fl fr rl rr) */
+  readonly doorTrim: Array<{ mesh: THREE.Mesh; rest: THREE.BufferGeometry | null; doors: Array<THREE.BufferGeometry | null> }> = [];
   private leverX = 0;
   private leverZ = 0;
   private gate = 0;
@@ -926,10 +931,12 @@ export class PlayerCar {
     const cluster: ClusterPlace = { centre: [ex, 0.905, zc + 0.435], tilt: 0.32, width: 0.36, height: 0.12 };
     buildBinnacle(kit, cluster, dash.browY(ex));
     buildConsole(kit, dash.browZ(0));
-    buildDoor(sh, kit, -1, zc + 0.1, sh.zPillarB - 0.04, true);
-    buildDoor(sh, kit, 1, zc + 0.1, sh.zPillarB - 0.04, true);
-    buildDoor(sh, kit, -1, sh.zPillarB + 0.04, sh.zRoofRear - 0.15, false);
-    buildDoor(sh, kit, 1, sh.zPillarB + 0.04, sh.zRoofRear - 0.15, false);
+    // (each door's panel kept apart as well, for the doors that open)
+    const doorKits: Kit[] = [0, 1, 2, 3].map(() => ({ soft: [], hard: [], pale: [], fabric: [], accent: [], carpet: [], silver: [], black: [] }));
+    buildDoor(sh, doorKits[0], -1, zc + 0.1, sh.zPillarB - 0.04, true);
+    buildDoor(sh, doorKits[1], 1, zc + 0.1, sh.zPillarB - 0.04, true);
+    buildDoor(sh, doorKits[2], -1, sh.zPillarB + 0.04, sh.zRoofRear - 0.15, false);
+    buildDoor(sh, doorKits[3], 1, sh.zPillarB + 0.04, sh.zRoofRear - 0.15, false);
     buildSeat(kit, ex, -0.15, 0.5, 0.3, [0]);
     buildSeat(kit, -ex, -0.15, 0.5, 0.3, [0]);
     buildSeat(kit, 0, 0.86, 1.3, 0.36, [-0.36, 0.36]);
@@ -972,7 +979,11 @@ export class PlayerCar {
     kit.pale.push(box(0.05, 0.004, 0.06, -0.005, roofAt(0.03) - 0.014, sh.zRoofFront + 0.2), box(0.05, 0.004, 0.06, 0.065, roofAt(0.03) - 0.014, sh.zRoofFront + 0.2));
 
     for (const name of Object.keys(kit) as Array<keyof Kit>) {
-      if (kit[name].length) part(merge(kit[name]), mats[name]);
+      const doors = doorKits.map((k) => k[name]);
+      const all = [...kit[name], ...doors.flat()];
+      if (!all.length) continue;
+      const m = part(merge(all), mats[name]);
+      if (doors.some((l) => l.length)) this.doorTrim.push({ mesh: m, rest: kit[name].length ? merge(kit[name]) : null, doors: doors.map((l) => (l.length ? merge(l) : null)) });
     }
 
     // ---- instrument cluster and centre display: self-lit pictures ------------
@@ -1161,7 +1172,9 @@ export class PlayerCar {
         const o = s.centre.clone().addScaledVector(n, -back * depth);
         return place(roundRect((s.width + 0.022) * k, (s.height + 0.022) * k, 0.018 * k, 2), [o.x, o.y, o.z], [right.x, right.y, right.z], [up.x, up.y, up.z]);
       });
-      this.cockpit.add(m.mesh, new THREE.Mesh(new Sculpt().tube(rings, true, true).build(50), i === 0 ? mirrorPlastic : shellPaint));
+      const housing = new THREE.Mesh(new Sculpt().tube(rings, true, true).build(50), i === 0 ? mirrorPlastic : shellPaint);
+      housing.name = `mirror housing ${s.name}`;
+      this.cockpit.add(m.mesh, housing);
     });
     // stem of the inside mirror up to the roof's front edge, feet of the door mirrors
     const stem = new Sculpt().tube(
@@ -1182,7 +1195,9 @@ export class PlayerCar {
       ].map(([x, d, h]) => place(roundRect(d, h, 0.009, 1), [side * x, belt - 0.013, zc + 0.264], Z, Y));
       feet.push(new Sculpt().tube(arm, false, true).build(50));
     }
-    this.cockpit.add(new THREE.Mesh(merge(feet), mirrorPlastic));
+    const feetMesh = new THREE.Mesh(merge(feet), mirrorPlastic);
+    feetMesh.name = 'mirror feet';
+    this.cockpit.add(feetMesh);
 
     // ---- see-through cabin: the body belongs to it as well --------------------
     for (const m of this.exterior.solids) this.ghost(m, 0);
@@ -1311,6 +1326,33 @@ export class PlayerCar {
       this.setCabinOpacity(o);
     }
     this.detail?.show(on);
+    if (on && this.detail && this.opener) this.opener.addDetail(this.detail.meshes);
+  }
+
+  /** The doors, the bonnet and the tailgate (render/caropen.ts) – cut out of the body the first time this is asked for. */
+  get openings(): CarOpenings {
+    if (!this.opener) {
+      this.opener = new CarOpenings({
+        root: this.root,
+        exterior: this.exterior,
+        cockpit: this.cockpit,
+        mirrors: this.mirrors,
+        doorTrim: this.doorTrim,
+        register: (m) => this.ghost(m, 0),
+      });
+      if (this.detail) this.opener.addDetail(this.detail.meshes);
+      // (the see-through cabin takes the new parts in at once)
+      const o = this.cabinOpacity;
+      this.cabinOpacity = 1;
+      this.setCabinOpacity(o);
+    }
+    return this.opener;
+  }
+
+  /** How far each part is open (fl fr rl rr bonnet boot, 0 … 1) – nothing is made while all of them are shut. */
+  setOpenings(values: ArrayLike<number>): void {
+    if (this.opener) this.opener.pose(values);
+    else for (let i = 0; i < values.length; i++) if (values[i] > 0) return this.openings.pose(values);
   }
 
   dispose(): void {

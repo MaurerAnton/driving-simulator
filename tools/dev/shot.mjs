@@ -65,7 +65,7 @@ if (process.env.FS_FILL) {
   if (process.env.FS_WAIT_FOR) await page.waitForSelector(process.env.FS_WAIT_FOR, { timeout: 120000 }).catch((e) => logs.push(`[shot] ${e.message.split('\n')[0]}`));
 }
 if (process.env.FS_CLICK) await page.click(process.env.FS_CLICK, { timeout: 120000 }).catch((e) => logs.push(`[shot] ${e.message.split('\n')[0]}`));
-// FS_STEPS="key:Escape;;click:<selector>;;wait:800;;until:<expression using g>;;shot:<file>;;hold:KeyU;;select:<selector>=<value>;;eval:<statements using g>"
+// FS_STEPS="key:Escape;;click:<selector>;;wait:800;;until:<expression using g>;;shot:<file>;;hold:KeyU;;release:KeyU;;select:<selector>=<value>;;eval:<statements using g>"
 // – things to do one after the other before the picture is taken
 for (const step of (process.env.FS_STEPS ?? '').split(';;').filter(Boolean)) {
   const at = step.indexOf(':');
@@ -73,6 +73,7 @@ for (const step of (process.env.FS_STEPS ?? '').split(';;').filter(Boolean)) {
   try {
     if (what === 'key') await page.keyboard.press(arg);
     else if (what === 'hold') await page.keyboard.down(arg);
+    else if (what === 'release') await page.keyboard.up(arg);
     else if (what === 'click') await page.click(arg, { timeout: 120000 });
     else if (what === 'wait') await page.waitForTimeout(Number(arg));
     else if (what === 'until') {

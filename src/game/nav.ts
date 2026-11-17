@@ -445,16 +445,16 @@ export const LESSONS: LessonDef[] = [
   { id: 'rural', kind: 'route', targets: ['rural', 'home'] },
   { id: 'motorway', kind: 'route', targets: ['motorway', 'home'], notFor: ['tractor'] },
   // (the test drive on the road, for every class but CE – that one has its own, with the yard tasks)
-  { id: 'exam', kind: 'exam', targets: ['rbl', 'signals', 'roundabout', 'priority', 'rural', 'home'], notFor: ['truck'] },
+  { id: 'exam', kind: 'exam', targets: ['rbl', 'signals', 'roundabout', 'priority', 'rural', 'home'], notFor: ['truck', 'semi'] },
   // class CE: truck with trailer (Anlage 7 FeV: coupling, two basic manoeuvres, the drive)
-  { id: 'ceCouple', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['couple'] },
-  { id: 'ceCorner', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['corner'] },
-  { id: 'ceRamp', kind: 'yard', targets: [], vehicle: 'truck', tasks: ['ramp'] },
+  { id: 'ceCouple', kind: 'yard', targets: [], vehicles: ['truck', 'semi'], tasks: ['couple'] },
+  { id: 'ceCorner', kind: 'yard', targets: [], vehicles: ['truck', 'semi'], tasks: ['corner'] },
+  { id: 'ceRamp', kind: 'yard', targets: [], vehicles: ['truck', 'semi'], tasks: ['ramp'] },
   // the tram: a line with its stops (sim/tramdrive.ts)
   { id: 'tramLine', kind: 'tram', targets: [], vehicle: 'tram' },
   // the bus on a line: five stops on the way, with their doors and passengers
   { id: 'busLine', kind: 'bus', targets: [], vehicles: ['bus', 'busTrailer', 'minibus', 'minibusTrailer'] },
-  { id: 'ceExam', kind: 'exam', targets: ['signals', 'roundabout', 'priority', 'rural', 'home'], vehicle: 'truck', tasks: ['couple', 'corner', 'ramp'] },
+  { id: 'ceExam', kind: 'exam', targets: ['signals', 'roundabout', 'priority', 'rural', 'home'], vehicles: ['truck', 'semi'], tasks: ['couple', 'corner', 'ramp'] },
 ];
 
 /** Pick a destination edge of the wanted kind at a sensible distance from (x, z). */

@@ -83,6 +83,8 @@ export const VIOLATION_REFS: Record<string, string> = {
   ceLights: 'Anlage 7 FeV, Nr. 2.1.3',
   ceHeight: 'Anlage 7 FeV, Nr. 2.1.3',
   ceFast: 'Anlage 7 FeV, Nr. 2.1.3',
+  // (the articulated lorry: driving it so that the semi-trailer swings round against the cab – no command of the vehicle)
+  semiJackknife: 'Anlage 7 FeV, Nr. 2.1.4.5.2',
   truckRightTurn: '§ 9 Abs. 6 StVO',
   truckSpeed: '§ 3 Abs. 3, § 18 Abs. 5 StVO',
   // roadworks and the closures for demonstrations (src/sim/roadevents.ts)
@@ -96,6 +98,14 @@ export const VIOLATION_REFS: Record<string, string> = {
   emergencyJunction: '§ 38 Abs. 1 StVO',
   stall: '@ref.vehicle',
   seatbelt: '§ 21a Abs. 1 StVO',
+  // driving with the windscreen full of rain or snow (render/windscreen.ts): the driver must see out
+  noView: '§ 23 Abs. 1 StVO',
+  // the lights and the main beam (src/sim/beams.ts): lights on in the dark and in poor sight, the main beam dipped in time
+  dazzleOncoming: '§ 17 Abs. 2 StVO',
+  dazzleAhead: '§ 17 Abs. 2 StVO',
+  dazzleRider: '§ 17 Abs. 2 StVO',
+  beamLit: '§ 17 Abs. 2 StVO',
+  noLights: '§ 17 Abs. 1, Abs. 3 StVO',
   handbrakeOn: '@ref.vehicle',
   // working a crane (game/cranetasks.ts): its load chart and operating manual, the accident prevention regulation for cranes
   craneOverload: '@ref.crane',
@@ -107,6 +117,16 @@ export const VIOLATION_REFS: Record<string, string> = {
   craneDiagonalPull: '@ref.crane',
   craneNotLevel: '@ref.crane',
   craneTipped: '@ref.crane',
+  // driving a forklift (game/forkliftplay.ts): its operating manual and load chart, the accident prevention regulation for industrial trucks
+  forkliftTipped: '@ref.forklift',
+  forkliftOverload: '@ref.forklift',
+  forkliftForksIn: '@ref.forklift',
+  forkliftRearLift: '@ref.forklift',
+  forkliftTurnFast: '@ref.forklift',
+  forkliftHit: '@ref.forklift',
+  forkliftLoadHigh: '@ref.forklift',
+  forkliftTiltForward: '@ref.forklift',
+  forkliftForksHigh: '@ref.forklift',
 };
 
 /** Where the regulations can be read: the official collection of federal law (gesetze-im-internet.de). */

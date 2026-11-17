@@ -49,6 +49,8 @@ export function keyLabel(code: string, lang: string, name: (key: string) => stri
     if (lang === 'fr') return AZERTY[code] ?? letter;
     return letter;
   }
+  // (the full stop: on foot, opening what one stands at – game/openplay.ts)
+  if (code === 'Period') return layout?.get(code) ?? '.';
   return code; // F1 …
 }
 

@@ -20,6 +20,8 @@ import { COMPACT_DIMS } from '../render/carBody.ts';
 import { TRAINER } from '../sim/flightspec.ts';
 import { LOADER_TRUCK_SPEC, MOBILE_CRANE_SPEC } from '../sim/crane.ts';
 import type { CraneType } from '../sim/crane.ts';
+import { FORKLIFT_SPEC } from '../sim/forklift.ts';
+import { HEAVY_RIGID, SEMI_TRAILER, TRACTOR_OUTLINE, TRACTOR_UNIT } from '../sim/semitrailer.ts';
 
 export type VehicleKind =
   | 'car'
@@ -32,6 +34,7 @@ export type VehicleKind =
   | 'lightTruckTrailer'
   | 'truckSolo'
   | 'truck'
+  | 'semi'
   | 'minibus'
   | 'minibusTrailer'
   | 'bus'
@@ -43,14 +46,15 @@ export type VehicleKind =
   | 'mobileCrane'
   | 'loaderCrane'
   | 'towerCrane'
+  | 'forklift'
   | 'pedestrian';
-/** in the order of the licence classes: B, BE, AM, A1, A2, A, C1, C1E, C, CE, D1, D1E, D, DE, L, T – the tram, the aeroplane, the cranes, and on foot */
-export const VEHICLE_KINDS: readonly VehicleKind[] = ['car', 'carTrailer', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'minibus', 'minibusTrailer', 'bus', 'busTrailer', 'tractorSlow', 'tractor', 'tram', 'plane', 'mobileCrane', 'loaderCrane', 'towerCrane', 'pedestrian'];
+/** in the order of the licence classes: B, BE, AM, A1, A2, A, C1, C1E, C, CE (drawbar, articulated), D1, D1E, D, DE, L, T – the tram, the aeroplane, the cranes, and on foot */
+export const VEHICLE_KINDS: readonly VehicleKind[] = ['car', 'carTrailer', 'moped', 'motorcycle125', 'motorcycle35', 'motorcycle', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'semi', 'minibus', 'minibusTrailer', 'bus', 'busTrailer', 'tractorSlow', 'tractor', 'tram', 'plane', 'mobileCrane', 'loaderCrane', 'towerCrane', 'forklift', 'pedestrian'];
 
 /** the kinds of vehicle that are driven on the road (not the tram on its tracks, not the aeroplane, not the tower crane on its base, not on foot) */
-export const ROAD_VEHICLE_KINDS: readonly VehicleKind[] = VEHICLE_KINDS.filter((k) => k !== 'tram' && k !== 'pedestrian' && k !== 'plane' && k !== 'towerCrane');
+export const ROAD_VEHICLE_KINDS: readonly VehicleKind[] = VEHICLE_KINDS.filter((k) => k !== 'tram' && k !== 'pedestrian' && k !== 'plane' && k !== 'towerCrane' && k !== 'forklift');
 
-export type ModelKind = 'car' | 'truck' | 'truckLight' | 'bus' | 'minibus' | 'tractor' | 'motorcycle' | 'tram' | 'walker' | 'plane' | 'towerCrane' | 'mobileCrane' | 'loaderCrane';
+export type ModelKind = 'car' | 'truck' | 'truckLight' | 'truckHeavy' | 'semi' | 'bus' | 'minibus' | 'tractor' | 'motorcycle' | 'tram' | 'walker' | 'plane' | 'towerCrane' | 'mobileCrane' | 'loaderCrane' | 'forklift';
 
 export interface VehicleDef {
   kind: VehicleKind;
@@ -263,8 +267,51 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     power: 115,
   },
   motorcycle: { ...MOTO_DEF },
-  truckSolo: { ...truck, kind: 'truckSolo', licence: 'C', name: 'vehTruckSolo', trailer: null, caps: { rural: 60, motorway: 80 }, capFault: 'classSpeed', zoom: 14, zoomMax: 32 },
+  // class C: the three-axle rigid truck (render/semitruck.ts) – bigger than the 7.5-tonner of C1 and unlike it
+  truckSolo: {
+    ...truck,
+    kind: 'truckSolo',
+    licence: 'C',
+    name: 'vehTruckSolo',
+    model: 'truckHeavy',
+    spec: (_t, power) => atPower(HEAVY_RIGID, power),
+    powers: [320, 360, 400],
+    power: 360,
+    trailer: null,
+    caps: { rural: 60, motorway: 80 },
+    capFault: 'classSpeed',
+    outline: { front: 4.0, rear: 4.7, hw: 1.25 },
+    axles: [2.6, -1.92, -3.28],
+    track: 1.1,
+    door: 3.0,
+    circles: [-2.8, -0.9, 1.0, 2.9, 3.45],
+    radius: 1.25,
+    zoom: 15,
+    zoomMax: 34,
+  },
   truck: { ...truck, kind: 'truck', licence: 'CE', name: 'vehTruck', trailer: TANDEM_TRAILER, caps: { rural: 60, motorway: 80 }, capFault: 'truckSpeed', zoom: 21, zoomMax: 45, powers: [257, 300, 354, 408, 449], power: 354 },
+  // class CE as well: the articulated lorry – tractor unit and semi-trailer (sim/semitrailer.ts)
+  semi: {
+    ...truck,
+    kind: 'semi',
+    licence: 'CE',
+    name: 'vehSemi',
+    model: 'semi',
+    spec: (_t, power) => atPower(TRACTOR_UNIT, power),
+    powers: [400, 450, 510],
+    power: 450,
+    trailer: SEMI_TRAILER,
+    caps: { rural: 60, motorway: 80 },
+    capFault: 'truckSpeed',
+    outline: { front: TRACTOR_OUTLINE.front, rear: TRACTOR_OUTLINE.rear, hw: TRACTOR_OUTLINE.hw },
+    axles: [TRACTOR_UNIT.wheelbase / 2, -TRACTOR_UNIT.wheelbase / 2],
+    track: 1.1,
+    door: 2.0,
+    circles: [-2.0, -0.6, 0.8, 2.0],
+    radius: 1.25,
+    zoom: 22,
+    zoomMax: 48,
+  },
   bus: BUS_DEF,
   tractor: {
     ...car,
@@ -499,6 +546,37 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
     long: false,
     dash: true,
     crane: 'tower',
+  },
+  // The forklift (sim/forklift.ts, game/forkliftplay.ts): no licence class – the operator's certificate
+  // (DGUV Grundsatz 308-001) –, driven on the practice yard by its own simulation; what is given here is what
+  // the rest of the game needs of it (its size, the camera, the sound's engine).
+  forklift: {
+    ...car,
+    kind: 'forklift',
+    licence: '',
+    name: 'vehForklift',
+    model: 'forklift',
+    spec: () => FORKLIFT_SPEC,
+    powers: [],
+    power: 0,
+    trailer: null,
+    caps: null,
+    capFault: 'speed',
+    // (the forks reach ahead of the mast)
+    outline: { front: 2.45, rear: 1.3, hw: 0.6 },
+    axles: [0.825, -0.825],
+    track: 0.55,
+    door: 0.2,
+    doorSide: -1,
+    circles: [-0.7, 0.02, 0.7],
+    radius: 0.58,
+    zoom: 6,
+    zoomMax: 16,
+    governed: 20,
+    heavy: false,
+    noMotorway: true,
+    long: false,
+    dash: true,
   },
   // On foot there is no vehicle at all (game.ts walks with OnFoot, game/onfoot.ts): what is given here is
   // what the rest of the game needs of "the vehicle" – the camera keeps to the person, the motorway is not

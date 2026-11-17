@@ -34,7 +34,7 @@ test('the kinds of vehicle: every vehicle in one of them, in the order of the li
   for (const id of ['car', 'moto', 'truck', 'bus', 'tractor', 'tram', 'plane', 'foot']) assert.ok(ids.includes(id), id);
   assert.deepEqual(ids.slice(0, 5), ['car', 'moto', 'truck', 'bus', 'tractor']);
   assert.deepEqual(groups.find((g) => g.id === 'moto')?.kinds, ['moped', 'motorcycle125', 'motorcycle35', 'motorcycle']);
-  assert.deepEqual(groups.find((g) => g.id === 'truck')?.kinds, ['lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck']);
+  assert.deepEqual(groups.find((g) => g.id === 'truck')?.kinds, ['lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'semi']);
   assert.deepEqual(groups.find((g) => g.id === 'bus')?.kinds, ['minibus', 'minibusTrailer', 'bus', 'busTrailer']);
   // a vehicle of a model the menu does not know is a kind of its own; a crane is known by its name
   assert.equal(groupOf({ kind: 'mobileCrane' as VehicleKind, model: 'crane' as never }), 'crane');
@@ -115,7 +115,7 @@ test('what can be done with a vehicle: as the other menus offer it', () => {
   assert.ok(!ids('truck', false).some((id) => id.startsWith('ceC') || id === 'ceRamp'), 'no yard, no yard tasks');
   assert.ok(ids('bus').includes('busLine') && ids('minibusTrailer').includes('busLine'));
   assert.deepEqual(ids('tram'), ['free', 'demo', 'tramLine']);
-  assert.deepEqual(ids('plane'), ['free']);
+  assert.deepEqual(ids('plane'), ['free', 'demo'], 'the aeroplane: free flight and the demonstration flight');
   assert.deepEqual(ids('pedestrian'), ['free', 'show']);
   assert.ok(!ids('tractor').includes('motorway') && ids('tractor').includes('exam'));
   const groupsOf = stageModes('car', true).map((m) => m.group);

@@ -23,6 +23,8 @@ export class WorldGround implements Ground {
   weatherGrip = 1;
   /** places that are paved for the time being, whatever the map says (the practice yard laid over a field) */
   paved: ((x: number, z: number) => boolean) | null = null;
+  /** how deep the water is at a place where the cover is water (m; game/wading.ts) – the wheels go down to its bed */
+  waterDepth: ((x: number, z: number) => number) | null = null;
 
   constructor(world: World, terrain: TerrainSource) {
     this.world = world;
@@ -92,8 +94,12 @@ export class WorldGround implements Ground {
       out.grip = 0.95 * this.weatherGrip;
       out.rolling = 1.1;
     } else if (c === COVER.WATER) {
+      const depth = this.waterDepth ? this.waterDepth(x, z) : 0;
+      out.y = y - depth;
       out.grip = 0.3;
-      out.rolling = 12;
+      out.rolling = 12 + 10 * depth;
+      this.lastY = out.y;
+      return;
     } else if (c === COVER.FARMLAND || c === COVER.BARE) {
       out.grip = 0.45 * this.weatherGrip;
       out.rolling = 5;

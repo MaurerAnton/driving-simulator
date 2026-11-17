@@ -19,13 +19,19 @@ import type { World } from '../world/world.ts';
 import type { AddressHit, AddressIndex } from '../game/address.ts';
 import type { TourPlan } from '../game/tour.ts';
 import { addressPicker } from './addresspicker.ts';
-import { loadPlaces, loadWays, savePlace, saveWay } from '../game/history.ts';
+import { loadFavourites, loadPlaces, loadWays, removeFavourite, saveFavourite, savePlace, saveWay } from '../game/history.ts';
 import { TransitLayer } from './transitmap.ts';
 import type { TransitSource, WatchRequest } from './transitmap.ts';
 import { PathDrawer } from './pathdraw.ts';
 import type { RoadSource } from './pathdraw.ts';
 import { addGrip, foldButton } from './mapwindow.ts';
 import type { RoadEventInfo } from '../sim/roadevents.ts';
+import { searchPlaces } from './placesearch.ts';
+import type { StopSource } from './placesearch.ts';
+import { locate } from './geolocate.ts';
+import { LAYERS, LAYER_KEYS, drawLayerIcons, layerIconAt, loadLayers, saveLayers } from './maplayers.ts';
+import type { MapEmergency, MapService } from './maplayers.ts';
+import { FUELS } from '../world/services.ts';
 
 export interface BigMapHost {
   world: World;
@@ -42,6 +48,16 @@ export interface BigMapHost {
   teleport(spot: SpawnJson): void;
   /** opened from the main menu, before a drive: a place tapped is offered as where the drive is to begin (`teleport`) – nothing to plan there yet */
   menu?(): boolean;
+  /** the fuel stations and car washes, the emergency vehicles of the traffic – and a fuel's price at a station (today's, or a typical one) */
+  services?(): readonly MapService[];
+  emergencies?(): readonly MapEmergency[];
+  fuelPrice?(s: MapService, fuel: string): { price: number; live: boolean };
+  /** the name of the service the prices come from (shown under them when they are today's) */
+  priceSource?(): string;
+  /** watch an emergency vehicle, a demonstration or a site of roadworks */
+  watchPoint?(what: { kind: 'em'; id: number } | { kind: 'event'; ev: RoadEventInfo }): void;
+  /** the stops of trams and buses (for the search field) */
+  stops?(): readonly StopSource[];
   /** the roadworks and demonstrations of the day (sim/roadevents.ts) – drawn with their icons, the march's way in red */
   events?(): readonly RoadEventInfo[];
   /** the address list, for adding a place by its address */
@@ -124,6 +140,8 @@ export class BigMap {
   private node: HTMLElement | null = null;
   private canvas!: HTMLCanvasElement;
   private spotBar!: HTMLElement;
+  /** which of the layers are shown (maplayers.ts) */
+  private layers = loadLayers();
   private cx = 0;
   private cz = 0;
   private scale = 0.25;
@@ -165,7 +183,7 @@ export class BigMap {
     this.transit = new TransitLayer({
       lang: () => host.lang(),
       source: () => host.transit?.() ?? null,
-      canWatch: () => !!host.watch && host.canTeleport(),
+      canWatch: () => !!host.watch && (host.canTeleport() || host.menu?.() === true),
       watch: (v) => host.watch?.(v),
       redraw: () => this.redraw(),
     });
@@ -239,7 +257,35 @@ export class BigMap {
       button('−', '−', () => this.zoom(1 / 1.6)),
       button('✕', this.t('realityClose'), () => this.host.close(), 'bm-close'),
     );
-    top.append(title, tools);
+    // a place to look for – a town, a stop, a street, an address – and where the player is: the map goes there
+    const search = addressPicker({
+      placeholder: this.t('mapSearch'),
+      loading: this.t('realityLoading'),
+      none: this.t('addressNone'),
+      load: async () => {
+        const idx = await this.host.loadAddresses();
+        // (the favourite places first, among the towns)
+        const towns = (): Array<{ name: string; kind: string; x: number; z: number }> => [...loadFavourites().map((f) => ({ name: f.name, kind: 'city', x: f.x, z: f.z })), ...(this.host.world.json.places ?? [])];
+        return { search: (q: string, n = 8, near: { x: number; z: number } | null = null) => searchPlaces(q, towns(), this.host.stops?.() ?? [], idx ? (qq, nn, nr) => idx.search(qq, nn, nr) : null, n, near) };
+      },
+      near: () => ({ x: this.cx, z: this.cz }),
+      pick: (hit) => {
+        search.input.value = '';
+        search.input.blur();
+        this.goTo(hit.x, hit.z, hit.exact || hit.street ? 1.2 : 0.3, hit.label);
+      },
+    });
+    search.node.classList.add('bm-search');
+    const me = button('⌖', this.t('myLocation'), () => {
+      me.disabled = true;
+      void locate(this.host.world.json.meta).then((r) => {
+        me.disabled = false;
+        if (r.ok) this.goTo(r.x, r.z, 1.2, this.t('myLocation'));
+        else this.note(this.t(r.why === 'outside' ? 'myLocationOutside' : r.why === 'denied' ? 'myLocationDenied' : 'myLocationNone'));
+      });
+    });
+    tools.prepend(me);
+    top.append(title, search.node, tools);
 
     const bottom = el('div', 'bm-bottom');
     const pathToggle = el('label', 'bm-check');
@@ -281,6 +327,26 @@ export class BigMap {
     scale.append(this.scaleText, this.scaleBar, this.credit);
     bottom.append(scale, aerialToggle, pathToggle, clear);
     if (this.host.transit) bottom.append(this.transit.toggle());
+    // which layers are shown: a small panel of switches
+    const layersBtn = button(this.t('mapLayers'), this.t('mapLayers'), () => {
+      layersBox.hidden = !layersBox.hidden;
+    });
+    const layersBox = el('div', 'bm-layers');
+    layersBox.hidden = true;
+    for (const id of LAYERS) {
+      const l = el('label', 'bm-check');
+      const box2 = el('input');
+      box2.type = 'checkbox';
+      box2.checked = this.layers[id];
+      box2.onchange = () => {
+        this.layers[id] = box2.checked;
+        saveLayers(this.layers);
+        this.redraw();
+      };
+      l.append(box2, el('span', '', this.t(LAYER_KEYS[id])));
+      layersBox.append(l);
+    }
+    bottom.append(layersBtn, layersBox);
     // a drive is planned here: places by a tap on the map or by their address, or a tour of the streets
     this.planBox = el('div', 'bm-plan');
     this.planBox.hidden = true;
@@ -308,6 +374,12 @@ export class BigMap {
     this.ungrip = addGrip(this.planBox, this.t('winResize'));
 
     const c = this.canvas;
+    c.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const r = c.getBoundingClientRect();
+      this.transit.closePopup();
+      this.showSpot(this.cx + (e.clientX - r.left - r.width / 2) / this.scale, this.cz + (e.clientY - r.top - r.height / 2) / this.scale);
+    });
     c.addEventListener('pointerdown', (e) => {
       c.setPointerCapture(e.pointerId);
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -420,6 +492,26 @@ export class BigMap {
     box.append(picker.node);
     if (this.stops.length === 0) {
       box.append(el('small', 'bm-none', this.t('demoNone')));
+      // the favourite places: a tap adds one to the drive
+      const favs = loadFavourites();
+      if (favs.length > 0) {
+        const list = el('details', 'bm-tours');
+        list.open = true;
+        list.append(el('summary', '', `★ ${this.t('favourites')}`));
+        for (const f of favs) {
+          const b = el('button', 'bm-tour', f.name);
+          b.type = 'button';
+          b.onclick = () => {
+            this.stops.push({ name: f.name, x: f.x, z: f.z, yaw: f.yaw, kind: 'street', rough: true });
+            this.cx = f.x;
+            this.cz = f.z;
+            if (this.scale < 0.5) this.scale = 0.5;
+            changed();
+          };
+          list.append(b);
+        }
+        box.append(list);
+      }
       // what was looked for before: the places picked, the ways driven – a tap sets them again
       const places = loadPlaces();
       const ways = loadWays();
@@ -698,6 +790,47 @@ export class BigMap {
       return;
     }
     this.transit.closePopup();
+    // an emergency vehicle, a fuel station or a car wash there
+    const sxf = (x: number): number => r.width / 2 + (x - this.cx) * this.scale;
+    const syf = (z: number): number => r.height / 2 + (z - this.cz) * this.scale;
+    const icon = layerIconAt(px - r.left, py - r.top, this.scale, sxf, syf, this.host.services?.() ?? [], this.host.emergencies?.() ?? [], this.layers);
+    if (icon && 'em' in icon) {
+      this.spot = null;
+      const bar = this.spotBar;
+      bar.replaceChildren();
+      bar.hidden = false;
+      const names = ['emPolice', 'emAmbulance', 'emFire', 'emDoctor'];
+      const text = el('div');
+      text.append(el('b', '', this.t(names[icon.em.kind] ?? 'emPolice')), el('small', '', this.t(icon.em.call ? 'emOnCall' : 'emPatrol')));
+      bar.append(text);
+      if (this.host.watchPoint && this.host.canTeleport()) {
+        const w = el('button', 'btn', this.t('transitWatch'));
+        w.type = 'button';
+        const id = icon.em.id;
+        w.onclick = () => this.host.watchPoint?.({ kind: 'em', id });
+        bar.append(w);
+      }
+      this.redraw();
+      return;
+    }
+    if (icon && 'service' in icon) {
+      const sv = icon.service;
+      this.showSpot(sv.x, sv.z, sv.name || sv.brand || this.t(sv.k === 'fuel' ? 'layerFuel' : 'layerWash'));
+      // its prices: today's where the player has a key of the price service, else typical ones
+      const prices = el('div', 'bm-prices');
+      if (sv.k === 'fuel') {
+        let live = false;
+        for (const f of sv.fuels && sv.fuels.length > 0 ? sv.fuels : ['e10', 'e5', 'diesel']) {
+          const p = this.host.fuelPrice?.(sv, f);
+          if (!p || !FUELS[f]) continue;
+          live ||= p.live;
+          prices.append(el('span', '', `${FUELS[f].label} ${p.price.toLocaleString(localeOf(this.host.lang()), { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €`));
+        }
+        prices.append(el('small', '', live ? `${this.t('priceToday')} · ${this.host.priceSource?.() ?? ''}` : this.t('priceTypical')));
+      } else prices.append(el('span', '', `${this.t('layerWash')} 9,90 €`));
+      this.spotBar.prepend(prices);
+      return;
+    }
     // roadworks or a demonstration there: what it is, where, until when
     const ev = this.eventAt(px - r.left, py - r.top, r.width, r.height);
     if (ev) {
@@ -711,12 +844,41 @@ export class BigMap {
       if (ev.kind === 'works') text.append(el('b', '', this.t(ev.detail === 'lane' ? 'eventWorksLane' : ev.detail === 'light' ? 'eventWorksLight' : ev.detail === 'signs' ? 'eventWorksSigns' : 'eventWorks')), el('small', '', ev.street));
       else text.append(el('b', '', ev.active ? this.t('eventDemoNow', { place: ev.detail, until: hm(ev.until) }) : this.t('eventDemo', { place: ev.detail, from: hm(ev.from), until: hm(ev.until) })), el('small', '', ev.street));
       bar.append(text);
+      if (this.host.watchPoint && this.host.canTeleport()) {
+        const w = el('button', 'btn', this.t('transitWatch'));
+        w.type = 'button';
+        w.onclick = () => this.host.watchPoint?.({ kind: 'event', ev });
+        bar.append(w);
+      }
       this.redraw();
       return;
     }
     const x = this.cx + (px - r.left - r.width / 2) / this.scale;
     const z = this.cz + (py - r.top - r.height / 2) / this.scale;
+    this.showSpot(x, z);
+  }
+
+  /** The map to a place (a search hit, the player's position): centred, zoomed to `scale` at least, its place panel open. */
+  private goTo(x: number, z: number, scale: number, name: string): void {
+    this.cx = x;
+    this.cz = z;
+    this.scale = Math.max(this.scale, scale);
+    this.transit.closePopup();
+    this.showSpot(x, z, name);
+  }
+
+  /** A short line in the place panel (a position that could not be found). */
+  private note(text: string): void {
+    this.spot = null;
+    this.spotBar.replaceChildren(el('span', '', text));
+    this.spotBar.hidden = false;
+    this.redraw();
+  }
+
+  /** The place panel for a point of the map: the road there, and what can be done (go there, plan a drive, start from it). */
+  private showSpot(x: number, z: number, name = ''): void {
     this.spot = this.host.spotAt(x, z);
+    if (this.spot && name) this.spot = { ...this.spot, name };
     const bar = this.spotBar;
     bar.replaceChildren();
     bar.hidden = false;
@@ -760,6 +922,15 @@ export class BigMap {
           h.append(el('span', '', this.t('planeHeight')), sel);
           bar.append(h, go);
         } else bar.append(go, add);
+        // … or straight there by the autopilot (the aeroplane flies there and circles – or lands, if it is an airfield)
+        const auto = el('button', 'btn', this.t(this.host.flying?.() ? 'autoFlyHere' : 'autoDriveHere'));
+        auto.type = 'button';
+        auto.onclick = () => {
+          this.stops.length = 0;
+          this.tour = null;
+          this.host.startTrip([spot], false, null);
+        };
+        bar.append(auto);
       } else if (this.host.menu?.()) {
         // (from the main menu: the drive is to begin there)
         const go = el('button', 'btn', this.t('mapTeleport'));
@@ -767,13 +938,24 @@ export class BigMap {
         go.onclick = () => this.host.teleport(spot);
         bar.append(go);
       }
+      // a favourite place: kept on this device, a star on the map, in the list of the plan panel
+      const fav = loadFavourites().find((f) => Math.hypot(f.x - spot.x, f.z - spot.z) <= 20);
+      const star = el('button', 'btn ghost', fav ? `★ ${this.t('favRemove')}` : `☆ ${this.t('favAdd')}`);
+      star.type = 'button';
+      star.onclick = () => {
+        if (fav) removeFavourite(fav.x, fav.z);
+        else saveFavourite({ name: spot.name || this.t('mapPlace'), x: spot.x, z: spot.z, yaw: spot.yaw });
+        this.showSpot(x, z, name);
+        if (!this.planBox.hidden) this.fillPlan();
+      };
+      bar.append(star);
     }
     this.redraw();
   }
 
   /** The roadworks (an orange sign) and demonstrations (a red one, the march's way in red dashes) in view. */
   private drawEvents(g: CanvasRenderingContext2D, W: number, H: number, s: number): void {
-    const list = this.host.events?.() ?? [];
+    const list = (this.host.events?.() ?? []).filter((e) => (e.kind === 'works' ? this.layers.works : this.layers.demos));
     if (list.length === 0) return;
     const sx = (x: number): number => W / 2 + (x - this.cx) * s;
     const sy = (z: number): number => H / 2 + (z - this.cz) * s;
@@ -818,7 +1000,7 @@ export class BigMap {
 
   /** The roadworks or demonstration whose sign is under a point of the map (null: none). */
   private eventAt(px: number, py: number, W: number, H: number): RoadEventInfo | null {
-    const list = this.host.events?.() ?? [];
+    const list = (this.host.events?.() ?? []).filter((e) => (e.kind === 'works' ? this.layers.works : this.layers.demos));
     let best: RoadEventInfo | null = null;
     let bestD = 18;
     for (const e of list) {
@@ -1073,8 +1255,25 @@ export class BigMap {
       g.fillText(p.name, x, y);
     }
 
-    // the roadworks and demonstrations of the day
+    // the roadworks and demonstrations of the day, the fuel stations and car washes, the emergency vehicles
     this.drawEvents(g, W, H, s);
+    // the favourite places: gold stars
+    g.save();
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = '700 18px system-ui, sans-serif';
+    for (const f of loadFavourites()) {
+      const fx = W / 2 + (f.x - this.cx) * s;
+      const fy = H / 2 + (f.z - this.cz) * s;
+      if (fx < -12 || fy < -12 || fx > W + 12 || fy > H + 12) continue;
+      g.lineWidth = 3;
+      g.strokeStyle = '#1b1208';
+      g.strokeText('★', fx, fy);
+      g.fillStyle = '#ffcc00';
+      g.fillText('★', fx, fy);
+    }
+    g.restore();
+    drawLayerIcons(g, W, H, s, (x) => W / 2 + (x - this.cx) * s, (z) => H / 2 + (z - this.cz) * s, this.host.services?.() ?? [], this.host.emergencies?.() ?? [], this.layers, Math.floor(performance.now() / 400) % 2 === 0);
     // the trams and buses with their stops, and a way drawn on the map
     this.transit.draw(g, W, H, s, this.cx, this.cz);
     this.drawer.draw(g, W, H, s, this.cx, this.cz);

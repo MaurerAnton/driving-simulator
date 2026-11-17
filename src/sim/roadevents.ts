@@ -1292,6 +1292,16 @@ export class RoadEvents {
     return out;
   }
 
+  /** Where the crowd of the demonstration listed at (x, z) is at `ms`: its middle, facing the way it walks (null: none there, or its way not loaded). */
+  crowdAt(x: number, z: number, ms: number): { x: number; y: number; z: number; yaw: number } | null {
+    const d = this.demos.find((q) => Math.hypot(q.x - x, q.z - z) < 1);
+    if (!d?.route) return null;
+    const { head, dir } = marchAt(d, ms);
+    const at = routeAt(this.world, d.route, head - (dir * crowdShape(d).length) / 2, 0, this.smp);
+    if (!at) return null;
+    return { x: this.smp.x, y: this.smp.y, z: this.smp.z, yaw: Math.atan2(-this.smp.tx * dir, -this.smp.tz * dir) };
+  }
+
   /** The crowd of a march as boxes along its way. */
   private crowdBoxes(d: Demonstration, ms: number, out: PlayerState[]): void {
     const route = d.route;

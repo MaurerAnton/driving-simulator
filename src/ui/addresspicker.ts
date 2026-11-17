@@ -7,7 +7,7 @@ export interface AddressPickerOptions {
   loading: string;
   none: string;
   /** fetches the address list the first time it is needed */
-  load(): Promise<AddressIndex | null>;
+  load(): Promise<Pick<AddressIndex, 'search'> | null>;
   pick(hit: AddressHit): void;
   /** where the one who asks is (a place of the map): what lies near comes first */
   near?(): { x: number; z: number } | null;
@@ -35,7 +35,7 @@ export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; inp
   input.setAttribute('aria-controls', listId);
   input.setAttribute('aria-expanded', 'false');
 
-  let index: AddressIndex | null = null;
+  let index: Pick<AddressIndex, 'search'> | null = null;
   let asked = false;
   let hits: AddressHit[] = [];
   let buttons: HTMLButtonElement[] = [];

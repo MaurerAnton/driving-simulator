@@ -217,6 +217,23 @@ export class TransitScene {
     this.movePeople(time, dt, buses);
   }
 
+  /** The departure board of the stops built so far nearest to (x, z), within `radius` (null: none there – or its stop not built yet). */
+  boardNear(x: number, z: number, radius = 80): { x: number; z: number } | null {
+    let best: { x: number; z: number } | null = null;
+    let bd = radius;
+    for (const view of this.places.values()) {
+      for (const b of view.boards) {
+        const p = b.group.getWorldPosition(new THREE.Vector3());
+        const d = Math.hypot(p.x - x, p.z - z);
+        if (d < bd) {
+          bd = d;
+          best = { x: p.x, z: p.z };
+        }
+      }
+    }
+    return best;
+  }
+
   private buildPlace(place: StopPlace, time: number): PlaceView {
     const root = new THREE.Group();
     root.name = `stop ${place.name}`;
@@ -235,7 +252,24 @@ export class TransitScene {
       // along the kerb: to the right of the way it faces
       const ax = Math.cos(yaw);
       const az = -Math.sin(yaw);
-      const at = (along: number, back: number): [number, number] => [pole.x + ax * along - fx * back, pole.z + az * along - fz * back];
+      const at0 = (along: number, back: number): [number, number] => [pole.x + ax * along - fx * back, pole.z + az * along - fz * back];
+      // (a pole mapped at the kerb or on the road: shelter, bench, board and the waiting people go back until none of it stands on the carriageway)
+      const onCarriageway = (px: number, pz: number): boolean => this.world.surfaceAt(px, pz, y + 2, hit) && hit.zone === 0;
+      let extra = 0;
+      for (let sh = 0; sh <= 8; sh += 0.5) {
+        let clear = true;
+        for (const along of [-2.6, -0.9, 0, 2.6, 4.6]) {
+          for (const back of [0.4, 1.6, 2.8]) {
+            const [px, pz] = at0(along, back + sh);
+            if (onCarriageway(px, pz)) clear = false;
+          }
+        }
+        if (clear) {
+          extra = sh;
+          break;
+        }
+      }
+      const at = (along: number, back: number): [number, number] => at0(along, back + extra);
       const put = (o: THREE.Object3D, along: number, back: number, turn = 0): void => {
         const [px, pz] = at(along, back);
         o.position.set(px, this.groundOr(px, pz, y + 2, y), pz);

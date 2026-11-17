@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Game } from './game/game.ts';
+import { startNetStats } from './game/netstats.ts';
+
+// (how much is downloaded: shown on the loading screens)
+startNetStats();
 import { loadSettings } from './game/settings.ts';
 import { loadLang, tr } from './i18n/index.ts';
 

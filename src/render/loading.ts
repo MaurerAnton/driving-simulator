@@ -253,8 +253,8 @@ function boxMesh(w: number, h: number, d: number, x: number, y: number, z: numbe
   return mesh;
 }
 
-/** A pallet with its goods (its middle on the ground at the origin, the long side along z). */
-function palletModel(p: PalletLoad): THREE.Group {
+/** A pallet with its goods (its middle on the ground at the origin, the long side along z) – also the forklift's (render/forkliftyard.ts). */
+export function palletModel(p: PalletLoad): THREE.Group {
   const g = new THREE.Group();
   // the pallet: three runners and the deck
   for (const x of [-0.34, 0, 0.34]) g.add(boxMesh(0.1, 0.1, PALLET.len, x, 0, 0, MAT.wood));

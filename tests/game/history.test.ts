@@ -42,3 +42,14 @@ test('ways driven: their places in order, the same way again moves up, broken en
   for (let i = 0; i < 15; i++) saveWay([{ name: `W${i}`, x: i, z: 0, yaw: 0 }], false);
   assert.equal(loadWays().length, WAYS_KEPT);
 });
+
+test('favourite places: added, a place near one replaces it, taken out again', async () => {
+  const { loadFavourites, saveFavourite, removeFavourite } = await import('../../src/game/history.ts');
+  store.clear();
+  saveFavourite({ name: 'Home', x: 100, z: 200, yaw: 0 });
+  saveFavourite({ name: 'Work', x: 5000, z: -300, yaw: 1 });
+  saveFavourite({ name: 'Home (door)', x: 105, z: 204, yaw: 0 });
+  assert.deepEqual(loadFavourites().map((f) => f.name), ['Home (door)', 'Work']);
+  removeFavourite(5000, -300);
+  assert.deepEqual(loadFavourites().map((f) => f.name), ['Home (door)']);
+});

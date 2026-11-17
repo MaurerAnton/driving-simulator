@@ -24,6 +24,8 @@ import { SIG } from './signals.ts';
 import type { SignalSystem } from './signals.ts';
 import type { Emergencies, EmergencyCar } from './emergency.ts';
 import type { RoadEvents } from './roadevents.ts';
+import { PastBlocks, offsetAt } from './pastblock.ts';
+import type { PastState } from './pastblock.ts';
 
 export interface TrafficCar {
   id: number;
@@ -85,6 +87,8 @@ export interface TrafficCar {
   em?: EmergencyCar;
   /** how far it keeps left (+) or right (−) of the middle of its lane (m): making way for one of those, or passing the others */
   side?: number;
+  /** going round something that blocks its lane – waiting behind it, out, beside it, back (src/sim/pastblock.ts) */
+  past?: PastState;
   crashed: number;
   wheelSpin: number;
 }
@@ -133,6 +137,8 @@ export interface SelfDriving {
   y: number;
   z: number;
   yaw: number;
+  /** going round something that blocks its lane (src/sim/pastblock.ts) */
+  past?: PastState | null;
 }
 
 /** What the traffic needs to know about the player's car. */
@@ -153,6 +159,8 @@ export interface PlayerState {
   onFoot?: boolean;
   /** the horn sounds (the people near it start) */
   horn?: boolean;
+  /** among the obstacles: a vehicle that stands there for good (parked, broken down) – the traffic goes round it, over a solid line if need be */
+  parked?: boolean;
 }
 
 /** the style of a traffic car that is a city bus (12 m, it calls at the stops) */
@@ -224,6 +232,8 @@ export class Traffic {
   emergency: Emergencies | null = null;
   /** the roadworks and closures of the day: where cars wait, move over and keep out (src/sim/roadevents.ts – null: none) */
   roadEvents: RoadEvents | null = null;
+  /** getting past what blocks a lane: a car standing behind something that does not move goes round it (src/sim/pastblock.ts) */
+  readonly pastBlocks: PastBlocks = new PastBlocks(this);
 
   constructor(world: World, graph: LaneGraph, signals: SignalSystem) {
     this.world = world;
@@ -351,6 +361,22 @@ export class Traffic {
   /** the obstacles and the cyclists, as the cars see them (made anew in every step) */
   private readonly blocks: PlayerState[] = [];
   private readonly cycleBoxes: PlayerState[] = [];
+  /** everything besides the cars in their way this step (for src/sim/pastblock.ts) */
+  get blockList(): readonly PlayerState[] {
+    return this.blocks;
+  }
+  /** the cars on a lane now, unsorted */
+  carsOn(lane: Lane): readonly TrafficCar[] | undefined {
+    return this.onLane.get(lane.id);
+  }
+  /** the cars on a path through a junction now, unsorted */
+  carsOnConn(c: Connector): readonly TrafficCar[] | undefined {
+    return this.onConn.get(c.id);
+  }
+  /** distance along a car's way until it would touch `box` (Infinity: it does not within `horizon`) */
+  gapTo(car: TrafficCar, box: PlayerState, horizon: number): number {
+    return this.playerAhead(car, box, horizon);
+  }
 
   private spawn(player: PlayerState): void {
     for (let attempt = 0; attempt < 10; attempt++) {
@@ -828,7 +854,21 @@ export class Traffic {
     p.y = me.y;
     p.z = me.z;
     p.yaw = me.yaw;
+    p.past = me.past ?? undefined;
     return p;
+  }
+
+  /**
+   * For a vehicle that drives itself (the player's autopilot): one step of
+   * going round something that stands in its way – as the traffic's cars do
+   * (src/sim/pastblock.ts).  `gap`: to what is ahead; `held`: it stands for
+   * a reason of the road.  Leaves the state in `me.past`.
+   */
+  passBy(me: SelfDriving, dt: number, gap: number, held: boolean): void {
+    const p = this.aim(me);
+    this.pastBlocks.look(p, dt, gap, held, null, true);
+    this.pastBlocks.slide(p, me.v * dt, dt);
+    me.past = p.past ?? null;
   }
 
   /**
@@ -838,7 +878,9 @@ export class Traffic {
    */
   aheadOf(me: SelfDriving, horizon: number): { gap: number; v: number; loose: boolean } {
     const p = this.aim(me);
-    const lead = this.leader(p, horizon) as { gap: number; v: number; loose: boolean };
+    // (going round something: what is in the way there, by where it is)
+    const round = p.past && p.past.phase !== 'wait' ? this.pastBlocks.lead(p, horizon) : null;
+    const lead = (round ? { gap: round.gap, v: round.v } : this.leader(p, horizon)) as { gap: number; v: number; loose: boolean };
     lead.loose = false;
     for (const o of this.blocks) {
       if (Math.abs(o.x - p.x) > horizon + 30 || Math.abs(o.z - p.z) > horizon + 30) continue;
@@ -1145,7 +1187,9 @@ export class Traffic {
     let at = car.s;
     const step = 1.5;
     // (a car off the middle of its lane – making way, or passing those that do: its way runs beside the lane's)
-    const side = car.side ?? 0;
+    const side0 = car.side ?? 0;
+    // (… and one going round something: its way runs across to where it goes)
+    const past = car.past && car.past.phase !== 'wait' ? car.past : null;
     for (let n = 0; n < 60 && dist < horizon; n++) {
       at += step;
       dist += step;
@@ -1170,6 +1214,7 @@ export class Traffic {
         // (where a side of the road is closed for roadworks, the way runs over the oncoming lane)
         this.roadEvents?.offset(lane, at, tmp2);
       } else return Infinity;
+      const side = past ? side0 + offsetAt(past, dist) : side0;
       if (side !== 0) {
         tmp2.x += tmp2.tz * side;
         tmp2.z -= tmp2.tx * side;
@@ -1306,6 +1351,8 @@ export class Traffic {
     }
     // … and the people on foot who are on the carriageway
     this.crowd.addBlocks(blocks);
+    // … and the cars that go round something, off their lanes (src/sim/pastblock.ts)
+    this.pastBlocks.boxes(this.cars, blocks);
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && this.cars.length < this.targetCount) {
       this.spawn(player);
@@ -1367,6 +1414,9 @@ export class Traffic {
     }
     // an emergency vehicle on its call goes faster; whoever makes way for one slows down (src/sim/emergency.ts)
     if (this.emergency) v0 = this.emergency.desired(car, v0, limit);
+    // going round something that blocks its lane: slowly (src/sim/pastblock.ts)
+    const past = car.past && car.past.phase !== 'wait' ? car.past : null;
+    if (past) v0 = Math.min(v0, past.cap);
     const A = 1.7;
     const B = 2.4;
     let acc = A * (1 - (car.v / Math.max(v0, 0.5)) ** 4);
@@ -1380,7 +1430,8 @@ export class Traffic {
 
     // --- car ahead ---
     // (an emergency vehicle on its call passes those that make way for it: it sees past them)
-    const lead = car.em?.call && this.emergency ? this.emergency.lead(car) : this.leader(car, 90);
+    // (one going round something sees what is in its way there by where it is)
+    const lead = past ? this.pastBlocks.lead(car, 90) : car.em?.call && this.emergency ? this.emergency.lead(car) : this.leader(car, 90);
     if (lead.gap < Infinity) brakeFor(lead.gap, lead.v, 2.3);
 
     // --- the player's car ---
@@ -1404,10 +1455,13 @@ export class Traffic {
     }
 
     // --- whatever else is on the road: trams and trains crossing or running in the street ---
+    /** the nearest thing ahead that is not a car of the traffic */
+    let thingGap = pGap;
     for (const o of this.blocks) {
-      if (Math.abs(o.x - car.x) > 110 || Math.abs(o.z - car.z) > 110) continue;
+      if (Math.abs(o.x - car.x) > 110 || Math.abs(o.z - car.z) > 110 || o === car.past?.box) continue;
       const gap = this.playerAhead(car, o, clamp(car.v * 3.5 + 12, 14, 80));
       if (gap === Infinity) continue;
+      thingGap = Math.min(thingGap, gap);
       const along = -Math.sin(o.yaw) * -Math.sin(car.yaw) + -Math.cos(o.yaw) * -Math.cos(car.yaw);
       brakeFor(gap, Math.max(0, o.speed * along), 2.6);
     }
@@ -1563,6 +1617,8 @@ export class Traffic {
       }
     } else if (car.v > 1) car.waited = 0;
 
+    // standing behind something that does not move: after a while, a way round it (src/sim/pastblock.ts)
+    if (!car.bus?.dwell) this.pastBlocks.look(car, dt, Math.min(lead.gap, thingGap), stopDist < Math.min(lead.gap, thingGap) + 12 || works !== null || car.crashed > 0, player);
     if (car.crashed > 0) acc = -6;
     acc = clamp(acc, -7.5, A);
     // report hard braking caused by the player (the rule monitor decides who was at fault) –
@@ -1583,6 +1639,7 @@ export class Traffic {
     car.stuck = car.v < 0.1 ? car.stuck + dt : 0;
     const ds = car.v * dt;
     car.wheelSpin += ds / 0.31;
+    if (car.past) this.pastBlocks.slide(car, ds, dt);
 
     // --- advance along the path ---
     this.detach(car);
@@ -1648,6 +1705,12 @@ export class Traffic {
       // off the middle of its lane: making way for an emergency vehicle, or one passing the others (src/sim/emergency.ts)
       tmp.x += tmp.tz * car.side;
       tmp.z -= tmp.tx * car.side;
+    }
+    if (car.past && car.past.off !== 0) {
+      // going round something that blocks its lane, turned a little while it moves across (src/sim/pastblock.ts)
+      tmp.x += tmp.tz * car.past.off;
+      tmp.z -= tmp.tx * car.past.off;
+      yaw += Math.atan(car.past.turn);
     }
     // passing a side of the road closed for roadworks: over on the oncoming lane, turned a little while it moves across
     const re = this.roadEvents;

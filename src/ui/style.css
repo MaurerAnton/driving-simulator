@@ -979,3 +979,33 @@ span.st-cls { cursor: default; }
 /* the crane's tasks on the result page */
 .crane-results { margin: 6px 0 14px; }
 .crane-results .crane-total { font-weight: 700; margin: 6px 0; }
+
+/* ---- the big map's search field (towns, stops, addresses) between its title and its buttons ---- */
+.bm-top .bm-search { flex: 1 1 260px; max-width: 420px; min-width: 140px; pointer-events: auto; }
+.bm-top .bm-search input { height: 44px; background: var(--panel-solid); }
+.bm-top .bm-search .addr-list { background: var(--panel-solid); }
+@media (max-width: 640px) {
+  .bm-top { flex-wrap: wrap; }
+  .bm-top .bm-title { display: none; }
+  .bm-top .bm-search { order: 2; flex-basis: 100%; max-width: none; }
+}
+
+/* ---- the aeroplane's autopilot button on the touch screen (only while flying) ---- */
+.touch .tb.ap { display: none; font-size: 15px; }
+#ui.flying .touch .tb.ap { display: block; right: calc(3vw + 186px); bottom: calc(43vh + 8px); }
+@media (max-height: 500px), (max-width: 500px) {
+  #ui.flying .hud.touchmode .touch .tb.ap { right: calc(3vw + 156px); bottom: calc(5vh + min(36vh, 138px) + 10px); }
+}
+.touch .mb[hidden] { display: none; }
+/* (the indicator arrows of the speed strip can be tapped: hazard lights off, an indicator on or off) */
+.hud .dash { pointer-events: auto; }
+.hud .dash .ind { cursor: pointer; padding: 0 4px; }
+
+/* ---- the big map: the layers panel, the prices of a fuel station ---- */
+.bm-layers { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 10px; border-radius: 10px; background: var(--panel-solid); border: 1px solid var(--line); pointer-events: auto; }
+.bm-layers[hidden] { display: none; }
+.bm-prices { display: flex; flex-wrap: wrap; gap: 2px 12px; width: 100%; font-variant-numeric: tabular-nums; }
+.bm-prices small { width: 100%; color: var(--muted); }
+/* (the vehicles to change to, in the pause menu) */
+.veh-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 6px; margin: 10px 0 14px; max-height: 60vh; overflow-y: auto; }
+.veh-pick .btn.on { border-color: var(--accent); color: var(--accent); }

@@ -783,7 +783,7 @@ export class MobileCraneModel implements CraneModel {
   setCabinOpacity(): void {}
 
   update(s: CarVisualState, _dt: number, now: number): void {
-    this.lamps.update(s);
+    this.lamps.update(s, this.root);
     for (let i = 0; i < this.wheels.length; i++) {
       // (the physics knows four wheels: the middle and the last axle follow the rear pair)
       const k = i < 2 ? i : 2 + (i % 2);
@@ -1066,7 +1066,7 @@ export class LoaderCraneModel implements CraneModel {
   setCabinOpacity(): void {}
 
   update(s: CarVisualState): void {
-    this.lamps.update(s);
+    this.lamps.update(s, this.root);
     for (let i = 0; i < this.wheels.length; i++) {
       const w = this.wheels[i];
       w.position.y = s.wheelY[i] ?? 0.5;

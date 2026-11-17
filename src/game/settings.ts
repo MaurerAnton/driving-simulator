@@ -27,15 +27,29 @@ export interface Graphics {
   farView: number;
   /** the player's vehicles in finer detail, outside and in the cockpit (render/cardetail.ts, render/fleetdetail.ts) */
   vehicleDetail: boolean;
+  /** real water: rivers, lakes and ponds with ripples, the sky mirrored and the sun glinting (render/water.ts) */
+  water: boolean;
 }
 
 export const GRAPHICS_PRESETS: Record<Exclude<Quality, 'custom'>, Graphics> = {
-  low: { shadows: 'off', viewDistance: 700, propDensity: 0.35, facades: false, propShadows: false, farView: 0, vehicleDetail: false },
-  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false, farView: 8000, vehicleDetail: false },
-  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true, farView: 12000, vehicleDetail: false },
-  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true, farView: 20000, vehicleDetail: true },
+  // (for weak phones: little to draw, few trees, a short view – the resolutions go down with it: lowResolutions)
+  low: { shadows: 'off', viewDistance: 500, propDensity: 0.2, facades: false, propShadows: false, farView: 0, vehicleDetail: false, water: false },
+  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false, farView: 8000, vehicleDetail: false, water: false },
+  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true, farView: 12000, vehicleDetail: false, water: false },
+  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true, farView: 20000, vehicleDetail: true, water: true },
 };
 export const VIEW_DISTANCES = [500, 700, 1000, 1250, 1600, 2000, 2500, 3000];
+
+/** A weak device by what the browser tells: four cores or fewer, or 3 GB of memory or less (a phone of the lower end). */
+export function lowDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const cores = navigator.hardwareConcurrency ?? 8;
+  const mem = (navigator as { deviceMemory?: number }).deviceMemory ?? 8;
+  return cores <= 4 || mem <= 3;
+}
+
+/** What the low preset sets beside the graphics: the resolutions (the biggest saving on a weak phone). */
+export const LOW_RESOLUTIONS = { pixelCap: 1, render3d: 0.75 } as const;
 /** the ground beyond the map: off, or so far (m) */
 export const FAR_VIEWS = [0, 5000, 8000, 12000, 20000, 30000];
 /** running on foot (km/h): a jog … a sprint */
@@ -72,8 +86,12 @@ export interface Settings {
   limiter: boolean;
   /** the autopilot lets the player take over for a moment and drives on to its places when let go (else taking over ends it) */
   autopilotAssist: boolean;
+  /** the main-beam assist: at night the main beam goes on and off by itself (game/beamplay.ts) */
+  beamAssist: boolean;
   /** the light of day: the game's fair afternoon always, or the sun as it stands at the time (night at night) */
   daylight: 'day' | 'clock';
+  /** the player's key of Tankerkönig for today's fuel prices (empty: typical prices; world/fuelprices.ts) */
+  fuelKey: string;
   /** the weather: the real one where the vehicle is (Open-Meteo), none, or one chosen – and the season: by the date, or one chosen */
   weather: 'off' | 'real' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'storm';
   season: 'real' | 'spring' | 'summer' | 'autumn' | 'winter';
@@ -112,6 +130,8 @@ export interface Settings {
   hudRules: boolean;
   /** small timers over the traffic lights near by (a tap switches the light on; not in lessons and tests) */
   signalTimers: boolean;
+  /** small labels over the queues in the traffic near by: how long, how many cars, the wait (not in lessons and tests) */
+  queueLabels: boolean;
   /** show the engaged gear in the instrument cluster */
   hudGear: boolean;
   /** spoken instructor (browser speech synthesis) */
@@ -160,7 +180,9 @@ export const DEFAULT_SETTINGS: Settings = {
   powers: {},
   limiter: true,
   autopilotAssist: true,
+  beamAssist: false,
   daylight: 'day',
+  fuelKey: '',
   weather: 'real',
   season: 'real',
   flightAssist: 'beginner',
@@ -175,18 +197,20 @@ export const DEFAULT_SETTINGS: Settings = {
   view: 'chase',
   cabinOpacity: 1,
   lastStart: { spawn: 0, address: null },
-  quality: 'medium',
+  // (a weak device – few cores or little memory – begins on the low preset: lowDevice)
+  quality: lowDevice() ? 'low' : 'medium',
   graphics: { ...GRAPHICS_PRESETS.medium },
   uiScale: 1,
-  pixelCap: 1.5,
-  render3d: 1,
-  mirrors: 'alternate',
+  pixelCap: lowDevice() ? 1 : 1.5,
+  render3d: lowDevice() ? 0.75 : 1,
+  mirrors: lowDevice() ? 'off' : 'alternate',
   hudRules: true,
   signalTimers: true,
+  queueLabels: true,
   hudGear: true,
   voice: false,
   volume: 0.7,
-  traffic: 0.6,
+  traffic: lowDevice() ? 0.4 : 0.6,
   drawDistance: 1300,
   wheel: { steerAxis: 0, throttleAxis: 2, brakeAxis: 5, clutchAxis: 1, pedalsInverted: true, wheelRange: 900, shifter: [12, 13, 14, 15, 16, 17, 18] },
   invertLookY: false,
@@ -248,12 +272,14 @@ function merge(parsed: Partial<Settings>): Settings {
   if (typeof g.propShadows !== 'boolean') g.propShadows = d.graphics.propShadows;
   // (stored before there were finer vehicles: as the preset of then gives them – on "very high" only)
   if (typeof (parsed.graphics as Partial<Graphics> | undefined)?.vehicleDetail !== 'boolean') g.vehicleDetail = s.quality === 'ultra';
+  if (typeof (parsed.graphics as Partial<Graphics> | undefined)?.water !== 'boolean') g.water = s.quality === 'ultra';
   if (!(s.uiScale >= 0.7 && s.uiScale <= 1.6)) s.uiScale = d.uiScale;
   if (![1, 1.5, 3].includes(s.pixelCap)) s.pixelCap = d.pixelCap;
   if (!(s.render3d >= 0.5 && s.render3d <= 1)) s.render3d = d.render3d;
   if (!(s.cabinOpacity >= 0.2 && s.cabinOpacity <= 1)) s.cabinOpacity = d.cabinOpacity;
   if (typeof s.showFps !== 'boolean') s.showFps = d.showFps;
   if (typeof s.signalTimers !== 'boolean') s.signalTimers = d.signalTimers;
+  if (typeof s.queueLabels !== 'boolean') s.queueLabels = d.queueLabels;
   if (typeof s.startOutside !== 'boolean') s.startOutside = d.startOutside;
   if (typeof s.mapOnScreen !== 'boolean') s.mapOnScreen = d.mapOnScreen;
   // settings written before 1.4.0 stored the map's old default (not on the screen) as if chosen: the new default, once
@@ -264,8 +290,10 @@ function merge(parsed: Partial<Settings>): Settings {
   if (!(Number(parsed.version) >= 2) && s.menuStyle === 'carousel') s.menuStyle = 'stage';
   s.version = SETTINGS_VERSION;
   if (typeof s.autopilotAssist !== 'boolean') s.autopilotAssist = d.autopilotAssist;
+  if (typeof s.beamAssist !== 'boolean') s.beamAssist = d.beamAssist;
   if (s.daylight !== 'day' && s.daylight !== 'clock') s.daylight = d.daylight;
   if (s.music !== 'off' && s.music !== 'quiet' && s.music !== 'on') s.music = d.music;
+  if (typeof s.fuelKey !== 'string') s.fuelKey = d.fuelKey;
   if (s.flightAssist !== 'off' && s.flightAssist !== 'light' && s.flightAssist !== 'beginner') s.flightAssist = d.flightAssist;
   if (!['off', 'real', 'cloudy', 'fog', 'drizzle', 'rain', 'snow', 'storm'].includes(s.weather)) s.weather = d.weather;
   if (!['real', 'spring', 'summer', 'autumn', 'winter'].includes(s.season)) s.season = d.season;

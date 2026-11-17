@@ -3,9 +3,10 @@
 import type { AddressHit, AddressIndex } from '../game/address.ts';
 import { LESSONS } from '../game/nav.ts';
 import { VEHICLES, VEHICLE_KINDS, powerOf } from '../game/vehicles.ts';
+import type { VehicleKind } from '../game/vehicles.ts';
 import { RELEASES, VERSION } from '../game/releases.ts';
 import type { Settings } from '../game/settings.ts';
-import { FAR_VIEWS, GRAPHICS_PRESETS, RUN_SPEEDS, VIEW_DISTANCES, saveSettings } from '../game/settings.ts';
+import { FAR_VIEWS, GRAPHICS_PRESETS, LOW_RESOLUTIONS, RUN_SPEEDS, VIEW_DISTANCES, saveSettings } from '../game/settings.ts';
 import type { Input } from '../input/input.ts';
 import type { Violation } from '../sim/rules.ts';
 import { SIG } from '../sim/signals.ts';
@@ -23,6 +24,8 @@ import { carouselMenu } from './carousel.ts';
 import { MiniMap } from './minimap.ts';
 import { stageMenu, startFromSpot } from './stage.ts';
 import { arcadePanel, type ArcadeHost } from './arcade.ts';
+import { locate } from './geolocate.ts';
+import { downloaded, formatBytes } from '../game/netstats.ts';
 import { WEATHER_ATTRIBUTION } from '../game/weather.ts';
 
 /** the weathers and seasons one may choose, and the names of each */
@@ -188,6 +191,8 @@ export class Hud {
   private dashV!: HTMLElement;
   private lampBrake!: HTMLElement;
   private lampBelt!: HTMLElement;
+  /** the wiper stalk's place (setWipers): made the first time it is asked for */
+  private lampWipers: HTMLElement | null = null;
   /** the fuel gauge of the dashboard strip (ui/fuelgauge.ts) */
   private fuelGauge!: FuelGauge;
   private dashG!: HTMLElement;
@@ -201,6 +206,9 @@ export class Hud {
   /** the corner map's photographs, looking round on it and moving it (minimap.ts) */
   private mini!: MiniMap;
   private fpsBox!: HTMLElement;
+  /** the touch sheet's starter, and in its place while the engine runs: switching it off */
+  private starterBtn: HTMLElement | null = null;
+  private engineOffBtn: HTMLElement | null = null;
   /** the world's moment when the arcade mode set another one or runs the time faster (a tap opens the arcade panel) */
   private clockBox!: HTMLButtonElement;
   /** the arcade mode's panel: another moment, faster time (set by the game for free drives) */
@@ -337,6 +345,7 @@ export class Hud {
   }
 
   showLoading(text: string): void {
+    this.loadShown = 0;
     const o = el('div', 'overlay solid');
     const p = el('div', 'panel narrow');
     const bar = el('div', 'progress', '<i></i>');
@@ -351,19 +360,26 @@ export class Hud {
   setLoadingProgress(share: number): void {
     const l = this.loadingBar;
     if (!l || !l.bar.isConnected) return;
-    const p = Math.round(Math.max(0, Math.min(1, share)) * 100);
+    // (the share is put together from the roads and the tiles, which come at their own pace: it is shown only ever growing)
+    this.loadShown = Math.max(this.loadShown, Math.max(0, Math.min(1, share)));
+    const p = Math.round(this.loadShown * 100);
     l.bar.classList.add('known');
     (l.bar.firstElementChild as HTMLElement).style.width = `${p}%`;
-    l.pct.textContent = `${p} %`;
+    l.pct.textContent = `${p} % · ${formatBytes(downloaded(), localeOf(this.lang))}`;
   }
 
   private loadingBar: { bar: HTMLElement; pct: HTMLElement } | null = null;
+  /** the largest share shown on the loading screen, and behind the menu, since each loading began */
+  private loadShown = 0;
+  private menuShown = 0;
 
   /** Behind the menu of rows: how far the surroundings of the start place are loaded (null: done). */
   setMenuLoading(share: number | null): void {
     const e = this.root.querySelector<HTMLElement>('.cm-loading');
     if (!e) return;
-    const text = share === null ? '' : `${this.t('loadingTiles')} ${Math.round(Math.max(0, Math.min(1, share)) * 100)} %`;
+    // (only ever growing while the place loads; null: done – the next place counts from 0)
+    this.menuShown = share === null ? 0 : Math.max(this.menuShown, Math.max(0, Math.min(1, share)));
+    const text = share === null ? '' : `${this.t('loadingTiles')} ${Math.round(this.menuShown * 100)} % · ${formatBytes(downloaded(), localeOf(this.lang))}`;
     if (e.textContent !== text) e.textContent = text;
   }
 
@@ -612,6 +628,7 @@ export class Hud {
     card(this.t(def.kind === 'plane' ? 'freeFly' : 'free'), this.t(def.kind === 'tram' ? 'freeTramDesc' : def.kind === 'pedestrian' ? 'freeWalkDesc' : def.kind === 'plane' ? 'freeFlyDesc' : 'freeDesc'), 'free');
     // (the drives the car does by itself, and the tours, are on the roads – and by car)
     if (def.kind === 'tram') card(this.t('demo'), this.t('demoTramDesc'), 'demo');
+    if (def.kind === 'plane') card(this.t('demoFly'), this.t('demoFlyDesc'), 'demo');
     if (def.kind !== 'tram' && def.kind !== 'pedestrian' && def.kind !== 'plane') {
       card(this.t('demo'), this.t('demoDesc'), 'demo');
       card(this.t('tourTitle'), this.t('tourDesc'), 'tour');
@@ -718,6 +735,11 @@ export class Hud {
           controls: () => this.showControls(redraw),
           log: () => this.showLog(redraw),
           about: () => this.showAbout(redraw),
+        },
+        here: async () => {
+          const r = await locate(this.world.json.meta);
+          if (r.ok) return { hit: { label: this.t('myLocation'), street: '', x: r.x, z: r.z, exact: false } };
+          return { error: this.t(r.why === 'outside' ? 'myLocationOutside' : r.why === 'denied' ? 'myLocationDenied' : 'myLocationNone') };
         },
         // the theory lessons: difficult situations shown on the practice yard (game/theorymode.ts) – for everything but the aeroplane
         extraModes: [{ id: 'theory', label: this.t('theory.title'), yard: true, kinds: VEHICLE_KINDS.filter((k) => k !== 'plane') }],
@@ -839,6 +861,8 @@ export class Hud {
     p.append(el('p', 'note', this.t('settingsNextDrive')));
     check(this.t('limiter'), s.limiter, (v) => (s.limiter = v));
     check(this.t('autopilotAssist'), s.autopilotAssist, (v) => (s.autopilotAssist = v));
+    // the main beam on and off by itself at night (game/beamplay.ts)
+    check(this.t('beam.assist'), s.beamAssist, (v) => (s.beamAssist = v));
     // the aeroplane by hand: how much the help does
     select(this.t('flightAssist'), s.flightAssist, [['beginner', this.t('flightAssistBeginner')], ['light', this.t('flightAssistLight')], ['off', this.t('flightAssistOff')]], (v) => (s.flightAssist = v as Settings['flightAssist']));
     // the light: the game's fair afternoon, or the sun as it stands at the time (the arcade mode's chosen time always has its own)
@@ -854,6 +878,11 @@ export class Hud {
     select(this.t('quality'), s.quality, [['low', this.t('qLow')], ['medium', this.t('qMedium')], ['high', this.t('qHigh')], ['ultra', this.t('qUltra')], ['custom', this.t('qCustom')]], (v) => {
       s.quality = v as Settings['quality'];
       if (v !== 'custom') s.graphics = { ...GRAPHICS_PRESETS[v as Exclude<Settings['quality'], 'custom'>] };
+      // (the low preset is for weak phones: the resolutions go down with it)
+      if (v === 'low') {
+        s.pixelCap = LOW_RESOLUTIONS.pixelCap;
+        s.render3d = LOW_RESOLUTIONS.render3d;
+      }
       // (the advanced settings below show the preset's values)
       queueMicrotask(() => this.showSettings(back));
     });
@@ -880,6 +909,8 @@ export class Hud {
       select(this.t('gfxFar'), String(g.farView), FAR_VIEWS.map((m): [string, string] => [String(m), m === 0 ? this.t('farOff') : `${m / 1000} km`]), (v) => custom(() => (g.farView = Number(v)))());
       // the player's vehicles in finer detail, outside and in the cockpit (on "very high")
       check(this.t('gfxVehicleDetail'), g.vehicleDetail, (v) => custom(() => (g.vehicleDetail = v))());
+      // real water: ripples, the sky mirrored, the sun glinting (on "very high")
+      check(this.t('gfxWater'), g.water, (v) => custom(() => (g.water = v))());
       // (the rows were added to the panel: into the folded box with them)
       while (p.childElementCount > at) box.append(p.children[at]);
       p.append(box);
@@ -904,6 +935,29 @@ export class Hud {
     credit.append(link, ' (', lic, ') – ', this.t('weatherNote'));
     p.append(credit);
     select(this.t('season'), s.season, SEASON_CHOICES.map((k): [string, string] => [k, this.t(SEASON_KEYS[k])]), (v) => (s.season = v as Settings['season']));
+    // today's fuel prices: with one's own key of Tankerkönig (free, asked for there) – else typical prices
+    {
+      const row = el('label', 'row');
+      const input = el('input');
+      input.type = 'text';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      input.value = s.fuelKey;
+      input.placeholder = '00000000-0000-0000-0000-000000000000';
+      input.onchange = () => {
+        s.fuelKey = input.value.trim();
+        saveSettings(s);
+      };
+      row.append(el('span', '', this.t('fuelKey')), input);
+      p.append(row);
+      const note = el('p', 'note');
+      const a = el('a', '', 'creativecommons.tankerkoenig.de');
+      a.href = 'https://creativecommons.tankerkoenig.de';
+      a.target = '_blank';
+      a.rel = 'noopener';
+      note.append(this.t('fuelKeyNote'), ' ', a);
+      p.append(note);
+    }
     select(this.t('touchControls'), s.touchControls, [['auto', this.t('tcAuto')], ['on', this.t('tcOn')], ['off', this.t('tcOff')]], (v) => (s.touchControls = v as Settings['touchControls']));
     range(this.t('touchOpacity'), s.touchOpacity, (v) => (s.touchOpacity = Math.max(0.15, v)));
     check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
@@ -915,6 +969,7 @@ export class Hud {
     p.append(el('p', 'note', this.t('mapAerialNote')));
     check(this.t('hudRules'), s.hudRules, (v) => (s.hudRules = v));
     check(this.t('signalTimers'), s.signalTimers, (v) => (s.signalTimers = v));
+    check(this.t('queueLabels'), s.queueLabels, (v) => (s.queueLabels = v));
     check(this.t('hudGear'), s.hudGear, (v) => (s.hudGear = v));
     check(this.t('voice'), s.voice, (v) => (s.voice = v));
     // settings live in the browser's storage; say so if this browser keeps none
@@ -930,45 +985,180 @@ export class Hud {
 
   showControls(back: () => void): void {
     const k = (...codes: string[]): HTMLElement[] => this.keycaps(...codes);
-    const rows: Array<[Array<HTMLElement | string>, string]> = [
-      [[...k('KeyW', 'KeyS'), ' / ', ...k('ArrowUp', 'ArrowDown')], 'ctl.throttleBrake'],
-      [[...k('KeyA', 'KeyD'), ' / ', ...k('ArrowLeft', 'ArrowRight')], 'ctl.steer'],
-      [k('ShiftLeft'), 'ctl.clutch'],
-      [k('KeyE', 'KeyQ'), 'ctl.gearUpDown'],
-      [[...k('Digit1'), '–', ...k('Digit6'), ' ', ...k('KeyR'), ' ', ...k('KeyN')], 'ctl.gearDirect'],
-      [k('KeyP'), 'ctl.park'],
-      [k('Space'), 'ctl.handbrake'],
-      [[...k('Enter'), ' / ', ...k('KeyI')], 'ctl.engine'],
-      [[...k('KeyZ', 'KeyC'), ' / ', ...k('KeyX')], 'ctl.indicators'],
-      [k('KeyJ', 'KeyK'), 'ctl.look'],
-      [k('KeyU'), 'ctl.lookBack'],
-      [k('KeyY'), 'ctl.mirror'],
-      [k('KeyB'), 'ctl.belt'],
-      [[...k('KeyL'), ' / ', ...k('KeyO')], 'ctl.lights'],
-      [k('KeyH'), 'ctl.horn'],
-      [k('KeyV'), 'ctl.camera'],
-      [k('KeyG'), 'ctl.door'],
-      [['Alt + ', ...k('KeyW', 'KeyA', 'KeyS', 'KeyD')], 'ctl.freeCam'],
-      [k('KeyT'), 'ctl.reset'],
-      [k('KeyF'), 'ctl.reality'],
-      [k('KeyM'), 'ctl.map'],
-      [k('Escape'), 'ctl.pause'],
-      [k('F1'), 'ctl.help'],
+    const cap = (text: string): HTMLElement => el('kbd', '', text);
+    // every key and every button of the game, by where it works – what it does, and when (the text of the row says both)
+    type Row = [Array<HTMLElement | string>, string];
+    const sections: Array<[string, Row[]]> = [
+      [
+        'ctl.section.drive',
+        [
+          [[...k('KeyW', 'KeyS'), ' / ', ...k('ArrowUp', 'ArrowDown')], 'ctl.throttleBrake'],
+          [[...k('KeyA', 'KeyD'), ' / ', ...k('ArrowLeft', 'ArrowRight')], 'ctl.steer'],
+          [k('ShiftLeft'), 'ctl.clutch'],
+          [k('KeyE', 'KeyQ'), 'ctl.gearUpDown'],
+          [[...k('Digit1'), '–', ...k('Digit6'), ' ', ...k('KeyR'), ' ', ...k('KeyN')], 'ctl.gearDirect'],
+          [k('KeyP'), 'ctl.park'],
+          [k('Space'), 'ctl.handbrake'],
+          [[...k('Enter'), ' / ', ...k('KeyI')], 'ctl.engine'],
+          [[...k('KeyZ', 'KeyC'), ' / ', ...k('KeyX')], 'ctl.indicators'],
+          [k('KeyJ', 'KeyK'), 'ctl.look'],
+          [k('KeyU'), 'ctl.lookBack'],
+          [k('KeyY'), 'ctl.mirror'],
+          [k('KeyB'), 'ctl.belt'],
+          [[...k('KeyL'), ' / ', ...k('KeyO')], 'ctl.lights'],
+          [k('KeyO'), 'beam.ctlFlasher'],
+          [k('KeyH'), 'ctl.horn'],
+          [[...k('Digit8'), ' / ', ...k('Digit7')], 'ctl.wipers'],
+          [k('Digit9'), 'ctl.service'],
+          [k('KeyV'), 'ctl.camera'],
+          [k('KeyG'), 'ctl.door'],
+          [['Alt + ', ...k('KeyW', 'KeyA', 'KeyS', 'KeyD')], 'ctl.freeCam'],
+          [k('KeyT'), 'ctl.reset'],
+          [k('KeyF'), 'ctl.reality'],
+          [k('KeyM'), 'ctl.map'],
+          [k('Escape'), 'ctl.pause'],
+          [k('F1'), 'ctl.help'],
+        ],
+      ],
+      [
+        'ctl.section.foot',
+        [
+          [[...k('KeyW', 'KeyS', 'KeyA', 'KeyD'), ' + ', ...k('ShiftLeft')], 'ctl.walk'],
+          [k('KeyJ', 'KeyK', 'KeyU'), 'ctl.footLook'],
+          [k('KeyG'), 'ctl.footDoor'],
+          [k('Period'), 'ctl.footOpen'],
+          [k('KeyG'), 'ctl.footSeat'],
+          [k('KeyG'), 'ctl.seatOut'],
+          [k('KeyV'), 'ctl.footView'],
+        ],
+      ],
+      [
+        'ctl.section.tram',
+        [
+          [k('KeyW', 'KeyS'), 'ctl.tramLever'],
+          [k('KeyP'), 'ctl.tramPanto'],
+          [k('KeyG'), 'ctl.tramDoors'],
+          [k('KeyZ', 'KeyC'), 'ctl.tramSwitch'],
+          [k('KeyH'), 'ctl.tramBell'],
+          [k('Space'), 'ctl.tramEmergency'],
+        ],
+      ],
+      [
+        'ctl.section.fly',
+        [
+          [k('KeyW', 'KeyS'), 'ctl.flyThrottle'],
+          [k('ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'), 'ctl.flyStick'],
+          [k('KeyA', 'KeyD'), 'ctl.flyRudder'],
+          [k('KeyE', 'KeyQ'), 'ctl.flyFlaps'],
+          [k('Space'), 'ctl.flyBrakes'],
+          [k('KeyT'), 'ctl.flyAutopilot'],
+          [k('KeyG'), 'ctl.flyOut'],
+        ],
+      ],
+      [
+        'ctl.section.crane',
+        [
+          [k('KeyA', 'KeyD'), 'craneKeys.slew'],
+          [k('KeyW', 'KeyS'), 'craneKeys.hoist'],
+          [k('ArrowUp', 'ArrowDown'), 'craneKeys.luff'],
+          [k('ArrowLeft', 'ArrowRight'), 'craneKeys.tele'],
+          [k('Space'), 'craneKeys.attach'],
+          [k('ShiftLeft'), 'craneKeys.fine'],
+          [k('Digit1', 'Digit2'), 'craneKeys.beams'],
+          [k('Digit3', 'Digit4'), 'craneKeys.jacks'],
+          [k('Digit5'), 'craneKeys.level'],
+          [k('KeyG'), 'craneKeys.drive'],
+        ],
+      ],
+      [
+        'ctl.section.forklift',
+        [
+          [[...k('KeyW', 'KeyS'), ' / ', ...k('ArrowUp', 'ArrowDown')], 'ctl.forkDrive'],
+          [[...k('KeyA', 'KeyD'), ' / ', ...k('ArrowLeft', 'ArrowRight')], 'ctl.forkSteer'],
+          [[...k('KeyE', 'KeyQ'), ' / ', ...k('KeyR')], 'ctl.forkDirection'],
+          [[...k('Space'), ' / ', ...k('KeyP')], 'ctl.forkHold'],
+          [[...k('PageUp', 'PageDown'), ' / ', cap('▲'), cap('▼')], 'ctl.forkLift'],
+          [[...k('Home', 'End'), ' / ', cap('↶'), cap('↷')], 'ctl.forkTilt'],
+          [[...k('Insert', 'Delete'), ' / ', cap('◀'), cap('▶')], 'ctl.forkShift'],
+          [[cap('🎮'), ' R ↕ / ◀ ▶'], 'ctl.forkPad'],
+          [k('KeyV'), 'ctl.forkCamera'],
+        ],
+      ],
+      [
+        'ctl.section.semi',
+        [
+          [[...k('KeyR'), ' + ', ...k('KeyW')], 'ctl.semiReverse'],
+          [[...k('Space'), ' / ', cap('P')], 'ctl.semiHandbrake'],
+          [[cap(this.t('ce.choose', { n: '…' }))], 'ctl.semiChoices'],
+          [[cap(this.t('ce.backToSeat'))], 'ctl.semiBack'],
+          [[...k('KeyY'), ' / ', cap('◫')], 'ctl.semiMirror'],
+          [k('KeyV'), 'ctl.semiCamera'],
+        ],
+      ],
+      [
+        'ctl.section.touch',
+        [
+          [[cap('▭')], 'ctl.tSteer'],
+          [[cap('▮ ▮')], 'ctl.tPedals'],
+          [[cap('◀'), cap('▶')], 'ctl.tIndicators'],
+          [[cap('▲'), cap('▼')], 'ctl.tGears'],
+          [[cap('P')], 'ctl.tHandbrake'],
+          [[cap('AP')], 'ctl.tAutopilot'],
+          [[cap('◫')], 'ctl.tMirror'],
+          [[cap('⋯')], 'ctl.tMore'],
+          [[cap('↔')], 'ctl.tSwipe'],
+          [[cap(this.t('openDoor')), cap(this.t('getInSeat'))], 'ctl.tOpen'],
+        ],
+      ],
+      [
+        'ctl.section.hud',
+        [
+          [[cap('↑ …')], 'ctl.hStreet'],
+          [[cap('◯')], 'ctl.hMap'],
+          [[cap('⬚')], 'ctl.hTip'],
+          [[cap('◀ ▶')], 'ctl.hArrows'],
+          [[cap('⏱')], 'ctl.hClock'],
+          [[cap('●')], 'ctl.hSignal'],
+          [[cap('🚗')], 'ctl.hNewVehicle'],
+        ],
+      ],
+      [
+        'ctl.section.pause',
+        [
+          [[cap('▶')], 'ctl.pResume'],
+          [[cap('🗺')], 'ctl.pMap'],
+          [[cap('📷')], 'ctl.pReality'],
+          [[cap('↺')], 'ctl.pReplay'],
+          [[cap('⌖')], 'ctl.pTeleport'],
+          [[cap('A')], 'ctl.pDemo'],
+          [[cap('⏱')], 'ctl.pArcade'],
+          [[cap('🚙')], 'ctl.pChange'],
+          [[cap('📍')], 'ctl.pLive'],
+          [[cap('🚪')], 'ctl.pGetOut'],
+          [[cap('≡')], 'ctl.pLog'],
+          [[cap('⚙')], 'ctl.pSettings'],
+          [[cap('⏹')], 'ctl.pEnd'],
+          [[cap('⌂')], 'ctl.pMenu'],
+        ],
+      ],
     ];
     const o = el('div', 'overlay');
     const p = el('div', 'panel');
     p.append(el('h1', '', this.t('controls')));
-    const table = el('table', 'keys');
-    for (const [keys, text] of rows) {
-      const row = el('tr');
-      const left = el('td');
-      left.append(...keys);
-      const right = el('td');
-      right.textContent = this.t(text);
-      row.append(left, right);
-      table.append(row);
+    for (const [title, rows] of sections) {
+      p.append(el('h2', '', this.t(title)));
+      const table = el('table', 'keys');
+      for (const [keys, text] of rows) {
+        const row = el('tr');
+        const left = el('td');
+        left.append(...keys);
+        const right = el('td');
+        right.textContent = this.t(text);
+        row.append(left, right);
+        table.append(row);
+      }
+      p.append(table);
     }
-    p.append(table);
     const para = (title: string, text: string): void => {
       const e = el('p');
       if (title) {
@@ -1083,9 +1273,20 @@ export class Hud {
       const a = el('button', 'btn ghost', this.t('teleport'));
       a.onclick = () => this.showTeleport();
       // … or have the car drive somewhere by itself and watch how it is done
-      const demo = el('button', 'btn ghost', this.t('demo'));
+      // (in the aeroplane the same button switches its autopilot)
+      const demo = el('button', 'btn ghost', this.t(this.root.closest('.flying') ? 'tbAutopilot' : 'demo'));
       demo.onclick = () => this.onDemo();
       b.append(a, demo);
+      // on foot: the walker follows the player's real position (the browser asks first)
+      if (this.liveOffer) {
+        const live = el('button', 'btn ghost', this.t(this.liveOn ? 'liveLocationOff' : 'liveLocation'));
+        live.onclick = () => this.onLiveLocation();
+        b.append(live);
+      }
+      // another vehicle, here and now (the world stays as it is)
+      const cv = el('button', 'btn ghost', this.t('changeVehicle'));
+      cv.onclick = () => this.showVehiclePicker();
+      b.append(cv);
       // the arcade mode: the world at another moment, the time faster while the autopilot drives
       if (this.arcade) {
         const ar = el('button', 'btn ghost', this.t('arcadeTitle'));
@@ -1365,6 +1566,16 @@ export class Hud {
     this.dashRpm = el('i');
     rpm.append(this.dashRpm);
     this.indR = el('span', 'ind', '▶');
+    // a tap on an arrow: the hazard lights off when they flash – otherwise that indicator on or off
+    const tapInd = (code: string): void => {
+      const i = this.input;
+      if (!i) return;
+      const k = this.last?.hazard ? 'KeyX' : code;
+      i.press(k, true);
+      i.press(k, false);
+    };
+    this.indL.onclick = () => tapInd('KeyZ');
+    this.indR.onclick = () => tapInd('KeyC');
     // warning lamps as in an instrument cluster: parking brake and seat belt
     this.lampBrake = el(
       'span',
@@ -1505,11 +1716,66 @@ export class Hud {
     }
   }
 
+  /**
+   * The wiper stalk's place as a lamp beside the speed (off: none) – "int",
+   * "1", "2" under a wiper sign.  Without a dashboard (null) it is hidden.
+   */
+  setWipers(mode: 'off' | 'intermittent' | 'normal' | 'fast' | null): void {
+    if (!this.dash) return;
+    if (!this.lampWipers) {
+      this.lampWipers = el(
+        'span',
+        'lamp wipers',
+        '<svg viewBox="0 0 30 24" aria-hidden="true"><path d="M3 15a12 12 0 0 1 24 0z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 15 7.5 6.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><text x="15" y="23.5" text-anchor="middle" font-size="8.5" font-weight="800" font-family="sans-serif" fill="currentColor"></text></svg>',
+      );
+      // (green as a switched-on lamp; the class's display would beat the hidden attribute)
+      this.lampWipers.style.color = '#4fd06a';
+      this.lampWipers.style.opacity = '1';
+      this.dash.insertBefore(this.lampWipers, this.lampBelt);
+    }
+    const show = mode !== null && mode !== 'off';
+    const display = show ? '' : 'none';
+    if (this.lampWipers.style.display !== display) this.lampWipers.style.display = display;
+    const label = mode === 'intermittent' ? 'int' : mode === 'fast' ? '2' : '1';
+    const text = this.lampWipers.querySelector('text');
+    if (show && text && text.textContent !== label) {
+      text.textContent = label;
+      this.lampWipers.title = `${this.t('tbWipers')}: ${this.t(`wipers.${mode}`)}`;
+    }
+  }
+
   /** The vehicle went up in flames (true) – the button for a new one – or there is one again (false). */
   setWrecked(on: boolean): void {
     if (!this.wreckBtn) return;
     this.wreckBtn.hidden = !on;
     this.wreckBtn.textContent = `🚗 ${this.t('newVehicle')}`;
+  }
+
+  /** on foot the pause menu offers following the real position (liveOffer), which is on or off (liveOn) */
+  liveOffer = false;
+  liveOn = false;
+  onLiveLocation: () => void = () => {};
+
+  /** another vehicle chosen in the pause menu: the game puts it where the player is */
+  onChangeVehicle: (kind: VehicleKind) => void = () => {};
+
+  /** The vehicles to change to, by their names – the one driven now marked. */
+  showVehiclePicker(): void {
+    const o = el('div', 'overlay');
+    const p = el('div', 'panel narrow');
+    p.append(el('h1', '', this.t('changeVehicle')));
+    const grid = el('div', 'veh-pick');
+    for (const k of VEHICLE_KINDS) {
+      const b = el('button', `btn ghost${k === this.settings.vehicle ? ' on' : ''}`, this.t(VEHICLES[k].name));
+      b.type = 'button';
+      b.onclick = () => this.onChangeVehicle(k);
+      grid.append(b);
+    }
+    const back = el('button', 'btn', this.t('resume'));
+    back.onclick = () => this.showPause();
+    p.append(grid, back);
+    o.append(p);
+    this.setOverlay(o);
   }
 
   /** The arcade panel (over the paused drive). */
@@ -1649,6 +1915,10 @@ export class Hud {
         on('Space', s.handbrake);
         on('KeyB', s.seatbelt);
         on('KeyI', s.engineOn);
+        if (this.starterBtn && this.engineOffBtn) {
+          this.starterBtn.hidden = s.engineOn;
+          this.engineOffBtn.hidden = !s.engineOn;
+        }
         on('KeyL', s.lights);
         on('KeyX', s.hazard);
       } else {
@@ -1841,16 +2111,26 @@ export class Hud {
       const b = key('mb', label, code);
       b.addEventListener('pointerup', () => {
         // a toggle is done with one tap; what must be held (horn, starter, glance) keeps the sheet open
-        if (!['KeyH', 'Enter', 'KeyJ', 'KeyK'].includes(code)) more.hidden = true;
+        if (!['KeyH', 'Enter', 'KeyJ', 'KeyK', 'Digit7', 'Flash'].includes(code)) more.hidden = true;
       });
       more.append(b);
     };
     item(this.t('tbBelt'), 'KeyB');
     item(this.t('tbStarter'), 'Enter');
+    // (with the engine running the starter's place is taken by switching it off)
+    this.starterBtn = more.lastElementChild as HTMLElement;
+    item(this.t('tbEngineOff'), 'KeyI');
+    this.engineOffBtn = more.lastElementChild as HTMLElement;
+    this.engineOffBtn.hidden = true;
     item(this.t('tbIgnition'), 'KeyI');
     item(this.t('tbLights'), 'KeyL');
     item(this.t('tbHighBeam'), 'KeyO');
+    // the headlight flasher: lit while held
+    item(this.t('beam.flasher'), 'Flash');
     item(this.t('tbHazard'), 'KeyX');
+    // the wiper stalk one place on, and the washer (held)
+    item(this.t('tbWipers'), 'Digit8');
+    item(this.t('tbWasher'), 'Digit7');
     item(this.t('tbHorn'), 'KeyH');
     item(this.t('tbLookLeft'), 'KeyJ');
     item(this.t('tbLookRight'), 'KeyK');
@@ -1881,6 +2161,8 @@ export class Hud {
       key('tb gear-up', '▲', 'KeyE', this.t('tbGearUp')),
       key('tb gear-dn', '▼', 'KeyQ', this.t('tbGearDown')),
       key('tb hb', 'P', 'Space', this.t('tbHandbrake')),
+      // (the aeroplane: its autopilot at hand, not only in the sheet)
+      key('tb ap', 'AP', 'KeyT', this.t('tbAutopilot')),
       dots,
       more,
     );

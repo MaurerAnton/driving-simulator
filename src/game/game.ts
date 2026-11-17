@@ -16,6 +16,8 @@ import type { PlayerSnapshot } from '../sim/rules.ts';
 import { markArrows } from '../sim/arrows.ts';
 import { COMPACT_DIMS } from '../render/carBody.ts';
 import { CheckMarkers, EYE, OnFoot, TETHER } from './onfoot.ts';
+import { isDoor } from './cardoors.ts';
+import { OpenPlay } from './openplay.ts';
 import type { CheckId, WalkUnit, WalkVehicle } from './onfoot.ts';
 import { SIG, SignalSystem } from '../sim/signals.ts';
 import { Traffic } from '../sim/traffic.ts';
@@ -56,6 +58,7 @@ import type { CarVisualState } from '../render/car.ts';
 import { PropRenderer } from '../render/props.ts';
 import { SignRenderer } from '../render/signs.ts';
 import { SignalTimers } from '../ui/signaltimers.ts';
+import { QueueLabels } from '../ui/queuelabels.ts';
 import { TimedRules, loadExtraSigns } from '../world/extrasigns.ts';
 import type { ExtraSigns } from '../world/extrasigns.ts';
 import type { LoadedTile } from '../render/tiles.ts';
@@ -70,9 +73,12 @@ import { stageFrame } from '../ui/stage.ts';
 import { Stops } from '../world/stops.ts';
 import { LANGS, formatUnit, isRtl, lessonIntro, lessonTitle, loadLang, localeOf, setKeyStyle, tr } from '../i18n/index.ts';
 import { gameClock, gameNow, sunAt } from './clock.ts';
+import { downloaded, formatBytes } from './netstats.ts';
 import { clockBadge } from '../ui/arcade.ts';
 import { Outdoors } from './outdoors.ts';
 import { weatherNow } from './weather.ts';
+import { rainIntensity, snowIntensity, windVector } from './weather.ts';
+import { WindscreenView } from '../render/windscreen.ts';
 import { ASSIST_BEGINNER, ASSIST_LIGHT, FlightAssist, FlightAutopilot, landingRunway, runwayAt } from '../sim/autopilot.ts';
 import type { AutopilotState } from '../sim/autopilot.ts';
 import { WEATHER_PARTICLES } from '../render/weather.ts';
@@ -82,7 +88,7 @@ import { LaneGraph, TURN, lanePoint } from '../world/lanes.ts';
 import type { Lane } from '../world/lanes.ts';
 import { newPolySample, projectOnPolyline, samplePolyline } from '../core/geom.ts';
 import type { SignPost } from '../world/tilefmt.ts';
-import { CLS, CTRL, RAIL, STOP_FLAG, SURF_ROLLING, XING } from '../world/types.ts';
+import { CLS, CTRL, EF, RAIL, STOP_FLAG, SURF_ROLLING, XING } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { Edge, Node as Junction } from '../world/world.ts';
@@ -104,6 +110,11 @@ import { FaultLog } from './faultlog.ts';
 import { DrivenPath } from './track.ts';
 import { BigMap } from '../ui/bigmap.ts';
 import { Watcher, lineWay, transitSource } from './spectate.ts';
+import { PointWatcher } from './pointwatch.ts';
+import { FUEL_PRICE_SOURCE, fuelPrices } from '../world/fuelprices.ts';
+import { priceAt } from '../world/services.ts';
+import type { WatchTarget } from './pointwatch.ts';
+import type { RoadEventInfo } from '../sim/roadevents.ts';
 import type { TakeOver } from './spectate.ts';
 import type { TransitSource, WatchRequest } from '../ui/transitmap.ts';
 import { roadSource } from '../ui/pathdraw.ts';
@@ -116,7 +127,7 @@ import type { Timetable, TripRef } from '../sim/timetable.ts';
 import type { CrossingJson } from '../world/types.ts';
 import { RailActors } from '../render/trams.ts';
 import { PlayerTruck } from '../render/truck.ts';
-import { CarTrailerModel, PlayerBike, PlayerBus, PlayerTractor, TramCab } from '../render/fleet.ts';
+import { PlayerBike, PlayerBus, PlayerTractor, TramCab } from '../render/fleet.ts';
 import type { BikeVariant } from '../render/bike.ts';
 import { TramDriver, tramStart } from '../sim/tramdrive.ts';
 import type { TramEvent } from '../sim/tramdrive.ts';
@@ -126,17 +137,25 @@ import { VEHICLES, powerOf, trailerOf, vehicleKind } from './vehicles.ts';
 import type { ModelKind, VehicleDef, VehicleKind } from './vehicles.ts';
 import { YardScene } from '../render/yard.ts';
 import { Trailer } from '../sim/trailer.ts';
+import { SemiTrailer, makeTrailer } from '../sim/semitrailer.ts';
+import { PlayerRigid, PlayerSemi, linkTowed, towedModel } from '../render/semitruck.ts';
+import type { TowedModel } from '../render/semitruck.ts';
+import { taskTextKey } from './semice.ts';
 import { COUPLING_STEPS, MAX_CORRECTIONS, TRAILER_AXLES, TRAILER_OUTLINE, TRUCK_AXLES, TRUCK_OUTLINE, YardFrame, offArea } from './ce.ts';
 import type { CouplingStepId, TaskId } from './ce.ts';
 import { YardTask } from './yardtask.ts';
 import { CraneWork, craneMenuPose, craneMenuSite, craneStart, isCraneModel } from './craneplay.ts';
 import { makeCraneModel } from '../render/crane.ts';
+import { ForkliftWork, forkliftMenuSite, forkliftStart, isForkliftModel } from './forkliftplay.ts';
+import { ForkliftModel } from '../render/forklift.ts';
 import type { CraneType } from '../sim/crane.ts';
 import { TheoryMode } from './theorymode.ts';
 import { THEORY_MODE } from './theory.ts';
 import { AutoDriver } from '../sim/autodriver.ts';
 import { followMap } from '../sim/follow.ts';
 import { ServiceWorld } from './serviceworld.ts';
+import { Wading } from './wading.ts';
+import { BeamPlay } from './beamplay.ts';
 import type { Settings } from './settings.ts';
 
 type State = 'loading' | 'menu' | 'intro' | 'placing' | 'drive' | 'pause' | 'reality' | 'map' | 'result' | 'replay' | 'theory';
@@ -232,15 +251,17 @@ export class Game {
   private readonly models = new Map<string, VehicleModel>([['car', this.car]]);
   /** the work with a crane on the construction site (game/craneplay.ts; null: no crane is worked) */
   private crane: CraneWork | null = null;
+  /** the forklift on the practice yard (game/forkliftplay.ts; null: not driving one) */
+  private forklift: ForkliftWork | null = null;
   /** the box trailer behind a car (class BE) */
-  private carTrailer: CarTrailerModel | null = null;
+  private carTrailer: TowedModel | null = null;
   /** the car's centre display, for the HUD to draw the map on */
   private readonly carScreen: VehicleScreen = { canvas: this.car.mapCanvas, drawn: (): void => void (this.car.mapTexture.needsUpdate = true), setLive: (on) => this.car.setMapOnScreen(on) };
   /** what the vehicle's lamps showed in the last picture (for the trailer's) */
   private lastVisual: CarVisualState | null = null;
   /** the truck with the trailer of the class CE (its yard tasks, the coupling) */
   private get isTruck(): boolean {
-    return this.def.model === 'truck';
+    return this.def.model === 'truck' || this.def.model === 'semi';
   }
   /** the practice yard of the truck lessons, and the task that is being done on it */
   private readonly yardScene = new YardScene();
@@ -305,6 +326,8 @@ export class Game {
   signalHeads!: SignalRenderer;
   /** the timers over the traffic lights (ui/signaltimers.ts) */
   private signalTimers!: SignalTimers;
+  /** the labels over the queues in the traffic (ui/queuelabels.ts) – made with the first one to show */
+  private queueLabels: QueueLabels | null = null;
   /** the signs the map was built without (signs.json.gz, world/extrasigns.ts): added to each tile */
   private extraSigns: ExtraSigns | null = null;
   /** the pedestrian lights: their poles (with the buttons) and their heads */
@@ -314,6 +337,8 @@ export class Game {
   private readonly passengerView = new PassengerView();
   /** the ground beyond the map's tiles: the hills on the horizon */
   private readonly far = new FarTerrain();
+  /** driving through water: its depth for the wheels, the wash, wet brakes, a drowned engine, the spray (game/wading.ts) */
+  private wading!: Wading;
   /** stops, platforms, people waiting, the overhead line and the tram signals around the camera */
   private transit!: TransitScene;
   /** the roadworks and the demonstrations of the day (src/sim/roadevents.ts – `roadEvents.list()` for the map), and how they are drawn */
@@ -329,6 +354,8 @@ export class Game {
   private readonly flightAssist = new FlightAssist(ASSIST_BEGINNER);
   /** how long the stick has been moved while the autopilot flies (taking over), and a demonstration flight to begin once the aeroplane stands */
   private flightTake = 0;
+  /** where the autopilot is to fly once it has taken off (a place chosen on the map while standing on the runway) */
+  private flightGoto: { x: number; z: number; alt: number } | null = null;
   private planeDemoPending = false;
   private airGround: AirfieldGround | null = null;
   private airfieldView!: AirfieldRenderer;
@@ -366,6 +393,8 @@ export class Game {
   private fpsFrames = 0;
   private fpsSince = 0;
   private mirrorTurn = 0;
+  /** the windscreen in rain and snow, and the wiper stalk (render/windscreen.ts, game/wipers.ts) */
+  private readonly windscreen = new WindscreenView();
   /** looking into a mirror, large over the picture (ui/mirrorzoom.ts) – made with the first picture of a drive */
   private mirrorZoom: MirrorZoomPanel | null = null;
   private spawn: SpawnJson | null = null;
@@ -397,6 +426,8 @@ export class Game {
   private readonly driver: DriverInput = { steer: 0, throttle: 0, brake: 0, clutch: 0, handbrake: 1, gear: 0, ignition: true, starter: false };
   private autoDrive = 0;
   private tipText = '';
+  /** the headlights: their light, the traffic's lamps and main beam, the rules of § 17 StVO (game/beamplay.ts) */
+  private readonly beams = new BeamPlay();
   /** every fault of this and of earlier sessions */
   private readonly faultLog = new FaultLog();
   /** where the car has been, for the map */
@@ -410,7 +441,7 @@ export class Game {
    * a runway).
    */
   private transitSrc: TransitSource | null = null;
-  private watcher: Watcher | null = null;
+  private watcher: Watcher | PointWatcher | null = null;
   private tramLineRef = '';
   private afterPlace: (() => void) | null = null;
   private airAgl = 0;
@@ -479,7 +510,7 @@ export class Game {
     const show = (p: number): void => {
       shown = Math.max(shown, Math.min(1, p));
       bar.style.width = `${Math.round(shown * 100)}%`;
-      pct.textContent = `${Math.round(shown * 100)} %`;
+      pct.textContent = `${Math.round(shown * 100)} % · ${formatBytes(downloaded(), localeOf(this.settings.lang))}`;
     };
     const step = (done: number, next: number): void => {
       show(done);
@@ -514,6 +545,9 @@ export class Game {
     this.rules = new RuleMonitor(world, this.lanes, this.signals, this.traffic);
     this.nav = new Navigator(this.lanes);
     this.ground = new WorldGround(world, app.tiles);
+    this.wading = new Wading(app.tiles);
+    this.ground.waterDepth = (x, z) => this.wading.depth.at(x, z);
+    app.scene.add(this.wading.group);
     this.signs = new SignRenderer(new URL('signs/', document.baseURI).href, app.renderer.capabilities.getMaxAnisotropy());
     // (and the signs the map was built without – with the rules of those with a time on them, by the game's clock)
     const [, extra] = await Promise.all([this.signs.init(), loadExtraSigns(app.map)]);
@@ -534,6 +568,7 @@ export class Game {
     this.transit.onAlight = (x, y, z, look) => this.traffic.crowd.adopt(x, y, z, look);
     this.traffic.crowd.standing = () => this.transit.waiting;
     this.actors.view = app.camera;
+    this.actors.highOf = (id) => this.beams.traffic.high(id);
     this.airfieldView = new AirfieldRenderer((x, z) => this.groundHeight(x, z), (x, z) => !Number.isNaN(this.app.tiles.heightAt(x, z)));
     this.services = new ServiceWorld({ scene: app.scene, collider: this.collider, ui: this.ui, map: app.map, ground: (x, z) => app.tiles.heightAt(x, z), onRoad: (x, z) => app.world.surfaceAt(x, z, app.tiles.heightAt(x, z) + 1, this.hit), blocked: (x, z, yaw) => this.collider.blocked(x, app.tiles.heightAt(x, z), z, yaw, 0.2), lang: () => this.settings.lang, message: (t, sub) => this.hud.message(t, sub), click: (k) => this.audio.click(k), hideOverlay: () => this.hud.hideOverlay(), rules: this.rules, shadows: () => this.settings.graphics.shadows !== 'off' });
     await this.services.load();
@@ -681,6 +716,11 @@ export class Game {
       },
       close: () => this.resume(),
     };
+    this.hud.onChangeVehicle = (kind) => this.changeVehicle(kind);
+    this.hud.onLiveLocation = () => {
+      this.toggleLiveGeo();
+      this.resume();
+    };
     this.hud.onNewVehicle = () => {
       if (this.state === 'drive') this.newVehicle();
     };
@@ -689,7 +729,7 @@ export class Game {
       if (this.state === 'pause') this.hud.showArcade();
     };
     this.hud.onGetOut = () => {
-      if (this.walker || this.demo?.active || this.task || this.crane) return;
+      if (this.walker || this.demo?.active || this.task || this.crane || this.forklift) return;
       // (the tram: standing, not driving by itself – out of the cab and on foot beside it)
       if (this.tram ? this.tram.speed > 0.1 || this.tramAuto : Math.abs(this.vehicle.speed) > 0.3) return;
       this.resume();
@@ -734,7 +774,7 @@ export class Game {
       path: this.path,
       net: () => this.netIndex,
       spotAt: (x, z) => this.roadSpot(x, z, '', 160),
-      canTeleport: () => this.mapFrom !== 'menu' && !this.lesson && !this.crane,
+      canTeleport: () => this.mapFrom !== 'menu' && !this.lesson && !this.crane && !this.forklift,
       teleport: (spot) => {
         if (this.mapFrom !== 'menu') return this.teleportSpot(spot);
         this.hud.menuStartAt(spot);
@@ -742,6 +782,15 @@ export class Game {
       },
       menu: () => this.mapFrom === 'menu',
       events: () => this.roadEvents?.list() ?? [],
+      stops: () => this.stops?.places ?? [],
+      services: () => this.services.sites(),
+      emergencies: () => this.traffic.cars.filter((c) => c.em).map((c) => ({ id: c.id, kind: c.em!.kind, call: c.em!.call, x: c.x, z: c.z })),
+      fuelPrice: (sv, fuel) => {
+        const live = fuelPrices.priceAt(sv.x, sv.z, fuel);
+        return live !== null ? { price: live, live: true } : { price: priceAt(sv, fuel), live: false };
+      },
+      priceSource: () => `${FUEL_PRICE_SOURCE.name}, ${FUEL_PRICE_SOURCE.licence}`,
+      watchPoint: (what) => this.startPointWatch(what),
       loadAddresses: () => this.loadAddresses(),
       spotOf: (hit) => this.spawnAt(hit),
       startTrip: (stops, self, tour) => this.startTrip(stops, self, tour),
@@ -1030,6 +1079,7 @@ export class Game {
     this.props.setShadows(gx.propShadows);
     // as many raindrops and snowflakes as the graphics allow
     if (this.outdoors) this.outdoors.view.quality = WEATHER_PARTICLES[s.quality === 'custom' ? 'medium' : s.quality];
+    if (this.outdoors) this.outdoors.water.enabled = gx.water;
     // the trams' doors: drawn, opening and closing, from the medium graphics on (on the low preset the plain bodies of before)
     this.railActors.detail = this.showRail.detail = s.quality !== 'low';
     this.ui.style.setProperty('zoom', String(s.uiScale));
@@ -1071,6 +1121,8 @@ export class Game {
     this.services.end();
     this.crane?.dispose();
     this.crane = null;
+    this.forklift?.dispose();
+    this.forklift = null;
     this.figure.hide();
     // (the menu of rows places the vehicle chosen anew; the test place is left)
     this.previewKey = '';
@@ -1161,9 +1213,12 @@ export class Game {
       m.setDetail?.(this.settings.graphics.vehicleDetail);
     }
     // (the truck of class CE has its own trailer)
-    if (def.trailer && def.model !== 'truck' && !this.carTrailer) {
-      this.carTrailer = new CarTrailerModel();
-      this.app.scene.add(this.carTrailer.group);
+    // (and the semi-trailer of the articulated lorry its own: render/semitruck.ts)
+    const towed = def.trailer && def.model !== 'truck' ? towedModel(def.trailer, this.carTrailer) : this.carTrailer;
+    if (towed !== this.carTrailer) {
+      if (this.carTrailer) this.app.scene.remove(this.carTrailer.group);
+      this.carTrailer = towed;
+      if (towed) this.app.scene.add(towed.group);
     }
     return m;
   }
@@ -1180,7 +1235,7 @@ export class Game {
   private setMenuPreview(p: MenuPreview | null): void {
     // (a crane is shown where its work begins: on the construction site)
     const crane = p ? VEHICLES[p.kind]?.crane : undefined;
-    const at = crane ? craneStart(crane, this.yardFrame) : null;
+    const at = crane ? craneStart(crane, this.yardFrame) : p?.kind === 'forklift' ? forkliftStart(this.yardFrame) : null;
     this.menuPreview = p && at ? { ...p, x: at.x, z: at.z, yaw: at.yaw } : p;
     if (!p) this.clearPreview();
   }
@@ -1203,6 +1258,7 @@ export class Game {
     if (this.carTrailer) this.carTrailer.group.visible = false;
     if (this.truck) this.truck.trailer.visible = false;
     craneMenuSite({ scene: this.app.scene, yard: this.yardFrame, settings: this.settings }, null, () => 0);
+    forkliftMenuSite({ scene: this.app.scene, yard: this.yardFrame, settings: this.settings }, false, () => 0);
     this.previewCentre = null;
     this.previewKey = '';
   }
@@ -1258,8 +1314,10 @@ export class Game {
       if (def.trailer) {
         const t = new Trailer(def.trailer, this.ground);
         t.coupleBehind(v);
-        if (this.truck && def.kind === 'truck') this.truck.setTrailer(t.x, t.y, t.z, t.yaw, t.pitch, 0, true);
-        else if (this.carTrailer) this.carTrailer.place(t.x, t.y, t.z, t.yaw, t.pitch, 0, this.visual);
+        // (where the ground under its wheels is not loaded yet the trailer would tip: level, then, at the vehicle's height)
+        const [ty0, tp] = this.levelTrailer(t, y);
+        if (this.truck && def.kind === 'truck') this.truck.setTrailer(t.x, ty0, t.z, t.yaw, tp, 0, true);
+        else if (this.carTrailer) this.carTrailer.place(t.x, ty0, t.z, t.yaw, tp, 0, this.visual);
       }
       this.previewRadius = def.long ? 25 : def.model === 'motorcycle' ? 5.5 : def.model === 'car' ? (def.trailer ? 12 : 8) : 15;
       if (def.crane && isCraneModel(model)) {
@@ -1267,6 +1325,10 @@ export class Game {
         craneMenuSite({ scene: this.app.scene, yard: this.yardFrame, settings: this.settings }, def.crane, (x, z) => this.app.tiles.heightAt(x, z));
         craneMenuPose(model, def.crane);
         this.previewRadius = def.crane === 'tower' ? 55 : 18;
+      }
+      if (def.kind === 'forklift') {
+        forkliftMenuSite({ scene: this.app.scene, yard: this.yardFrame, settings: this.settings }, true, (x, z) => this.app.tiles.heightAt(x, z));
+        this.previewRadius = 6;
       }
     }
     this.showModel(true);
@@ -1307,7 +1369,18 @@ export class Game {
   }
 
   /** A vehicle of the game standing (engine off) at (x, z) on the ground, facing yaw – and the trailer it pulls. */
-  private standModel(def: VehicleDef, model: VehicleModel, x: number, z: number, yaw: number, ground: (x: number, z: number) => number, trailer: CarTrailerModel | null, truck: PlayerTruck | null): void {
+  /**
+   * A trailer just coupled behind a vehicle that stands (the menu, the test
+   * place): its height and pitch – level at the vehicle's ground `y` where
+   * the ground under its wheels gave an implausible slope (not loaded yet).
+   */
+  private levelTrailer(t: Trailer, y: number): [number, number] {
+    const ground = this.app.tiles.heightAt(t.x, t.z);
+    if (Math.abs(t.pitch) > 0.12 || Number.isNaN(ground)) return [y, 0];
+    return [t.y, t.pitch];
+  }
+
+  private standModel(def: VehicleDef, model: VehicleModel, x: number, z: number, yaw: number, ground: (x: number, z: number) => number, trailer: TowedModel | null, truck: PlayerTruck | null): void {
     const v = new Vehicle(def.spec('automatic', powerOf(def, this.settings.powers)), this.ground);
     v.teleport(x, ground(x, z) + 0.02, z, yaw);
     v.getModelPosition(this.previewPos);
@@ -1319,8 +1392,9 @@ export class Game {
     if (def.trailer) {
       const t = new Trailer(def.trailer, this.ground);
       t.coupleBehind(v);
-      if (truck) truck.setTrailer(t.x, t.y, t.z, t.yaw, t.pitch, 0, true);
-      else trailer?.place(t.x, t.y, t.z, t.yaw, t.pitch, 0, this.visual);
+      const [ty0, tp] = this.levelTrailer(t, ground(x, z));
+      if (truck) truck.setTrailer(t.x, ty0, t.z, t.yaw, tp, 0, true);
+      else trailer?.place(t.x, ty0, t.z, t.yaw, tp, 0, this.visual);
     }
   }
 
@@ -1350,13 +1424,13 @@ export class Game {
     const place = (kind: VehicleKind, row: number, facing: number, gap: number): void => {
       const def = VEHICLES[kind];
       const m: VehicleModel =
-        def.model === 'car' ? new PlayerCar() : def.model === 'motorcycle' ? new PlayerBike(bikeVariant(kind)) : def.model === 'truckLight' ? new PlayerTruck(LIGHT_TRUCK) : def.model === 'truck' ? new PlayerTruck() : def.model === 'bus' ? new PlayerBus() : def.model === 'minibus' ? new PlayerBus(MINIBUS) : new PlayerTractor();
+        def.model === 'car' ? new PlayerCar() : def.model === 'motorcycle' ? new PlayerBike(bikeVariant(kind)) : def.model === 'truckLight' ? new PlayerTruck(LIGHT_TRUCK) : def.model === 'truck' ? new PlayerTruck() : def.model === 'semi' ? new PlayerSemi() : def.model === 'truckHeavy' ? new PlayerRigid() : def.model === 'bus' ? new PlayerBus() : def.model === 'minibus' ? new PlayerBus(MINIBUS) : new PlayerTractor();
       const truck = m instanceof PlayerTruck && def.model === 'truck' ? m : null;
       if (truck) {
         this.showGroup.add(truck.trailer);
         truck.trailer.visible = kind === 'truck';
       }
-      const trailer = def.trailer && !truck ? new CarTrailerModel() : null;
+      const trailer = def.trailer && !truck ? towedModel(def.trailer, null) : null;
       if (trailer) this.showGroup.add(trailer.group);
       this.showGroup.add(m.root);
       const [x, z] = frame.toWorld(u, row);
@@ -1398,7 +1472,7 @@ export class Game {
     this.nameSign(tr('showPeople', lang), px, ground(px, pz) + 2.6, pz);
     // the big ones
     u = -len / 2 + 8;
-    for (const kind of ['carTrailer', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'minibus', 'minibusTrailer', 'bus', 'busTrailer'] as const) place(kind, bigRow, north, 6.5);
+    for (const kind of ['carTrailer', 'lightTruck', 'lightTruckTrailer', 'truckSolo', 'truck', 'semi', 'minibus', 'minibusTrailer', 'bus', 'busTrailer'] as const) place(kind, bigRow, north, 6.5);
     // the trams, lengthwise along the north edge: two coupled, and one with a trailer car
     const east = frame.yawToWorld(-Math.PI / 2);
     const trams: RailVehicle[] = [];
@@ -1509,6 +1583,10 @@ export class Game {
         return (this.truck = new PlayerTruck());
       case 'truckLight':
         return new PlayerTruck(LIGHT_TRUCK);
+      case 'truckHeavy':
+        return new PlayerRigid();
+      case 'semi':
+        return new PlayerSemi();
       case 'bus':
         return new PlayerBus();
       case 'minibus':
@@ -1527,6 +1605,8 @@ export class Game {
       case 'mobileCrane':
       case 'loaderCrane':
         return makeCraneModel(def.crane ?? 'tower', this.settings.quality === 'low' ? 'low' : 'full');
+      case 'forklift':
+        return new ForkliftModel(this.settings.quality === 'low' ? 'low' : 'full');
       default: {
         const none: never = mk;
         return none;
@@ -1561,7 +1641,7 @@ export class Game {
   private nextTask(): void {
     const frame = this.yardFrame!;
     const id = this.tasksLeft.shift()!;
-    const run = new YardTask(id);
+    const run = new YardTask(id, this.def.kind === 'semi');
     const layout = run.layout;
     this.task = { run, laid: false, order: new Map(), second: false };
     const start = frame.poseToWorld(layout.start);
@@ -1643,7 +1723,7 @@ export class Game {
       const st = run.manoeuvre(dt, frame, v, t, handbrake);
       // a basic manoeuvre that went wrong may be repeated once – as in the test
       for (const f of st.faults) this.rules.note(f, f === 'ceLine' || !task.second ? 'major' : 'fail');
-      this.lessonLine = tr(`ce.do.${run.id}`, lang);
+      this.lessonLine = tr(taskTextKey(run.semi, 'do', run.id), lang);
       this.taskSub = tr('ce.corrections', lang, { n: st.corrections, max: MAX_CORRECTIONS });
       if (Number.isFinite(st.gap) && st.gap < 15) this.taskSub += ` · ${tr('ce.gap', lang, { d: formatUnit(Math.max(0, st.gap), 'meter', lang, 1) })}`;
       if (st.state === 'failed' && !task.second) {
@@ -1665,7 +1745,7 @@ export class Game {
     for (const id of choices) if (!task.order.has(id)) task.order.set(id, Math.random());
     choices.sort((a, b) => task.order.get(a)! - task.order.get(b)!);
     this.hud.setChoices(
-      choices.map((id) => ({ id, label: tr(`ce.step.${id}`, lang) })),
+      choices.map((id) => ({ id, label: tr(taskTextKey(run.semi, 'step', id), lang) })),
       (id: string) => {
         const fault = proc.act(id as CouplingStepId, run.state);
         if (fault) this.rules.note(fault, 'major', {}, 0.5);
@@ -1674,7 +1754,7 @@ export class Game {
       // (nothing to do with the truck just now: it is the driver's turn on foot)
       !st.todo,
     );
-    this.lessonLine = st.todo ? tr(`ce.do.${st.todo}`, lang) : choices.length ? tr('ce.onFoot', lang) : tr('ce.do.uPark', lang);
+    this.lessonLine = st.todo ? tr(taskTextKey(run.semi, 'do', st.todo), lang) : choices.length ? tr('ce.onFoot', lang) : tr('ce.do.uPark', lang);
     this.taskSub = `${proc.done.size} / ${COUPLING_STEPS.length}`;
     if (st.state === 'done') this.taskDone(true);
   }
@@ -1716,7 +1796,7 @@ export class Game {
   /** Free drive: put the car at a spot on a road (an address, or a place chosen on the map). */
   private teleportSpot(spot: SpawnJson): void {
     // (not from a lesson, nor from the crane's construction site)
-    if (this.lesson || this.crane || (this.state !== 'pause' && this.state !== 'map')) return;
+    if (this.lesson || this.crane || this.forklift || (this.state !== 'pause' && this.state !== 'map')) return;
     this.bigMap.close();
     this.endWatch(false);
     if (this.demo) {
@@ -1898,8 +1978,15 @@ export class Game {
       if (!self && stops.length > 0) {
         const to = stops[0];
         const field = this.air ? landingRunway(this.air.airfields, to.x, to.z) : null;
+        const alt = Math.max(plane.altitude, this.groundHeight(to.x, to.z) + 300);
+        const rw = plane.onGround && this.air ? runwayAt(this.air.airfields, plane.pos.x, plane.pos.z, plane.yaw) : null;
+        this.flightGoto = null;
         if (field && field.distance < 1500 && !plane.onGround) this.flightAuto.land(field.runway, field.fromSecond);
-        else this.flightAuto.goto(to.x, to.z, Math.max(plane.altitude, this.groundHeight(to.x, to.z) + 300));
+        else if (rw) {
+          // on a runway: take off first, then there (stepFlight hands over once it climbs)
+          this.flightAuto.takeoff(rw.runway, rw.fromSecond);
+          this.flightGoto = { x: to.x, z: to.z, alt };
+        } else this.flightAuto.goto(to.x, to.z, alt);
         this.flightAuto.takeOver({ throttle: this.flight.throttle, trim: this.flight.trim });
         this.flightTake = 0;
         this.hud.message(tr('apOn', this.settings.lang));
@@ -2179,6 +2266,15 @@ export class Game {
     this.audio.start();
     this.spawnStreet = address?.street ?? '';
     this.spawn = (address ? this.spawnAt(address) : null) ?? world.json.spawns[Math.max(0, Math.min(world.json.spawns.length - 1, spawnIdx))] ?? { name: '', x: 0, z: 0, yaw: 0, kind: 'street' };
+    // On foot from the first start place: at the stop Baunatal Stadtmitte, looking at its departure board
+    this.boardStart = null;
+    if (VEHICLES[this.settings.vehicle]?.kind === 'pedestrian' && !address && spawnIdx === 0 && mode === 'free') {
+      const st = this.stops?.places.find((p) => /stadtmitte/i.test(p.name) && (p.town === 'Baunatal' || /baunatal/i.test(p.name)));
+      if (st) {
+        this.spawn = { name: st.town && !st.name.includes(st.town) ? `${st.town}, ${st.name}` : st.name, x: st.x, z: st.z, yaw: 0, kind: 'street', rough: true };
+        this.boardStart = { x: st.x, z: st.z, until: -1 };
+      }
+    }
     // (the aeroplane: at the end of the runway chosen in the menu – the first of the map's if none was)
     this.aircraft = null;
     this.planePending = false;
@@ -2226,6 +2322,7 @@ export class Game {
     this.railActors.hidden = null;
     this.passengerView.show(null);
     this.doorT = -1;
+    this.opens.reset(this.car);
     this.fadeEl.classList.remove('on');
     // ("demo" and "tour" are free drives that begin with the map open, for planning – the tram's drives by itself at once)
     this.planeDemoPending = mode === 'demo' && VEHICLES[this.settings.vehicle]?.kind === 'plane';
@@ -2235,7 +2332,9 @@ export class Game {
     this.keepClock = false;
     this.path.breakLine();
     // the car, or the truck with its trailer (class CE)
-    this.def = VEHICLES[this.lesson?.vehicle ?? this.settings.vehicle] ?? VEHICLES.car;
+    // (a lesson for some vehicles only – the yard tasks of class CE, the bus line – with one of them: the one chosen, if it is one)
+    const allowed = this.lesson?.vehicles;
+    this.def = VEHICLES[this.lesson?.vehicle ?? (allowed && !allowed.includes(this.settings.vehicle) ? allowed[0] : this.settings.vehicle)] ?? VEHICLES.car;
     // (a tractor may not go on the motorway: its lesson is driven with the car)
     if (this.def.noMotorway && this.lesson?.id === 'motorway') this.def = VEHICLES.car;
     // the tram: at the stop nearest to the place chosen (on the tracks of Kassel and Baunatal)
@@ -2250,10 +2349,12 @@ export class Game {
     routeFor.noMotorway = this.def.noMotorway;
     const spec = this.services.begin(this.def, this.def.spec(this.settings.transmission, powerOf(this.def, this.settings.powers)), !this.lesson && mode === 'free');
     this.vehicle = new Vehicle(spec, this.ground);
+    this.wading.reset();
     // the sound of this kind of vehicle (its engine's revs – the tram and the aeroplane have their own)
     this.audio.setVehicle(soundKindOf(this.def.kind), spec);
     this.ensureModel(this.def);
-    this.trailer = this.def.trailer ? new Trailer(this.def.trailer, this.ground) : null;
+    this.trailer = this.def.trailer ? makeTrailer(this.def.trailer, this.ground) : null;
+    linkTowed(this.carTrailer, this.trailer);
     this.hud.gearbox = spec.transmission === 'automatic' && this.def.model !== 'car' && this.def.model !== 'motorcycle' ? 'automatic' : null;
     this.endTasks();
     // the camera stands further back for 16 m of vehicle
@@ -2274,6 +2375,17 @@ export class Game {
       this.crane = this.makeCraneWork(this.def.crane);
       const at = craneStart(this.def.crane, this.yardFrame);
       if (at) this.spawn = { name: tr('craneSite', this.settings.lang), x: at.x, z: at.z, yaw: at.yaw, kind: 'street' };
+      this.showOn = false;
+      this.rules.yard = true;
+      this.hud.canTeleport = false;
+    }
+    // the forklift: on its place on the practice yard (game/forkliftplay.ts), whatever was chosen to do with it
+    this.forklift?.dispose();
+    this.forklift = null;
+    if (this.def.kind === 'forklift') {
+      this.forklift = this.makeForkliftWork();
+      const at = forkliftStart(this.yardFrame);
+      if (at) this.spawn = { name: tr('forkPlace', this.settings.lang), x: at.x, z: at.z, yaw: at.yaw, kind: 'street' };
       this.showOn = false;
       this.rules.yard = true;
       this.hud.canTeleport = false;
@@ -2378,7 +2490,7 @@ export class Game {
     this.trailer?.coupleBehind(this.vehicle);
     this.lastGood = { x: place.x, y, z: place.z, yaw: place.yaw, t: 0 };
     // (on foot first – not on the yard of the class CE tasks, not when the car is to drive by itself)
-    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker && this.def.kind !== 'tram' && this.def.kind !== 'pedestrian' && !this.crane;
+    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker && this.def.kind !== 'tram' && this.def.kind !== 'pedestrian' && !this.crane && !this.forklift;
     this.footPending = this.def.kind === 'pedestrian';
     if (this.tramAt) {
       // the player's tram, its front at the stop's mark (the other way round if it does not fit behind it there)
@@ -2467,6 +2579,14 @@ export class Game {
   // ------------------------------------------------- watching a tram or bus of the timetables (spectate.ts)
   /** Watch a tram or bus (chosen on the big map): the camera goes with it, the world loads round it, the player's vehicle waits. */
   private startWatch(v: WatchRequest): void {
+    if (this.state === 'map' && this.mapFrom === 'menu') {
+      // from the main menu: a free drive begins (the vehicle and the place chosen there), and the watching with it once placed
+      this.closeMap();
+      const ls = this.settings.lastStart;
+      this.begin('free', ls.spawn, true, ls.address ?? undefined);
+      this.afterPlace = () => this.startWatch(v);
+      return;
+    }
     const src = this.transitData();
     if (!src || this.lesson || this.replay || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
     this.watcher?.dispose();
@@ -2484,6 +2604,55 @@ export class Game {
       ready: (x, z) => this.app.map.ready(x, z, 400) && !Number.isNaN(this.app.tiles.heightAt(x, z)),
       ground: (x, z) => this.groundHeight(x, z),
       takeOver: (w, at) => this.takeOverWatched(w, at),
+      back: () => this.endWatch(),
+    });
+    if (this.state === 'map') {
+      this.mapFrom = 'drive';
+      this.closeMap();
+    } else if (this.state === 'pause') this.resume();
+  }
+
+  /**
+   * Watch something else the map shows: an emergency vehicle of the traffic
+   * (by its id), a demonstration (its crowd) or a site of roadworks (its
+   * middle, where the workers are).
+   */
+  private startPointWatch(what: { kind: 'em'; id: number } | { kind: 'event'; ev: RoadEventInfo }): void {
+    if (this.lesson || this.replay || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
+    const lang = this.settings.lang;
+    let target: WatchTarget;
+    if (what.kind === 'em') {
+      const car = this.traffic.cars.find((c) => c.id === what.id);
+      if (!car?.em) return;
+      const names = ['emPolice', 'emAmbulance', 'emFire', 'emDoctor'];
+      target = {
+        title: tr(names[car.em.kind] ?? 'emPolice', lang),
+        sub: tr(car.em.call ? 'emOnCall' : 'emPatrol', lang),
+        length: car.length,
+        get: () => {
+          const c = this.traffic.cars.find((q) => q.id === what.id);
+          return c ? { x: c.x, y: c.y, z: c.z, yaw: c.yaw } : null;
+        },
+      };
+    } else {
+      const ev = what.ev;
+      const demo = ev.kind === 'demo';
+      target = {
+        title: demo ? tr('eventDemoTitle', lang, { place: ev.detail }) : tr('eventWorks', lang),
+        sub: ev.street,
+        length: demo ? 40 : 24,
+        get: () => {
+          if (demo) return this.roadEvents.crowdAt(ev.x, ev.z, gameClock.ms()) ?? { x: ev.x, y: NaN, z: ev.z, yaw: 0 };
+          return { x: ev.x, y: NaN, z: ev.z, yaw: 0 };
+        },
+      };
+    }
+    this.watcher?.dispose();
+    this.watcher = new PointWatcher(target, {
+      hud: () => this.ui.querySelector<HTMLElement>('.hud'),
+      backText: () => tr('watchBack', this.settings.lang),
+      goneText: () => tr('watchGone', this.settings.lang),
+      ground: (x, z) => this.groundHeight(x, z),
       back: () => this.endWatch(),
     });
     if (this.state === 'map') {
@@ -2518,7 +2687,7 @@ export class Game {
 
   /** A step while watching: the vehicle runs on, the world round it – the player's own vehicle waits. */
   private stepWatch(dt: number): void {
-    const w = this.watcher as Watcher;
+    const w = this.watcher as Watcher | PointWatcher;
     w.step(dt, this.input.c);
     const g = w.ghost;
     this.signals.update(dt);
@@ -2660,9 +2829,49 @@ export class Game {
       const sun = sunAt(ms);
       // (below the horizon the night is not black: the sky keeps some light, as on a clear night in town)
       this.app.sky.setSun(Math.max(sun.elevation, -6), sun.azimuth);
+      this.beams.sunElevation = sun.elevation;
     } else if (this.sunPlacedAt !== -2) {
       this.sunPlacedAt = -2;
       this.app.sky.setSun(52, 215);
+      this.beams.sunElevation = 52;
+    }
+  }
+
+  /** The headlights, once a frame (game/beamplay.ts): `model` the vehicle driven (null: none – a replay, the menu). */
+  private headlights(dt: number, model: VehicleModel | null): void {
+    const v = this.vehicle;
+    const drive = this.state === 'drive';
+    const driving = !!model && !!v && !this.walker && !this.aircraft && !this.tram;
+    const c = this.input.c;
+    const night = this.beams.dark > 0 && !!this.traffic;
+    const edge = this.rules.laneNow?.edge;
+    const r = this.beams.frame({
+      dt: drive ? dt : 0,
+      driving,
+      judged: drive && !this.demo?.active && !this.opens.passenger && !this.rules.yard,
+      root: model?.root ?? null,
+      front: this.def.outline.front,
+      height: this.def.model === 'motorcycle' ? 1 : this.def.model === 'car' ? 0.68 : 0.95,
+      x: this.mpos[0],
+      z: this.mpos[2],
+      yaw: v?.yaw ?? 0,
+      speed: v?.speed ?? 0,
+      low: c.lowBeam,
+      high: this.lastVisual?.highBeam ?? false,
+      lit: !!edge && (edge.flags & (EF.URBAN | EF.LIT)) !== 0,
+      visibility: weatherNow().visibility,
+      cheap: this.settings.graphics.shadows === 'off',
+      cars: night ? this.traffic.cars : [],
+      riders: night ? [...this.traffic.cyclists.list, ...this.traffic.crowd.people] : [],
+      scene: this.app.scene,
+      camera: this.app.camera,
+      heightPx: this.app.canvas.height,
+      heightAt: (x, z) => this.app.tiles.heightAt(x, z),
+    });
+    for (const f of r.faults) this.rules.note(f.id, f.severity, {}, f.cooldown);
+    if (r.tip && driving && this.settings.hudRules && !this.rules.strict && !this.demo?.active) {
+      this.tipText = tr(r.tip, this.settings.lang);
+      this.tipUntil = this.time + 5;
     }
   }
 
@@ -2685,8 +2894,8 @@ export class Game {
     this.audio.suspend();
     this.hud.setHudVisible(false);
     this.lastResult = {
-      title: l ? lessonTitle(l.id, this.settings.lang) : tr(this.crane ? 'craneWork' : 'free', this.settings.lang),
-      extra: this.crane?.resultNode() ?? null,
+      title: l ? lessonTitle(l.id, this.settings.lang) : tr(this.crane ? 'craneWork' : this.forklift ? 'forkWork' : 'free', this.settings.lang),
+      extra: this.crane?.resultNode() ?? this.forklift?.resultNode() ?? null,
       exam: !!exam || judged,
       passed: !failed,
       log: this.rules.log.slice(),
@@ -2931,6 +3140,9 @@ export class Game {
       else if (this.state === 'map') this.closeMap();
       else if (this.state === 'replay') this.endReplay();
       else if (this.state === 'theory') this.theory?.back();
+    } else if (a === 'open' && this.state === 'drive') {
+      // on foot beside the vehicle: open or shut what is there (game/openplay.ts)
+      this.opens.toggleAt(this.walker);
     } else if (a === 'door' && this.state === 'drive' && this.def.kind === 'pedestrian') {
       this.footAction();
     } else if (a === 'door' && this.state === 'drive' && this.aircraft) {
@@ -2944,13 +3156,21 @@ export class Game {
       this.busService.toggleDoors(front, stops, this.vehicle.speed, ev);
       this.audio.click('airDoor');
       for (const e of ev) this.rules.noteAt(e.fault, e.severity, this.mpos[0], this.mpos[2], {}, 8);
+    } else if (a === 'door' && this.state === 'drive' && this.forklift) {
+      // (the forklift: the operator stays on the seat)
     } else if (a === 'door' && this.state === 'drive' && this.crane && !this.walker) {
       // the crane: from driving to working it, and back
       this.craneToggle();
     } else if (a === 'door' && this.state === 'drive') {
       // (out of the tram's cab: the door key gets one in again at its door – after a vehicle went up in flames, a new one)
       if (this.walker && this.wrecked) this.newVehicle();
+      else if (this.walker && this.aircraft) this.boardPlane();
       else if (this.walker) this.getIn();
+      else if (this.aircraft && !this.aircraft.onGround) {
+        // (no stepping out in flight by a slip of the finger: the pause menu's "Get out" does that)
+        this.tipText = tr('planeOutMenu', this.settings.lang);
+        this.tipUntil = this.time + 4;
+      }
       else if (this.tram) {
         // the tram's doors
         const ev = this.tramEvents;
@@ -2993,6 +3213,11 @@ export class Game {
       // (in the aeroplane there is no road to be put back on: the key is its autopilot)
       if (this.aircraft) this.toggleFlightAuto();
       else this.resetToRoad();
+    } else if (a === 'wiper' && this.state === 'drive' && !this.walker && !this.aircraft) {
+      // the wiper stalk one place on: off → intermittent → normal → fast
+      const m = this.windscreen.cycle();
+      this.audio.click('tick');
+      this.hud.message(tr('wipers.title', this.settings.lang), tr(`wipers.${m}`, this.settings.lang));
     } else if (a === 'service') {
       this.services.act(this.state);
     } else if (a === 'help') {
@@ -3120,11 +3345,17 @@ export class Game {
       return;
     }
     if (this.aircraft) {
-      this.stepFlight(dt);
+      // (out of the parked aeroplane: on foot beside it)
+      if (this.walker) this.stepFoot(dt);
+      else this.stepFlight(dt);
       return;
     }
     if (this.crane?.operating) {
       this.stepCrane(dt);
+      return;
+    }
+    if (this.forklift) {
+      this.stepForklift(dt);
       return;
     }
     const d = this.driver;
@@ -3139,6 +3370,7 @@ export class Game {
     // a look back over the left shoulder: that is what is asked for before the door is opened
     if (c.lookYaw > 0.9) this.lookedBackAt = this.time;
     this.stepDoor(dt);
+    this.stepOpen(dt);
     if (this.walker) {
       // nobody in the seat: the vehicle stands as it was left (the keys W S A D walk)
       c.steer = d.steer = this.parkedSteer;
@@ -3146,8 +3378,9 @@ export class Game {
       c.brake = d.brake = 0;
       c.clutch = d.clutch = 0;
       d.starter = false;
-      this.stepWalk(dt);
-    }
+      // (not while getting into the car)
+      if (!this.opens.busy) this.stepWalk(dt);
+    } else this.opens.idle(c, d, !!this.demo?.active, this.parkedSteer);
     // Speed limiter: a key or a pedal on the screen is all or nothing, which makes it hard to hold
     // 30 or 50 km/h.  With the limiter the throttle eases off just below the current limit – the
     // driver still has to brake when the limit drops.
@@ -3219,6 +3452,14 @@ export class Game {
     }
 
     this.services.drive(dt, v, d, this.def, !!this.walker, !!this.task, !!this.demo?.active || this.autoDrive > 0);
+    // through water: washed, the brakes wet (weaker while the physics steps), the engine drowned, the spray (game/wading.ts)
+    const wadeTip = this.wading.step(dt, this.walker || this.tram || this.aircraft || this.wrecked ? null : v, this.def.model, this.services, d.brake, this.settings.quality !== 'low', this.app.sky.hemi.intensity / 1.2);
+    if (wadeTip) {
+      this.tipText = tr(wadeTip, this.settings.lang);
+      this.tipUntil = this.time + 6;
+    }
+    const pedal = d.brake;
+    d.brake *= this.wading.brakeFactor;
     this.acc = Math.min(this.acc + dt, 0.1);
     let stalled = false;
     let grind = false;
@@ -3229,6 +3470,8 @@ export class Game {
     while (this.acc >= PHYS_DT) {
       v.step(PHYS_DT, d);
       this.trailer?.step(PHYS_DT, v, d);
+      // (the semi-trailer swung round against the tractor's cab)
+      if (this.trailer instanceof SemiTrailer && this.trailer.jackknifeEvent) this.rules.note('semiJackknife', 'major');
       this.acc -= PHYS_DT;
       if (v.stalledEvent) stalled = true;
       if (v.gearGrind) grind = true;
@@ -3236,6 +3479,7 @@ export class Game {
       if (hit > this.impact) this.impact = hit;
       if (this.collider.lastBuilding > building) building = this.collider.lastBuilding;
     }
+    d.brake = pedal;
     // Into the wall of a building at 70 km/h or more, head on rather than grazing it: the vehicle goes up
     // in flames and is gone – the driver walks away unhurt (it is a game) and may take a new one.
     if (!this.wrecked && speed0 * 3.6 >= 70 && building > 0.5 * speed0 && !this.walker) this.explode();
@@ -3282,10 +3526,10 @@ export class Game {
       const t = this.trailer;
       const o = trailerOf(this.def) ?? TRAILER_OUTLINE;
       const off = (o.front - o.rear) / 2;
-      boxes.push({ x: t.x - Math.sin(t.yaw) * off, y: t.y, z: t.z - Math.cos(t.yaw) * off, yaw: t.yaw, speed: t.coupled ? t.speed : 0, length: o.front + o.rear, width: o.hw * 2, own: t.coupled });
+      boxes.push({ x: t.x - Math.sin(t.yaw) * off, y: t.y, z: t.z - Math.cos(t.yaw) * off, yaw: t.yaw, speed: t.coupled ? t.speed : 0, length: o.front + o.rear, width: o.hw * 2, own: t.coupled, parked: !t.coupled });
     }
     if (this.walker && !away) boxes.push({ x: this.walker.x, y: this.walker.y, z: this.walker.z, yaw: this.walker.yaw, speed: 0, length: 0.6, width: 0.6 });
-    if (away && !this.wrecked) boxes.push({ x: car.x, y: car.y, z: car.z, yaw: car.yaw, speed: 0, length: car.length, width: car.width });
+    if (away && !this.wrecked) boxes.push({ x: car.x, y: car.y, z: car.z, yaw: car.yaw, speed: 0, length: car.length, width: car.width, parked: true });
     this.traffic.obstacles = boxes;
     // (the horn: the people on foot near it start)
     player.horn = c.horn && !away;
@@ -3344,7 +3588,8 @@ export class Game {
       length: v.spec.length ?? 4.28,
       front: this.def.outline.front,
     };
-    this.rules.update(dt, snap, this.traffic.events);
+    // (a passenger does not drive: nothing to judge)
+    if (!this.opens.passenger) this.rules.update(dt, snap, this.traffic.events);
     this.signalTips(dt);
     // blue lights and siren near by: what to do (src/sim/emergency.ts) – not judged on a demonstration drive
     if (this.traffic.emergency) this.traffic.emergency.judging = !this.demo?.active;
@@ -3422,6 +3667,34 @@ export class Game {
     if (cw.over) this.finish();
   }
 
+  /** The forklift's work (game/forkliftplay.ts), told what it needs of the game. */
+  private makeForkliftWork(): ForkliftWork {
+    return new ForkliftWork({
+      scene: this.app.scene,
+      ui: this.ui,
+      settings: this.settings,
+      yard: this.yardFrame,
+      heightAt: (x, z) => this.app.tiles.heightAt(x, z),
+      input: this.input,
+      audio: this.audio,
+      note: (id, severity, x, z, data, cooldown) => this.rules.noteAt(id, severity, x, z, data, cooldown),
+    });
+  }
+
+  /** A step of the forklift: its own simulation drives it (game/forkliftplay.ts) – and the traffic beyond the yard. */
+  private stepForklift(dt: number): void {
+    const fw = this.forklift as ForkliftWork;
+    fw.step(dt, this.vehicle, this.input.c);
+    this.vehicle.getModelPosition(this.mpos);
+    this.rules.time += dt;
+    this.signals.update(dt);
+    const player: PlayerState = { x: this.mpos[0], y: this.mpos[1], z: this.mpos[2], yaw: this.vehicle.yaw, speed: this.vehicle.speed, length: 3.8, width: 1.2 };
+    this.rail.update(dt, player, []);
+    this.traffic.obstacles = [];
+    this.traffic.update(dt, player);
+    if (fw.over) this.finish();
+  }
+
   private tipUntil = 0;
 
   private rememberGoodSpot(p: PlayerState): void {
@@ -3441,6 +3714,8 @@ export class Game {
   // ------------------------------------------------- on foot: round the vehicle, out and in
   /** somebody on foot beside the vehicle (null: in the driver's seat) */
   private walker: OnFoot | null = null;
+  /** the doors, bonnet and boot that open, the car's seats (game/openplay.ts) */
+  private readonly opens = new OpenPlay();
   private readonly markers = new CheckMarkers();
   private readonly fadeEl = document.createElement('div');
   /** the drive began on foot: the check round the vehicle counts */
@@ -3490,7 +3765,11 @@ export class Game {
     const v = this.vehicle;
     const c = this.input.c;
     const lang = this.settings.lang;
-    if (this.walker || this.doorT >= 0 || this.demo?.active || this.task) return;
+    if (this.walker || this.doorT >= 0 || this.opens.busy || this.demo?.active || this.task) return;
+    if (this.aircraft) {
+      this.leavePlane();
+      return;
+    }
     if (this.tram) {
       // out of the tram's cab: it stands braked meanwhile (the passengers' doors as they are)
       if (this.tram.speed > 0.1 || this.tramAuto) return;
@@ -3501,6 +3780,12 @@ export class Game {
     if (Math.abs(v.speed) > 0.3) {
       this.tipText = tr('stopFirst', lang);
       this.tipUntil = this.time + 3;
+      return;
+    }
+    if (this.model === this.car && this.opens.passenger) {
+      // a passenger: out through the door of that seat (what the driver has to see to is not the passenger's)
+      this.walkStart = false;
+      this.opens.beginOut();
       return;
     }
     v.getModelPosition(this.mpos);
@@ -3532,14 +3817,32 @@ export class Game {
     c.seatbelt = false;
     this.parkedSteer = c.steer;
     this.walkStart = false;
-    this.startDoor('out');
+    // (the car: its door opens, no fade – game/openplay.ts)
+    if (this.model === this.car) this.opens.beginOut();
+    else this.startDoor('out');
   }
 
   /** In again: from beside the driver's door. */
   private getIn(): void {
     const w = this.walker;
     const lang = this.settings.lang;
-    if (!w || this.doorT >= 0) return;
+    if (!w || this.doorT >= 0 || this.opens.busy) return;
+    if (this.model === this.car) {
+      // the car: into the seat of the door one stands at (at the bonnet or the boot: open or shut it)
+      const at = this.opens.at(w);
+      if (at && !isDoor(at.id)) {
+        this.opens.toggleAt(w);
+        return;
+      }
+      if (!at || !isDoor(at.id)) {
+        this.tipText = tr('toDoor', lang);
+        this.tipUntil = this.time + 3;
+        return;
+      }
+      if (at.id === 'fl' && this.walkStart && !w.allChecked) this.rules.noteAt('preCheck', 'hint', this.mpos[0], this.mpos[2], { missing: new Intl.ListFormat(localeOf(lang), { style: 'long', type: 'conjunction' }).format(w.missing().map((id) => tr(CHECK_TEXT[id], lang))) }, 30);
+      this.opens.beginIn(at.id);
+      return;
+    }
     if (!w.atDoor) {
       this.tipText = tr('toDoor', lang);
       this.tipUntil = this.time + 3;
@@ -3597,10 +3900,106 @@ export class Game {
     if (this.lesson && this.failT < 0) this.failT = this.time + 4;
   }
 
+  /**
+   * Out of the aeroplane: standing on the ground, beside it (it stays where it
+   * is, and the door key gets one back in); in the air, down to the ground
+   * below – the aeroplane is gone, and a new one waits at the nearest runway.
+   */
+  private leavePlane(): void {
+    const a = this.aircraft as Aircraft;
+    const lang = this.settings.lang;
+    if (a.onGround && a.ias > 1.5) {
+      this.tipText = tr('stopFirst', lang);
+      this.tipUntil = this.time + 3;
+      return;
+    }
+    if (this.flightAuto.engaged) this.flightAuto.off();
+    const yaw = a.yaw;
+    let x = a.pos.x;
+    let z = a.pos.z;
+    if (a.onGround) {
+      // beside the left door, clear of the wing strut
+      x -= Math.cos(yaw) * 3.2;
+      z += Math.sin(yaw) * 3.2;
+      this.flight.throttle = 0;
+    } else {
+      // in the air: down on the ground below – the aeroplane does not fly on without its pilot
+      this.wrecked = true;
+      this.aircraft = null;
+      this.vehicle.teleport(x, a.pos.y - 400, z, yaw);
+      this.hud.setWrecked(true);
+      this.ui.classList.remove('flying');
+      this.tipText = tr('planeLeft', lang);
+      this.tipUntil = this.time + 6;
+    }
+    this.walker = new OnFoot(null, { x, y: this.footGround(x, z, a.pos.y + 2), z, yaw });
+    this.walker.runSpeed = this.settings.runSpeed / 3.6;
+    this.walkSince = this.time;
+    this.cameraMode = 'cockpit';
+    this.input.resetLook(false, true);
+    this.camSnap = true;
+  }
+
+  /** Back into the aeroplane parked near by (within a few metres of it). */
+  private boardPlane(): void {
+    const a = this.aircraft;
+    const w = this.walker;
+    if (!a || !w) return;
+    if (Math.hypot(w.x - a.pos.x, w.z - a.pos.z) > 7) {
+      this.tipText = tr('planeTooFar', this.settings.lang);
+      this.tipUntil = this.time + 3;
+      return;
+    }
+    this.walker = null;
+    this.figure.hide();
+    this.cameraMode = 'cockpit';
+    this.input.resetLook(false, false);
+    this.camSnap = true;
+  }
+
+  /**
+   * Another vehicle, here and now: a free drive with it begins where the
+   * player is (the world stays loaded) – the tram at the nearest stop, the
+   * aeroplane at the end of the nearest runway.
+   */
+  private changeVehicle(kind: VehicleKind): void {
+    if (this.lesson || (this.state !== 'pause' && this.state !== 'drive')) return;
+    const w = this.walker;
+    const x = w ? w.x : this.mpos[0];
+    const z = w ? w.z : this.mpos[2];
+    this.endWatch(false);
+    if (this.demo) this.endDemo('ended');
+    this.settings.vehicle = kind;
+    saveSettings(this.settings);
+    const k = VEHICLES[kind]?.kind;
+    if (k === 'tram') this.begin('free', 0, true, undefined, { name: '', town: '', x, z });
+    else if (k === 'plane') {
+      const near = this.air ? landingRunway(this.air.airfields, x, z, 300) : null;
+      const r = near ? { field: near.field.name, end: runwayEnd(near.runway, near.fromSecond), ...runwayStart(near.runway, near.fromSecond) } : undefined;
+      this.begin('free', 0, true, undefined, undefined, r);
+    } else this.begin('free', 0, true, { label: tr('mapPlace', this.settings.lang), street: '', x, z, exact: false });
+  }
+
   /** A new vehicle of the same kind, in the lane nearest to the person on foot – and the person in it. */
   private newVehicle(): void {
     const w = this.walker;
     if (!this.wrecked) return;
+    if (this.def.kind === 'plane') {
+      // a new aeroplane at the end of the runway nearest to where the person stands
+      const near = w && this.air ? landingRunway(this.air.airfields, w.x, w.z, 300) : null;
+      const r = near ? { field: near.field.name, end: runwayEnd(near.runway, near.fromSecond), ...runwayStart(near.runway, near.fromSecond) } : this.firstRunway();
+      if (!r) return;
+      this.wrecked = false;
+      this.explosion.clear();
+      this.hud.setWrecked(false);
+      if (this.walker) this.leaveWalk();
+      this.spawn = { name: `${r.field} ${r.end}`, x: r.x, z: r.z, yaw: r.yaw, kind: 'street' };
+      this.planePending = true;
+      this.keepClock = true;
+      this.state = 'placing';
+      this.hud.showLoading(tr('loadingTiles', this.settings.lang));
+      return;
+    }
     const g = this.lastGood;
     const spot = (w && this.freeSpot(w.x, w.z, w.yaw, 0)) ?? this.freeSpot(g.x, g.z, g.yaw, 0) ?? g;
     this.wrecked = false;
@@ -3629,7 +4028,10 @@ export class Game {
   }
 
   private enterWalk(): void {
-    const w = new OnFoot(this.walkVehicle());
+    const wv = this.walkVehicle();
+    const w = new OnFoot(wv);
+    // (where its parts open; out of the car through another door: beside that one)
+    this.opens.walk(w, wv, this.model === this.car ? this.car : null, this.model instanceof PlayerTruck);
     w.y = this.footGround(w.x, w.z, this.mpos[1] + 1);
     this.walker = w;
     // (nobody sits on the motorcycle while its rider walks round it)
@@ -3672,6 +4074,25 @@ export class Game {
       this.fadeEl.classList.remove('on');
     }
     if (this.doorT >= 1) this.doorT = -1;
+  }
+
+  /** The parts that open, and getting into the car or out of it: the door opens, one moves, the door shuts (game/openplay.ts). */
+  private stepOpen(dt: number): void {
+    const car = this.model === this.car ? this.car : null;
+    const r = this.opens.step(dt, (k) => this.audio.click(k));
+    const b = this.opens.board;
+    if (r.start && b) {
+      // the camera goes from where it is to the seat, or to the place beside the door
+      this.doorFrom.pos.copy(this.app.camera.position);
+      this.doorFrom.quat.copy(this.app.camera.quaternion);
+      if (b.way === 'in') {
+        this.leaveWalk();
+        this.opens.setSeat(car, b.seat);
+      } else this.enterWalk();
+    }
+    const model = this.model;
+    const trailer = !this.def.trailer ? null : this.def.model === 'truck' ? (this.truck?.trailer ?? null) : (this.carTrailer?.group ?? null);
+    this.opens.pose(car, model instanceof PlayerTruck ? model : null, trailer);
   }
 
   /**
@@ -3740,6 +4161,108 @@ export class Game {
   private footBus: TrafficCar | null = null;
 
   /** On foot, as a pedestrian: on the pavement beside the start point (to the right of the road), looking along it. */
+  /** a drive on foot that begins at a stop: the walker turns to its departure board once the stop is built (until: game time to give up) */
+  private boardStart: { x: number; z: number; until: number } | null = null;
+
+  /**
+   * Live location: the walker follows where the player really is (the
+   * browser's geolocation, asked once) – walking to each new fix, jumping
+   * when it is far. (Finer steps between fixes from the motion sensors would
+   * need a native app: see the README.)
+   */
+  private liveGeo: { watch: number; target: { x: number; z: number } | null; heading: number } | null = null;
+
+  private toggleLiveGeo(): void {
+    const lang = this.settings.lang;
+    if (this.liveGeo) {
+      navigator.geolocation?.clearWatch(this.liveGeo.watch);
+      this.liveGeo = null;
+      this.hud.message(tr('liveLocationStopped', lang));
+      return;
+    }
+    const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
+    if (!geo || !this.walker) {
+      this.hud.message(tr('myLocationNone', lang));
+      return;
+    }
+    const meta = this.app.world.json.meta;
+    const state: { watch: number; target: { x: number; z: number } | null; heading: number } = { watch: -1, target: null, heading: NaN };
+    state.watch = geo.watchPosition(
+      (p) => {
+        const [x, z] = latLonToWorld(p.coords.latitude, p.coords.longitude);
+        if (x < meta.minX || x > meta.maxX || z < meta.minZ || z > meta.maxZ) {
+          this.hud.message(tr('myLocationOutside', this.settings.lang));
+          return;
+        }
+        state.target = { x, z };
+        // (the compass heading of the device's movement: north 0, clockwise – the game's yaw turns the other way)
+        if (p.coords.heading !== null && Number.isFinite(p.coords.heading) && (p.coords.speed ?? 0) > 0.5) state.heading = (-p.coords.heading * Math.PI) / 180;
+      },
+      (e) => this.hud.message(tr(e.code === 1 ? 'myLocationDenied' : 'myLocationNone', this.settings.lang)),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
+    );
+    this.liveGeo = state;
+    this.hud.message(tr('liveLocationStarted', lang));
+  }
+
+  private stepLiveGeo(dt: number): void {
+    const g = this.liveGeo;
+    const w = this.walker;
+    if (!g || !w || !g.target) return;
+    const dx = g.target.x - w.x;
+    const dz = g.target.z - w.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 80) {
+      // far (the first fix, or a jump): there at once
+      w.x = g.target.x;
+      w.z = g.target.z;
+      this.camSnap = true;
+    } else if (d > 0.3) {
+      // near: walking there, a little faster than walking when behind
+      const step = Math.min(d, dt * Math.max(1.4, d * 0.8));
+      w.x += (dx / d) * step;
+      w.z += (dz / d) * step;
+      w.yaw = Number.isFinite(g.heading) ? g.heading : Math.atan2(-dx, -dz);
+    }
+    w.y = this.footGround(w.x, w.z, w.y + 2);
+  }
+
+  /** On foot at the start stop: stand before its departure board, looking at it (once the stop is built, within 20 s). */
+  private faceBoard(): void {
+    const b = this.boardStart;
+    const w = this.walker;
+    if (!b || !w) return;
+    if (b.until < 0) b.until = this.time + 20;
+    if (this.time > b.until) {
+      this.boardStart = null;
+      return;
+    }
+    const board = this.transit.boardNear(b.x, b.z, 90);
+    if (!board) return;
+    this.boardStart = null;
+    // a few steps from the board, on the side the walker came from – where there is room
+    let dx = w.x - board.x;
+    let dz = w.z - board.z;
+    const l = Math.hypot(dx, dz) || 1;
+    dx /= l;
+    dz /= l;
+    for (const d of [4, 3, 5, 2.5, 6]) {
+      const px = board.x + dx * d;
+      const pz = board.z + dz * d;
+      const y = this.footGround(px, pz, w.y + 2);
+      const road = this.app.world.surfaceAt(px, pz, w.y + 2, this.hit) && this.hit.zone === 0;
+      if (!road && Number.isFinite(y) && !this.collider.circleBlocked(px, y, pz, 0.35)) {
+        w.x = px;
+        w.z = pz;
+        w.y = y;
+        break;
+      }
+    }
+    w.yaw = Math.atan2(-(board.x - w.x), -(board.z - w.z));
+    this.input.resetLook(false, true);
+    this.camSnap = true;
+  }
+
   private startPedestrian(): void {
     const v = this.vehicle;
     v.getModelPosition(this.mpos);
@@ -4144,6 +4667,11 @@ export class Game {
     }
     if (ap.engaged) {
       const ac = ap.update(a, dt, ground);
+      if (this.flightGoto && ap.state.mode === 'hold') {
+        const g = this.flightGoto;
+        this.flightGoto = null;
+        ap.goto(g.x, g.z, Math.max(g.alt, a.altitude));
+      }
       // (the levers follow what the autopilot does: taking over is smooth)
       f.throttle = ac.throttle;
       f.flaps = ap.flapNotch;
@@ -4708,6 +5236,10 @@ export class Game {
       } else {
         this.stepDrive(dt);
         gameClock.tick(dt);
+        if (this.boardStart) this.faceBoard();
+        if (this.liveGeo) this.stepLiveGeo(dt);
+        this.hud.liveOffer = !!this.walker;
+        this.hud.liveOn = !!this.liveGeo;
       }
       if (this.autoNotice && this.time - this.startTime > 0.3) {
         const kind = this.autoNotice;
@@ -4805,6 +5337,7 @@ export class Game {
       this.updateVisuals(dt);
       // a crane posed as it works, the loads of its site where they are
       if (this.crane && isCraneModel(model)) this.crane.render(model, this.time, this.state === 'drive');
+      if (this.forklift && isForkliftModel(model)) this.forklift.render(model, this.time, this.cameraMode === 'cockpit', this.state === 'drive');
       // the drive written down for its replay
       if (this.state === 'drive') {
         const due = this.recorder.due(this.time);
@@ -4888,6 +5421,7 @@ export class Game {
     this.roadworks.crowdCap = this.settings.quality === 'low' ? 70 : this.settings.quality === 'medium' ? 140 : 220;
     this.roadworks.update(this.roadEvents, this.signs, cam.x, cam.z, this.time, dt);
     if (this.explosion.active) this.explosion.update(this.state === 'drive' ? dt : 0);
+    this.headlights(dt, haveCar && !rp ? model : null);
 
     if (this.state === 'reality') {
       // the panel covers the window: only a 360° panorama is drawn, not the world behind it
@@ -4920,6 +5454,13 @@ export class Game {
         }
       }
       app.render(this.watcher ? this.tmpV.set(this.watcher.at.x, this.watcher.at.y, this.watcher.at.z) : model.root.position);
+      // rain and snow on the windscreen, the wipers ("very high" graphics, from the driver's seat): after the picture, which it keeps for its blur
+      const wn = weatherNow();
+      const wind = windVector(wn, { x: 0, z: 0 });
+      const ws = this.windscreen;
+      ws.frame({ renderer: app.renderer, model, detail: this.settings.graphics.vehicleDetail && !this.aircraft, cockpit: this.cameraMode === 'cockpit' && !this.walker && this.doorT < 0 && !this.watcher, dt: this.state === 'drive' ? dt : 0, rain: rainIntensity(wn), snow: snowIntensity(wn), temperature: wn.temperature, roadWet: wn.wet, windX: wind.x, windZ: wind.z, heater: this.vehicle.engineRunning, washer: this.input.washer, light: app.sky.hemi.intensity / 1.2 });
+      this.hud.setWipers(this.walker || this.aircraft ? null : ws.mode);
+      if (ws.blindFor > 4 && this.state === 'drive') this.rules.note('noView', 'minor', {}, 60);
     } else {
       app.render(this.state === 'theory' && this.theory ? this.theory.focus : this.menuFocus);
     }
@@ -4928,6 +5469,10 @@ export class Game {
       this.signalTimers.setHint(tr('signalTimers.hint', this.settings.lang));
       this.signalTimers.update(app.camera, window.innerWidth, window.innerHeight, this.settings.uiScale, this.signalHeads.spots, this.walker ? this.pedPoles : null, this.signals);
     } else this.signalTimers?.hide();
+    // the labels over the queues near by (ui/queuelabels.ts): while driving, not in lessons and tests
+    if (this.state === 'drive' && !this.lesson && this.settings.queueLabels && this.traffic) {
+      (this.queueLabels ??= new QueueLabels(this.ui)).update(app.camera, window.innerWidth, window.innerHeight, this.settings.uiScale, this.traffic.cars, this.signals, this.settings.lang);
+    } else this.queueLabels?.hide();
     // looking into a mirror: one of the vehicle's mirrors large over the upper half of the picture (ui/mirrorzoom.ts)
     if (this.input) {
       (this.mirrorZoom ??= new MirrorZoomPanel(this.ui, this.input, app)).frame({
@@ -5012,6 +5557,9 @@ export class Game {
     const x = w && this.walkerAway() ? w.x : this.mpos[0];
     const z = w && this.walkerAway() ? w.z : this.mpos[2];
     od.update(dt, this.app.camera.position, { x, y: this.app.tiles.heightAt(x, z), z }, this.settings, this.lanes);
+    // (today's fuel prices round the player, where the settings hold a key of Tankerkönig)
+    fuelPrices.key = this.settings.fuelKey;
+    fuelPrices.refresh(x, z);
     this.ground.weatherGrip = od.grip;
     // (bare winter crowns throw no full shadows: the trees' shadows go while they are bare)
     this.props.setShadows(this.settings.graphics.propShadows && !od.look.thinCrowns);
@@ -5035,7 +5583,7 @@ export class Game {
     s.hazard = c.hazard;
     s.blinkOn = Math.floor(this.time * 3) % 2 === 0;
     s.lowBeam = c.lowBeam;
-    s.highBeam = c.highBeam;
+    s.highBeam = this.beams.high(c.lowBeam, c.highBeam, this.input.flasher, this.settings.beamAssist);
     s.handbrake = c.handbrake > 0.5;
     s.ignition = c.ignition;
     s.engineRunning = v.engineRunning;
@@ -5325,7 +5873,12 @@ export class Game {
       hs.navActive = false;
       hs.tip = '';
       hs.tipAction = '';
-      if (w.atDoor) {
+      const open = this.time < this.tipUntil ? null : this.opens.walkHud(w, touch, lang, !this.wrecked && this.model === this.car);
+      if (this.time < this.tipUntil) hs.tip = this.tipText;
+      else if (open) {
+        hs.tip = open.tip;
+        hs.tipAction = open.action;
+      } else if (w.atDoor) {
         hs.tip = tr(touch ? 'getInTouch' : 'getIn', lang);
         hs.tipAction = 'KeyG';
       } else if (this.wrecked) hs.tip = tr('wreckedTip', lang);
@@ -5336,6 +5889,18 @@ export class Game {
       hs.tip = tr(touch ? 'getOutHintTouch' : 'getOutHint', lang);
       hs.tipAction = 'KeyG';
     }
+    if (!w && this.opens.passenger && this.model === this.car && !this.opens.busy && this.time >= this.tipUntil) {
+      // a passenger: where one sits – and, the car standing, how to get out
+      const out = Math.abs(kmh) < 1 && !demo?.active;
+      hs.tip = this.opens.seatTip(touch, lang, out);
+      hs.tipAction = out ? 'KeyG' : '';
+    }
+    // the buttons beside the person on foot: open, shut, get in (game/openplay.ts)
+    const near = w && this.state === 'drive' && this.def.kind !== 'pedestrian' ? this.opens.walkHud(w, touch, lang, !this.wrecked && this.model === this.car) : null;
+    this.opens.buttons(this.ui, near?.buttons ?? [], (id) => {
+      if (id === 'enter') this.getIn();
+      else this.opens.toggleAt(this.walker);
+    });
     const ac = this.aircraft;
     if (ac) {
       // flying: how fast through the air (the strip in km/h, the line in knots), how high, climbing or sinking
@@ -5368,6 +5933,7 @@ export class Game {
     }
     this.services.hud(hs, touch);
     if (this.crane) this.crane.hud(hs, touch);
+    if (this.forklift) this.forklift.hud(hs, touch);
     this.hud.update(hs, this.time);
   }
 
@@ -5385,7 +5951,17 @@ export class Game {
     window.speechSynthesis.speak(u);
   }
 
+  /** on foot: how far the head is turned by the glance keys (smoothed) */
+  private footGlance = 0;
+
+  /** the chase camera's place relative to the point it circles (smoothed) */
+  private readonly chaseOff = new THREE.Vector3();
+
   private updateCamera(dt: number): void {
+    {
+      const want = this.walker ? this.input.glanceYaw() : 0;
+      this.footGlance += (want - this.footGlance) * (1 - Math.exp(-dt * 8));
+    }
     const cam = this.app.camera;
     if (this.watcher) {
       this.watcher.camera(cam, this.input.c, dt);
@@ -5405,7 +5981,7 @@ export class Game {
       return;
     }
     const w = this.walker;
-    if (w || this.doorT >= 0) {
+    if (w || this.doorT >= 0 || this.opens.blending) {
       // on foot: the eyes of somebody standing beside the vehicle – and on the way in or out, from one to the other
       cam.near = 0.06;
       cam.fov = 62;
@@ -5432,7 +6008,8 @@ export class Game {
         const head = this.headV.set(w.x, w.y + 1.55, w.z);
         const pitch = Math.max(-1.1, Math.min(0.6, w.pitch - 0.22));
         const back = 3.3 * Math.cos(pitch);
-        to.set(w.x + Math.sin(w.yaw) * back, head.y - Math.sin(pitch) * 3.3, w.z + Math.cos(w.yaw) * back);
+        const gy0 = w.yaw + this.footGlance;
+        to.set(w.x + Math.sin(gy0) * back, head.y - Math.sin(pitch) * 3.3, w.z + Math.cos(gy0) * back);
         // (not into the ground behind a kerb or on a slope)
         const gy = this.footGround(to.x, to.z, to.y + 1);
         if (Number.isFinite(gy)) to.y = Math.max(to.y, gy + 0.5);
@@ -5440,12 +6017,18 @@ export class Game {
         q.setFromRotationMatrix(this.tmpM);
       } else if (w) {
         to.set(w.x, w.y + EYE, w.z);
-        q.setFromEuler(new THREE.Euler(w.pitch, w.yaw, 0, 'YXZ'));
+        // (looking left, right or back: the head turns – the glance keys and their buttons)
+        q.setFromEuler(new THREE.Euler(w.pitch, w.yaw + this.footGlance, 0, 'YXZ'));
       } else {
         to.copy(this.eyeWorld);
         q.copy(car.quaternion);
       }
-      if (this.doorT >= 0) {
+      if (this.opens.blending) {
+        // into the car's seat or out of it, as the door stands open (game/openplay.ts)
+        const k = this.opens.blend;
+        cam.position.copy(this.doorFrom.pos).lerp(to, k);
+        cam.quaternion.copy(this.doorFrom.quat).slerp(q, k);
+      } else if (this.doorT >= 0) {
         const k = Math.min(1, this.doorT / 0.6);
         cam.position.copy(this.doorFrom.pos).lerp(to, k);
         cam.quaternion.copy(this.doorFrom.quat).slerp(q, k);
@@ -5493,12 +6076,15 @@ export class Game {
       const fx = car.position.x + Math.sin(v.yaw) * behind;
       const fz = car.position.z + Math.cos(v.yaw) * behind;
       const back = this.tmpV.set(Math.sin(c.lookYaw) * reach, up + c.lookZoom * Math.sin(lift), Math.cos(c.lookYaw) * reach).applyAxisAngle(THREE.Object3D.DEFAULT_UP, v.yaw);
-      const target = this.camTarget.set(fx, car.position.y, fz).add(back);
+      // (the camera's place relative to the car is what is smoothed – not its place in the world: following a
+      // moving point by a share of the way per picture left it trailing by more or less with every uneven
+      // picture, a quick little zoom in and out while driving)
+      if (this.camSnap) this.chaseOff.copy(back);
+      else this.chaseOff.lerp(back, 1 - Math.exp(-dt * 8));
+      const target = this.camTarget.set(fx, car.position.y, fz).add(this.chaseOff);
       const g = this.app.tiles.heightAt(target.x, target.z);
       if (!Number.isNaN(g)) target.y = Math.max(target.y, g + 0.6);
-      // (after the car was put somewhere the camera is there at once – it does not fly in from where it was)
-      if (this.camSnap) cam.position.copy(target);
-      else cam.position.lerp(target, Math.min(1, dt * 8));
+      cam.position.copy(target);
       this.camSnap = false;
       cam.lookAt(fx, car.position.y + up, fz);
     } else if (this.cameraMode === 'free') {

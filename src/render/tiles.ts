@@ -104,7 +104,7 @@ export class TileManager {
   }
 
   /** the share of the tiles around the current position that are there (0 … 1: for a progress bar) */
-  progress = 1;
+  progress = 0;
 
   update(x: number, z: number): void {
     const { x0: minX, z0: minZ, size: tileSize } = this.grid;

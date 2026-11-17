@@ -68,6 +68,19 @@ Lizenz **CC BY 4.0** (<https://creativecommons.org/licenses/by/4.0/>) – umgese
 Wolken, Wind, nasse Straßen und Licht des Simulators. Der Dienst erfährt dabei die IP-Adresse; die
 Einstellungen sagen das und nennen die Quelle. Mit einem anderen Wetter als „echt“ wird nichts abgefragt.
 
+## Kraftstoffpreise
+
+Ohne weiteres zeigen die Tankstellen typische Preise. Wer in den Einstellungen einen eigenen (kostenlosen)
+Schlüssel von Tankerkönig einträgt, bekommt die heutigen Preise der Tankstellen im Umkreis von 25 km:
+**Tankerkönig** (<https://creativecommons.tankerkoenig.de>), Daten der Markttransparenzstelle für
+Kraftstoffe (MTS-K), Lizenz **CC BY 4.0**. Der Dienst erfährt dabei die IP-Adresse, den Schlüssel und das
+Gebiet; ohne Schlüssel wird nichts abgefragt.
+
+## Mein Standort
+
+„Mein Standort“ (Hauptmenü, große Karte) fragt den Browser nach der eigenen Position – der Browser fragt
+vorher um Erlaubnis. Die Position bleibt im Browser und wird nirgendwohin geschickt.
+
 ## Musik und Klänge
 
 Alle Klänge (Motoren, Straßenbahn, Flugzeug, Hupen, Türen, Explosion) und die Musik werden im Browser

@@ -36,6 +36,8 @@ export class TrafficRenderer {
   readonly people = new PeopleRenderer(CROWD_MAX);
   /** the camera: those far off, or far behind it, are left out (null: everybody is drawn) */
   view: THREE.Camera | null = null;
+  /** is a car's main beam lit (at night on an empty road, or flashing: game/beamplay.ts)?  null: never */
+  highOf: ((id: number) => boolean) | null = null;
   private readonly poses: PersonPose[] = [];
   private readonly shown: PersonPose[] = [];
   private readonly look = new THREE.Vector3();
@@ -103,7 +105,7 @@ export class TrafficRenderer {
       m.group.rotation.set(c.pitch, c.yaw, 0, 'YXZ');
       const r = m.dims.wheelRadius;
       m.setWheels([0, 0, 0, 0], [c.wheelSpin, c.wheelSpin, c.wheelSpin, c.wheelSpin], [r, r, r, r]);
-      m.setLamps({ low: true, high: false, brake: c.braking, reverse: false, left: blinkOn && c.blinker < 0, right: blinkOn && c.blinker > 0 });
+      m.setLamps({ low: true, high: this.highOf?.(c.id) ?? false, brake: c.braking, reverse: false, left: blinkOn && c.blinker < 0, right: blinkOn && c.blinker > 0 });
     }
     for (const [id, m] of this.cars) {
       if (seen.has(id)) continue;

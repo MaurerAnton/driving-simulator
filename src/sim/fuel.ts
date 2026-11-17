@@ -49,6 +49,7 @@ const TANKS: Record<string, TankSpec> = {
   lightTruckTrailer: { capacity: 150, fuel: 'diesel', efficiency: 0.42, reserve: 0.1, flow: 3.5 },
   truckSolo: { capacity: 300, fuel: 'diesel', efficiency: 0.43, reserve: 0.08, flow: 5 },
   truck: { capacity: 300, fuel: 'diesel', efficiency: 0.43, reserve: 0.08, flow: 5 },
+  semi: { capacity: 600, fuel: 'diesel', efficiency: 0.44, reserve: 0.07, flow: 6 },
   minibus: { capacity: 90, fuel: 'diesel', efficiency: 0.41, reserve: 0.1, flow: 3 },
   minibusTrailer: { capacity: 90, fuel: 'diesel', efficiency: 0.41, reserve: 0.1, flow: 3 },
   bus: { capacity: 280, fuel: 'diesel', efficiency: 0.42, reserve: 0.08, flow: 5 },

@@ -29,6 +29,30 @@ export const RIM = new THREE.MeshLambertMaterial({ color: 0xb4b8bc });
 /** window glass: tinted, seen through from both sides */
 export const GLASS = new THREE.MeshPhongMaterial({ color: 0x0c1418, shininess: 120, specular: 0x8fa4b4, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false });
 export const LAMP = new THREE.MeshBasicMaterial({ color: 0xfff3cf });
+/** the headlights switched off (glass over a dark reflector), and on full beam */
+export const LAMP_OFF = new THREE.MeshLambertMaterial({ color: 0xb9bcbd });
+export const LAMP_HIGH = new THREE.MeshBasicMaterial({ color: 0xffffff });
+/** the tail lamps with the lights off */
+export const TAIL_OFF = new THREE.MeshLambertMaterial({ color: 0x5c1210 });
+
+/**
+ * The lamps of a model as the light switch has them: every mesh in `root`
+ * made of the headlight material (LAMP / LAMP_OFF / LAMP_HIGH) shows the
+ * beams, every given tail lamp glows with the lights on (and brightly on the brake).
+ */
+export function lightLamps(root: THREE.Object3D, s: { lowBeam?: boolean; highBeam?: boolean; braking?: boolean }, tails: readonly THREE.Mesh[], heads: THREE.Mesh[] | null): THREE.Mesh[] {
+  let list = heads;
+  if (!list) {
+    list = [];
+    root.traverse((o) => {
+      if (o instanceof THREE.Mesh && o.material === LAMP) list!.push(o);
+    });
+  }
+  const head = s.highBeam ? LAMP_HIGH : s.lowBeam ? LAMP : LAMP_OFF;
+  for (const h of list) h.material = head;
+  for (const t of tails) t.material = s.braking ? LAMP_STOP : s.lowBeam ? TAIL : TAIL_OFF;
+  return list;
+}
 export const TAIL = new THREE.MeshBasicMaterial({ color: 0xb01410 });
 export const AMBER = new THREE.MeshBasicMaterial({ color: 0xff9a1a });
 
@@ -134,6 +158,7 @@ export class PlayerTruck {
   private readonly trailerWheels: THREE.Group[] = [];
   private readonly steering = new THREE.Group();
   private readonly brakeLamps: THREE.Mesh[] = [];
+  private heads: THREE.Mesh[] | null = null;
   private readonly indicators: Array<{ mesh: THREE.Mesh; side: number }> = [];
   private readonly leg: THREE.Mesh;
   private readonly cabin = new THREE.Group();
@@ -293,7 +318,10 @@ export class PlayerTruck {
     const thw = tr.width / 2;
     const tFront = -(tr.hitchToAxle - tr.bodyFront);
     const tRear = tr.length - tr.hitchToAxle;
-    tg.add(box(-thw, thw, 1.12, tr.height, tFront, tRear, WHITE));
+    // (named for its rear doors, which open: render/rearopen.ts)
+    const shell = box(-thw, thw, 1.12, tr.height, tFront, tRear, WHITE);
+    shell.name = 'trailer box';
+    tg.add(shell);
     tg.add(box(-0.5, 0.5, 0.7, 1.12, tFront, tRear - 0.1, FRAME));
     tg.add(box(-thw + 0.05, thw - 0.05, 0.5, 0.62, tRear - 0.12, tRear, FRAME));
     // the rigid drawbar and its eye
@@ -320,7 +348,7 @@ export class PlayerTruck {
     // the support leg under the drawbar: down when the trailer stands alone
     this.leg = box(-0.06, 0.06, 0, TRUCK_HITCH.height - 0.1, -tr.hitchToAxle + 0.75, -tr.hitchToAxle + 0.87, FRAME);
     tg.add(this.leg);
-    letterBox(tg, BRAND, thw, 2.55, (tFront + tRear) / 2, tRear, tRear - tFront - 0.8);
+    letterBox(tg, BRAND, thw, 2.55, (tFront + tRear) / 2, tRear, tRear - tFront - 0.8).name = 'trailer rear plate';
   }
 
   /**
@@ -348,7 +376,8 @@ export class PlayerTruck {
       w.rotation.set(-(s.wheelSpin[i] ?? 0), i < 2 ? -(s.wheelSteer[i] ?? 0) : 0, 0, 'YXZ');
     }
     this.steering.rotation.z = -s.steerWheel;
-    for (const lamp of this.brakeLamps) lamp.material = s.braking ? LAMP_STOP : TAIL;
+    // (the headlights and the tail lamps as the light switch has them)
+    this.heads = lightLamps(this.root, s, this.brakeLamps, this.heads);
     const on = s.blinkOn && s.ignition;
     for (const ind of this.indicators) ind.mesh.material = on && (s.hazard || s.indicator === ind.side) ? AMBER : this.off;
     this.panel.update(s, now);

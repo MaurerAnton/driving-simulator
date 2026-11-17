@@ -38,13 +38,15 @@ const ZOOM_FAR = 5;
 
 /** mirror: look into the next mirror, large over the picture (ui/mirrorzoom.ts) */
 /** service: fill up at a pump, wash at a car wash, call for help with an empty tank, skip the loading of a truck (game/serviceworld.ts) */
-export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto' | 'mirror' | 'service';
+export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto' | 'mirror' | 'service' | 'wiper' | 'open';
 
 /** Lateral acceleration (m/s²) the steering keys may ask for: brisk in town, gentle on the motorway. */
 const keyLateral = (v: number): number => 2.4 + 3.4 / (1 + (v / 15) * (v / 15));
 /** … and what full deflection of a stick or of the steering bar asks for: close to what the tyres hold. */
 const ANALOG_LATERAL = 7;
 const TAU = Math.PI * 2;
+/** O held longer than this (ms) is the flasher, not a switch of the main beam */
+const FLASH_HOLD_MS = 350;
 /** an angle brought into -π … π */
 const wrap = (a: number): number => a - TAU * Math.round(a / TAU);
 
@@ -214,9 +216,10 @@ export class Input {
           this.cam.dolly += Math.log(scale);
         } else if (this.orbit) this.c.lookZoom = clamp(this.c.lookZoom / scale, 3.5, this.zoomMax * ZOOM_FAR);
       } else if (e.pointerId === this.lookId) {
-        // a thumb travels less than a mouse: a third of the screen is a full shoulder check
+        // a thumb travels less than a mouse: a third of the screen is a full shoulder check – and it turns
+        // the view the way the mouse does (to the right when drawn to the right, down when drawn down)
         const k = 5.4 / Math.max(320, window.innerWidth);
-        this.turnLook(dx * k, dy * k * 0.5 * inv);
+        this.turnLook(-dx * k, -dy * k * 0.5 * inv);
       }
     });
     // the wheel of the mouse moves the camera closer to the car or further away
@@ -263,6 +266,8 @@ export class Input {
     if (this.touch.active) {
       fwd += this.touch.throttle - this.touch.brake;
       turn -= this.touch.steer;
+      // (the pedal pressed near its top: running)
+      run ||= this.touch.throttle > 0.85;
     }
     const pad = this.readPad();
     if (pad) {
@@ -271,6 +276,28 @@ export class Input {
       run ||= pad.throttle > 0.95;
     }
     return { fwd: clamp(fwd, -1, 1), turn: clamp(turn, -1, 1), run };
+  }
+
+  /**
+   * A forklift's mast (game/forkliftplay.ts): the forks up (+) or down, the
+   * mast tilted back (+) or forwards, the side-shift right (+) or left, each
+   * −1 … 1 – from Page Up / Page Down, Home / End and Insert / Delete (the
+   * buttons on the screen press the same keys), and a gamepad's right stick
+   * (up and down: the forks) and its pad (left and right: the tilt).
+   */
+  forkInput(): { lift: number; tilt: number; shift: number } {
+    if (!this.enabled) return { lift: 0, tilt: 0, shift: 0 };
+    let lift = (this.key('PageUp') ? 1 : 0) - (this.key('PageDown') ? 1 : 0);
+    let tilt = (this.key('Home') ? 1 : 0) - (this.key('End') ? 1 : 0);
+    const shift = (this.key('Delete') ? 1 : 0) - (this.key('Insert') ? 1 : 0);
+    const pad = this.readPad();
+    if (pad && pad.kind === 'standard') {
+      const gp = navigator.getGamepads().find((g) => g?.connected);
+      const ry = gp?.axes[3] ?? 0;
+      if (Math.abs(ry) > 0.15) lift -= ry;
+      tilt += (pad.buttons[15] ? 1 : 0) - (pad.buttons[14] ? 1 : 0);
+    }
+    return { lift: clamp(lift, -1, 1), tilt: clamp(tilt, -1, 1), shift: clamp(shift, -1, 1) };
   }
 
   /**
@@ -324,6 +351,14 @@ export class Input {
   private readonly camOut = { yaw: 0, pitch: 0, right: 0, fwd: 0, dolly: 0, keyRight: 0, keyFwd: 0, keyUp: 0, fast: false, reset: false };
 
   /** Looking around with the mouse or a finger; the stops depend on what is turning: a head or a camera. */
+  /** Where the glance keys (or their buttons) turn the head now: left, right, back over the shoulder (radians, 0: ahead). */
+  glanceYaw(): number {
+    const l = this.key('KeyJ');
+    const r = this.key('KeyK');
+    if (this.key('KeyU') || (l && r)) return Math.PI;
+    return l ? 1.6 : r ? -1.6 : 0;
+  }
+
   private turnLook(dYaw: number, dPitch: number): void {
     if (this.freeCam) {
       this.cam.yaw += dYaw;
@@ -436,7 +471,8 @@ export class Input {
         e.preventDefault();
         return;
       }
-      if (this.crane && code !== 'KeyV' && code !== 'KeyM' && code !== 'KeyG') {
+      // (working a crane: its own keys – but the camera, the map, the door, and the lights, hazard lights, horn and ignition still work)
+      if (this.crane && !['KeyV', 'KeyM', 'KeyG', 'KeyL', 'KeyO', 'KeyX', 'KeyH', 'KeyI'].includes(code)) {
         if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
         return;
       }
@@ -480,7 +516,8 @@ export class Input {
           if (!c.lowBeam) c.highBeam = false;
           break;
         case 'KeyO':
-          c.highBeam = !c.highBeam && c.lowBeam;
+          // (a tap switches the main beam when it is let go; held, it is the flasher – see `flasher`)
+          this.oDownAt = performance.now();
           break;
         case 'KeyB':
           c.seatbelt = !c.seatbelt;
@@ -494,6 +531,10 @@ export class Input {
         case 'KeyG':
           this.fire('door');
           break;
+        case 'Period':
+          // (on foot: open or shut the door, the bonnet, the boot where one stands – game/openplay.ts)
+          this.fire('open');
+          break;
         case 'KeyM':
           this.fire('map');
           break;
@@ -506,15 +547,38 @@ export class Input {
         case 'Digit9':
           this.fire('service');
           break;
+        case 'Digit8':
+          // the wiper stalk one place on (Digit7 held: the washer, see `washer`)
+          this.fire('wiper');
+          break;
         default:
           if (/^Digit[1-6]$/.test(code) && this.gearMax === 6) c.gear = Number(code.slice(5));
           else if (code === 'Digit1' && this.gearMax === 1) c.gear = 1;
       }
       if (code.startsWith('Arrow')) e.preventDefault();
     } else {
+      // the main beam on or off: O tapped, not held as the flasher
+      if (code === 'KeyO' && this.keys.has('KeyO') && this.enabled && performance.now() - this.oDownAt < FLASH_HOLD_MS) this.c.highBeam = !this.c.highBeam && this.c.lowBeam;
       this.keys.delete(code);
       if (code === 'AltLeft' || code === 'AltRight') e.preventDefault();
     }
+  }
+
+  /**
+   * The headlight flasher (the stalk pulled towards one): the main beam lit
+   * while O is held – a short tap switches the main beam instead – or while
+   * the flasher's own button on the screen is held (its code 'Flash').
+   */
+  get flasher(): boolean {
+    return this.enabled && (this.keys.has('Flash') || this.keys.has('KeyO'));
+  }
+
+  /** when O went down (ms, performance.now) */
+  private oDownAt = 0;
+
+  /** The washer: sprays while its key (7) or button is held. */
+  get washer(): boolean {
+    return this.enabled && this.key('Digit7');
   }
 
   private key(...codes: string[]): boolean {

@@ -274,7 +274,9 @@ test('the faults of the truck lessons cite the test regulations and the StVO, wi
 });
 
 test('the lessons of the truck: three on the yard, then the test with all of them before the drive', () => {
-  const truck = LESSONS.filter((l) => l.vehicle === 'truck');
+  const truck = LESSONS.filter((l) => (l.vehicles ?? [l.vehicle]).includes('truck'));
+  // (the articulated lorry has the same lessons: game/semice.ts)
+  assert.deepEqual(LESSONS.filter((l) => l.vehicles?.includes('semi')), truck);
   assert.deepEqual(truck.map((l) => l.id), ['ceCouple', 'ceCorner', 'ceRamp', 'ceExam']);
   assert.deepEqual(truck.filter((l) => l.kind === 'yard').map((l) => l.tasks), [['couple'], ['corner'], ['ramp']]);
   const exam = truck[3];

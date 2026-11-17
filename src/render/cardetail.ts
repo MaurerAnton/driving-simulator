@@ -54,6 +54,8 @@ const v3 = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3
 
 // materials of the outside (the inside's are made per car, as the cabin's: render/car.ts cabinMaterial)
 const GAP = new THREE.MeshLambertMaterial({ color: 0x0a0b0c, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+// (the parts that open leave the gaps along their edges on the body: render/caropen.ts)
+GAP.name = 'panel gap';
 const GLOSS_BLACK = new THREE.MeshPhongMaterial({ color: 0x0e0f11, shininess: 70, specular: 0x4a4f55, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
 const RUBBER = new THREE.MeshLambertMaterial({ color: 0x141517 });
 const PLASTIC = new THREE.MeshLambertMaterial({ color: 0x1d1f22, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
@@ -773,6 +775,11 @@ export class CarDetail {
         this.keep(pp.build(p, 'pedal detail'), 0);
       });
     }
+  }
+
+  /** What the finer model added (for the parts that open to take theirs: render/caropen.ts). */
+  get meshes(): readonly THREE.Object3D[] {
+    return this.added;
   }
 
   /** Keep the meshes as part of the finer model (and of the see-through cabin, in `layer`; −1: never see-through). */

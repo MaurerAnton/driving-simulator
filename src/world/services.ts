@@ -20,6 +20,8 @@
  * long side is u and the short side v.
  */
 
+import { fuelPrices } from './fuelprices.ts';
+
 /** The newest version of services.json.gz this reads. */
 export const SERVICES_VERSION = 1;
 
@@ -111,7 +113,12 @@ export function fuelsOf(tags: Record<string, string | undefined>): string[] {
 }
 
 /** A station's price of a fuel: the generic price, a few cents up or down from station to station (the same every visit). */
-export function priceAt(site: { osm: string }, fuel: string): number {
+export function priceAt(site: { osm: string; x?: number; z?: number }, fuel: string): number {
+  // (today's real price, where the player has a key of Tankerkönig: world/fuelprices.ts)
+  if (site.x !== undefined && site.z !== undefined) {
+    const live = fuelPrices.priceAt(site.x, site.z, fuel);
+    if (live !== null) return live;
+  }
   const base = FUELS[fuel]?.price ?? 1.8;
   let h = 2166136261;
   for (let i = 0; i < site.osm.length; i++) h = Math.imul(h ^ site.osm.charCodeAt(i), 16777619);

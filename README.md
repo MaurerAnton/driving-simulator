@@ -144,6 +144,17 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   Autopilot weiter zu seinen Zielen; was ihm im Weg steht, umfährt er.
 - **Unfall:** gegen eine Hauswand mit 70 km/h oder mehr geht das Fahrzeug in Flammen auf – zu Fuß weiter, ein
   Knopf (oder `G`) holt ein neues.
+- **Neu in 1.5.0:** ein **Sattelzug** (CE) mit Sattelkupplung, Stützbeinen und eigener Kupplungsübung, der Lkw der
+  Klasse C als dreiachsiger 26-Tonner, ein **Gabelstapler** mit Hubmast, Traglastdiagramm und Aufgaben; Türen, Motorhaube
+  und Heckklappe des Autos öffnen sich, jeder Sitz lässt sich nehmen (mitfahren); Anhänger und Kofferaufbauten öffnen
+  hinten, wie sie es wirklich tun; **Scheinwerfer** leuchten nachts die Straße aus, Fernlicht abblenden (§ 17 StVO),
+  Lichthupe, Fernlichtassistent; auf „Sehr hoch“ Regen und Schnee auf der Scheibe mit **Scheibenwischern** und echtes
+  **Wasser** in Flüssen und Seen – durchs Wasser fahren wäscht das Auto; **Stauschilder** über Schlangen, und der Verkehr
+  kommt an Hindernissen vorbei; auf der großen Karte **Suche** nach Orten, Haltestellen und Adressen, „Mein Standort“,
+  Einsatzfahrzeuge, Baustellen und Demonstrationen zum Zusehen, Tankstellen und Waschanlagen mit Preisen (heutige mit
+  eigenem Tankerkönig-Schlüssel) und **Ebenen** zum Ein- und Ausblenden; „Fahrzeug wechseln“ ohne neu zu laden; zu Fuß
+  **der eigenen Position folgen**; eine F1-Seite, die jede Taste und jeden Knopf erklärt; Ortstafeln nur, wo sie wirklich
+  stehen; eine leichtere Grafikstufe „Niedrig“ für schwache Handys.
 - **Jedes Modell:** ein Testplatz auf dem Übungsplatz mit allen Fahrzeugen des Spiels nebeneinander (jede
   Führerscheinklasse, mit und ohne Anhänger), den Autos, Radfahrern und Leuten des Verkehrs, zwei Straßenbahnen
   und dem Flugzeug – zu Fuß oder mit dem eigenen Fahrzeug zwischen ihnen.
@@ -455,7 +466,7 @@ muss man zum Spielen und Entwickeln nicht.
 ### Tests
 
 ```bash
-npm test             # 587 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
+npm test             # 666 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
                      # Tank und Waschanlage, Wetter, Jahreszeiten, Ampel-Uhren, Autopilot des Flugzeugs, Karten, Klänge; Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
                      # Klassen mit jeder Motorleistung (77), Flugphysik (25), Flugplätze (3), Straßenbahn fahren, ihr
                      # Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne im Verkehr (10), Fahrpläne
@@ -533,7 +544,7 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 587 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
+- **Automatisch geprüft:** 666 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
   Straßenbahn mit Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne, Buslinien, die Wiederholung, Bus auf der Linie, zu Fuß an Fußgängerampel und Zebrastreifen, Fernsicht, Anhänger, Aufgaben der Klasse CE,
   Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
   Umgebungsverkehrs (seit 1.4.0 auch Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen und Demonstrationen,
@@ -579,7 +590,9 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   wenn sie in den Umkreis von gut einem halben Kilometer kommt.
 - **Buslinien:** Abbiegeverbote der Karte gelten auch für Busse, Busspuren und Busstraßen fehlen – dort weicht ein
   Bus vom echten Weg ab; ein Drittel der Linien ist nur teilweise auf der Karte (sie führen aus Nordhessen hinaus).
-- **Zu Fuß:** Die eigene Figur sieht immer gleich aus (wählen lässt sie sich noch nicht).
+- **Zu Fuß:** Die eigene Figur sieht immer gleich aus (wählen lässt sie sich noch nicht). „Der eigenen Position
+  folgen“ nutzt nur die GPS-Ortung des Browsers; feinere Schritte zwischen zwei Ortungen aus den Bewegungssensoren
+  (Koppelnavigation) wären erst in einer eigenen App verlässlich möglich – vorgemerkt.
 - **Kräne:** Die Wiederholung zeigt den Kran in seiner letzten Stellung; die Last dreht sich nicht am Haken;
   der Turmdrehkran lässt sich nicht aufbauen oder klettern; der dreiachsige Autokran fährt auf dem Vierrad-Modell.
 - **Theoriestunden:** auf dem Übungsplatz nachgestellt, nicht an echten Kreuzungen; die Szenen haben keinen Ton.
@@ -725,6 +738,11 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   zoom (`Y`); every vehicle sounds like itself, and there is music made as it plays (off by default).
 - **The autopilot** lets you take the wheel for a moment and drives on when you let go; hit a wall at 70 km/h
   or more and the vehicle goes up in flames – walk on and take a new one.
+- **New in 1.5.0:** an articulated lorry (CE) and a forklift; the car's doors, bonnet and tailgate open and every
+  seat can be taken; headlights that light the road at night with the main-beam rules; windscreen rain, snow and
+  wipers and real water on "Very high"; queue labels and traffic that gets past blocks; map search, "my location",
+  watching emergency vehicles and events, fuel prices and map layers; changing vehicle without reloading; following
+  your real position on foot; an F1 page for every key and button.
 - **Every model:** a test place on the practice yard with every vehicle of the game side by side, the cars,
   cyclists and people of the traffic, two trams and the aeroplane – walk or drive among them.
 - **Flying:** a light two-seat high-wing aeroplane (100 to 180 PS) takes off from the 21 airfields of
@@ -788,7 +806,7 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 587 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
+Verified automatically by 666 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
 fuel and car washes, weather and seasons, signal timers, the aeroplane's autopilot, maps and sounds; vehicle dynamics of every vehicle with every engine power, the tram with its pantograph and
 coupled units, the trailer, the class-CE tasks, cyclists, traffic lights, on foot and the pedestrian lights, trams with their lines and
 timetables, bus lines, replays, the bus line, flight physics, airfields, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,

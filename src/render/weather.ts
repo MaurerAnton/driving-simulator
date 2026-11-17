@@ -28,7 +28,7 @@ import type { WeatherKind, WeatherState } from '../game/weather.ts';
 export type WeatherQuality = 'low' | 'medium' | 'high' | 'ultra';
 
 /** the most raindrops in the air at once, by graphics quality (snow: 60 % of it – the flakes are bigger) */
-export const WEATHER_PARTICLES: Readonly<Record<WeatherQuality, number>> = Object.freeze({ low: 1200, medium: 3000, high: 6000, ultra: 10000 });
+export const WEATHER_PARTICLES: Readonly<Record<WeatherQuality, number>> = Object.freeze({ low: 600, medium: 3000, high: 6000, ultra: 10000 });
 const SNOW_SHARE = 0.6;
 
 /** What the weather does to the picture now (smoothed). */

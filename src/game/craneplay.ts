@@ -737,7 +737,8 @@ export class CraneWork {
     } else if (!this.operating && this.type !== 'tower' && stillOk && t?.inStand({ vx: this.veh.x, vz: this.veh.z, yaw: this.veh.yaw })) {
       // parked in its stand: change to working the crane
       hs.tip = tr(touch ? 'craneTip.operateTouch' : 'craneTip.operate', lang);
-      hs.tipAction = touch ? '' : 'KeyG';
+      // (on a touch screen the tip itself is the button – as well as «Crane» beside the controls)
+      hs.tipAction = 'KeyG';
     }
   }
 

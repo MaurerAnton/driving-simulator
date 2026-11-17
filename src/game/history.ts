@@ -79,3 +79,38 @@ export function saveWay(stops: WayRecord['stops'], self: boolean, now = new Date
   write(WAYS_KEY, list);
   return list;
 }
+
+// ------------------------------------------------------------------ favourite places
+
+/** A place the player keeps: a name (given, or that of the road there) and where it is. */
+export interface FavouriteRecord {
+  name: string;
+  x: number;
+  z: number;
+  yaw: number;
+}
+
+const FAVOURITES_KEY = 'fahrsim.favourites';
+/** how many are kept at most */
+export const FAVOURITES_KEPT = 50;
+
+/** The favourite places, in the order they were added (the newest first). */
+export function loadFavourites(): FavouriteRecord[] {
+  return read<FavouriteRecord>(FAVOURITES_KEY).filter((p) => p && typeof p.name === 'string' && finite(p.x) && finite(p.z));
+}
+
+/** A place added to the favourites (a place within 20 m of one already there replaces it). */
+export function saveFavourite(p: FavouriteRecord): FavouriteRecord[] {
+  const list = loadFavourites().filter((q) => Math.hypot(q.x - p.x, q.z - p.z) > 20);
+  list.unshift({ name: p.name, x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10, yaw: Math.round((p.yaw || 0) * 1000) / 1000 });
+  list.length = Math.min(list.length, FAVOURITES_KEPT);
+  write(FAVOURITES_KEY, list);
+  return list;
+}
+
+/** A favourite taken out again (the one within 20 m of x, z). */
+export function removeFavourite(x: number, z: number): FavouriteRecord[] {
+  const list = loadFavourites().filter((q) => Math.hypot(q.x - x, q.z - z) > 20);
+  write(FAVOURITES_KEY, list);
+  return list;
+}

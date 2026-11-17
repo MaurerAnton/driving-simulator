@@ -127,6 +127,11 @@ export class ServiceWorld {
   private readonly fillView = new FillView();
   private readonly spray = new SprayView();
   private readonly dirtLook = new DirtLook();
+  /** The fuel stations and car washes of the map (for the big map; none before the file is read). */
+  sites(): readonly ServiceSite[] {
+    return this.index?.sites ?? [];
+  }
+
   /** the fuel in the tank of the vehicle being driven (null: one without a tank) */
   tank: FuelTank | null = null;
   /** the dirt on it, 0 clean … 1 filthy */

@@ -13,6 +13,7 @@ import type { Trailer } from '../sim/trailer.ts';
 import type { Vehicle } from '../sim/vehicle/index.ts';
 import { CouplingProcedure, ManoeuvreJudge, TRUCK_OUTLINE, taskLayout } from './ce.ts';
 import type { CouplingState, CouplingStatus, ManoeuvreStatus, TaskId, TaskLayout, YardFrame } from './ce.ts';
+import { SEMI_APPROACH, SEMI_RIG, semiStop, syncSemi } from './semice.ts';
 
 /** how far past the coupling the drawbar eye can get before the truck's rear end stands against the drawbar (m) */
 const PAST_THE_EYE = 0.22;
@@ -31,12 +32,15 @@ export class YardTask {
   /** the truck ran into the standing trailer in the last step, faster than a crawl */
   bumped = false;
   private readonly mpos = new Float64Array(3);
+  /** done with the articulated lorry (game/semice.ts) rather than the truck with the drawbar trailer */
+  readonly semi: boolean;
 
-  constructor(id: TaskId) {
+  constructor(id: TaskId, semi = false) {
     this.id = id;
+    this.semi = semi;
     this.layout = taskLayout(id);
-    this.judge = id === 'couple' ? null : new ManoeuvreJudge(id);
-    this.coupling = id === 'couple' ? new CouplingProcedure() : null;
+    this.judge = id === 'couple' ? null : new ManoeuvreJudge(id, semi ? SEMI_RIG : undefined);
+    this.coupling = id === 'couple' ? new CouplingProcedure(semi ? SEMI_APPROACH : undefined) : null;
   }
 
   /** One step of a reversing manoeuvre on the yard `frame`. */
@@ -56,7 +60,8 @@ export class YardTask {
   /** One step of uncoupling and coupling: moves on in the procedure and couples or uncouples the trailer. */
   couple(dt: number, truck: Vehicle, trailer: Trailer, handbrake: boolean): CouplingStatus {
     this.bumped = false;
-    if (!trailer.coupled) {
+    if (!trailer.coupled && this.semi) this.bumped = semiStop(truck, trailer, this.mpos);
+    else if (!trailer.coupled) {
       // The trailer stands alone.  Its drawbar eye goes into the coupling and no further: backed up
       // beside it, or past it, the truck's rear cross-member stops at the drawbar.
       truck.getModelPosition(this.mpos);
@@ -87,6 +92,7 @@ export class YardTask {
     const st = this.coupling!.update(s, dt);
     if (st.uncouple) trailer.uncouple();
     if (st.couple) trailer.couple();
+    if (this.semi) syncSemi(trailer, this.coupling!);
     return st;
   }
 }

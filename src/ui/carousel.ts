@@ -60,6 +60,7 @@ const ICONS: Record<VehicleKind, string> = {
   lightTruckTrailer: '🚚',
   truckSolo: '🚛',
   truck: '🚛',
+  semi: '🚛',
   minibus: '🚐',
   minibusTrailer: '🚐',
   bus: '🚌',
@@ -71,6 +72,7 @@ const ICONS: Record<VehicleKind, string> = {
   mobileCrane: '🏗️',
   loaderCrane: '🏗️',
   towerCrane: '🏗️',
+  forklift: '🏭',
   pedestrian: '🚶',
 };
 
@@ -350,6 +352,7 @@ export function carouselMenu(c: CarouselContext): HTMLElement {
   };
   mode(c.t(kind === 'plane' ? 'freeFly' : 'free'), c.t(kind === 'tram' ? 'freeTramDesc' : kind === 'pedestrian' ? 'freeWalkDesc' : kind === 'plane' ? 'freeFlyDesc' : 'freeDesc'), 'free', true);
   if (kind === 'tram') mode(c.t('demo'), c.t('demoTramDesc'), 'demo');
+  if (kind === 'plane') mode(c.t('demoFly'), c.t('demoFlyDesc'), 'demo');
   if (kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane') {
     mode(c.t('demo'), c.t('demoDesc'), 'demo');
     mode(c.t('tourTitle'), c.t('tourDesc'), 'tour');
