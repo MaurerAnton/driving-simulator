@@ -98,10 +98,10 @@
   },
   {
    "id": "UUID_29b31aec-f92e-4977-9ebc-dc89b4945fa7",
-   "wall": "#eee4c8",
-   "roof": "#a8553a",
+   "wall": "#dccaa6",
+   "roof": "#6a3a2e",
    "material": "render",
-   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof"
+   "note": "Schubertstraße: cream rendered block of flats, terracotta tiled roof; Baunatal centre (street photos, round 3, vp 207-0): beige render block of flats, dark red-brown tiles (overlay: cream, terracotta)"
   },
   {
    "id": "DEHE061800006Lnt",
@@ -145,10 +145,10 @@
   },
   {
    "id": "UUID_273c016d-8995-403c-9064-41fac07b41d1",
-   "wall": "#e2d3b5",
+   "wall": "#e4e2dc",
    "roof": "#7a3f30",
    "material": "render",
-   "note": "Baunatal centre: beige walls, redbrown roof"
+   "note": "Baunatal centre: beige walls, redbrown roof; Baunatal centre (street photos, round 3, vp 023-1): white / pale grey render (game: beige-yellow)"
   },
   {
    "id": "DEHE061800006Lx0",
@@ -177,10 +177,10 @@
   },
   {
    "id": "DEHE061800006LvC",
-   "wall": "#f2f0ea",
+   "wall": "#dccaa6",
    "roof": "#57504c",
    "material": "render",
-   "note": "Baunatal centre: white walls, darkbrown roof"
+   "note": "Baunatal centre: white walls, darkbrown roof; Baunatal centre (street photos, round 3, vp 023-0): beige/sand render (game: white-grey)"
   },
   {
    "id": "DEHE061800006LBd",
@@ -224,24 +224,24 @@
   },
   {
    "id": "DEHE061800006LE8",
-   "wall": "#efe2a8",
-   "roof": "#4b4b4e",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
    "material": "render",
-   "note": "Baunatal centre: paleyellow walls, anthracite roof"
+   "note": "Baunatal centre: paleyellow walls, anthracite roof; Baunatal centre (street photos, round 3, vp 050-0): white render, anthracite tiles (overlay had pale yellow)"
   },
   {
    "id": "DEHE061800006LFM",
    "wall": "#f2f0ea",
-   "roof": "#4b4b4e",
+   "roof": "#8a4434",
    "material": "render",
-   "note": "Baunatal centre: white walls, anthracite roof"
+   "note": "Baunatal centre: white walls, anthracite roof; Baunatal centre (street photos, round 3, vp 240-0): white render (already), red-brown tiles on the house and its low front annex (overlay/game: anthracite)"
   },
   {
    "id": "DEHE061800006LBI",
-   "wall": "#f2f0ea",
-   "roof": "#9a5540",
+   "wall": "#eee4c8",
+   "roof": "#5e4030",
    "material": "render",
-   "note": "Baunatal centre: white walls, red roof"
+   "note": "Baunatal centre: white walls, red roof; Baunatal centre (street photos, round 3, vp 103-0): cream render, brown tiles (overlay had white and a red-brown roof)"
   },
   {
    "id": "DEHE061800006LlG",
@@ -286,16 +286,17 @@
   },
   {
    "id": "UUID_f62daef4-6300-4923-a10a-ea0db1efc29f",
-   "wall": "#eee4c8",
+   "wall": "#ead79c",
+   "roof": "#6a3a2e",
    "material": "render",
-   "note": "Baunatal centre: cream walls"
+   "note": "Baunatal centre: cream walls; Baunatal centre (street photos, round 3, vp 142-1, 144-1): pale yellow with salmon/brown stripes, dark red-brown tiles (overlay: cream, no roof colour)"
   },
   {
    "id": "UUID_fe406a04-057f-4091-82d6-1db1d7de3f20",
-   "wall": "#efe9dc",
-   "roof": "#6b4a3a",
-   "material": "render",
-   "note": "Baunatal centre: warmwhite walls, brown roof"
+   "wall": "#b07a52",
+   "roof": "#3a3a3c",
+   "material": "brick",
+   "note": "Baunatal centre: warmwhite walls, brown roof; Baunatal centre (street photos, round 3, vp 140-0, 020-0): orange-brown facing brick on both storeys (sandy in full sun at 020-0), white rendered gable, anthracite tiles (game: white with a red-brown roof)"
   },
   {
    "id": "DEHE061800006LqA",
@@ -361,10 +362,10 @@
   },
   {
    "id": "GUID_1488958994062_26860573",
-   "wall": "#efe9dc",
-   "roof": "#7a3f30",
+   "wall": "#ebe8e0",
+   "roof": "#6a4a3a",
    "material": "render",
-   "note": "Baunatal centre: warmwhite walls, redbrown roof"
+   "note": "Baunatal centre: warmwhite walls, redbrown roof; Baunatal centre (street photos, round 3, vp 110-1): white render, brown tiles (game: bright red roof)"
   },
   {
    "id": "DEHE061800006LBi",
@@ -376,16 +377,16 @@
   {
    "id": "UUID_e6db7ded-5a12-4cdd-8be3-fc32946c233f",
    "wall": "#f2f0ea",
-   "roof": "#5c4b46",
+   "roof": "#5e4434",
    "material": "render",
-   "note": "Baunatal centre: white walls, greybrown roof"
+   "note": "Baunatal centre: white walls, greybrown roof; Baunatal centre (street photos, round 3, vp 107-1): end house of the same terrace: brown tiles (wall already white)"
   },
   {
    "id": "DEHE061800006LwS",
-   "wall": "#f2f0ea",
+   "wall": "#dcdc96",
    "roof": "#4b4b4e",
    "material": "render",
-   "note": "Baunatal centre: white walls, anthracite roof"
+   "note": "Baunatal centre: white walls, anthracite roof; Baunatal centre (street photos, round 3, vp 133-1 (also seen in 071-1)): pale lime / yellow-green render, anthracite roof (overlay had white)"
   },
   {
    "id": "DEHE061800006Lvf",
@@ -449,9 +450,10 @@
   },
   {
    "id": "DEHE061800006LBp",
-   "wall": "#f2f0ea",
+   "wall": "#eee4c8",
+   "roof": "#5e4030",
    "material": "render",
-   "note": "Baunatal centre: white walls"
+   "note": "Baunatal centre: white walls; Baunatal centre (street photos, round 3, vp 109-0): cream render, brown tiles"
   },
   {
    "id": "DEHE061800006LgX",
@@ -590,10 +592,10 @@
   },
   {
    "id": "UUID_8a563b92-8cae-47b4-93dc-0f676c99fb14",
-   "wall": "#efe2a8",
-   "roof": "#57504c",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
    "material": "render",
-   "note": "Baunatal centre: paleyellow walls, darkbrown roof"
+   "note": "Baunatal centre: paleyellow walls, darkbrown roof; Baunatal centre (street photos, round 3, vp 226-0): white render block, dark brown roof (overlay had pale yellow)"
   },
   {
    "id": "DEHE061800006LEW",
@@ -625,10 +627,10 @@
   },
   {
    "id": "UUID_26f1f111-606b-45e6-b94c-7506448a70de",
-   "wall": "#d6d6d2",
-   "roof": "#777774",
-   "material": "render",
-   "note": "Baunatal centre: palegrey walls, grey roof"
+   "wall": "#c9b48e",
+   "roof": "#3a3a3c",
+   "material": "brick",
+   "note": "Baunatal centre: palegrey walls, grey roof; Baunatal centre (street photos, round 3, vp 104-0): light beige facing brick, anthracite tiles (overlay had pale grey)"
   },
   {
    "id": "UUID_0b199420-27cf-461e-8951-cc43cc466a02",
@@ -688,10 +690,10 @@
   },
   {
    "id": "GUID_1488958994062_25982476",
-   "wall": "#55575a",
+   "wall": "#ebe8e0",
    "roof": "#4b4b4e",
-   "material": "plain",
-   "note": "Baunatal centre: anthracite walls, anthracite roof"
+   "material": "render",
+   "note": "Baunatal centre: anthracite walls, anthracite roof; Baunatal centre (street photos, round 3, vp 186-0): white render under a large anthracite roof that comes far down (overlay had anthracite walls - probably the roof's colour; game: black walls)"
   },
   {
    "id": "UUID_82825412-ffe1-49f2-8b1b-13de2f44f761",
@@ -751,15 +753,16 @@
   {
    "id": "UUID_9b031498-ad72-4bf3-a536-0a57cdd2cfe2",
    "wall": "#f2f0ea",
+   "roof": "#5a3a2e",
    "material": "render",
-   "note": "Baunatal centre: white walls"
+   "note": "Baunatal centre: white walls; Baunatal centre (street photos, round 3, vp 138-0): same terrace: dark brown tiles (wall already white)"
   },
   {
    "id": "UUID_d31d212d-7d53-46f5-b695-c3e10f5eea08",
-   "wall": "#b4583e",
-   "roof": "#777774",
+   "wall": "#a8705a",
+   "roof": "#9a4a35",
    "material": "brick",
-   "note": "Haydnstraße (vp21): red brick, grey roof"
+   "note": "Haydnstraße (vp21): red brick, grey roof; Baunatal centre (street photos, round 3, vp 074-1, 138-0, 014-0, 200-0): light red-brown brick blocks of flats (pinkish-beige in full sun at 074-1, brown-red in shade at 138-0), red-brown tiles throughout; game had saturated red brick with a grey roof and a cream part with an anthracite roof"
   },
   {
    "id": "UUID_48bb483a-e4b1-49fe-b61e-8eeacd613a87",
@@ -825,10 +828,10 @@
   },
   {
    "id": "DEHE061800006LdP",
-   "wall": "#eee4c8",
-   "roof": "#57504c",
-   "material": "brick",
-   "note": "Baunatal centre: cream facing brick, darkbrown roof"
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre: cream facing brick, darkbrown roof; Baunatal centre (street photos, round 3, vp 202-0): white (painted) house with brown garage doors, anthracite tiles (overlay: cream facing brick, which the game shows as grey rubble)"
   },
   {
    "id": "DEHE061800006L7j",
@@ -895,10 +898,10 @@
   },
   {
    "id": "UUID_0d60fbb9-f37e-452b-8767-49456ff641d3",
-   "wall": "#eee4c8",
-   "roof": "#7a3f30",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
    "material": "render",
-   "note": "Rudolf-Diesel-Straße (vp34): cream/pale yellow render, brown tiled roof"
+   "note": "Rudolf-Diesel-Straße (vp34): cream/pale yellow render, brown tiled roof; Baunatal centre (street photos, round 3, vp 209-1): pale yellow render blocks of flats, dark brown tiles (game: white/grey and one salmon part, red roofs)"
   },
   {
    "id": "DEHE061800006Ll8",
@@ -967,9 +970,9 @@
   },
   {
    "id": "UUID_7fa33360-73f2-474a-87ea-597f234cd672",
-   "wall": "#d9c39a",
-   "material": "render",
-   "note": "Baunatal centre: sand walls"
+   "wall": "#bc7f6c",
+   "material": "brick",
+   "note": "Baunatal centre: sand walls; Baunatal centre (street photos, round 3, vp 055-0, 059-1, 118-1, 119-1, 180-1): salmon / pinkish red-brown facing brick with red window frames, grey flat roof (overlay had sand render)"
   },
   {
    "id": "DEHE061800006LoW",
@@ -1021,9 +1024,9 @@
   },
   {
    "id": "DEHE061800006LyB",
-   "wall": "#7a5a40",
+   "wall": "#5a5652",
    "material": "plain",
-   "note": "Baunatal centre: brown walls"
+   "note": "Baunatal centre: brown walls; Baunatal centre (street photos, round 3, vp 060-0): dark grey-brown facade with white window bands (game: white with a brown end block)"
   },
   {
    "id": "DEHE061800006LbB",
@@ -1046,10 +1049,10 @@
   },
   {
    "id": "UUID_5c5bd334-9e0a-4e3b-80c9-c438b34fa76e",
-   "wall": "#f2f0ea",
-   "roof": "#5c4b46",
+   "wall": "#ebe8e0",
+   "roof": "#4e4642",
    "material": "render",
-   "note": "Baunatal centre: white walls, greybrown roof"
+   "note": "Baunatal centre: white walls, greybrown roof; Baunatal centre (street photos, round 3, vp 128-1, 186-0): white render, dark grey-brown tiles (anthracite in shade at 128-1, grey-brown in sun at 186-0); game: red-brown roof parts"
   },
   {
    "id": "DEHE061800006Lxe",
@@ -1110,16 +1113,17 @@
   },
   {
    "id": "DEHE061800006LCU",
-   "wall": "#f2f0ea",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
    "material": "render",
-   "note": "Im Wiesental (street view vp20): white render with yellow and red accent stripes"
+   "note": "Im Wiesental (street view vp20): white render with yellow and red accent stripes; Baunatal centre (street photos, round 3, vp 106-0): white render block of flats with a yellow stair-tower stripe, anthracite roof (game: red roof, one half beige)"
   },
   {
    "id": "DEHE061800006LEr",
-   "wall": "#f2f0ea",
+   "wall": "#efe2a8",
    "roof": "#4b4b4e",
    "material": "render",
-   "note": "Im Wiesental (vp20): white render, anthracite roof"
+   "note": "Im Wiesental (vp20): white render, anthracite roof; Baunatal centre (street photos, round 3, vp 106-1): pale yellow render like the rest of the house LEo (game: white front)"
   },
   {
    "id": "GUID_1488958994062_25981928",
@@ -1172,9 +1176,9 @@
   {
    "id": "DEHE061800006LtO",
    "wall": "#f2f0ea",
-   "roof": "#7a3f30",
+   "roof": "#5a3a2e",
    "material": "render",
-   "note": "Brahmsstraße (vp25): white render, brown tiled roof"
+   "note": "Brahmsstraße (vp25): white render, brown tiled roof; Baunatal centre (street photos, round 3, vp 002-1): white render (overlay already white; grey in game is shade), dark brown tiles"
   },
   {
    "id": "DEHE061800006LMF",
@@ -1302,21 +1306,27 @@
   },
   {
    "id": "UUID_a1ed2acf-c243-4f43-b4e7-b7af31843e30",
+   "wall": "#ebe8e0",
+   "material": "render",
    "roofMaterial": "green",
    "flatAt": 0.5,
-   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs; Baunatal centre (street photos, round 3, vp 142-1, 204-1): church centre in white render with green flat roofs (game: beige/brown church palette); roof entries kept"
   },
   {
    "id": "GUID_1488958994062_25982456",
+   "wall": "#ebe8e0",
+   "material": "render",
    "roofMaterial": "green",
    "flatAt": 0.5,
-   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs; Baunatal centre (street photos, round 3, vp 142-1, 204-1): church centre in white render with green flat roofs (game: beige/brown church palette); roof entries kept"
   },
   {
    "id": "GUID_1488958994062_25982453",
+   "wall": "#ebe8e0",
+   "material": "render",
    "roofMaterial": "green",
    "flatAt": 0.5,
-   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs; Baunatal centre (street photos, round 3, vp 142-1, 204-1): church centre in white render with green flat roofs (game: beige/brown church palette); roof entries kept"
   },
   {
    "id": "GUID_1488958994062_25982454",
@@ -1326,33 +1336,43 @@
   },
   {
    "id": "GUID_1488958994062_25982457",
+   "wall": "#ebe8e0",
+   "material": "render",
    "roofMaterial": "green",
    "flatAt": 0.5,
-   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs; Baunatal centre (street photos, round 3, vp 142-1, 204-1): church centre in white render with green flat roofs (game: beige/brown church palette); roof entries kept"
   },
   {
    "id": "GUID_1488958994062_25982458",
+   "wall": "#ebe8e0",
+   "material": "render",
    "roofMaterial": "green",
    "flatAt": 0.5,
-   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs; Baunatal centre (street photos, round 3, vp 142-1, 204-1): church centre in white render with green flat roofs (game: beige/brown church palette); roof entries kept"
   },
   {
    "id": "GUID_1488958994062_25982451",
+   "wall": "#ebe8e0",
+   "material": "render",
    "roofMaterial": "green",
    "flatAt": 0.5,
-   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs; Baunatal centre (street photos, round 3, vp 142-1, 204-1): church centre in white render with green flat roofs (game: beige/brown church palette); roof entries kept"
   },
   {
    "id": "GUID_1488958994062_25982450",
+   "wall": "#ebe8e0",
+   "material": "render",
    "roofMaterial": "green",
    "flatAt": 0.5,
-   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs; Baunatal centre (street photos, round 3, vp 142-1, 204-1): church centre in white render with green flat roofs (game: beige/brown church palette); roof entries kept"
   },
   {
    "id": "DEHE061800006LjN",
+   "wall": "#ebe8e0",
+   "material": "render",
    "roofMaterial": "green",
    "flatAt": 0.5,
-   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs; Baunatal centre (street photos, round 3, vp 142-1, 204-1): church centre in white render with green flat roofs (game: beige/brown church palette); roof entries kept"
   },
   {
    "id": "GUID_1488958994062_26861853",
@@ -1454,6 +1474,1126 @@
    "roof": "#6f706f",
    "roofMaterial": "metal",
    "note": "aerial photo (square 4-2): grey low-pitched sheet roof, not tiles"
+  },
+  {
+   "id": "UUID_d39cac8c-138b-4a29-853f-8e4bb299963e",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-0, 122-1): white render, anthracite low roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980276",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-0, 122-1): white render, anthracite low roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980279",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-0, 122-1): white render, anthracite low roof"
+  },
+  {
+   "id": "GUID_1488958994062_25979852",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-0): white render, dark brown low roof (parts of the house whose other part is already white)"
+  },
+  {
+   "id": "GUID_1488958994062_25979850",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-0): white render, dark brown low roof (parts of the house whose other part is already white)"
+  },
+  {
+   "id": "GUID_1488958994062_25979849",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-0): white render, dark brown low roof (parts of the house whose other part is already white)"
+  },
+  {
+   "id": "UUID_918c3b1e-232b-400b-b237-c8c344cdf35b",
+   "wall": "#ebe8e0",
+   "roof": "#4e3a30",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-1, 123-0): white render, dark brown tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25981205",
+   "wall": "#ebe8e0",
+   "roof": "#4e3a30",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-1, 123-0): white render, dark brown tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25981202",
+   "wall": "#ebe8e0",
+   "roof": "#4e3a30",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-1, 123-0): white render, dark brown tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25981203",
+   "wall": "#ebe8e0",
+   "roof": "#4e3a30",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-1, 123-0): white render, dark brown tiles"
+  },
+  {
+   "id": "UUID_00a44b62-efff-4879-98bc-4fe27bfb57fa",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-1): white render, anthracite roof with solar panels"
+  },
+  {
+   "id": "GUID_1488958994062_25980184",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 001-1): white render, anthracite roof with solar panels"
+  },
+  {
+   "id": "UUID_1385e226-3756-49c0-b262-e7e048e4783f",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 002-0, 124-1): white render, dark brown tiles (close view 124-1; 002-0 from afar looked anthracite) - game: salmon-brick palette"
+  },
+  {
+   "id": "DEHE061800006LuA",
+   "wall": "#ebe8e0",
+   "roof": "#45403e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 005-1): white render house and white garages, dark grey-brown roof"
+  },
+  {
+   "id": "DEHE061800006LuD",
+   "wall": "#ebe8e0",
+   "roof": "#45403e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 005-1): white render house and white garages, dark grey-brown roof"
+  },
+  {
+   "id": "DEHE061800006Lvy",
+   "wall": "#a88a6e",
+   "roof": "#4a403c",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 189-0, 008-1): light brown facing brick, dark brown-anthracite tiles (game: beige with red roof)"
+  },
+  {
+   "id": "UUID_b0a3e5e8-ec89-4ebb-9a70-6cd043fc8f86",
+   "wall": "#ebe8e0",
+   "roof": "#4a3a32",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 009-1): white render bungalow, dark brown hip roof (game: red facets)"
+  },
+  {
+   "id": "GUID_1488958994062_25980399",
+   "wall": "#ebe8e0",
+   "roof": "#4a3a32",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 009-1): white render bungalow, dark brown hip roof (game: red facets)"
+  },
+  {
+   "id": "DEHE061800006Lww",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 009-0): white render, dark brown tiles"
+  },
+  {
+   "id": "UUID_811ff4c9-c3a6-4564-bb41-7b26b8b66acc",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 010-0): white render, dark brown hip roof"
+  },
+  {
+   "id": "GUID_1488958994062_25982438",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 010-0): white render, dark brown hip roof"
+  },
+  {
+   "id": "UUID_29c4cc7e-6205-43cc-bdd0-4e6d983bd9e9",
+   "wall": "#ebe8e0",
+   "roof": "#8a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 011-0, 014-1): white render terrace, red-brown tiles (game: salmon brick)"
+  },
+  {
+   "id": "GUID_1488958994062_25980486",
+   "wall": "#ebe8e0",
+   "roof": "#8a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 011-0, 014-1): white render terrace, red-brown tiles (game: salmon brick)"
+  },
+  {
+   "id": "GUID_1488958994062_25981416",
+   "wall": "#ebe8e0",
+   "roof": "#8a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 011-0, 014-1): white render terrace, red-brown tiles (game: salmon brick)"
+  },
+  {
+   "id": "DEHE061800006LkT",
+   "wall": "#6a4a3a",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 013-1): dark brown brick upper storey over the white garages (garage block KUr stays white)"
+  },
+  {
+   "id": "GUID_1488958994062_25981672",
+   "wall": "#e8d698",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 019-1, 020-1, 202-0): pale yellow render block of flats, dark brown tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25981673",
+   "wall": "#e8d698",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 019-1, 020-1, 202-0): pale yellow render block of flats, dark brown tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25981676",
+   "wall": "#e8d698",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 019-1, 020-1, 202-0): pale yellow render block of flats, dark brown tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25981669",
+   "wall": "#e8d698",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 019-1, 020-1, 202-0): pale yellow render block of flats, dark brown tiles"
+  },
+  {
+   "id": "DEHE061800006Lju",
+   "wall": "#e8d698",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 019-1, 020-1, 202-0): pale yellow render block of flats, dark brown tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25981670",
+   "wall": "#e8d698",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 019-1, 020-1, 202-0): pale yellow render block of flats, dark brown tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25981675",
+   "wall": "#d99a78",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 019-1): salmon/orange render stairwell section of the pale yellow block"
+  },
+  {
+   "id": "DEHE061800006LEc",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 050-0): white render, anthracite tiles (overlay had pale yellow)"
+  },
+  {
+   "id": "DEHE061800006LKy",
+   "wall": "#7a3e30",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 055-0, 059-1): dark red-brown brick with white fascia band and grey window panels, flat roof"
+  },
+  {
+   "id": "DEHE061800006Lyc",
+   "wall": "#5a5652",
+   "material": "plain",
+   "note": "Baunatal centre (street photos, round 3, vp 060-0): dark grey-brown facade with white window bands (game: white with a brown end block)"
+  },
+  {
+   "id": "DEHE061800006LDZ",
+   "wall": "#ece6d6",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 061-0): hotel in white/cream render (game: light grey)"
+  },
+  {
+   "id": "DEHE061800006LE2",
+   "wall": "#ece6d6",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 061-0): hotel in white/cream render (game: light grey)"
+  },
+  {
+   "id": "DEHE061800006LE5",
+   "wall": "#ece6d6",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 061-0): hotel in white/cream render (game: light grey)"
+  },
+  {
+   "id": "UUID_d4d70c8b-35de-450d-9577-789c252fd91c",
+   "wall": "#9a4a35",
+   "roof": "#4e3a30",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 064-1): red brick house, dark brown tiles (game: beige with red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_25982286",
+   "wall": "#9a4a35",
+   "roof": "#4e3a30",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 064-1): red brick house, dark brown tiles (game: beige with red roof)"
+  },
+  {
+   "id": "DEHE061800006LGw",
+   "wall": "#9a4a35",
+   "roof": "#4e3a30",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 064-1): red brick house, dark brown tiles (game: beige with red roof)"
+  },
+  {
+   "id": "UUID_0c275060-790a-47fd-a410-002cdcface38",
+   "wall": "#dcb45e",
+   "roof": "#8a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 007-0, 067-0): ochre / golden-yellow render, red-brown tiles (game: grey-beige, anthracite roof)"
+  },
+  {
+   "id": "GUID_1488958994062_25981100",
+   "wall": "#dcb45e",
+   "roof": "#8a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 007-0, 067-0): ochre / golden-yellow render, red-brown tiles (game: grey-beige, anthracite roof)"
+  },
+  {
+   "id": "DEHE061800006Lq3",
+   "wall": "#cf6a6c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 071-1, 133-0): pink-red render bungalow with white fascia, grey flat roof (game: salmon brick)"
+  },
+  {
+   "id": "GUID_1488958994062_25979716",
+   "wall": "#a8705a",
+   "roof": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 074-1, 138-0, 014-0, 200-0): light red-brown brick blocks of flats (pinkish-beige in full sun at 074-1, brown-red in shade at 138-0), red-brown tiles throughout; game had saturated red brick with a grey roof and a cream part with an anthracite roof"
+  },
+  {
+   "id": "GUID_1488958994062_25979717",
+   "wall": "#a8705a",
+   "roof": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 074-1, 138-0, 014-0, 200-0): light red-brown brick blocks of flats (pinkish-beige in full sun at 074-1, brown-red in shade at 138-0), red-brown tiles throughout; game had saturated red brick with a grey roof and a cream part with an anthracite roof"
+  },
+  {
+   "id": "UUID_03c96383-aef4-42de-b942-b679bdda6b61",
+   "wall": "#a8705a",
+   "roof": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 074-1, 138-0, 014-0, 200-0): light red-brown brick blocks of flats (pinkish-beige in full sun at 074-1, brown-red in shade at 138-0), red-brown tiles throughout; game had saturated red brick with a grey roof and a cream part with an anthracite roof"
+  },
+  {
+   "id": "GUID_1488958994062_25983411",
+   "wall": "#a8705a",
+   "roof": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 074-1, 138-0, 014-0, 200-0): light red-brown brick blocks of flats (pinkish-beige in full sun at 074-1, brown-red in shade at 138-0), red-brown tiles throughout; game had saturated red brick with a grey roof and a cream part with an anthracite roof"
+  },
+  {
+   "id": "DEHE061800006Lot",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 079-0): terrace: white render ground floor, anthracite slate-clad upper floor (all houses alike); game: terracotta, beige; white chosen like its already-white neighbours Lon/Loe"
+  },
+  {
+   "id": "DEHE061800006Low",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 079-0): terrace: white render ground floor, anthracite slate-clad upper floor (all houses alike); game: terracotta, beige; white chosen like its already-white neighbours Lon/Loe"
+  },
+  {
+   "id": "DEHE061800006Loq",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 079-0): terrace: white render ground floor, anthracite slate-clad upper floor (all houses alike); game: terracotta, beige; white chosen like its already-white neighbours Lon/Loe"
+  },
+  {
+   "id": "DEHE061800006Lpt",
+   "wall": "#e0e2d8",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 084-1, 210-1): white / very pale grey-green render blocks of flats with green fascia, flat roofs (game: beige-yellow)"
+  },
+  {
+   "id": "DEHE061800006Lpz",
+   "wall": "#e0e2d8",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 084-1, 210-1): white / very pale grey-green render blocks of flats with green fascia, flat roofs (game: beige-yellow)"
+  },
+  {
+   "id": "DEHE061800006Luk",
+   "wall": "#ebe8e0",
+   "roof": "#5e5048",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 098-0): white render, grey-brown tiles (game: bright red roof)"
+  },
+  {
+   "id": "UUID_69efa89c-eaba-4227-8c9d-b72165a63cbd",
+   "wall": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 100-0, 167-0, 170-1): high-rise in red brick with white balcony bands, flat roof (game: beige render)"
+  },
+  {
+   "id": "GUID_1488958994062_26861806",
+   "wall": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 100-0, 167-0, 170-1): high-rise in red brick with white balcony bands, flat roof (game: beige render)"
+  },
+  {
+   "id": "GUID_1488958994062_26861807",
+   "wall": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 100-0, 167-0, 170-1): high-rise in red brick with white balcony bands, flat roof (game: beige render)"
+  },
+  {
+   "id": "GUID_1488958994062_26861808",
+   "wall": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 100-0, 167-0, 170-1): high-rise in red brick with white balcony bands, flat roof (game: beige render)"
+  },
+  {
+   "id": "GUID_1488958994062_26861809",
+   "wall": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 100-0, 167-0, 170-1): high-rise in red brick with white balcony bands, flat roof (game: beige render)"
+  },
+  {
+   "id": "GUID_1488958994062_26861812",
+   "wall": "#9a4a35",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 100-0, 167-0, 170-1): high-rise in red brick with white balcony bands, flat roof (game: beige render)"
+  },
+  {
+   "id": "UUID_8c6af089-a094-461b-8bb4-b1ca2c452259",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 101-1): white render with dark grey parts, anthracite tiles (game: cream, bright red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_26862211",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 101-1): white render with dark grey parts, anthracite tiles (game: cream, bright red roof)"
+  },
+  {
+   "id": "UUID_6666eb4c-9bbd-4e8f-952c-dbfd10a70f4f",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 102-1): white render offices/shop, grey flat roof (game: grey and brown)"
+  },
+  {
+   "id": "GUID_1488958994062_26862247",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 102-1): white render offices/shop, grey flat roof (game: grey and brown)"
+  },
+  {
+   "id": "GUID_1488958994062_26860309",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860308",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860317",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860318",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_25980172",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_25980169",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860322",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860323",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860310",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860311",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860313",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860316",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860312",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860320",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "GUID_1488958994062_26860321",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "UUID_ae18fbbc-97ef-4835-8207-5e0c7421fb3d",
+   "wall": "#e2e2de",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 229-1, 102-1): high-rise blocks in white / light grey (game: salmon-brick palette on several parts, beige on others)"
+  },
+  {
+   "id": "DEHE061800006KXr",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 104-0 (not listed by the reviewer)): white render, dark roof (game: beige-yellow)"
+  },
+  {
+   "id": "DEHE061800006LB3",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 106-0): white render block of flats with a yellow stair-tower stripe, anthracite roof (game: red roof, one half beige)"
+  },
+  {
+   "id": "UUID_432d5fa6-e9da-41a5-a1f4-af3e55a15b20",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "UUID_3a91c8d9-746c-4aba-9e2d-275dbbf287f6",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "UUID_b0688454-5c60-4795-ac25-5f14bdde6f42",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "UUID_f724178a-2a3a-4267-813a-78340de12011",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_26861765",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_26861199",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_26861672",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_26862851",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_26862446",
+   "wall": "#ece7da",
+   "roof": "#5e4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 107-1): terrace with porches, all white/cream render, brown tiles (game: beige/grey walls, alternating bright red and dark roofs)"
+  },
+  {
+   "id": "DEHE061800006LFC",
+   "wall": "#e6c4b2",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 109-1): pale pink / salmon render, anthracite tiles (game: white, bright red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_26860569",
+   "wall": "#ebe8e0",
+   "roof": "#6a4a3a",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 110-1): white render, brown tiles (game: bright red roof)"
+  },
+  {
+   "id": "DEHE061800006LDN",
+   "wall": "#ebe8e0",
+   "roof": "#4e3a30",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 112-1): white render with orange balcony backs, dark brown tiles (game: beige, red roof)"
+  },
+  {
+   "id": "UUID_2999dedc-f0bd-41dc-8b88-b7d80d157298",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 113-1): white render, anthracite tiles (game: grey-beige, bright red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_26862706",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 113-1): white render, anthracite tiles (game: grey-beige, bright red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_26862707",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 113-1): white render, anthracite tiles (game: grey-beige, bright red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_26862164",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 119-1, 118-1): the white cube at the end of the salmon-brick hall 7fa33360 (game: beige)"
+  },
+  {
+   "id": "DEHE061800006LWn",
+   "wall": "#ebe8e0",
+   "roof": "#7a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 121-1, 178-1): white render blocks of flats, red-brown tiles (game: beige, bright red roofs)"
+  },
+  {
+   "id": "DEHE061800006LUN",
+   "wall": "#ebe8e0",
+   "roof": "#7a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 121-1, 178-1): white render blocks of flats, red-brown tiles (game: beige, bright red roofs)"
+  },
+  {
+   "id": "DEHE061800006LUQ",
+   "wall": "#ebe8e0",
+   "roof": "#7a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 121-1, 178-1): white render blocks of flats, red-brown tiles (game: beige, bright red roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_25980278",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 122-1): garage/annex of the white house d39cac8c: white render, dark roof (game: bright red roof piece)"
+  },
+  {
+   "id": "GUID_1488958994062_25982676",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 122-1, 123-0): white render terrace houses (game: salmon-brick / beige)"
+  },
+  {
+   "id": "UUID_69ee426c-b486-4ab6-b86c-9eac4401338b",
+   "wall": "#d4d4d2",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 123-0): light grey render ground floor with anthracite-clad upper storey, anthracite roof (one colour: light grey)"
+  },
+  {
+   "id": "GUID_1488958994062_25981925",
+   "wall": "#ebe8e0",
+   "roof": "#4e3a30",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 126-1): white render over a dark red brick base, dark brown tiles (game: partly red roof)"
+  },
+  {
+   "id": "DEHE061800006L1O",
+   "wall": "#8e4a38",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 126-1): the garage in front: red brick with a grey door"
+  },
+  {
+   "id": "DEHE061800006KZi",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 131-0, 127-1): white render ground floor, anthracite slate-clad upper storey (the model's steep roof), flat top (game: beige, red roof); 049533e1 is the identical neighbour"
+  },
+  {
+   "id": "UUID_049533e1-c013-4ba0-8c4c-ca2cc4f55343",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 131-0, 127-1): white render ground floor, anthracite slate-clad upper storey (the model's steep roof), flat top (game: beige, red roof); 049533e1 is the identical neighbour"
+  },
+  {
+   "id": "DEHE061800006LsT",
+   "wall": "#ebe8e0",
+   "roof": "#4a4a4c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 131-0 (not listed by the reviewer)): white render bungalow, dark grey hip roof (game: beige, red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_25981837",
+   "wall": "#ebe8e0",
+   "roof": "#4e4642",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 128-1, 186-0): white render, dark grey-brown tiles (anthracite in shade at 128-1, grey-brown in sun at 186-0); game: red-brown roof parts"
+  },
+  {
+   "id": "GUID_1488958994062_25981838",
+   "wall": "#ebe8e0",
+   "roof": "#4e4642",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 128-1, 186-0): white render, dark grey-brown tiles (anthracite in shade at 128-1, grey-brown in sun at 186-0); game: red-brown roof parts"
+  },
+  {
+   "id": "DEHE061800006L2I",
+   "wall": "#ebe8e0",
+   "roof": "#4e4642",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 128-1, 186-0): white render, dark grey-brown tiles (anthracite in shade at 128-1, grey-brown in sun at 186-0); game: red-brown roof parts"
+  },
+  {
+   "id": "UUID_e03006c8-1259-4d03-b6da-f08892e4f4c1",
+   "wall": "#ebe8e0",
+   "roof": "#4a3c36",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 128-1 (not listed by the reviewer)): white render, dark brown roof (game: cream, red roof)"
+  },
+  {
+   "id": "UUID_79e9f8eb-a2b9-4005-8068-667c10b340b4",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 138-0): white render terrace, dark brown tiles (game: beige/cream, red roofs)"
+  },
+  {
+   "id": "UUID_adef9ae7-f6cf-490d-b5e5-0f27fa09fdf8",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 138-0): white render terrace, dark brown tiles (game: beige/cream, red roofs)"
+  },
+  {
+   "id": "DEHE061800006Lvi",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 138-0): white render terrace, dark brown tiles (game: beige/cream, red roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_25981590",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 138-0): white render terrace, dark brown tiles (game: beige/cream, red roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_25979792",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 138-0): white render terrace, dark brown tiles (game: beige/cream, red roofs)"
+  },
+  {
+   "id": "DEHE061800006L8p",
+   "wall": "#ebe8e0",
+   "roof": "#9a4a35",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 137-1): white render terrace with brown bay windows, red tiles (game: grey/beige walls, one anthracite roof)"
+  },
+  {
+   "id": "DEHE061800006L8m",
+   "wall": "#ebe8e0",
+   "roof": "#9a4a35",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 137-1): white render terrace with brown bay windows, red tiles (game: grey/beige walls, one anthracite roof)"
+  },
+  {
+   "id": "DEHE061800006L8t",
+   "wall": "#ebe8e0",
+   "roof": "#9a4a35",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 137-1): white render terrace with brown bay windows, red tiles (game: grey/beige walls, one anthracite roof)"
+  },
+  {
+   "id": "DEHE061800006LMd",
+   "wall": "#ebe8e0",
+   "roof": "#9a4a35",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 137-1): white render terrace with brown bay windows, red tiles (game: grey/beige walls, one anthracite roof)"
+  },
+  {
+   "id": "DEHE061800006LwO",
+   "wall": "#e4e4e0",
+   "material": "plain",
+   "note": "Baunatal centre (street photos, round 3, vp 139-0): white/light grey garage with teal door (game: beige)"
+  },
+  {
+   "id": "UUID_95db1599-b00b-46ee-a70b-135ddc11c304",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 142-0, 144-1): pale yellow render block of flats (salmon bands), dark brown tiles (game: grey-beige, red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_25979800",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 142-0, 144-1): pale yellow render block of flats (salmon bands), dark brown tiles (game: grey-beige, red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_25979801",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 142-0, 144-1): pale yellow render block of flats (salmon bands), dark brown tiles (game: grey-beige, red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_25979803",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 142-0, 144-1): pale yellow render block of flats (salmon bands), dark brown tiles (game: grey-beige, red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_25979804",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 142-0, 144-1): pale yellow render block of flats (salmon bands), dark brown tiles (game: grey-beige, red roof)"
+  },
+  {
+   "id": "GUID_1488958994062_25979805",
+   "wall": "#9a5a40",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 144-1): the projecting gable wing of the same block in rust-brown (game: white gable)"
+  },
+  {
+   "id": "GUID_1488958994062_25979802",
+   "wall": "#9a5a40",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 144-1): the projecting gable wing of the same block in rust-brown (game: white gable)"
+  },
+  {
+   "id": "DEHE061800006LFF",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 178-0): white render block with a brown stair tower, anthracite tiles (game: red roof)"
+  },
+  {
+   "id": "DEHE061800006LWq",
+   "wall": "#ebe8e0",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 178-1): white render tower block (game: beige-grey)"
+  },
+  {
+   "id": "UUID_a1cfa69b-5a17-472a-83fc-deaff0116a3e",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 183-1): white render, anthracite roof (game: beige/brown); 25981078 of the same house already white"
+  },
+  {
+   "id": "GUID_1488958994062_25981075",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 183-1): white render, anthracite roof (game: beige/brown); 25981078 of the same house already white"
+  },
+  {
+   "id": "GUID_1488958994062_25981076",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 183-1): white render, anthracite roof (game: beige/brown); 25981078 of the same house already white"
+  },
+  {
+   "id": "DEHE061800006KYQ",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 183-1): white render, anthracite roof (game: beige/brown); 25981078 of the same house already white"
+  },
+  {
+   "id": "UUID_4fe8db3c-1bb5-4e3d-93f3-42e78e3a3bd9",
+   "wall": "#ebe8e0",
+   "roof": "#45403e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 188-0): white render bungalow, dark grey-brown tiles (game: beige/tan)"
+  },
+  {
+   "id": "GUID_1488958994062_25981833",
+   "wall": "#ebe8e0",
+   "roof": "#45403e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 188-0): white render bungalow, dark grey-brown tiles (game: beige/tan)"
+  },
+  {
+   "id": "DEHE061800006LGE",
+   "wall": "#ebe8e0",
+   "roof": "#45403e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 188-0): white render bungalow, dark grey-brown tiles (game: beige/tan)"
+  },
+  {
+   "id": "UUID_0669e881-fdcf-43c5-83d0-5848a558ea69",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 201-0): white render bungalow, dark brown tiles (game: salmon brick)"
+  },
+  {
+   "id": "GUID_1488958994062_25979865",
+   "wall": "#ebe8e0",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 201-0): white render bungalow, dark brown tiles (game: salmon brick)"
+  },
+  {
+   "id": "DEHE061800006LjO",
+   "wall": "#b4b4b0",
+   "material": "plain",
+   "note": "Baunatal centre (street photos, round 3, vp 202-0 (not listed by the reviewer)): the church tower: grey exposed concrete (game: white)"
+  },
+  {
+   "id": "GUID_1488958994062_25981363",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 209-1): pale yellow render blocks of flats, dark brown tiles (game: white/grey and one salmon part, red roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_25981364",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 209-1): pale yellow render blocks of flats, dark brown tiles (game: white/grey and one salmon part, red roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_25981366",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 209-1): pale yellow render blocks of flats, dark brown tiles (game: white/grey and one salmon part, red roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_25981367",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 209-1): pale yellow render blocks of flats, dark brown tiles (game: white/grey and one salmon part, red roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_25981368",
+   "wall": "#ead79c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 209-1): pale yellow render blocks of flats, dark brown tiles (game: white/grey and one salmon part, red roofs)"
+  },
+  {
+   "id": "GUID_1488958994062_25980254",
+   "wall": "#9a4a35",
+   "roof": "#5a3a2e",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 215-0): red brick house over its garage, dark brown tiles (game: beige over a grey garage)"
+  },
+  {
+   "id": "UUID_bc0c8500-a9c2-4a28-8c1b-17b94b4f92fa",
+   "wall": "#9a4a35",
+   "roof": "#5a3a2e",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 215-0): red brick house over its garage, dark brown tiles (game: beige over a grey garage)"
+  },
+  {
+   "id": "DEHE061800006Li9",
+   "wall": "#9a4a35",
+   "roof": "#5a3a2e",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 215-0): red brick house over its garage, dark brown tiles (game: beige over a grey garage)"
+  },
+  {
+   "id": "DEHE061800006LhG",
+   "wall": "#9a4a35",
+   "roof": "#5a3a2e",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 215-0 (not listed by the reviewer)): further red brick houses of the same street, brown tiles (game: white/beige with red roofs)"
+  },
+  {
+   "id": "DEHE061800006Lhq",
+   "wall": "#9a4a35",
+   "roof": "#5a3a2e",
+   "material": "brick",
+   "note": "Baunatal centre (street photos, round 3, vp 215-0 (not listed by the reviewer)): further red brick houses of the same street, brown tiles (game: white/beige with red roofs)"
+  },
+  {
+   "id": "UUID_caf3d323-06ac-4f36-ab43-8dc48a13bacf",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 224-0): white render bungalow, anthracite roof (game: grey walls, red/brown roof parts, one salmon part)"
+  },
+  {
+   "id": "DEHE061800006KXA",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 224-0): white render bungalow, anthracite roof (game: grey walls, red/brown roof parts, one salmon part)"
+  },
+  {
+   "id": "DEHE061800006KXy",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 224-0): white render bungalow, anthracite roof (game: grey walls, red/brown roof parts, one salmon part)"
+  },
+  {
+   "id": "GUID_1488958994062_26860475",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 224-0): white render bungalow, anthracite roof (game: grey walls, red/brown roof parts, one salmon part)"
+  },
+  {
+   "id": "DEHE061800006KXz",
+   "wall": "#ebe8e0",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 224-0): white render bungalow, anthracite roof (game: grey walls, red/brown roof parts, one salmon part)"
+  },
+  {
+   "id": "UUID_ce3b3b56-0802-4a90-b16d-a58a40a1be9f",
+   "wall": "#eee4c8",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 227-0): cream render, anthracite tiles (game: beige-grey, red tiles)"
+  },
+  {
+   "id": "GUID_1488958994062_26861895",
+   "wall": "#eee4c8",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 227-0): cream render, anthracite tiles (game: beige-grey, red tiles)"
+  },
+  {
+   "id": "DEHE061800006KXF",
+   "wall": "#eee4c8",
+   "roof": "#3a3a3c",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 227-0): cream render, anthracite tiles (game: beige-grey, red tiles)"
+  },
+  {
+   "id": "DEHE061800006KXE",
+   "roof": "#3a3a3c",
+   "note": "Baunatal centre (street photos, round 3, vp 227-0): its garage: anthracite roof like the house"
+  },
+  {
+   "id": "DEHE061800006LEs",
+   "wall": "#ead79c",
+   "roof": "#8a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 236-0): pale yellow render, red-brown tiles (game: white, anthracite roof)"
+  },
+  {
+   "id": "DEHE061800006LEw",
+   "wall": "#ead79c",
+   "roof": "#8a4434",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 236-0): pale yellow render, red-brown tiles (game: white, anthracite roof)"
+  },
+  {
+   "id": "DEHE061800006LN8",
+   "roof": "#8a4434",
+   "note": "Baunatal centre (street photos, round 3, vp 240-0): white render (already), red-brown tiles on the house and its low front annex (overlay/game: anthracite)"
+  },
+  {
+   "id": "GUID_1488958994062_26860672",
+   "wall": "#6e6c6a",
+   "material": "plain",
+   "note": "Baunatal centre (street photos, round 3, vp 243-0): office block in dark grey with lighter window bands, flat roof (game: beige / pale yellow)"
+  },
+  {
+   "id": "GUID_1488958994062_26860675",
+   "wall": "#6e6c6a",
+   "material": "plain",
+   "note": "Baunatal centre (street photos, round 3, vp 243-0): office block in dark grey with lighter window bands, flat roof (game: beige / pale yellow)"
+  },
+  {
+   "id": "DEHE061800006LJr",
+   "wall": "#d8c49c",
+   "roof": "#5a3a2e",
+   "material": "render",
+   "note": "Baunatal centre (street photos, round 3, vp 244-1): beige / sand render block, dark brown roof (game: light grey)"
   }
  ],
  "add": [
