@@ -1,0 +1,2000 @@
+{
+  "about": "Corrections to OpenStreetMap way tags where the street as seen on site (street-level pictures compared by eye, 2026-11) differs from what is mapped. Key: OSM way id; tags: replaced over the mapped ones, null deletes. Read by tools/mapgen/osm.ts for every part of the map build (tools/mapgen/observedroads.ts). Besides the OSM keys (parking:<side>[:orientation|:markings|:width], sidewalk:<side>[:width], kerb[:<side>], cycleway:<side>[:width|:surface:colour|:lane], width) the build reads two of its own: verge:<side>=grass|<width in m> (a grass strip between kerb and pavement) and median:contents=grass|parking|hedge|trees (combinable with ';', on a one-way carriageway of a dual road: what lies between it and the other carriageway, on its left). Facts only. Our own keys too: gutter[:<side>]=no|yes|<width>, lane_markings:edge=yes|no|left|right|both, verge:<side>=paving_stones;trees, parking:<side>:trees=<every n m>|yes, frontage:<side>=hedge|fence|wall|lawn (+ :height), median:contents=…|paving_stones, island:surface=grass|plants|paving_stones|cobblestone|asphalt. Geometry: ways.<id>.shift=[dx,dz] (metres east, south), nodes.<id>=[dx,dz]; areas=[{id,tags,pts:[[x,z],…]}], newWays=[{id,tags,pts,connect}], remove=[way ids] (docs/MAP_DATA.md). Way edits (tools/mapgen/waysplit.ts): split=[{osm,at:[x,z]}] cuts a way, its parts '<id>:<n>' (from 1, in drawing order) take tags in ways and may be removed in remove; merge=[{id,a:[ways],b:[ways],from,to,tags}] makes two one-way carriageways one two-way way over a stretch; points=[{id,at,tags,way?}] puts a tagged node into the nearest road (traffic_calming=table|hump|bump|cushion|choker|chicane, beacon=yes, highway=give_way …). Own keys: mouth:kerb=lowered|raised, markings:give_way=yes|no, markings:zigzag=left|right|both, road_text=<text> (+:position, :backward, :backward:position), sidewalk:<side>:surface|:colour=grey|red|anthracite, traffic_calming:depth.",
+  "ways": {
+    "1201944106": {
+      "tags": {
+        "sidewalk:left": "no",
+        "sidewalk:right:width": "2",
+        "sidewalk:right:surface": "asphalt"
+      },
+      "note": "Theodor-Heuss-Allee eastbound (vp00, vp27, aerial 2-2): no pavement on the median side; south pavement ~2 m (asphalt). East of x≈656 both directions are really one carriageway – see not-fixable. — round 2: asphalt pavement (vp27)"
+    },
+    "21121334": {
+      "tags": {
+        "sidewalk:left": "no"
+      },
+      "note": "Theodor-Heuss-Allee westbound (vp27, aerial 2-2): no pavement on the median side"
+    },
+    "1201944113": {
+      "tags": {
+        "sidewalk:left": "no",
+        "parking:right": "street_side",
+        "parking:right:orientation": "parallel"
+      },
+      "note": "Theodor-Heuss-Allee westbound east of Schubertstraße (vp00, aerial 2-2): parallel parking lay-by along the north kerb, no pavement on the south (median) side"
+    },
+    "1201944112": {
+      "tags": {
+        "parking:right": "street_side",
+        "parking:right:orientation": "parallel"
+      },
+      "note": "Theodor-Heuss-Allee westbound west of the big junction (aerial 3-2): parallel parking strip on the north kerb"
+    },
+    "802163194": {
+      "tags": {
+        "width": "9",
+        "lane_markings:edge": "no"
+      },
+      "note": "Friedrich-Ebert-Allee (vp01, vp14, vp38, aerial 0-0): ~9 m, dashed centre line, no edge lines; along the south kerb a strip behind a solid line (parked cars in the west, a cycle lane east of x≈336), red advisory lanes on both sides on the last ~36 m – split, see parts :1–:4"
+    },
+    "22775779": {
+      "tags": {
+        "width": "3.8",
+        "gutter": "0.4",
+        "frontage:left": "hedge"
+      },
+      "note": "Brahmsstraße living street (vp02): ~3.8 m, paved gutter strips, hedges and fences right at the north-east edge"
+    },
+    "46722547": {
+      "tags": {
+        "width": "3.8",
+        "gutter": "0.4"
+      },
+      "note": "Brahmsstraße living street (vp02): ~3.5-4 m with paved gutter strips"
+    },
+    "22757384": {
+      "tags": {
+        "width": "6",
+        "sidewalk:left:width": "2",
+        "sidewalk:right:width": "1.5",
+        "frontage:right": "fence"
+      },
+      "note": "Lohweg (vp03): ~6 m; pavement 2 m south-west, 1.5 m north-east with a wooden fence right behind it (the parked cars change sides along the way – left out) — round 2: split: parked cars on the north-east kerb in the east part (vp03), on the south kerb in the west part (aerial 4-0)"
+    },
+    "200434448": {
+      "tags": {
+        "width": "6.5",
+        "lane_markings:edge": "no",
+        "sidewalk:left": "separate",
+        "sidewalk:right": "no"
+      },
+      "note": "Kirchbaunaer Straße K 22 (vp04; aerial 4-3/4-4 checked): ~6.5 m, dashed centre line, no edge lines — round 2: vp04: no pavement at the road; shared foot/cycle path behind the tree-lined verge on the north-east side"
+    },
+    "58643495": {
+      "tags": {
+        "width": "3.75",
+        "median:contents": "paving_stones;trees",
+        "verge:right": "paving_stones;trees",
+        "verge:right:width": "2.5"
+      },
+      "note": "Friedrich-Ebert-Allee eastbound (vp05): one lane ~3.75 m; paver median with young trees on the left, paver strip ~2.5 m with young trees before the foot/cycle path on the right"
+    },
+    "193666833": {
+      "tags": {
+        "median:contents": "paving_stones;trees"
+      },
+      "note": "Friedrich-Ebert-Allee westbound (vp05): paver median with young trees"
+    },
+    "21351807": {
+      "tags": {
+        "width": "5.5",
+        "sidewalk:right": "no",
+        "frontage:right": "hedge"
+      },
+      "note": "Gustav-Heinemann-Allee (vp06, vp18): ~5-5.5 m, no pavement on the south side – hedges and planted strip right behind a low kerb (north side varies: pavement only in the west part – left as is) — round 2: split at x≈317: red-paver pavement on the north side only west of it (vp06); east of it hedges at both kerbs (vp18)"
+    },
+    "200224345": {
+      "tags": {
+        "width": "2.8"
+      },
+      "note": "paved lane (vp07): only ~2.5-3 m wide"
+    },
+    "244044353": {
+      "tags": {
+        "width": "5.75",
+        "sidewalk:left:width": "1.7",
+        "sidewalk:left:surface": "paving_stones"
+      },
+      "note": "Händelstraße (vp08): ~5.75 m, north pavement ~1.7 m — round 2: north pavement grey pavers (vp08)"
+    },
+    "24436902": {
+      "tags": {
+        "width": "6.5",
+        "road_text:backward": "30",
+        "road_text:backward:position": "27"
+      },
+      "note": "Rudolf-Diesel-Straße (vp09): ~6.5 m — round 2: '30' in the southbound (west) lane at z≈−89 (vp09: upside down seen looking north; aerial 1-1)"
+    },
+    "22741558": {
+      "tags": {
+        "width": "8",
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel",
+        "verge:right": "grass",
+        "verge:right:width": "1.8",
+        "sidewalk:left:width": "2.5"
+      },
+      "note": "Marktstraße (vp10): ~8-8.5 m with parallel parking on the east kerb and a grass verge before the east pavement; west pavement 2.5 m — round 2: split ~20 m from the junction: zigzag no-parking marking along the east kerb on the first stretch (vp10)"
+    },
+    "184873567": {
+      "tags": {
+        "width": "7.5",
+        "cycleway:left": "lane",
+        "cycleway:left:lane": "advisory",
+        "cycleway:left:width": "1.5",
+        "sidewalk:left:width": "2"
+      },
+      "note": "Theodor-Heuss-Allee (vp11, vp29, aerial 0-3): ~7.5 m, no centre line, an advisory cycle lane (broad dashed line ~1.5 m from the kerb) on the south-east side; south-east pavement ~2 m (the cycle lane ends east of x≈500 – see not-fixable) — round 2: split at x≈502: the advisory cycle lane runs only west of it (vp29, aerial 0-3); east of it 6.5 m, grass verge and pavement on the south, forecourts directly at the north kerb (vp11)"
+    },
+    "22701025": {
+      "tags": {
+        "width": "6",
+        "sidewalk:both:width": "1.8"
+      },
+      "note": "Beethovenstraße (vp12, vp22): ~6 m, pavements ~1.5-1.8 m both sides — round 2: split at the start of the bend (329,406): parked cars on the west kerb in the north part (vp12), on the north/inner kerb in the bend and east part (vp22, aerial 0-3); '30' painted in both parts"
+    },
+    "802160513": {
+      "tags": {
+        "width": "5.2",
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "1.6",
+        "sidewalk:right": "no",
+        "gutter:right": "0.5",
+        "frontage:right": "hedge"
+      },
+      "note": "Haydnstraße loop (vp13, vp39): ~5-5.25 m, pavement only on the inner (left) side; the outer side has a ~0.5 m paver strip with hedges, fences and driveways right behind it — round 2: split at the bend (854,408): inner pavement grey pavers on the west–east leg (vp39), red-brown pavers on the north–south leg (vp13)"
+    },
+    "22886073": {
+      "tags": {
+        "width": "5.5",
+        "sidewalk:both:width": "1.5",
+        "sidewalk:left:surface": "asphalt",
+        "sidewalk:right:surface": "paving_stones"
+      },
+      "note": "Philipp-Reis-Straße (vp15): ~5.5 m, pavements ~1.5 m — round 2: west pavement dark asphalt, east pavement grey concrete pavers (vp15)"
+    },
+    "25557284": {
+      "tags": {
+        "width": "3.8"
+      },
+      "note": "Friedrich-Ebert-Allee entry to the roundabout (vp16): one lane ~3.8 m"
+    },
+    "602765392": {
+      "tags": {
+        "crossing": "uncontrolled",
+        "crossing:markings": "zebra"
+      },
+      "note": "crossing over the roundabout entry and exit (vp16): zebra stripes on both"
+    },
+    "30690471": {
+      "tags": {
+        "lane_markings:edge": "no"
+      },
+      "note": "Kirchbaunaer Straße K 22 (vp17): no edge lines"
+    },
+    "22775582": {
+      "tags": {
+        "width": "6.5"
+      },
+      "note": "Mozartstraße (vp19, aerial 3-2): ~6-7 m — round 2: split at the car-park mouth (956,191): the short north stub has its pavement on the west (vp19), the rest on the north/east (aerial 3-2)"
+    },
+    "22741556": {
+      "tags": {
+        "width": "7",
+        "sidewalk:both:width": "2",
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel",
+        "sidewalk:both:surface": "paving_stones"
+      },
+      "note": "Im Wiesental (vp20, aerial 3-0/4-0): ~6-7.5 m, pavements ~2 m both sides — round 2: parallel parking on the right (west/inner side of the curve, north side of the straight west part) – vp20 and aerial 4-0 agree once the drawing direction is taken into account, so no split; grey concrete-paver pavements"
+    },
+    "1201933087": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "parking aisle at Im Wiesental (vp20): the whole car park is concrete pavers"
+    },
+    "41751814": {
+      "tags": {
+        "width": "6",
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "2",
+        "sidewalk:right": "no"
+      },
+      "note": "Im Ährenfeld (vp20, aerial 4-0): ~5.5-6.5 m — round 2: pavement on the east/left side only (vp20, aerial 4-0); the corner plot has a hedge at the kerb"
+    },
+    "22701024": {
+      "tags": {
+        "width": "5.2",
+        "sidewalk:both:width": "1.5",
+        "sidewalk:left:surface": "asphalt"
+      },
+      "note": "Haydnstraße west (vp21): ~5 m, pavements ~1.5 m — round 2: east pavement dark asphalt (vp21); the west one changes from asphalt to pavers – left out"
+    },
+    "244044359": {
+      "tags": {
+        "width": "5.5",
+        "sidewalk:left:width": "1.8",
+        "sidewalk:right:width": "1.5",
+        "sidewalk:both:surface": "asphalt"
+      },
+      "note": "Werner-von-Siemens-Straße (vp23): ~5.5 m, pavements 1.8 m west, 1.5 m east — round 2: both pavements asphalt (vp23)"
+    },
+    "86280411": {
+      "tags": {
+        "width": "7",
+        "lane_markings:edge": "no"
+      },
+      "note": "Kirchbaunaer Straße southbound (vp24): ~7 m, two lanes, kerbs and gutters but no edge lines"
+    },
+    "395443787": {
+      "tags": {
+        "width": "10",
+        "lane_markings:edge": "left"
+      },
+      "note": "Kirchbaunaer Straße southbound, three lanes (vp24): ~10 m, solid line only on the left (towards the northbound carriageway)"
+    },
+    "191282070": {
+      "tags": {
+        "width": "5",
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "1.6",
+        "sidewalk:right": "no",
+        "frontage:right": "hedge"
+      },
+      "note": "Brahmsstraße (vp25, vp37): ~5 m, pavement only on the west/north-west side; on the other side front lawns, gravel strip, fence and tall hedges at the kerb"
+    },
+    "22701021": {
+      "tags": {
+        "width": "5",
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "1.8",
+        "sidewalk:right": "no",
+        "gutter:right": "0.5",
+        "sidewalk:left:surface": "paving_stones"
+      },
+      "note": "Brahmsstraße (vp25, vp28): ~5 m, pavement only on the inner (left) side, the other side a ~0.5 m paver strip with gardens — round 2: pavement grey/dark concrete pavers (vp25, vp28)"
+    },
+    "244044358": {
+      "tags": {
+        "width": "5",
+        "sidewalk:left:width": "1.5",
+        "sidewalk:right": "no",
+        "gutter:right": "0.5",
+        "frontage:right": "hedge"
+      },
+      "note": "Nikolaus-Otto-Ring (vp26): ~4.8 m, pavement only on the south side; north a ~0.5 m paved strip then hedges/fences"
+    },
+    "191282069": {
+      "tags": {
+        "width": "5.75",
+        "sidewalk:left:width": "1.5",
+        "sidewalk:right": "no",
+        "parking:right": "half_on_kerb",
+        "parking:right:orientation": "parallel",
+        "sidewalk:left:surface": "paving_stones",
+        "road_text": "30",
+        "road_text:position": "124",
+        "road_text:backward": "30",
+        "road_text:backward:position": "232"
+      },
+      "note": "Beethovenstraße east (vp30, aerial 2-3): ~5.75 m, north pavement 1.5 m; on the south a ~1 m paver strip behind a low kerb with cars parked half on it — round 2: north pavement concrete pavers (vp30); '30' in the eastbound lane at x≈813 (vp30, aerial 2-2) and in the westbound lane at x≈777 (aerial 2-2)"
+    },
+    "48869075": {
+      "tags": {
+        "width": "7",
+        "lane_markings": "yes",
+        "parking:left": "street_side",
+        "parking:left:orientation": "perpendicular",
+        "parking:left:markings": "no",
+        "verge:right": "grass",
+        "verge:right:width": "3"
+      },
+      "note": "Rudolf-Diesel-Straße south (vp31, aerial 1-0): ~7 m with a dashed centre line, perpendicular parking directly off the carriageway on the west side (no bay lines), grass verge ~3 m with a row of trees on the east"
+    },
+    "190728411": {
+      "tags": {
+        "width": "3.75",
+        "median:contents": "paving_stones;trees",
+        "parking:right": "on_kerb",
+        "parking:right:orientation": "parallel",
+        "parking:right:trees": "yes",
+        "kerb": "lowered",
+        "lane_markings:edge": "no"
+      },
+      "note": "Friedrich-Ebert-Allee eastbound (vp32): one lane ~3.75 m, no edge lines, low kerbs; ~4 m paver median with small trees; on the south a raised paver parking strip (parallel) with small trees"
+    },
+    "193670972": {
+      "tags": {
+        "median:contents": "paving_stones;trees",
+        "kerb": "lowered"
+      },
+      "note": "Friedrich-Ebert-Allee westbound (vp32): paver median with small trees, low kerbs"
+    },
+    "40635659": {
+      "tags": {
+        "width": "6.5",
+        "lane_markings": "yes",
+        "parking:left": "street_side",
+        "parking:left:orientation": "perpendicular",
+        "parking:left:markings": "no"
+      },
+      "note": "Rudolf-Diesel-Straße north (vp34): ~6.5 m with a dashed centre line, perpendicular parking directly off the carriageway on the west side"
+    },
+    "191282068": {
+      "tags": {
+        "width": "5.5",
+        "sidewalk:left:width": "1.5",
+        "sidewalk:right": "no",
+        "kerb:right": "lowered",
+        "frontage:right": "hedge",
+        "sidewalk:left:surface": "paving_stones",
+        "road_text": "30",
+        "road_text:position": "50"
+      },
+      "note": "Beethovenstraße west (vp35): ~5.5 m, pavement only on the north side; low kerb with a grass/hedge strip on the south — round 2: north pavement concrete pavers (vp35); '30' painted ~50 m east of the junction (aerial 0-3/1-3, in the middle of the road – direction taken as eastbound)"
+    },
+    "202271909": {
+      "tags": {
+        "width": "6",
+        "parking:both": "street_side",
+        "parking:both:orientation": "perpendicular",
+        "parking:both:markings": "yes",
+        "parking:both:trees": "yes"
+      },
+      "note": "car park aisle (vp36): ~6 m, marked perpendicular bays on both sides with tree islands between groups of bays"
+    },
+    "21121339": {
+      "tags": {
+        "width": "7",
+        "lane_markings:edge": "no"
+      },
+      "note": "Kirchbaunaer Straße northbound (vp33): two lanes ~7 m, no edge lines"
+    },
+    "802145855": {
+      "tags": {
+        "footway": "sidewalk"
+      },
+      "note": "shared foot/cycle path along Kirchbaunaer Straße (vp33): the pavement of the road, directly behind the east kerb"
+    },
+    "22775797": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "Edith-Stein-Straße living street (vp06): concrete pavers"
+    },
+    "70184750": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "Käthe-Kollwitz-Weg living street (vp34): grey concrete pavers"
+    },
+    "22675912": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "Elly-Heuss-Knapp-Straße living street (vp29): pavers"
+    },
+    "1314623312": {
+      "tags": {
+        "mouth:kerb": "lowered"
+      },
+      "note": "parking aisle at Beethovenstraße (vp30): joins over the continuous pavement, lowered kerb"
+    },
+    "1201955652": {
+      "tags": {
+        "mouth:kerb": "lowered"
+      },
+      "note": "emergency access at Kirchbaunaer Straße x≈1100, z≈265 (vp17): no road mouth, lowered kerb across the pavement"
+    },
+    "955061522": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "parking area west of Rudolf-Diesel-Straße: grey concrete pavers (vp09)"
+    },
+    "1314094829": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "car park with light concrete-paver bays (aerial 0-2)"
+    },
+    "1314094832": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "car park with light concrete-paver bays (aerial 0-2)"
+    },
+    "22775781": {
+      "tags": {
+        "highway": "service",
+        "service": "driveway",
+        "width": "3.5",
+        "lanes": null,
+        "sidewalk": "no"
+      },
+      "note": "aerial 0-3: only a narrow (~3-4 m) private driveway between houses opening into the asphalt yard obs-3; no turning circle (its end inside the yard is removed: 22775781:2)"
+    },
+    "434557658": {
+      "tags": {
+        "sidewalk": "no"
+      },
+      "note": "aerial 0-3: single-lane driveway, no pavements"
+    },
+    "207649781": {
+      "tags": {
+        "service": "driveway"
+      },
+      "note": "vp35, aerial 1-3: short drive into a paved yard behind a hedge, no street mouth"
+    },
+    "1064917574": {
+      "tags": {
+        "highway": "pedestrian",
+        "surface": "paving_stones",
+        "width": "3",
+        "lanes": null
+      },
+      "note": "aerial 2-0: a ~3 m paved path through greenery between the buildings, not a road (unsure whether delivery vehicles may use it)"
+    },
+    "1357480132": {
+      "tags": {
+        "highway": "footway",
+        "surface": "paving_stones",
+        "width": "3"
+      },
+      "note": "aerial 2-0: paved plaza path under trees with a small round paved feature at its end – no road, no turning circle"
+    },
+    "26825912": {
+      "tags": {
+        "highway": "path",
+        "service": null,
+        "surface": "ground"
+      },
+      "note": "aerial 4-3: only closed woodland (at most a path under the trees) where OSM has an 8 m parking aisle; its car park 26825911 is removed"
+    },
+    "132117608": {
+      "tags": {
+        "surface": "asphalt",
+        "width": "3"
+      },
+      "note": "aerial 4-1/4-2: grey paved allotment lane ~3 m, clearly visible"
+    },
+    "200507540": {
+      "tags": {
+        "surface": "asphalt",
+        "width": "3"
+      },
+      "note": "aerial 4-1/4-2: grey paved allotment lane ~3 m, clearly visible"
+    },
+    "200507541": {
+      "tags": {
+        "surface": "asphalt",
+        "width": "3"
+      },
+      "note": "aerial 4-1/4-2: grey paved allotment lane ~3 m, clearly visible"
+    },
+    "132083224": {
+      "tags": {
+        "surface": "asphalt",
+        "width": "3"
+      },
+      "note": "aerial 4-1/4-2: grey paved allotment lane ~3 m, clearly visible"
+    },
+    "592141817": {
+      "tags": {
+        "surface": "asphalt",
+        "width": "3",
+        "bicycle": "yes",
+        "foot": "yes"
+      },
+      "note": "aerial 4-4: the ~3 m asphalt foot/cycle path ~10 m east of K 22 lies on this line; the duplicate 244101996 beside it is removed south of (1213,434)"
+    },
+    "22757384:1": {
+      "tags": {
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel",
+        "sidewalk:left:surface": "paving_stones",
+        "sidewalk:right:surface": "asphalt"
+      },
+      "note": "Lohweg east part (vp03): parked cars on the north-east kerb; south-west pavement grey concrete pavers, north-east asphalt"
+    },
+    "22757384:2": {
+      "tags": {
+        "parking:left": "lane",
+        "parking:left:orientation": "parallel",
+        "frontage:right": null
+      },
+      "note": "Lohweg west part (aerial 4-0): parked cars on the south kerb"
+    },
+    "22701025:1": {
+      "tags": {
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel",
+        "sidewalk:both:surface": "asphalt",
+        "road_text": "30",
+        "road_text:position": "22"
+      },
+      "note": "Beethovenstraße north part (vp12, aerial 0-3): car on the west kerb; asphalt pavements; '30' in the southbound lane at z≈365 (upside down seen from the south)"
+    },
+    "22701025:2": {
+      "tags": {
+        "parking:left": "lane",
+        "parking:left:orientation": "parallel",
+        "parking:left:occupancy": "low",
+        "sidewalk:left:surface": "paving_stones",
+        "road_text": "30",
+        "road_text:position": "59"
+      },
+      "note": "Beethovenstraße bend and east part (vp22, aerial 0-3): cars on the north/inner kerb; north-west pavement grey pavers; '30' in the eastbound lane at x≈369 — round 2 (vp07, vp10): only now and then a single car there, no row – occupancy low"
+    },
+    "22775582:1": {
+      "tags": {
+        "sidewalk:right": "yes",
+        "sidewalk:right:width": "1.5",
+        "sidewalk:right:surface": "asphalt",
+        "sidewalk:left": "no"
+      },
+      "note": "Mozartstraße north stub (vp19): asphalt pavement on the west only, grass on the east"
+    },
+    "22775582:2": {
+      "tags": {
+        "sidewalk:left": "yes",
+        "sidewalk:right": "no"
+      },
+      "note": "Mozartstraße (aerial 3-2): pavement on the north/east side only, grass and paths on the other"
+    },
+    "802163194:1": {
+      "tags": {
+        "width": "9.5",
+        "parking:left": "lane",
+        "parking:left:orientation": "parallel",
+        "parking:left:trees": "yes",
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel"
+      },
+      "note": "Friedrich-Ebert-Allee west end, x≈245–296 (vp01): kerbside parking between kerbed tree bulb-outs on the north, parking strip behind a solid line on the south"
+    },
+    "802163194:2": {
+      "tags": {
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel"
+      },
+      "note": "Friedrich-Ebert-Allee x≈296–336 (vp01, aerial 0-0): parked cars on the south strip"
+    },
+    "802163194:3": {
+      "tags": {
+        "cycleway:right": "lane",
+        "cycleway:right:lane": "exclusive",
+        "cycleway:right:width": "1.8"
+      },
+      "note": "Friedrich-Ebert-Allee x≈336–490 (vp38): lane ~1.8 m behind a solid line along the south kerb"
+    },
+    "802163194:4": {
+      "tags": {
+        "width": "10",
+        "cycleway:both": "lane",
+        "cycleway:both:lane": "advisory",
+        "cycleway:both:width": "1.7",
+        "cycleway:both:surface:colour": "red"
+      },
+      "note": "Friedrich-Ebert-Allee x≈490–526 (vp14, aerial 0-0): red advisory cycle lanes on both sides"
+    },
+    "184873567:1": {
+      "tags": {
+        "width": "6.5",
+        "cycleway:left": null,
+        "cycleway:left:lane": null,
+        "cycleway:left:width": null,
+        "verge:left": "grass",
+        "verge:left:width": "2",
+        "sidewalk:left:surface": "asphalt",
+        "sidewalk:right": "no"
+      },
+      "note": "Theodor-Heuss-Allee x≈502–603 (vp11): ~6.5 m, no cycle lane; south: ~2 m grass verge, then a dark asphalt pavement; north: paved forecourts directly at the kerb"
+    },
+    "184873567:2": {
+      "tags": {
+        "sidewalk:left:surface": "paving_stones",
+        "sidewalk:left:colour": "anthracite",
+        "sidewalk:right:surface": "paving_stones"
+      },
+      "note": "Theodor-Heuss-Allee x≈252–502 (vp29): advisory lane on the south-east; dark (anthracite) paver pavement south-east, grey/red pavers north-west"
+    },
+    "21351807:1": {
+      "tags": {
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "2.5",
+        "sidewalk:left:surface": "paving_stones",
+        "sidewalk:left:colour": "red"
+      },
+      "note": "Gustav-Heinemann-Allee west of x≈317 (vp06): ~2.5 m red concrete-paver pavement on the north side"
+    },
+    "21351807:2": {
+      "tags": {
+        "sidewalk:left": "no",
+        "frontage:left": "hedge"
+      },
+      "note": "Gustav-Heinemann-Allee east of x≈317 (vp06, vp18): no pavement, hedges and shrubs directly behind the north kerb"
+    },
+    "22741558:1": {
+      "tags": {
+        "markings:zigzag": "right",
+        "parking:right": null,
+        "parking:right:orientation": null
+      },
+      "note": "Marktstraße first ~20 m from the junction (vp10): zigzag no-parking marking along the east kerb, no parked cars"
+    },
+    "202271616:2": {
+      "tags": {
+        "markings:zigzag": "left"
+      },
+      "note": "car park aisle (aerial 3-1): zigzag along the west edge, z≈−136…−112"
+    },
+    "802160513:1": {
+      "tags": {
+        "sidewalk:left:surface": "paving_stones"
+      },
+      "note": "Haydnstraße west–east leg (vp39): grey concrete-paver pavement on the inner side"
+    },
+    "802160513:2": {
+      "tags": {
+        "sidewalk:left:surface": "paving_stones",
+        "sidewalk:left:colour": "red"
+      },
+      "note": "Haydnstraße north–south leg (vp13): red-brown concrete-paver pavement on the inner side"
+    }
+  },
+  "nodes": {
+    "243229041": [
+      -5,
+      2.1
+    ]
+  },
+  "areas": [
+    {
+      "id": "obs-1",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          383.5,
+          -120
+        ],
+        [
+          400,
+          -120
+        ],
+        [
+          400,
+          -105
+        ],
+        [
+          383.5,
+          -105
+        ]
+      ],
+      "note": "aerial 0-1: asphalt parking court at the north end of 22876340"
+    },
+    {
+      "id": "obs-2",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          400,
+          -127
+        ],
+        [
+          406,
+          -127
+        ],
+        [
+          406,
+          -121
+        ],
+        [
+          426,
+          -121
+        ],
+        [
+          426,
+          -115
+        ],
+        [
+          406,
+          -115
+        ],
+        [
+          406,
+          -104
+        ],
+        [
+          400,
+          -104
+        ]
+      ],
+      "note": "aerial 0-1: paved garage court east of it"
+    },
+    {
+      "id": "obs-3",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          395,
+          380
+        ],
+        [
+          411,
+          380
+        ],
+        [
+          412,
+          386
+        ],
+        [
+          410,
+          394
+        ],
+        [
+          406,
+          401
+        ],
+        [
+          403,
+          404
+        ],
+        [
+          392,
+          403
+        ],
+        [
+          391,
+          389
+        ],
+        [
+          395,
+          388
+        ]
+      ],
+      "note": "aerial 0-3: asphalt yard at the north end of 22775781"
+    },
+    {
+      "id": "obs-4",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          469,
+          338
+        ],
+        [
+          478,
+          339
+        ],
+        [
+          490,
+          347
+        ],
+        [
+          490,
+          356
+        ],
+        [
+          484,
+          358
+        ],
+        [
+          470,
+          357
+        ],
+        [
+          467,
+          352
+        ],
+        [
+          467,
+          341
+        ]
+      ],
+      "note": "aerial 0-3: asphalt parking area at the end of 804817600"
+    },
+    {
+      "id": "obs-5",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          391,
+          531
+        ],
+        [
+          399,
+          532
+        ],
+        [
+          404,
+          541
+        ],
+        [
+          407,
+          550
+        ],
+        [
+          408,
+          557
+        ],
+        [
+          400,
+          560
+        ],
+        [
+          386,
+          553
+        ],
+        [
+          386,
+          541
+        ],
+        [
+          389,
+          535
+        ]
+      ],
+      "note": "aerial 0-4: turning area at the end of 22775780"
+    },
+    {
+      "id": "obs-6",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          585,
+          -284.5
+        ],
+        [
+          658,
+          -284.5
+        ],
+        [
+          658,
+          -238
+        ],
+        [
+          585,
+          -238
+        ]
+      ],
+      "note": "aerial 1-0: works yard, asphalt throughout (the loop 1211562542 runs in it)"
+    },
+    {
+      "id": "obs-7",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          567,
+          -46
+        ],
+        [
+          665,
+          -47
+        ],
+        [
+          665,
+          -25
+        ],
+        [
+          567,
+          -26
+        ]
+      ],
+      "note": "aerial 1-1: bus station – bus lanes and platforms, all paved"
+    },
+    {
+      "id": "obs-8",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          492.5,
+          2.5
+        ],
+        [
+          510,
+          2.5
+        ],
+        [
+          510,
+          8
+        ],
+        [
+          508.5,
+          14
+        ],
+        [
+          505,
+          24
+        ],
+        [
+          503,
+          30
+        ],
+        [
+          499,
+          30
+        ],
+        [
+          495,
+          17
+        ],
+        [
+          494,
+          8
+        ]
+      ],
+      "note": "aerial 1-1: asphalt parking area south of the railway"
+    },
+    {
+      "id": "obs-9",
+      "tags": {
+        "highway": "pedestrian",
+        "area": "yes",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          572,
+          128
+        ],
+        [
+          590,
+          128
+        ],
+        [
+          600,
+          130
+        ],
+        [
+          618,
+          131
+        ],
+        [
+          621,
+          134
+        ],
+        [
+          619,
+          143
+        ],
+        [
+          612,
+          148
+        ],
+        [
+          600,
+          150
+        ],
+        [
+          588,
+          152
+        ],
+        [
+          578,
+          150
+        ],
+        [
+          572,
+          145
+        ]
+      ],
+      "note": "aerial 1-2: light paved square with trees"
+    },
+    {
+      "id": "obs-10",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface"
+      },
+      "pts": [
+        [
+          898,
+          -190
+        ],
+        [
+          924.5,
+          -190
+        ],
+        [
+          924.5,
+          -167
+        ],
+        [
+          918.5,
+          -167
+        ],
+        [
+          918.5,
+          -160.5
+        ],
+        [
+          909,
+          -160.5
+        ],
+        [
+          909,
+          -163.5
+        ],
+        [
+          898,
+          -163.5
+        ]
+      ],
+      "note": "aerial 3-0: courtyard car park with marked bays"
+    },
+    {
+      "id": "obs-11",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          951,
+          344
+        ],
+        [
+          961,
+          346
+        ],
+        [
+          968,
+          347
+        ],
+        [
+          968,
+          353
+        ],
+        [
+          962,
+          354
+        ],
+        [
+          960,
+          362
+        ],
+        [
+          957,
+          369
+        ],
+        [
+          946,
+          369
+        ],
+        [
+          943,
+          365
+        ],
+        [
+          945,
+          357
+        ],
+        [
+          948,
+          352
+        ]
+      ],
+      "note": "aerial 3-3: turning area at the end of 191282069"
+    },
+    {
+      "id": "obs-12",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          1066,
+          -36
+        ],
+        [
+          1100,
+          -40
+        ],
+        [
+          1100,
+          -2
+        ],
+        [
+          1066,
+          -2
+        ]
+      ],
+      "note": "aerial 3-1/4-1: asphalt car park with marked bays south of the railway"
+    },
+    {
+      "id": "obs-13",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface",
+        "surface": "gravel"
+      },
+      "pts": [
+        [
+          1100,
+          -40
+        ],
+        [
+          1098,
+          -43
+        ],
+        [
+          1120,
+          -50
+        ],
+        [
+          1160,
+          -63
+        ],
+        [
+          1170,
+          -56
+        ],
+        [
+          1184,
+          -46
+        ],
+        [
+          1184,
+          -15
+        ],
+        [
+          1100,
+          -15
+        ]
+      ],
+      "note": "aerial 4-1: unsurfaced yard densely used for parking"
+    },
+    {
+      "id": "obs-14",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "asphalt"
+      },
+      "pts": [
+        [
+          1222,
+          208
+        ],
+        [
+          1238,
+          208
+        ],
+        [
+          1246,
+          214
+        ],
+        [
+          1250,
+          222
+        ],
+        [
+          1252,
+          235
+        ],
+        [
+          1246,
+          243
+        ],
+        [
+          1225,
+          244
+        ],
+        [
+          1220,
+          236
+        ],
+        [
+          1218,
+          225
+        ],
+        [
+          1216,
+          215
+        ]
+      ],
+      "note": "aerial 4-2: turning yard east of the factory (with a round planted island ~8 m at (1241,229) – not expressible)"
+    },
+    {
+      "id": "obs-15",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          1192,
+          371
+        ],
+        [
+          1198,
+          371
+        ],
+        [
+          1198,
+          392
+        ],
+        [
+          1196,
+          402
+        ],
+        [
+          1190,
+          407
+        ],
+        [
+          1183,
+          403
+        ],
+        [
+          1186,
+          392
+        ],
+        [
+          1192,
+          391
+        ]
+      ],
+      "note": "aerial 4-3: paved forecourt of the sports-ground building"
+    },
+    {
+      "id": "obs-16",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          1094,
+          -128.5
+        ],
+        [
+          1127,
+          -128.5
+        ],
+        [
+          1127,
+          -117
+        ],
+        [
+          1094,
+          -117
+        ]
+      ],
+      "note": "vp20, aerial 4-0: concrete-paver car park directly behind the south pavement of Im Wiesental (aisle 1201933087)"
+    },
+    {
+      "id": "obs-17",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          384,
+          256
+        ],
+        [
+          393,
+          255
+        ],
+        [
+          396,
+          264
+        ],
+        [
+          399,
+          280
+        ],
+        [
+          389,
+          280
+        ],
+        [
+          386,
+          268
+        ]
+      ],
+      "note": "aerial 0-2: light paver court with a parked car"
+    },
+    {
+      "id": "obs-18",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          409,
+          241
+        ],
+        [
+          421,
+          240
+        ],
+        [
+          421,
+          253
+        ],
+        [
+          409,
+          253
+        ]
+      ],
+      "note": "aerial 0-2: paver parking court with cars west of 200587457"
+    },
+    {
+      "id": "obs-19",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface"
+      },
+      "pts": [
+        [
+          896,
+          218
+        ],
+        [
+          907,
+          220
+        ],
+        [
+          904,
+          233
+        ],
+        [
+          894,
+          230
+        ]
+      ],
+      "note": "aerial 3-2: small parking bays with cars beside the aisle 22895211"
+    },
+    {
+      "id": "obs-20",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          1132,
+          -242
+        ],
+        [
+          1141,
+          -242
+        ],
+        [
+          1139,
+          -218
+        ],
+        [
+          1132,
+          -218
+        ]
+      ],
+      "note": "aerial 4-0: light paved yard and driveways west of Im Ährenfeld"
+    },
+    {
+      "id": "obs-21",
+      "tags": {
+        "highway": "service",
+        "area": "yes",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          1235,
+          -221
+        ],
+        [
+          1246,
+          -221
+        ],
+        [
+          1246,
+          -207
+        ],
+        [
+          1235,
+          -207
+        ]
+      ],
+      "note": "aerial 4-0: paved forecourt with cars east of Im Wiesental"
+    },
+    {
+      "id": "obs-22",
+      "tags": {
+        "amenity": "parking",
+        "parking": "surface",
+        "surface": "paving_stones"
+      },
+      "pts": [
+        [
+          1086,
+          -152
+        ],
+        [
+          1102,
+          -152
+        ],
+        [
+          1102,
+          -141
+        ],
+        [
+          1086,
+          -141
+        ]
+      ],
+      "note": "aerial 4-0: paved yard with cars north of Im Wiesental"
+    },
+    {
+      "id": "obs-23",
+      "tags": {
+        "natural": "scrub"
+      },
+      "pts": [
+        [
+          958,
+          -151
+        ],
+        [
+          966,
+          -154
+        ],
+        [
+          976,
+          -153
+        ],
+        [
+          982,
+          -150
+        ],
+        [
+          980,
+          -145
+        ],
+        [
+          970,
+          -145
+        ],
+        [
+          961,
+          -147
+        ]
+      ],
+      "note": "vp10, aerial 3-0: raised island planted with shrubs and two big trees between Marktstraße and the car park (±3 m)"
+    },
+    {
+      "id": "obs-24",
+      "tags": {
+        "landuse": "grass"
+      },
+      "pts": [
+        [
+          1245,
+          229
+        ],
+        [
+          1243.8,
+          231.8
+        ],
+        [
+          1241,
+          233
+        ],
+        [
+          1238.2,
+          231.8
+        ],
+        [
+          1237,
+          229
+        ],
+        [
+          1238.2,
+          226.2
+        ],
+        [
+          1241,
+          225
+        ],
+        [
+          1243.8,
+          226.2
+        ]
+      ],
+      "note": "aerial 4-2: round planted island (~8 m) in the turning yard obs-14"
+    }
+  ],
+  "newWays": [
+    {
+      "id": "obs-w1",
+      "tags": {
+        "highway": "track",
+        "surface": "ground",
+        "tracktype": "grade4"
+      },
+      "pts": [
+        [
+          1198,
+          131
+        ],
+        [
+          1207,
+          133
+        ],
+        [
+          1210,
+          145
+        ],
+        [
+          1213,
+          160
+        ],
+        [
+          1217,
+          180
+        ],
+        [
+          1222,
+          198
+        ],
+        [
+          1226,
+          208
+        ]
+      ],
+      "connect": true,
+      "note": "aerial 4-2: worn track from the end of 22775586 along the east side of the factory down to the turning yard"
+    },
+    {
+      "id": "obs-w2",
+      "tags": {
+        "highway": "service",
+        "width": "4"
+      },
+      "pts": [
+        [
+          1180,
+          399
+        ],
+        [
+          1190,
+          393
+        ],
+        [
+          1197,
+          389.5
+        ],
+        [
+          1215,
+          389
+        ],
+        [
+          1236,
+          388.5
+        ],
+        [
+          1242,
+          385
+        ],
+        [
+          1244,
+          375
+        ],
+        [
+          1240,
+          368
+        ]
+      ],
+      "connect": true,
+      "note": "aerial 4-3: light paved access drive from Kirchbaunaer Straße past the club house along the south and east of the sports ground"
+    },
+    {
+      "id": "obs-w3",
+      "tags": {
+        "highway": "path",
+        "width": "3"
+      },
+      "pts": [
+        [
+          1273.5,
+          -7.5
+        ],
+        [
+          1265,
+          -13
+        ],
+        [
+          1255,
+          -18
+        ]
+      ],
+      "connect": true,
+      "note": "aerial 4-1: grey paved allotment lane branching west from 132083224"
+    }
+  ],
+  "remove": [
+    1201944109,
+    1201944110,
+    26825911,
+    200568969,
+    "22775781:2",
+    "244101996:2"
+  ],
+  "removeNotes": {
+    "26825911": "aerial 4-3: car park in closed woodland, nothing visible",
+    "200568969": "aerial 2-2: the soccer pitch is gone – a long building (observed-buildings obs-b1) and a lawn stand there",
+    "22775781:2": "the driveway's end inside the yard (turning circle that does not exist)",
+    "244101996:2": "duplicate of the asphalt path 592141817 a few metres beside it (aerial 4-4)"
+  },
+  "split": [
+    {
+      "osm": 22757384,
+      "at": [
+        1204,
+        -309
+      ],
+      "note": "Lohweg at Im Ährenfeld"
+    },
+    {
+      "osm": 22701025,
+      "at": [
+        329,
+        406
+      ],
+      "note": "Beethovenstraße, start of the bend"
+    },
+    {
+      "osm": 22775582,
+      "at": [
+        956,
+        191
+      ],
+      "note": "Mozartstraße at the car-park mouth"
+    },
+    {
+      "osm": 802163194,
+      "at": [
+        296,
+        -308
+      ],
+      "note": "Friedrich-Ebert-Allee x≈296"
+    },
+    {
+      "osm": 802163194,
+      "at": [
+        336,
+        -305
+      ],
+      "note": "Friedrich-Ebert-Allee x≈336"
+    },
+    {
+      "osm": 802163194,
+      "at": [
+        490,
+        -306.5
+      ],
+      "note": "Friedrich-Ebert-Allee x≈490"
+    },
+    {
+      "osm": 184873567,
+      "at": [
+        502,
+        268
+      ],
+      "note": "Theodor-Heuss-Allee x≈502"
+    },
+    {
+      "osm": 21351807,
+      "at": [
+        317,
+        119
+      ],
+      "note": "Gustav-Heinemann-Allee x≈317"
+    },
+    {
+      "osm": 22741558,
+      "at": [
+        961.5,
+        -175
+      ],
+      "note": "Marktstraße ~20 m north of the junction"
+    },
+    {
+      "osm": 202271616,
+      "at": [
+        956,
+        -136
+      ],
+      "note": "car park aisle, start of the zigzag"
+    },
+    {
+      "osm": 202271616,
+      "at": [
+        956,
+        -112
+      ],
+      "note": "car park aisle, end of the zigzag"
+    },
+    {
+      "osm": 802160513,
+      "at": [
+        854,
+        408
+      ],
+      "note": "Haydnstraße at the bend"
+    },
+    {
+      "osm": 22775781,
+      "at": [
+        403,
+        404
+      ],
+      "note": "Beethovenstraße driveway at the edge of the yard obs-3"
+    },
+    {
+      "osm": 244101996,
+      "at": [
+        1213,
+        434
+      ],
+      "note": "footway beside K 22 where it meets 592141817"
+    }
+  ],
+  "merge": [
+    {
+      "id": "tha-east",
+      "a": [
+        1201944106,
+        1201944115
+      ],
+      "b": [
+        1367337921,
+        1201944113,
+        21121334
+      ],
+      "from": [
+        656,
+        194
+      ],
+      "to": [
+        891,
+        170
+      ],
+      "tags": {
+        "lanes": "2",
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "2",
+        "lane_markings": "yes"
+      },
+      "note": "Theodor-Heuss-Allee x≈656–891 (vp00, vp27, aerial 2-2): one carriageway of ~9–10 m with a dashed centre line; the real median ends at an island nose at x≈656. The links between the carriageways (1201944109, 1201944110) go with them. The parking lay-by on the north kerb (x≈785–845) is not on the merged way yet."
+    },
+    {
+      "id": "fea-roundabout",
+      "a": [
+        25557284
+      ],
+      "b": [
+        1526393046
+      ],
+      "from": [
+        1014,
+        -358
+      ],
+      "to": [
+        1044,
+        -351
+      ],
+      "tags": {
+        "lanes": "2",
+        "width": null,
+        "overtaking": "no",
+        "lane_markings": "yes"
+      },
+      "note": "Friedrich-Ebert-Allee at the roundabout entry x≈1014–1044 (vp16): only a solid line between the directions, no median"
+    },
+    {
+      "id": "k22-crossing",
+      "a": [
+        395443787
+      ],
+      "b": [
+        200224342
+      ],
+      "from": [
+        987,
+        -8
+      ],
+      "to": [
+        995,
+        32
+      ],
+      "tags": {
+        "lanes": "5",
+        "lanes:forward": "3",
+        "lanes:backward": "2",
+        "turn:lanes:forward": "left|through|through",
+        "width": "16",
+        "overtaking": "no",
+        "lane_markings": "yes",
+        "lane_markings:edge": null,
+        "sidewalk:left": "separate",
+        "cycleway:left": "separate"
+      },
+      "note": "Kirchbaunaer Straße K 22 south of the level crossing, z≈−8…32 (vp24, aerial 3-1): the carriageways run side by side with only a solid line between them"
+    }
+  ],
+  "points": [
+    {
+      "id": "table-mozart",
+      "way": "22775582",
+      "at": [
+        955,
+        180
+      ],
+      "tags": {
+        "traffic_calming": "table"
+      },
+      "note": "Mozartstraße at Theodor-Heuss-Allee (vp19): raised table with shark teeth"
+    },
+    {
+      "id": "table-rudolf-diesel",
+      "way": "40635659",
+      "at": [
+        571,
+        141
+      ],
+      "tags": {
+        "traffic_calming": "table"
+      },
+      "note": "Rudolf-Diesel-Straße x≈576, z≈141 (vp34): raised table with shark teeth"
+    },
+    {
+      "id": "give-way-brahms",
+      "way": "191282070",
+      "at": [
+        500.9,
+        406.7
+      ],
+      "tags": {
+        "highway": "give_way"
+      },
+      "note": "Brahmsstraße at Beethovenstraße (vp22): dashed give-way line across its mouth; Beethovenstraße is the through road"
+    },
+    {
+      "id": "give-way-lortzing",
+      "way": "22775777",
+      "at": [
+        496.9,
+        395.4
+      ],
+      "tags": {
+        "highway": "give_way"
+      },
+      "note": "Lortzingstraße at Beethovenstraße (vp22): give-way sign at the corner"
+    },
+    {
+      "id": "choker-beethoven-829",
+      "way": "191282069",
+      "at": [
+        829,
+        291
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "right",
+        "beacon": "yes"
+      },
+      "note": "Beethovenstraße x≈829 (vp30, aerial 2-2): planted kerb build-out on the south side with a red-white beacon"
+    },
+    {
+      "id": "choker-beethoven-770",
+      "way": "191282069",
+      "at": [
+        770,
+        288
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "left"
+      },
+      "note": "Beethovenstraße x≈770 (aerial 2-2): round planted kerb build-out on the north side before Schubertstraße (beacon not visible from above)"
+    },
+    {
+      "id": "choker-beethoven-626",
+      "way": "191282068",
+      "at": [
+        626,
+        341
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "right",
+        "beacon": "yes"
+      },
+      "note": "Beethovenstraße x≈626 (vp35, aerial 1-3): planted build-out on the south side with a red-white beacon"
+    },
+    {
+      "id": "choker-brahms-513",
+      "way": "191282070",
+      "at": [
+        513,
+        511
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "left",
+        "beacon": "yes"
+      },
+      "note": "Brahmsstraße z≈511 (vp37, aerial 1-3): planted build-out on the west side with a red-white beacon"
+    },
+    {
+      "id": "choker-tha-436",
+      "way": "184873567",
+      "at": [
+        436,
+        301
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "right"
+      },
+      "note": "Theodor-Heuss-Allee x≈436 (vp29): kerb build-out with grass and cobble edging on the north-west side"
+    }
+  ]
+}

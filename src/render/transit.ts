@@ -27,6 +27,7 @@ import { CTRL, RAIL, STOP_FLAG } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { World } from '../world/world.ts';
 import { PeopleRenderer } from './people.ts';
+import { inTheWay, stopSpot } from './stopspot.ts';
 import type { PersonPose } from './people.ts';
 import { CONTACT_WIRE_HEIGHT, DepartureBoard, SwitchSignal, TramSignal, bench, benchSeats, bin, catenaryMast, contactWire, mergeStatic, platform, releaseModel, shelter, shelterSeats, stopBoard, stopSign } from './stopmodels.ts';
 import type { StopKind, SwitchAspect, TramAspect } from './stopmodels.ts';
@@ -245,16 +246,18 @@ export class TransitScene {
     for (const pole of place.poles) {
       const y = this.ground(pole.x, pole.z, 400);
       if (!Number.isFinite(y)) continue;
-      // facing the road (or the track): the way to the nearest carriageway
-      const yaw = this.faceRoad(pole.x, pole.z);
+      // beside the carriageway, on the side the bus stops at, facing the road: behind the kerb, the parked cars
+      // and the cycle track – wherever the pole was mapped, on the road's centre line or between two carriageways too (stopspot.ts)
+      const spot = stopSpot(this.world, pole.x, pole.z, y, pole.flags);
+      const yaw = spot.edge ? spot.yaw : this.faceRoad(pole.x, pole.z);
       const fx = -Math.sin(yaw);
       const fz = -Math.cos(yaw);
       // along the kerb: to the right of the way it faces
       const ax = Math.cos(yaw);
       const az = -Math.sin(yaw);
-      const at0 = (along: number, back: number): [number, number] => [pole.x + ax * along - fx * back, pole.z + az * along - fz * back];
-      // (a pole mapped at the kerb or on the road: shelter, bench, board and the waiting people go back until none of it stands on the carriageway)
-      const onCarriageway = (px: number, pz: number): boolean => this.world.surfaceAt(px, pz, y + 2, hit) && hit.zone === 0;
+      const at0 = (along: number, back: number): [number, number] => [spot.x + ax * along - fx * back, spot.z + az * along - fz * back];
+      // (where a junction's corner or another road reaches it: shelter, bench, board and the waiting people go back until none of it stands in the way)
+      const onCarriageway = (px: number, pz: number): boolean => inTheWay(this.world, px, pz, y + 2);
       let extra = 0;
       for (let sh = 0; sh <= 8; sh += 0.5) {
         let clear = true;
@@ -280,7 +283,8 @@ export class TransitScene {
       // (the tiles already show the sign of a stop mapped on the road itself)
       if (!(pole.flags & STOP_FLAG.ON_ROAD)) {
         const sign = stopSign(kind, place.name);
-        sign.position.set(pole.x, y, pole.z);
+        const [sx, sz] = spot.moved || extra > 0 ? at(0, 0) : [pole.x, pole.z];
+        sign.position.set(sx, this.groundOr(sx, sz, y + 2, y), sz);
         sign.rotation.y = yaw;
         root.add(sign);
         view.signs.push(sign);

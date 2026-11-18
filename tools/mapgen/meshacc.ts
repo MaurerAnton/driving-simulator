@@ -2,6 +2,7 @@
 /** Geometry accumulation per map tile (pipeline side). */
 import { POS_XZ_SCALE, POS_Y_SCALE, UV_SCALE, tileKey } from '../../src/world/tilefmt.ts';
 import type { SectionArray, SignPost, TileObject } from '../../src/world/tilefmt.ts';
+import type { ParkedCar } from '../../src/world/parked.ts';
 
 /** Growable indexed triangle mesh with `stride` extra bytes/shorts per vertex. */
 export class MeshAcc {
@@ -81,6 +82,8 @@ export class TileData {
   readonly collCnt: number[] = [];
   /** collision segments x1,z1,x2,z2,baseY (walls, parapets, guard rails) */
   readonly collSeg: number[] = [];
+  /** cars parked along the streets (tools/mapgen/parking.ts) */
+  readonly parked: ParkedCar[] = [];
 
   constructor(ix: number, iz: number) {
     this.ix = ix;

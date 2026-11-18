@@ -23,10 +23,12 @@ import { RAIL } from '../world/types.ts';
 import { consistLength, consistOf } from '../sim/rail.ts';
 import { LIFT, along, bar, crossroads, dashes, finish, lanePath, laneArrow, newPathPoint, pathPoint, polyPath, roundabout, straight, yawOf } from './theorystage.ts';
 import type { Bound, Path, Stage, Surface } from './theorystage.ts';
+import { MORE_THEORY, faceAt } from './theoryscenes.ts';
+import { LEVEL_CROSSING, LEVEL_CROSSING_QUEUE } from './theorycrossing.ts';
 
 // ------------------------------------------------------------------- actors
-/** the learner's car; another car; an ambulance or police van; a bus; a lorry; a tram; a cyclist; a person; a child */
-export type ActorKind = 'me' | 'car' | 'van' | 'bus' | 'truck' | 'tram' | 'bike' | 'person' | 'child';
+/** the learner's car; another car; an ambulance or police van; a bus; a lorry; a tram; a cyclist; a person; a child; a deer; a wild boar */
+export type ActorKind = 'me' | 'car' | 'van' | 'bus' | 'truck' | 'tram' | 'bike' | 'person' | 'child' | 'deer' | 'boar';
 
 /**
  * How big each kind is: length and width, how far its nose lies ahead of
@@ -54,6 +56,9 @@ export const FOOT: Record<ActorKind, Footprint> = {
   bike: { length: 1.75, width: 0.62, front: 0.88, wheelbase: 1.06 },
   person: { length: 0.45, width: 0.5, front: 0.2, wheelbase: 0 },
   child: { length: 0.35, width: 0.4, front: 0.15, wheelbase: 0 },
+  // (animals: placed like people, by the middle of the body – game/theoryscenes.ts)
+  deer: { length: 1.5, width: 0.45, front: 0.75, wheelbase: 0 },
+  boar: { length: 1.3, width: 0.55, front: 0.65, wheelbase: 0 },
 };
 
 /** A key position: at time `t` (s) the nose is `at` along the path – metres, or a mark of the path ± metres ('line-12') – going `v` m/s. */
@@ -81,7 +86,20 @@ export interface ActorDef {
   display?: string;
   /** the vehicle it gets out of (it starts inside it: the two do not count as touching) */
   leaves?: string;
+  /** a person at work or of an age (game/theoryscenes.ts): a police officer, a flagman with his stop/go sign, a worker, somebody old with a rollator */
+  role?: PersonRole;
+  /** which way a person faces from `t` on (a yaw of the stage), turning over `dur` seconds – instead of the way its path goes */
+  face?: Array<[t: number, yaw: number, dur: number]>;
+  /** a person's signs from `t` on: a police officer's arms ('down', 'arms', 'raise'), a flagman's sign ('stop', 'go') */
+  gesture?: Array<[t: number, sign: Gesture]>;
+  /** its headlights from `t` on, drawn on the road in the dark: 0 off, 1 dipped, 2 full beam */
+  beam?: Array<[t: number, state: number]>;
 }
+
+/** a police officer directing the traffic, a flagman at roadworks, a worker there, somebody old walking with a rollator */
+export type PersonRole = 'police' | 'flagman' | 'worker' | 'senior';
+/** a police officer's arms: down (the basic position), both out to the sides, one raised; a flagman's sign: red, green */
+export type Gesture = 'down' | 'arms' | 'raise' | 'stop' | 'go';
 
 /** A traffic light's lamps: R red, Y red and amber, G green, A amber, O off. */
 export type LightState = 'R' | 'Y' | 'G' | 'A' | 'O';
@@ -116,6 +134,8 @@ export interface LessonDef {
   view: { at: [number, number] | string; ahead?: number; yaw: number; pitch: number; dist: number };
   /** the side gap between two actors shown while one passes the other */
   gap?: { a: string; b: string; t0: number; t1: number };
+  /** its own sky (game/theorymode.ts): the sun's elevation (degrees – below 0 dusk and night) and fog (how far one sees, m) */
+  sky?: { sun?: number; fog?: number };
 }
 
 // ------------------------------------------------------------- the lessons
@@ -586,8 +606,8 @@ const GREEN_ARROW: LessonDef = {
   view: { at: [1, 8], yaw: 0.5, pitch: -0.68, dist: 30 },
 };
 
-/** Every lesson, in the order of the list. */
-export const THEORY: readonly LessonDef[] = [RBL, BEND, LEFT_TURN, ZEBRA, TRAM_LESSON, CORRIDOR, SCHOOL_BUS, OVERTAKE, BLIND_SPOT, ZIP, MOTORWAY, ROUNDABOUT, GREEN_ARROW];
+/** Every lesson, in the order of the list (and the scenes of game/theoryscenes.ts after them). */
+export const THEORY: readonly LessonDef[] = [RBL, BEND, LEFT_TURN, ZEBRA, TRAM_LESSON, CORRIDOR, SCHOOL_BUS, OVERTAKE, BLIND_SPOT, ZIP, MOTORWAY, ROUNDABOUT, GREEN_ARROW, ...MORE_THEORY, LEVEL_CROSSING, LEVEL_CROSSING_QUEUE];
 
 /** The mode of the main menu that opens the theory lessons. */
 export const THEORY_MODE = 'theory';
@@ -836,6 +856,8 @@ export function poseAt(r: ActorRun, t: number, out: Pose): Pose {
     const [ax, az] = offPoint(r.path, mid + 0.35, off);
     const [bx, bz] = offPoint(r.path, mid - 0.35, off);
     out.yaw = yawOf(ax - bx, az - bz) + lean;
+    // (somebody who turns on the spot: a police officer, a flagman)
+    if (r.def.face) out.yaw = faceAt(r.def, t, out.yaw);
     out.steer = 0;
   }
   return out;

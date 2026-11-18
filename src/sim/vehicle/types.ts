@@ -156,4 +156,11 @@ export interface VehicleSpec {
    * converter's capacity (N·m per (rad/s)²).  Default: a petrol car.
    */
   auto?: { up: [number, number]; down: [number, number]; kickdownRpm: number; lockOmega: number; converter: number };
+  /**
+   * The bump stop at the end of the travel, per wheel: its stiffness (N/m) and
+   * its damping (N·s/m, acting both ways while it is pressed).  Default: a
+   * car's – hard enough for 1.4 t, far too hard for a light machine, which it
+   * would throw into the air off a kerb.
+   */
+  bumpStop?: { stiffness: number; damping: number };
 }

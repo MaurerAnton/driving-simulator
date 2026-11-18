@@ -28,7 +28,7 @@ import type { SignalSnapshot } from '../sim/signals.ts';
 import { CAR_FIELDS, CYCLIST_FIELDS, PED_FIELDS, RAIL_CAR_FIELDS, RAIL_HEAD, Recorder, ReplayView } from './replay.ts';
 import type { ReplayFrame } from './replay.ts';
 import { Vehicle } from '../sim/vehicle/index.ts';
-import { LIGHT_TRUCK, MINIBUS } from '../sim/vehicle/fleet.ts';
+import { bikeLean, LIGHT_TRUCK, MINIBUS } from '../sim/vehicle/fleet.ts';
 import type { DriverInput } from '../sim/vehicle/index.ts';
 import { SignalRenderer, TrafficRenderer } from '../render/actors.ts';
 import { PedLightRenderer } from '../render/pedlights.ts';
@@ -37,6 +37,10 @@ import { FLOOR as TRAM_FLOOR, PassengerView } from '../render/passenger.ts';
 import { FarTerrain } from '../render/far.ts';
 import { TransitScene } from '../render/transit.ts';
 import { RoadworksRenderer } from '../render/roadworks.ts';
+import { WildView } from '../render/wildlife.ts';
+import { Wildlife, worldRoads } from '../sim/wildlife.ts';
+import { LevelCrossingRenderer } from '../render/levelcrossings.ts';
+import { LevelCrossings } from '../sim/levelcrossing.ts';
 import { RoadEvents } from '../sim/roadevents.ts';
 import { AirfieldRenderer } from '../render/airfield.ts';
 import { PlaneModel } from '../render/plane.ts';
@@ -69,11 +73,17 @@ import { Hud, SEASON_CHOICES, SEASON_KEYS, WEATHER_CHOICES, WEATHER_KEYS } from 
 import { MirrorZoomPanel } from '../ui/mirrorzoom.ts';
 import { HudMirror } from '../ui/hudmirror.ts';
 import { ScreenTap } from '../ui/screentap.ts';
+import { WalkControl, planFootPath, walkModeOf } from './walkmodes.ts';
+import type { FootRoad } from './walkmodes.ts';
+import { FlyCam } from './flycam.ts';
+import { TouchStick } from '../ui/touchstick.ts';
+import { WorldTap } from '../ui/worldtap.ts';
 import type { HudState, ReplayState, ResultSummary, RunwayChoice, TramStopChoice } from '../ui/hud.ts';
 import type { MenuPreview } from '../ui/carousel.ts';
 import { stageFrame } from '../ui/stage.ts';
 import { Stops } from '../world/stops.ts';
 import { LANGS, formatUnit, isRtl, lessonIntro, lessonTitle, loadLang, localeOf, setKeyStyle, tr } from '../i18n/index.ts';
+import { speech } from '../audio/speech.ts';
 import { gameClock, gameNow, sunAt } from './clock.ts';
 import { busSchedule, resyncBuses, tramSchedule } from './timedtransit.ts';
 import { downloaded, formatBytes } from './netstats.ts';
@@ -87,6 +97,9 @@ import type { AutopilotState } from '../sim/autopilot.ts';
 import { WEATHER_PARTICLES } from '../render/weather.ts';
 import { initKeyLabels } from '../i18n/keys.ts';
 import { RealityPanel } from '../ui/reality.ts';
+import { Online } from '../net/online.ts';
+import type { Snapshot } from '../net/multiplayer.ts';
+import { extraLayers } from '../ui/maplayers.ts';
 import { LaneGraph, TURN, lanePoint } from '../world/lanes.ts';
 import type { Lane } from '../world/lanes.ts';
 import { newPolySample, projectOnPolyline, samplePolyline } from '../core/geom.ts';
@@ -101,7 +114,8 @@ import { planTourInSlices } from './tour.ts';
 import { ROUTE_PRESETS, RouteWatch, planPreset, presetOfMode, routeLine } from './routepresets.ts';
 import { findLessonPlace, lessonStart, placeKindOf, searchRadius } from './lessonplaces.ts';
 import type { LessonStart } from './lessonplaces.ts';
-import { askLessonPlace } from '../ui/lessonroutes.ts';
+import { lessonStartPanel } from '../ui/lessonstart.ts';
+import { LessonWatch, canWatch } from './lessonwatch.ts';
 import { BusService } from './busline.ts';
 import type { BusEvent } from './busline.ts';
 import { saveTour, thinLine } from './tourlog.ts';
@@ -116,7 +130,10 @@ import { newsDue } from './releases.ts';
 import { FaultLog } from './faultlog.ts';
 import { DrivenPath } from './track.ts';
 import { BigMap } from '../ui/bigmap.ts';
-import { Watcher, lineWay, transitSource } from './spectate.ts';
+import { Watcher, lineTakeOver, lineWay, transitSource } from './spectate.ts';
+import { TapPicker, takeKindOf } from './takeover.ts';
+import type { PickBox, PickTarget } from './takeover.ts';
+import { ShowSpots } from './showdrive.ts';
 import { PointWatcher } from './pointwatch.ts';
 import { FUEL_PRICE_SOURCE, fuelPrices } from '../world/fuelprices.ts';
 import { priceAt } from '../world/services.ts';
@@ -151,6 +168,10 @@ import { taskTextKey } from './semice.ts';
 import { COUPLING_STEPS, MAX_CORRECTIONS, TRAILER_AXLES, TRAILER_OUTLINE, TRUCK_AXLES, TRUCK_OUTLINE, YardFrame, offArea } from './ce.ts';
 import type { CouplingStepId, TaskId } from './ce.ts';
 import { YardTask } from './yardtask.ts';
+import { DrillRun } from './drillplay.ts';
+import { examDrills } from './drills.ts';
+import type { DrillId } from './drills.ts';
+import { DrillScene } from '../render/drillyard.ts';
 import { CraneWork, craneMenuPose, craneMenuSite, craneStart, isCraneModel } from './craneplay.ts';
 import { makeCraneModel } from '../render/crane.ts';
 import { ForkliftWork, forkliftMenuSite, forkliftStart, isForkliftModel } from './forkliftplay.ts';
@@ -159,8 +180,10 @@ import { ForkliftModel } from '../render/forklift.ts';
 import type { CraneType } from '../sim/crane.ts';
 import { TheoryMode } from './theorymode.ts';
 import { THEORY_MODE } from './theory.ts';
+import { noteLessonEnd } from './exam/learnstore.ts';
 import { AutoDriver } from '../sim/autodriver.ts';
 import { followMap } from '../sim/follow.ts';
+import { narrowCollide } from '../sim/narrowings.ts';
 import { ServiceWorld } from './serviceworld.ts';
 import { Wading } from './wading.ts';
 import { BeamPlay } from './beamplay.ts';
@@ -169,6 +192,7 @@ import { SpawnCars } from './spawncar.ts';
 import type { Parked } from './spawncar.ts';
 import { exactSpots, freeNear, inBuilding } from './spawnplace.ts';
 import { locate } from '../ui/geolocate.ts';
+import { ArcadeDrive, arcadeTransmission } from './arcadedrive.ts';
 
 type State = 'loading' | 'menu' | 'intro' | 'placing' | 'drive' | 'pause' | 'reality' | 'map' | 'result' | 'replay' | 'theory';
 /** the driver's seat, behind the car, a camera that is moved about freely – and a fixed one for pictures (?cam=) */
@@ -228,6 +252,9 @@ function bikeVariant(kind: string): BikeVariant {
   return kind === 'moped' ? 'moped' : kind === 'motorcycle125' ? 'light' : kind === 'motorcycle35' ? 'mid' : 'big';
 }
 
+/** (for the own vehicle's angles, sent to the other players) */
+const NET_EULER = new THREE.Euler();
+
 /** Which model a vehicle is drawn with: its kind of model – for a motorcycle, the build of its class. */
 function modelKey(def: VehicleDef): string {
   return def.model === 'motorcycle' ? `motorcycle:${bikeVariant(def.kind)}` : def.model;
@@ -283,6 +310,10 @@ export class Game {
   private taskCount = 0;
   private taskFailed = false;
   private taskSub = '';
+  /** the basic tasks of class B on the practice yard (game/drillplay.ts), while such a lesson runs – kept for its result */
+  private drill: DrillRun | null = null;
+  private readonly drillScene = new DrillScene();
+  private readonly drillPos = [0, 0, 0];
   private laidTry = 0;
   /** where the drive in traffic begins once the tasks on the yard are done */
   private roadSpawn: SpawnJson | null = null;
@@ -334,6 +365,9 @@ export class Game {
   /** a lesson in a real place (game/lessonplaces.ts): what to look for once the roads round the start are there – and the destination found with it */
   private placeSearch: LessonStart | null = null;
   private placeGoal: Edge | null = null;
+  /** watching the lesson: the autopilot drives it (game/lessonwatch.ts); the lesson's start panel was answered (ui/lessonstart.ts) */
+  private lessonWatch: LessonWatch | null = null;
+  private lessonChosen = false;
   private camSnap = false;
   private demoHead = 0;
   /** trams and trains on the tracks around the player */
@@ -362,6 +396,9 @@ export class Game {
   /** the roadworks and the demonstrations of the day (src/sim/roadevents.ts – `roadEvents.list()` for the map), and how they are drawn */
   roadEvents!: RoadEvents;
   private roadworks!: RoadworksRenderer;
+  /** the level crossings: lights, barriers and bells, driven by the trains (src/sim/levelcrossing.ts), and how they are drawn */
+  private levelCrossings!: LevelCrossings;
+  private crossingView!: LevelCrossingRenderer;
   // ------------------------------------------------- the aeroplane
   /** the aeroplane being flown (null: none), its model, and the airfields of the map with their firm ground */
   private aircraft: Aircraft | null = null;
@@ -446,12 +483,18 @@ export class Game {
   private readonly fc = { off: new THREE.Vector3(), yaw: 0, pitch: -0.3, ready: false };
   private readonly keys = new Set<string>();
   private readonly driver: DriverInput = { steer: 0, throttle: 0, brake: 0, clutch: 0, handbrake: 1, gear: 0, ignition: true, starter: false };
+  /** arcade driving (a setting): D and R by the pedals, held at a standstill, the engine always running (game/arcadedrive.ts) */
+  private readonly arcadeDrive = new ArcadeDrive();
   private autoDrive = 0;
   private tipText = '';
   /** the headlights: their light, the traffic's lamps and main beam, the rules of § 17 StVO (game/beamplay.ts) */
   private readonly beams = new BeamPlay();
+  /** the deer and wild boar crossing the country roads at dusk (sim/wildlife.ts), drawn */
+  private readonly wildView = new WildView();
   /** every fault of this and of earlier sessions */
   private readonly faultLog = new FaultLog();
+  /** the server, when the player set one: accounts, progress, photos, playing together (net/online.ts) */
+  private online: Online | null = null;
   /** where the car has been, for the map */
   private readonly path = new DrivenPath();
   private bigMap!: BigMap;
@@ -597,8 +640,10 @@ export class Game {
     this.services = new ServiceWorld({ scene: app.scene, collider: this.collider, ui: this.ui, map: app.map, ground: (x, z) => app.tiles.heightAt(x, z), onRoad: (x, z) => app.world.surfaceAt(x, z, app.tiles.heightAt(x, z) + 1, this.hit), blocked: (x, z, yaw) => this.collider.blocked(x, app.tiles.heightAt(x, z), z, yaw, 0.2), lang: () => this.settings.lang, message: (t, sub) => this.hud.message(t, sub), click: (k) => this.audio.click(k), hideOverlay: () => this.hud.hideOverlay(), rules: this.rules, shadows: () => this.settings.graphics.shadows !== 'off' });
     await this.services.load();
     this.spawnCars = this.makeSpawnCars();
+    // (a tap on a vehicle: watch it, or get into a model of the test place – game/takeover.ts)
+    new TapPicker(app.canvas, app.camera, () => this.pickBoxes(), (t) => this.picked(t));
     app.tiles.onTile((tile, loaded) => this.onTile(tile, loaded));
-    app.scene.add(this.car.root, this.actors.group, this.railActors.group, this.signalHeads.group, this.pedHeads.group, this.passengerView.group, this.far.group, this.transit.group, this.airfieldView.group, this.yardScene.group, this.markers.group, this.figure.group, this.showGroup, this.showRail.group, this.showPeople.group, this.explosion.group);
+    app.scene.add(this.car.root, this.actors.group, this.railActors.group, this.signalHeads.group, this.pedHeads.group, this.passengerView.group, this.far.group, this.transit.group, this.airfieldView.group, this.yardScene.group, this.drillScene.group, this.markers.group, this.figure.group, this.showGroup, this.showRail.group, this.showPeople.group, this.explosion.group);
     this.showGroup.name = 'every model';
     this.fadeEl.className = 'fade';
     this.ui.append(this.fadeEl);
@@ -608,12 +653,26 @@ export class Game {
     followMap(app.map, { lanes: this.lanes, traffic: this.traffic, signals: this.signals, changed: () => (this.signalsDirty = true) });
     // the roadworks and demonstrations of the day: the traffic, the rules and the way planners know them; the map's pieces bring their zones
     this.roadEvents = new RoadEvents(world, this.lanes, this.signals);
+    // deer and wild boar at dusk where forests meet the country roads: the traffic brakes for them
+    this.traffic.wild = new Wildlife({ sun: () => this.beams.sunElevation, coverAt: (x, z) => app.tiles.coverAt(x, z), heightAt: (x, z) => app.tiles.heightAt(x, z), road: worldRoads(world) });
+    // (?wildlife: at every forest by the road, to try it out)
+    if (new URLSearchParams(location.search).has('wildlife')) this.traffic.wild.chance = 1;
+    app.scene.add(this.wildView.group);
     this.roadEvents.ready = (x, z, r) => !app.map.pieces || app.map.ready(x, z, r);
     this.roadEvents.collider = this.collider;
     this.traffic.roadEvents = this.roadEvents;
     this.lanes.wayCost = routeFor.wayCost = (w) => this.roadEvents.wayCost(w);
     app.map.listen(this.roadEvents.listener);
+    // the kerb build-outs narrowing the roads: their beds and beacons are solid (src/sim/narrowings.ts)
+    narrowCollide(this.collider, world.allEdges, true);
+    app.map.listen({ added: (c) => narrowCollide(this.collider, c.edges, true), removed: (c) => narrowCollide(this.collider, c.edges, false) });
     this.roadEvents.setTracks(this.rail.net);
+    this.levelCrossings = new LevelCrossings(world, this.traffic);
+    this.levelCrossings.setRail(this.rail);
+    this.traffic.levelCrossings = this.levelCrossings;
+    this.signs.editPost = (p) => this.levelCrossings.editPost(p);
+    this.crossingView = new LevelCrossingRenderer(this.audio);
+    app.scene.add(this.crossingView.group);
     this.roadworks = new RoadworksRenderer(this.audio);
     app.scene.add(this.roadworks.group);
     if (app.map.pieces) {
@@ -625,6 +684,7 @@ export class Game {
         if (rails.length === 0) return;
         this.rail = new RailTraffic(rails);
         this.roadEvents.setTracks(this.rail.net);
+        this.levelCrossings.setRail(this.rail);
         this.applySettings();
       });
       // the airfields: drawn on the ground, firm under an aeroplane's wheels, and the ends of their runways to take off from
@@ -739,6 +799,16 @@ export class Game {
         this.settings.weather = v as Settings['weather'];
         saveSettings(this.settings);
       },
+      arcadeDrive: () => this.settings.arcadeDrive,
+      setArcadeDrive: (v) => {
+        this.settings.arcadeDrive = v;
+        saveSettings(this.settings);
+      },
+      evenRoads: () => this.settings.evenRoads,
+      setEvenRoads: (v) => {
+        this.settings.evenRoads = v;
+        saveSettings(this.settings);
+      },
       close: () => this.resume(),
     };
     this.hud.onChangeVehicle = (kind) => this.changeVehicle(kind);
@@ -781,8 +851,10 @@ export class Game {
       },
       maxTexture: app.renderer.capabilities.maxTextureSize,
       openAerial: () => this.openMap(true),
+      extraImages: (lat, lon) => this.online?.realityImages(lat, lon) ?? Promise.resolve([]),
     });
     this.hud.onQuit = () => this.toMenu();
+    this.makeOnline();
     this.hud.faultLog = this.faultLog;
     this.hud.onMap = () => this.openMap();
     this.hud.where = () => (this.vehicle ? { x: this.mpos[0], z: this.mpos[2] } : null);
@@ -950,6 +1022,24 @@ export class Game {
   }
 
   private debugLook: [number, number] | null = null;
+  /** the developer's view's field of view (degrees, vertical) */
+  private devFov = 60;
+
+  /**
+   * Developer: look from (x, height above the ground, z) towards the compass heading (degrees, 0 north, clockwise
+   * as photos are) and pitch (degrees, up positive) with a vertical field of view – the world loads round it.
+   */
+  devView(x: number, h: number, z: number, heading: number, pitch = 0, fov = 60, absolute = false): number {
+    this.cameraMode = 'dev';
+    // (the player's vehicle out of the picture – its parts, not its root: the loop draws while the root is shown)
+    for (const c of this.model.root.children) c.visible = false;
+    const g = this.app.tiles.heightAt(x, z);
+    this.free.pos.set(x, absolute ? h : (Number.isNaN(g) ? 200 : g) + h, z);
+    this.free.yaw = (-heading * Math.PI) / 180;
+    this.free.pitch = (pitch * Math.PI) / 180;
+    this.devFov = fov;
+    return Number.isNaN(g) ? NaN : g;
+  }
   private inputMode: 'touch' | 'keys' = 'keys';
   private addressIndex: Promise<AddressIndex | null> | null = null;
   private mainSet: Set<number> | null = null;
@@ -1305,7 +1395,7 @@ export class Game {
       this.planeModel?.update(this.planeVisual(a), 0, this.time);
       this.previewRadius = 15;
     } else {
-      const v = new Vehicle(def.spec(this.settings.transmission, powerOf(def, this.settings.powers)), this.ground);
+      const v = new Vehicle(def.spec(arcadeTransmission(this.settings.arcadeDrive, this.settings.transmission), powerOf(def, this.settings.powers)), this.ground);
       v.teleport(p.x, y + 0.02, p.z, p.yaw);
       v.getModelPosition(this.previewPos);
       model.root.position.set(this.previewPos[0], this.previewPos[1], this.previewPos[2]);
@@ -1347,6 +1437,8 @@ export class Game {
   private showBuilt = false;
   /** the drive "every model": on the yard among them */
   private showOn = false;
+  /** where each model stands there, which one is being driven (game/showdrive.ts) */
+  private readonly showSpots = new ShowSpots();
 
   /** A sign with a name, standing over a model (a sprite: it faces whoever looks). */
   private nameSign(text: string, x: number, y: number, z: number): void {
@@ -1438,6 +1530,9 @@ export class Game {
       this.showGroup.add(m.root);
       const [x, z] = frame.toWorld(u, row);
       this.standModel(def, m, x, z, facing, ground, trailer, truck);
+      // (it can be got into: game/showdrive.ts)
+      const small = def.model === 'car' || def.model === 'motorcycle';
+      this.showSpots.add({ kind, x, y: ground(x, z), z, yaw: facing, outline: def.outline, height: small ? 1.6 : 3.4, roots: [m.root, ...(trailer ? [trailer.group] : []), ...(truck && kind === 'truck' ? [truck.trailer] : [])] });
       this.nameSign(tr(def.name, lang), x, ground(x, z) + (def.model === 'car' || def.model === 'motorcycle' ? 2.6 : 4.4), z);
       u += gap;
     };
@@ -1454,6 +1549,8 @@ export class Game {
       e.setWheels([0, 0, 0, 0], [0, 0, 0, 0], [r, r, r, r]);
       e.setLamps({ low: false, high: false, brake: false, reverse: false, left: false, right: false });
       this.showGroup.add(e.group);
+      // (each driven as the car)
+      this.showSpots.add({ kind: 'car', x, y: ground(x, z), z, yaw: south, outline: { front: e.dims.length / 2, rear: e.dims.length / 2, hw: e.dims.width / 2 }, height: 1.5, roots: [e.group] });
       if (i === 1) this.nameSign(tr('showTraffic', lang), x, ground(x, z) + 2.4, z);
       u += 4.6;
     });
@@ -1501,6 +1598,7 @@ export class Game {
     plane.root.quaternion.set(a.q[0], a.q[1], a.q[2], a.q[3]);
     plane.update(this.planeVisual(a), 0, this.time);
     this.showGroup.add(plane.root);
+    this.showSpots.add({ kind: 'plane', x: ax, y: ground(ax, az), z: az, yaw: frame.yawToWorld(Math.PI / 2), outline: VEHICLES.plane.outline, height: 3, roots: [plane.root] });
     this.nameSign(tr('vehPlane', lang), ax, ground(ax, az) + 4.2, az);
     this.showGroup.traverse((o) => {
       if (o instanceof THREE.Mesh) o.castShadow = true;
@@ -1667,7 +1765,9 @@ export class Game {
     this.task = null;
     this.tasksLeft = [];
     this.yardScene.hide();
+    this.drillScene.hide();
     this.ground.paved = null;
+    this.ground.raise = null;
     this.rules.yard = false;
     this.hud.setChoices([], () => {});
   }
@@ -1761,6 +1861,62 @@ export class Game {
     this.lessonLine = st.todo ? tr(taskTextKey(run.semi, 'do', st.todo), lang) : choices.length ? tr('ce.onFoot', lang) : tr('ce.do.uPark', lang);
     this.taskSub = `${proc.done.size} / ${COUPLING_STEPS.length}`;
     if (st.state === 'done') this.taskDone(true);
+  }
+
+  // ------------------------------------------------- class B: the basic tasks on the practice yard
+  /** Lay out the first task, stand the car at its start (`ids`: 'exam' – three tasks as in the test: one of group a, two of group b, Anlage 7 FeV Nr. 2.1.4.2). */
+  private drillBegin(ids: Array<DrillId | 'exam'>): void {
+    const o = this.def.outline;
+    const list = ids.flatMap((id) => (id === 'exam' ? examDrills() : [id]));
+    this.drill = new DrillRun(list, this.yardFrame!, { front: o.front, rear: o.rear, hw: o.hw, axles: this.def.axles, track: this.def.track }, this.yardScene, this.drillScene, () => this.settings.lang);
+    this.drillPlace();
+    this.rules.yard = true;
+    // the yard is asphalt while the lesson runs, the ramp of the hill start raises the ground
+    this.ground.paved = this.drill.paved;
+    this.ground.raise = this.drill.raise;
+    this.lessonLine = this.drill.line();
+    this.taskSub = this.drill.sub();
+  }
+
+  /** The car to the start of the task now (placed there by placeAgain or at the start of the drive). */
+  private drillPlace(): void {
+    const d = this.drill!;
+    const at = d.start();
+    this.spawn = { name: '', x: at.x, z: at.z, yaw: at.yaw, kind: 'street' };
+    this.input.c.lookZoom = d.layout.zoom > 0 ? d.layout.zoom : this.def.zoom;
+  }
+
+  /** Judge the task on the yard; what to do in the street-name block, the instructor's remarks in the tip line. */
+  private updateDrill(dt: number): void {
+    const d = this.drill!;
+    const v = this.vehicle;
+    const c = this.input.c;
+    const lang = this.settings.lang;
+    v.getModelPosition(this.drillPos);
+    const ev = d.update(dt, { x: this.drillPos[0], z: this.drillPos[2], yaw: v.yaw, speed: v.speed, handbrake: c.handbrake > 0.5, brake: c.brake, engine: v.engineRunning }, (x, z) => this.app.tiles.heightAt(x, z));
+    for (const f of ev.faults) this.rules.note(f.id, f.severity, f.data, 0.5);
+    if (ev.stop) {
+      // (into a parked car: it stops there)
+      v.vel.fill(0);
+      v.angVel.fill(0);
+      this.audio.click('bump');
+    }
+    if (ev.signal) {
+      // the instructor's signal for the emergency stop
+      this.audio.click('beep');
+      this.hud.message(tr('drill.signal', lang), tr('drill.signalSub', lang));
+    }
+    if (ev.remark) {
+      this.tipText = ev.remark;
+      this.tipUntil = this.time + 6;
+    }
+    this.lessonLine = d.line();
+    this.taskSub = d.sub();
+    if (ev.next === 'again' || ev.next === 'next') {
+      this.audio.click('chime');
+      this.drillPlace();
+      this.placeAgain();
+    } else if (ev.next === 'over') this.finish();
   }
 
   /** The address list (house numbers of the map), fetched when somebody first searches. */
@@ -2018,18 +2174,7 @@ export class Game {
     let driver: AutoDriver | null = null;
     if (!self) {
       // the driver has no hand for a gear lever: the car gets the automatic gearbox for it
-      if (this.vehicle.spec.transmission !== 'automatic') {
-        const old = this.vehicle;
-        old.getModelPosition(this.mpos);
-        const spec = this.def.spec('automatic', powerOf(this.def, this.settings.powers));
-        const v = new Vehicle(spec, this.ground);
-        v.teleport(this.mpos[0], this.mpos[1] + 0.02, this.mpos[2], old.yaw);
-        v.odometer = old.odometer;
-        this.vehicle = v;
-        this.input.setSteering(spec.wheelbase, spec.maxWheelAngle, spec);
-        this.input.setAutomatic(true);
-        this.hud.gearbox = 'automatic';
-      }
+      this.toAutomatic();
       const v = this.vehicle;
       v.resetDrivetrain(true);
       const c = this.input.c;
@@ -2241,8 +2386,82 @@ export class Game {
     } else if (h.done && !demo.active) this.endDemo('arrived');
   }
 
+  // ------------------------------------------------------------ the server (net/online.ts)
+  private makeOnline(): void {
+    const on = new Online({
+      settings: this.settings,
+      ui: this.ui,
+      scene: this.app.scene,
+      collider: this.collider,
+      show: (node) => this.hud.showPanel(node),
+      message: (text, sub) => this.hud.message(text, sub),
+      where: () => (this.vehicle && this.state !== 'menu' && this.state !== 'loading' ? { x: this.mpos[0], z: this.mpos[2], yaw: this.vehicle.yaw } : null),
+      mapStamp: () => {
+        const m = this.app.world.json.meta;
+        return `${m.generated}${m.patched ? `+${m.patched}` : ''}`;
+      },
+      settingsChanged: () => void loadLang(this.settings.lang).then(() => this.applySettings()),
+      faultsChanged: () => {
+        const fresh = new FaultLog();
+        this.faultLog.entries.length = 0;
+        this.faultLog.entries.push(...fresh.entries);
+      },
+      pickOnMap: (done) => {
+        this.openMap();
+        if (this.state !== 'map') return;
+        extraLayers.pick = (x, z) => {
+          extraLayers.pick = null;
+          this.closeMap();
+          done(x, z);
+        };
+        this.hud.message(tr('net.pickPlace', this.settings.lang));
+      },
+      goNear: (x, z) => {
+        if (this.state !== 'pause' || this.lesson || this.crane || this.forklift || this.tram || this.aircraft) return false;
+        const sp = this.roadSpot(x, z, '', 120);
+        if (!sp) return false;
+        this.teleportSpot(sp);
+        return true;
+      },
+    });
+    this.online = on;
+    this.hud.onAccount = (back) => on.account(back);
+    this.hud.onTogether = () => on.together(() => this.hud.showPause());
+  }
+
+  /** The own vehicle (or the player on foot) as the others of a session are to see it. */
+  private netSelf(): Snapshot | null {
+    if (!this.online?.session || this.wrecked || this.state === 'menu' || this.state === 'loading' || this.state === 'theory') return null;
+    const now = performance.now();
+    const wk = this.walker;
+    if (wk && (this.def.kind === 'pedestrian' || this.walkerAway() || !this.riding)) {
+      return { time: now, kind: 'pedestrian', x: wk.x, y: wk.y, z: wk.z, yaw: wk.yaw, pitch: 0, roll: 0, speed: wk.speed, steer: 0, lights: 0, signal: 0, brake: false, horn: false, walker: { walk: wk.distance, moving: wk.speed > 0.2 } };
+    }
+    const root = this.model.root;
+    const e = NET_EULER.setFromQuaternion(root.quaternion, 'YXZ');
+    const s = this.visual;
+    return {
+      time: now,
+      kind: this.def.kind,
+      x: root.position.x,
+      y: root.position.y,
+      z: root.position.z,
+      yaw: e.y,
+      pitch: e.x,
+      roll: e.z,
+      speed: this.tram ? this.tram.speed : this.aircraft ? this.aircraft.ias : this.vehicle.speed,
+      steer: s.wheelSteer[0] ?? 0,
+      lights: (s.lowBeam ? 1 : 0) | (s.highBeam ? 2 : 0) | (s.hazard ? 4 : 0) | (s.reversing ? 8 : 0),
+      signal: s.indicator < 0 ? -1 : s.indicator > 0 ? 1 : 0,
+      brake: s.braking,
+      horn: this.input.c.horn,
+    };
+  }
+
   private closeMap(): void {
     if (this.state !== 'map') return;
+    // (a place that was to be picked for a photo: not any more)
+    extraLayers.pick = null;
     this.bigMap.close();
     if (this.mapFrom === 'menu') {
       // (back to the main menu: it places the vehicle anew – where it stood, or where it was chosen on the map)
@@ -2306,17 +2525,21 @@ export class Game {
       this.wantNet();
     }
     this.presetPending = preset?.id ?? '';
-    // the first lesson: where shall the lessons take place?  (asked once – game/lessonplaces.ts)
+    // a lesson on the road: where it takes place, and whether it is driven or watched (ui/lessonstart.ts – game/lessonplaces.ts, lessonwatch.ts)
     const lessonAsked = LESSONS.find((l) => l.id === mode);
-    if (lessonAsked && !address && !this.settings.lessonPlaceAsked && placeKindOf(lessonAsked)) {
-      const ask = askLessonPlace((k, v) => tr(k, this.settings.lang, v), this.settings, this.app.world.json.spawns, () => {
+    if (lessonAsked && !this.lessonChosen && (placeKindOf(lessonAsked) || canWatch(lessonAsked))) {
+      const lang = this.settings.lang;
+      const ask = lessonStartPanel((k, v) => tr(k, lang, v), this.settings, this.app.world.json.spawns, { title: lessonTitle(lessonAsked.id, lang), place: !address && !!placeKindOf(lessonAsked), watch: canWatch(lessonAsked) }, () => {
         ask.remove();
         saveSettings(this.settings);
+        this.lessonChosen = true;
         this.begin(mode, spawnIdx, skipIntro, address, stop, runway);
-      });
+      }, () => ask.remove());
       this.ui.append(ask);
       return;
     }
+    const watchLesson = this.lessonChosen && this.settings.lessonWatch;
+    this.lessonChosen = false;
     if (VEHICLES[this.settings.vehicle]?.kind === 'plane' && !runway && !this.air && !this.airAwaited && this.app.map.pieces) {
       // (a flight asked for by a link before the airfields were read: it begins once they are)
       this.airAwaited = true;
@@ -2365,7 +2588,13 @@ export class Game {
     if (this.showOn && this.yardFrame) {
       const f = this.yardFrame;
       const [x, z] = f.toWorld(-f.yard.len / 2 + 4, -2);
-      this.spawn = { name: tr('showTitle', this.settings.lang), x, z, yaw: f.yawToWorld(-Math.PI / 2), kind: 'street' };
+      // (or, got into one of the models: where it stood – game/showdrive.ts)
+      const at = this.showSpots.start();
+      this.spawn = at ? { name: tr('showTitle', this.settings.lang), x: at.x, z: at.z, yaw: at.yaw, kind: 'street' } : { name: tr('showTitle', this.settings.lang), x, z, yaw: f.yawToWorld(-Math.PI / 2), kind: 'street' };
+      if (!at) {
+        this.tipText = tr('showEnter', this.settings.lang);
+        this.tipUntil = this.time + 10;
+      }
     }
     this.lesson = LESSONS.find((l) => l.id === mode) ?? null;
     this.demo = null;
@@ -2414,7 +2643,8 @@ export class Game {
     this.lanes.longVehicle = this.def.long;
     this.lanes.noMotorway = this.def.noMotorway;
     routeFor.noMotorway = this.def.noMotorway;
-    const spec = this.services.begin(this.def, this.def.spec(this.settings.transmission, powerOf(this.def, this.settings.powers)), !this.lesson && mode === 'free');
+    const spec = this.services.begin(this.def, this.def.spec(arcadeTransmission(this.settings.arcadeDrive, this.settings.transmission), powerOf(this.def, this.settings.powers)), !this.lesson && mode === 'free');
+    this.arcadeDrive.reset();
     this.vehicle = new Vehicle(spec, this.ground);
     this.wading.reset();
     // the sound of this kind of vehicle (its engine's revs – the tram and the aeroplane have their own)
@@ -2422,7 +2652,7 @@ export class Game {
     this.ensureModel(this.def);
     this.trailer = this.def.trailer ? makeTrailer(this.def.trailer, this.ground) : null;
     linkTowed(this.carTrailer, this.trailer);
-    this.hud.gearbox = spec.transmission === 'automatic' && this.def.model !== 'car' && this.def.model !== 'motorcycle' ? 'automatic' : null;
+    this.hud.gearbox = spec.transmission === 'automatic' && ((this.def.model !== 'car' && this.def.model !== 'motorcycle') || this.settings.arcadeDrive) ? 'automatic' : null;
     this.endTasks();
     // the camera stands further back for 16 m of vehicle
     this.input.c.lookZoom = this.def.zoom;
@@ -2430,6 +2660,12 @@ export class Game {
     this.collider.setShape(this.def.circles, this.def.radius);
     this.rules.setVehicle(this.def.caps, this.def.capFault, this.def.heavy, this.def.noMotorway);
     this.taskFailed = false;
+    // watching the lesson: the car drives it by itself, with the automatic gearbox (game/lessonwatch.ts)
+    this.lessonWatch = null;
+    if (watchLesson && canWatch(this.lesson)) {
+      this.toAutomatic();
+      this.lessonWatch = new LessonWatch(new AutoDriver(this.app.world, this.signals, this.rules, this.traffic, { spec: this.vehicle.spec, front: this.def.outline.front, truck: this.def.heavy, caps: this.def.caps }));
+    }
     // a lesson in a real place (game/lessonplaces.ts): from the district chosen – the place itself is looked for once the roads round it are there
     this.placeGoal = null;
     this.placeSearch = this.lesson && !address && this.spawn ? lessonStart(this.lesson, this.settings.lessonPlace, this.settings.lessonArea, world.json.spawns, this.spawn) : null;
@@ -2442,6 +2678,9 @@ export class Game {
     this.taskCount = this.tasksLeft.length;
     if (this.tasksLeft.length > 0) this.nextTask();
     else if (this.def.long && !address) this.spawn = this.truckSpot(this.spawn);
+    // the basic tasks of class B: on the practice yard, one after the other (game/drillplay.ts)
+    this.drill = null;
+    if (this.lesson?.drills && this.yardFrame) this.drillBegin(this.lesson.drills);
     // a crane: its free drive is the work on the construction site (game/craneplay.ts) – from the depot, the tower crane on its base
     this.crane?.dispose();
     this.crane = null;
@@ -2576,7 +2815,7 @@ export class Game {
     if (this.task && !this.task.laid) this.task.laid = this.yardScene.show(this.yardFrame!, this.task.run.layout, (x, z) => this.app.tiles.heightAt(x, z));
     let place = { x: sp.x, z: sp.z, yaw: sp.yaw };
     // (never into a wall or onto a post: then the nearest free place in a lane instead)
-    if (!this.task && (this.collider.blocked(sp.x, y, sp.z, sp.yaw, 0.05) || (!this.crane && !this.forklift?.siteOn && inBuilding(sp.x, sp.z, sp.yaw, this.def.outline, (x, z) => this.spawnCars.footprints.inside(x, z))))) {
+    if (!this.task && !this.drill && (this.collider.blocked(sp.x, y, sp.z, sp.yaw, 0.05) || (!this.crane && !this.forklift?.siteOn && inBuilding(sp.x, sp.z, sp.yaw, this.def.outline, (x, z) => this.spawnCars.footprints.inside(x, z))))) {
       const free = this.freeSpot(sp.x, sp.z, sp.yaw, 0);
       if (free) {
         place = free;
@@ -2587,7 +2826,7 @@ export class Game {
     this.trailer?.coupleBehind(this.vehicle);
     this.lastGood = { x: place.x, y, z: place.z, yaw: place.yaw, t: 0 };
     // (on foot first – not on the yard of the class CE tasks, not when the car is to drive by itself)
-    this.walkPending = this.settings.startOutside && !this.task && !this.planDemo && !this.walker && this.def.kind !== 'tram' && this.def.kind !== 'pedestrian' && !this.crane && !this.forklift && !this.intoParked;
+    this.walkPending = this.settings.startOutside && !this.task && !this.drill && !this.planDemo && !this.lessonWatch && !this.walker && this.def.kind !== 'tram' && this.def.kind !== 'pedestrian' && !this.crane && !this.forklift && !this.intoParked;
     this.intoParked = false;
     this.footPending = this.def.kind === 'pedestrian';
     if (this.tramAt) {
@@ -2670,6 +2909,10 @@ export class Game {
   /** Where the world loads round: the vehicle – or somebody who walked away from it. */
   private focus(): [number, number] {
     if (this.watcher) return this.watcher.focus();
+    // (the developer's view: the world loads round the camera)
+    if (this.cameraMode === 'dev') return [this.free.pos.x, this.free.pos.z];
+    // (the flying camera: the world loads round it – game/flycam.ts)
+    if (this.flyFree() && this.fly.ready) return [this.fly.x, this.fly.z];
     const w = this.walker;
     return w && this.walkerAway() ? [w.x, w.z] : [this.mpos[0], this.mpos[2]];
   }
@@ -2715,22 +2958,45 @@ export class Game {
    * (by its id), a demonstration (its crowd) or a site of roadworks (its
    * middle, where the workers are).
    */
-  private startPointWatch(what: { kind: 'em'; id: number } | { kind: 'event'; ev: RoadEventInfo }): void {
+  private startPointWatch(what: { kind: 'em'; id: number } | { kind: 'car'; id: number } | { kind: 'rail'; id: number } | { kind: 'event'; ev: RoadEventInfo }): void {
     if (this.lesson || this.replay || (this.state !== 'map' && this.state !== 'drive' && this.state !== 'pause')) return;
     const lang = this.settings.lang;
     let target: WatchTarget;
-    if (what.kind === 'em') {
+    if (what.kind === 'em' || what.kind === 'car') {
+      // an emergency vehicle (from the map), or any car, bus or emergency vehicle tapped (game/takeover.ts) – each can be taken over
       const car = this.traffic.cars.find((c) => c.id === what.id);
-      if (!car?.em) return;
+      if (!car) return;
       const names = ['emPolice', 'emAmbulance', 'emFire', 'emDoctor'];
+      const line = car.bus?.line;
       target = {
-        title: tr(names[car.em.kind] ?? 'emPolice', lang),
-        sub: tr(car.em.call ? 'emOnCall' : 'emPatrol', lang),
+        title: car.em ? tr(names[car.em.kind] ?? 'emPolice', lang) : car.bus ? `${tr('transitBus', lang)} ${line ? `${line.ref} → ${line.to}` : ''}`.trim() : tr('watchCar', lang),
+        sub: car.em ? tr(car.em.call ? 'emOnCall' : 'emPatrol', lang) : '',
         length: car.length,
         get: () => {
           const c = this.traffic.cars.find((q) => q.id === what.id);
-          return c ? { x: c.x, y: c.y, z: c.z, yaw: c.yaw } : null;
+          // (as it is drawn: eased through the corners of its way – sim/smoothpose.ts)
+          const d = c?.drawn ?? c;
+          return c && d ? { x: d.x, y: c.y, z: d.z, yaw: d.yaw } : null;
         },
+        take: () => this.takeOverCar(what.id),
+      };
+    } else if (what.kind === 'rail') {
+      // a tram or a train tapped: a tram can be taken over (from its next stop)
+      const v = this.rail.vehicles.find((q) => q.id === what.id);
+      if (!v) return;
+      const tram = v.kind !== RAIL.TRAIN;
+      const ref = v.line ? (this.rail.lines[v.line.index]?.ref ?? '') : '';
+      target = {
+        title: `${tr(tram ? 'transitTram' : 'watchTrain', lang)} ${ref}`.trim(),
+        sub: '',
+        length: consistLength(v.consist),
+        get: () => {
+          const q = this.rail.vehicles.find((r) => r.id === what.id);
+          if (!q) return null;
+          const c = q.cars[Math.floor((q.cars.length - 1) / 2)];
+          return { x: c.x, y: c.y, z: c.z, yaw: q.cars[0].yaw };
+        },
+        ...(tram ? { take: () => this.takeOverTram(what.id) } : {}),
       };
     } else {
       const ev = what.ev;
@@ -2748,6 +3014,8 @@ export class Game {
     this.watcher?.dispose();
     this.watcher = new PointWatcher(target, {
       hud: () => this.ui.querySelector<HTMLElement>('.hud'),
+      ui: this.ui,
+      t: (k, p) => tr(k, this.settings.lang, p),
       backText: () => tr('watchBack', this.settings.lang),
       goneText: () => tr('watchGone', this.settings.lang),
       ground: (x, z) => this.groundHeight(x, z),
@@ -2757,6 +3025,114 @@ export class Game {
       this.mapFrom = 'drive';
       this.closeMap();
     } else if (this.state === 'pause') this.resume();
+  }
+
+  // ------------------------------------------------- any vehicle watched, taken over; the models of the test place got into (game/takeover.ts, showdrive.ts)
+  /**
+   * What a tap on the 3D picture may choose now: in a free drive – while
+   * watching, on foot, or standing in the vehicle seen from outside – any
+   * vehicle of the traffic, the trams and trains; on the test place its
+   * models.  Null: nothing (a tap is left to the rest of the game).
+   */
+  private pickBoxes(): PickBox[] | null {
+    if (this.state !== 'drive' || this.lesson || this.task || this.demo?.active || this.spawnCars.picking || this.doorT >= 0 || this.opens.busy || this.riding || this.busRide) return null;
+    const out: PickBox[] = [];
+    // (on foot, or standing in the vehicle seen from outside – in the driver's seat a tap is for its screen and mirrors)
+    const still = !!this.walker || (Math.abs(this.vehicle.speed) < 0.5 && this.cameraMode !== 'cockpit' && !this.aircraft && !this.tram);
+    if (this.showOn && !this.watcher && still) for (const b of this.showSpots.boxes()) out.push(b);
+    if (this.watcher || (still && !this.forklift && !this.crane && !this.showOn)) {
+      for (const c of this.traffic.cars) {
+        const d = c.drawn ?? c;
+        out.push({ x: d.x, y: c.y, z: d.z, yaw: d.yaw, height: c.length > 7 ? 3.1 : c.length > 5 ? 2.7 : 1.5, front: c.length / 2, rear: c.length / 2, hw: c.width / 2, what: { kind: 'car', id: c.id } });
+      }
+      for (const v of this.rail.vehicles) {
+        if (v.player) continue;
+        const roles = carLayout(v.consist);
+        v.cars.forEach((rc, i) => out.push({ x: rc.x, y: rc.y, z: rc.z, yaw: rc.yaw, height: 3.4, front: roles[i].len / 2, rear: roles[i].len / 2, hw: v.consist.width / 2, what: { kind: 'rail', id: v.id } }));
+      }
+    }
+    return out;
+  }
+
+  /** A vehicle was tapped: watch it – or, on the test place, get into the model. */
+  private picked(t: PickTarget): void {
+    if (t.kind === 'show') this.enterShow(t.i);
+    else this.startPointWatch(t);
+  }
+
+  /**
+   * Take over a car of the traffic watched – any car, a bus, an emergency
+   * vehicle: a free drive from where it is, as the game's vehicle nearest to
+   * it (game/takeover.ts takeKindOf), standing at first – a bus on a line
+   * shown its line's way.  The vehicle chosen in the menu stays what it was.
+   */
+  private takeOverCar(id: number): void {
+    const car = this.traffic.cars.find((c) => c.id === id);
+    if (!car) return;
+    const lang = this.settings.lang;
+    const d = car.drawn ?? car;
+    const kind = takeKindOf(car.style);
+    const line = car.bus?.line;
+    const src = line ? this.transitData() : null;
+    const way = line && src ? lineWay(src, { x: d.x, z: d.z, yaw: d.yaw, stop: '', ...lineTakeOver(src, line.index, line.k) }) : null;
+    const paint = !car.em && !car.bus ? car.color : -1;
+    this.endWatch(false);
+    if (this.demo) this.endDemo('ended');
+    const was = this.settings.vehicle;
+    this.settings.vehicle = kind;
+    this.parkedAt = { x: d.x, z: d.z, yaw: d.yaw };
+    this.intoParked = true;
+    try {
+      this.begin('free', 0, true, { label: tr('mapPlace', lang), street: '', x: d.x, z: d.z, exact: true });
+    } finally {
+      this.settings.vehicle = was;
+    }
+    // (a car of the traffic: in its paint)
+    if (paint >= 0 && this.def.model === 'car') this.car.exterior.paint.color.setHex(paint);
+    if (way) this.afterPlace = () => this.startTrip([], true, way);
+    this.hud.message(tr('watchTakenVehicle', lang, { what: tr(VEHICLES[kind].name, lang) }));
+  }
+
+  /** Take over a tram watched: a drive of the tram from the stop nearest to it, on its line. */
+  private takeOverTram(id: number): void {
+    const v = this.rail.vehicles.find((q) => q.id === id);
+    if (!v) return;
+    const lang = this.settings.lang;
+    const f = v.cars[0];
+    const ref = v.line ? (this.rail.lines[v.line.index]?.ref ?? '') : '';
+    this.endWatch(false);
+    if (this.demo) this.endDemo('ended');
+    const was = this.settings.vehicle;
+    this.settings.vehicle = 'tram';
+    try {
+      this.tramLineRef = ref;
+      this.begin('free', 0, true, undefined, { name: '', town: '', x: f.x, z: f.z });
+    } finally {
+      this.settings.vehicle = was;
+    }
+    this.hud.message(tr('watchTakenVehicle', lang, { what: tr(VEHICLES.tram.name, lang) }));
+  }
+
+  /** On foot on the test place beside one of its models – nearer to it than to the own vehicle: which (−1: none). */
+  private showBeside(): number {
+    const w = this.walker;
+    if (!w || !this.showOn || this.watcher) return -1;
+    const i = this.showSpots.near(w.x, w.z);
+    const s = this.showSpots.list[i];
+    if (!s) return -1;
+    this.vehicle.getModelPosition(this.mpos);
+    return Math.hypot(s.x - w.x, s.z - w.z) < Math.hypot(this.mpos[0] - w.x, this.mpos[2] - w.z) ? i : -1;
+  }
+
+  /** Into a model of the test place (tapped, or the door key on foot beside it): the drive there goes on with it, from where it stands. */
+  private enterShow(i: number): void {
+    if (!this.showOn || this.state !== 'drive' || this.watcher || !this.showSpots.choose(i)) return;
+    const s = this.showSpots.list[i];
+    // (the vehicle chosen from now on, as when getting into a parked one)
+    this.settings.vehicle = s.kind;
+    saveSettings(this.settings);
+    this.intoParked = true;
+    this.begin('show', 0, true);
   }
 
   /** the trams and buses for the maps (made when first asked for) */
@@ -2896,7 +3272,7 @@ export class Game {
 
   /** Does the autopilot drive now (the car's, or the tram's), without the player at the controls? */
   private autopilotDriving(): boolean {
-    return (!!this.demo?.active && !!this.demo.driver && !this.demo.held) || (this.tramAuto && !this.tramHeld);
+    return (!!this.demo?.active && !!this.demo.driver && !this.demo.held) || (this.tramAuto && !this.tramHeld) || (!!this.lessonWatch && !!this.lesson);
   }
 
   /**
@@ -2986,7 +3362,7 @@ export class Game {
     const l = this.lesson;
     const exam = l?.kind === 'exam';
     const failed = this.rules.failed || this.rules.points >= 10 || this.taskFailed;
-    const judged = this.taskCount > 0;
+    const judged = this.taskCount > 0 || !!this.drill;
     this.endTasks();
     this.state = 'result';
     this.input.enabled = false;
@@ -2994,7 +3370,7 @@ export class Game {
     this.hud.setHudVisible(false);
     this.lastResult = {
       title: l ? lessonTitle(l.id, this.settings.lang) : tr(this.crane ? 'craneWork' : this.forklift ? 'forkWork' : 'free', this.settings.lang),
-      extra: this.crane?.resultNode() ?? this.forklift?.resultNode() ?? null,
+      extra: this.crane?.resultNode() ?? this.forklift?.resultNode() ?? this.drill?.resultNode() ?? null,
       exam: !!exam || judged,
       passed: !failed,
       log: this.rules.log.slice(),
@@ -3002,6 +3378,8 @@ export class Game {
       distanceKm: this.tram ? this.tram.odometer / 1000 : (this.vehicle.odometer - this.startOdo) / 1000,
       minutes: (this.time - this.startTime) / 60,
     };
+    // how the lesson ended, for the lesson log (game/exam/learnstore.ts – ui/learn.ts)
+    if (l) noteLessonEnd(l.id, !failed, this.rules.points, this.drill?.results ?? []);
     this.offerReplay();
     this.hud.showResult(this.lastResult);
   }
@@ -3030,7 +3408,8 @@ export class Game {
     if (others) {
       const cars = this.traffic.cars;
       const c = new Float32Array(cars.length * CAR_FIELDS);
-      cars.forEach((k, i) => c.set([k.id, k.style, k.x, k.y, k.z, k.yaw, k.pitch, k.wheelSpin, k.blinker, k.braking ? 1 : 0, k.v, k.color, k.bus?.line ? k.bus.line.index : -1], i * CAR_FIELDS));
+      // (as they are drawn: eased through the corners of their ways – sim/smoothpose.ts)
+      cars.forEach((k, i) => c.set([k.id, k.style, k.drawn?.x ?? k.x, k.y, k.drawn?.z ?? k.z, k.drawn?.yaw ?? k.yaw, k.pitch, k.wheelSpin, k.blinker, k.braking ? 1 : 0, k.v, k.color, k.bus?.line ? k.bus.line.index : -1], i * CAR_FIELDS));
       f.cars = c;
       // (the people on foot near the player: those that matter in a replay – the town has many more)
       const peds = this.traffic.crowd.near(r.position.x, r.position.z, 90);
@@ -3227,6 +3606,11 @@ export class Game {
   }
 
   private onAction(a: Action): void {
+    // F2: the whole display hidden or shown again – in any state
+    if (a === 'hud') {
+      this.hud.view?.toggleHud();
+      return;
+    }
     // (watching a tram or bus: nothing is done to the player's own vehicle meanwhile)
     if (this.watcher && a !== 'map' && a !== 'pause' && a !== 'help') return;
     if (a === 'reality') {
@@ -3264,6 +3648,9 @@ export class Game {
     } else if (a === 'door' && this.state === 'drive' && this.crane && !this.walker) {
       // the crane: from driving to working it, and back
       this.craneToggle();
+    } else if (a === 'door' && this.state === 'drive' && this.showBeside() >= 0) {
+      // on the test place, on foot beside one of the models: into it (game/showdrive.ts)
+      this.enterShow(this.showBeside());
     } else if (a === 'door' && this.state === 'drive') {
       // (out of the tram's cab: the door key gets one in again at its door – after a vehicle went up in flames, a new one)
       const parked = this.walker ? this.spawnCars.near(this.walker.x, this.walker.z) : null;
@@ -3356,7 +3743,7 @@ export class Game {
     const spot = this.freeSpot(g.x, g.z, g.yaw, this.resetHop * 15) ?? g;
     this.putOnRoad(spot);
     // (the parking brake on – unless the car drives by itself: then it simply drives on from there)
-    if (!this.demo?.active) this.input.c.handbrake = 1;
+    if (!this.demo?.active && !this.lessonWatch) this.input.c.handbrake = 1;
   }
 
   private resetHop = 0;
@@ -3372,6 +3759,7 @@ export class Game {
     // else the driver would act once more on the lane it has just been taken from)
     this.rules.placed();
     this.demo?.driver?.reset();
+    this.lessonWatch?.driver.reset();
     this.lastGood = { x: spot.x, y: spot.y, z: spot.z, yaw: spot.yaw, t: this.time };
     this.resetAt = { x: spot.x, z: spot.z, t: this.time };
   }
@@ -3435,7 +3823,29 @@ export class Game {
   }
 
   // ------------------------------------------------------------- simulation
+  /** The vehicle driven gets the automatic gearbox, where it has another (for the autopilot, for arcade driving). */
+  private toAutomatic(): void {
+    if (this.vehicle.spec.transmission === 'automatic') return;
+    const old = this.vehicle;
+    old.getModelPosition(this.mpos);
+    const spec = this.def.spec('automatic', powerOf(this.def, this.settings.powers));
+    const v = new Vehicle(spec, this.ground);
+    v.teleport(this.mpos[0], this.mpos[1] + 0.02, this.mpos[2], old.yaw);
+    v.odometer = old.odometer;
+    this.vehicle = v;
+    this.input.setSteering(spec.wheelbase, spec.maxWheelAngle, spec);
+    this.input.setAutomatic(true);
+    this.hud.gearbox = 'automatic';
+  }
+
+  /** Arcade driving for the road vehicle driven now (not the tram, the aeroplane, the forklift, a crane at work, nor on foot or watching). */
+  private arcadeNow(): boolean {
+    return this.settings.arcadeDrive && !this.watcher && !this.tram && !this.aircraft && !this.forklift && !this.crane?.operating && this.def.kind !== 'pedestrian' && !this.walker && !this.wrecked;
+  }
+
   private stepDrive(dt: number): void {
+    // (arcade driving switched on in the middle of a drive: the automatic gearbox from here on)
+    if (this.arcadeNow()) this.toAutomatic();
     const v = this.vehicle;
     const c = this.input.update(dt, v.speed, v.steerTorque);
     if (this.debugLook) {
@@ -3551,6 +3961,21 @@ export class Game {
         }
       }
     }
+    // watching the lesson: the autopilot drives it – until the player takes the wheel, and the lesson goes on with the player (game/lessonwatch.ts)
+    if (this.lessonWatch && this.lesson && !this.walker) {
+      v.getModelPosition(this.mpos);
+      if (this.lessonWatch.control(dt, v, this.mpos, this.nav.route ?? [], this.nav.busy, c, d) === 'taken') {
+        this.lessonWatch = null;
+        this.hud.message(tr('lessonWatch.taken', this.settings.lang), tr('lessonWatch.takenSub', this.settings.lang));
+      } else if (this.lessonWatch.cmd?.turnRound) {
+        // (the end of a street the way leads back out of: turned round on the spot, as on a demonstration drive)
+        const to = this.lessonWatch.cmd.turnRound.to;
+        lanePoint(to, Math.min(3, to.len / 2), this.smp);
+        const y = this.app.world.surfaceAt(this.smp.x, this.smp.z, this.smp.y + 1.5, this.hit) ? this.hit.y : this.smp.y;
+        this.putOnRoad({ x: this.smp.x, y, z: this.smp.z, yaw: Math.atan2(-this.smp.tx, -this.smp.tz) });
+        this.camSnap = true;
+      }
+    }
     if (this.autoDrive > 0) {
       // test hook: drive off by itself
       d.ignition = true;
@@ -3559,6 +3984,15 @@ export class Game {
       d.gear = 1;
       c.gear = 1;
       d.throttle = this.autoDrive;
+    }
+    // arcade driving: the pedals choose D and R, the vehicle holds at a standstill, the engine runs (game/arcadedrive.ts) –
+    // not while the autopilot drives, nor for a passenger
+    const arcade = this.arcadeNow() && !(demo?.active && !demo.held) && !this.lessonWatch && this.autoDrive <= 0 && !this.opens.passenger;
+    if (arcade) {
+      this.arcadeDrive.step(c.throttle, c.brake, v.speed, dt, d, d.throttle, v.engineRunning);
+      c.gear = d.gear;
+      c.handbrake = d.handbrake;
+      c.ignition = true;
     }
 
     this.services.drive(dt, v, d, this.def, !!this.walker, !!this.task, !!this.demo?.active || this.autoDrive > 0);
@@ -3569,12 +4003,13 @@ export class Game {
       this.tipUntil = this.time + 6;
     }
     const pedal = d.brake;
-    d.brake *= this.wading.brakeFactor;
+    // (wet brakes are road physics too: not when it is switched off)
+    if (!this.settings.evenRoads) d.brake *= this.wading.brakeFactor;
     this.acc = Math.min(this.acc + dt, 0.1);
     let stalled = false;
     let grind = false;
     // (a vehicle that went up in flames is not there any more: nothing of it to step)
-    if (this.wrecked) this.acc = 0;
+    if (this.wrecked || this.flyHold()) this.acc = 0;
     const speed0 = Math.abs(v.speed);
     let building = 0;
     while (this.acc >= PHYS_DT) {
@@ -3640,6 +4075,8 @@ export class Game {
     }
     if (this.walker && !away) boxes.push({ x: this.walker.x, y: this.walker.y, z: this.walker.z, yaw: this.walker.yaw, speed: 0, length: 0.6, width: 0.6 });
     if (away && !this.wrecked) boxes.push({ x: car.x, y: car.y, z: car.z, yaw: car.yaw, speed: 0, length: car.length, width: car.width, parked: true });
+    // (the other players' vehicles, when playing together: the traffic keeps clear of them too)
+    this.online?.obstacles(boxes);
     this.traffic.obstacles = boxes;
     // (the horn: the people on foot near it start)
     player.horn = c.horn && !away;
@@ -3692,8 +4129,9 @@ export class Game {
       // (on a demonstration drive it is the driver who looks over the shoulder)
       lookYaw: this.demo?.active ? this.demo.look : c.lookYaw,
       seatbelt: c.seatbelt,
-      handbrake: c.handbrake,
-      stalled,
+      // (arcade driving: no handbrake to forget, no engine to stall – nothing of it judged)
+      handbrake: arcade ? 0 : c.handbrake,
+      stalled: stalled && !arcade,
       hitScenery: impact,
       length: v.spec.length ?? 4.28,
       front: this.def.outline.front,
@@ -3714,8 +4152,9 @@ export class Game {
       this.tipText = tr(roadTip, this.settings.lang);
       this.tipUntil = this.time + 7;
     }
-    this.rememberGoodSpot(player);
+    if (!this.flyParked) this.rememberGoodSpot(player);
     if (this.task) this.updateTask(dt);
+    else if (this.drill) this.updateDrill(dt);
     else if (this.demo) this.updateDemo(dt, player);
     else this.updateLesson(dt, player);
     // a crane driven to its stand: the site, the guide
@@ -4002,7 +4441,7 @@ export class Game {
     const x = this.mpos[0];
     const z = this.mpos[2];
     // (a motorcycle has no parking brake to set: the engine off is enough)
-    if ((c.handbrake < 0.5 && this.def.doorSide !== 0) || v.engineRunning) this.rules.noteAt('notSecured', 'minor', x, z);
+    if (!this.settings.arcadeDrive && ((c.handbrake < 0.5 && this.def.doorSide !== 0) || v.engineRunning)) this.rules.noteAt('notSecured', 'minor', x, z);
     // what comes from behind on the side where the door opens: within four seconds of it (a motorcycle has no door)
     const side = this.def.doorSide;
     const s = Math.sin(v.yaw);
@@ -4487,11 +4926,144 @@ export class Game {
     return this.app.world.surfaceAt(x, z, yRef, this.hit) ? this.hit.y : this.app.tiles.heightAt(x, z);
   }
 
+  // ------------------------------------------------- ways of walking, the flying camera, a tap to teleport (1.7.0)
+  // (game/walkmodes.ts, game/flycam.ts, ui/touchstick.ts, ui/worldtap.ts)
+  private readonly walkCtl = new WalkControl();
+  private readonly fly = new FlyCam();
+  private touchStick: TouchStick | null = null;
+  private worldTap: WorldTap | null = null;
+  /** the vehicle stands still – its physics not stepped – while the flying camera is far from it, and till the world round it is loaded again */
+  private flyParked = false;
+
+  /** The free camera flies, apart from the vehicle (not from the aeroplane, the tram or the forklift, nor on foot or watching: there it goes with them as before). */
+  private flyFree(): boolean {
+    return this.cameraMode === 'free' && this.state === 'drive' && !this.walker && !this.watcher && !this.aircraft && !this.tram && !this.forklift && !this.crane?.operating && this.doorT < 0;
+  }
+
+  /** Each picture: the stick on the screen, the button offered after a tap on the picture, the keys of the flying camera. */
+  private footFlyFrame(): void {
+    const app = this.app;
+    this.touchStick ??= new TouchStick(this.ui, this.input, (k) => tr(k, this.settings.lang));
+    this.worldTap ??= new WorldTap({
+      canvas: app.canvas,
+      camera: app.camera,
+      ui: this.ui,
+      heightAt: (x, z) => app.tiles.heightAt(x, z),
+      allowed: () => this.canTeleport(),
+      claimed: (cx, cy, down) => (down ? !!this.spawnCars?.picking : !!this.screenTap?.covers(cx, cy) || !!this.spawnCars?.claims(cx, cy)),
+      tapped: (p) => this.tapToWalk(p.x, p.z),
+      teleport: (p, yaw) => this.teleportHere(p.x, p.y, p.z, yaw),
+      t: (k) => tr(k, this.settings.lang),
+    });
+    const fly = this.flyFree();
+    this.input.flyCam = fly;
+    // (the free camera begins anew – where the camera is – each time it is chosen)
+    if (this.cameraMode !== 'free') this.fly.ready = false;
+    const w = this.walker;
+    const touch = this.inputMode === 'touch' && this.state === 'drive';
+    const walking = !!w && !this.riding && !this.busRide && this.doorT < 0 && walkModeOf(this.settings.walkControls, true) !== 'tank';
+    if (!w) this.walkCtl.cancel();
+    this.touchStick.frame(touch ? (walking ? 'walk' : fly ? 'fly' : null) : null);
+    this.worldTap.frame();
+  }
+
+  /** The flying camera (game/flycam.ts): from where the camera was – or from behind the vehicle – wherever it is flown. */
+  private flyCamera(cam: THREE.PerspectiveCamera, dt: number): void {
+    cam.near = 0.3;
+    cam.fov = 55;
+    const fl = this.fly;
+    const t = this.input.takeCam();
+    const car = this.model.root.position;
+    if (!fl.ready && cam.position.distanceTo(car) > 2.5 && cam.position.distanceTo(car) < 400) {
+      const dir = cam.getWorldDirection(this.tmpV);
+      fl.start(cam.position.x, cam.position.y, cam.position.z, dir.x, dir.y, dir.z);
+    }
+    if (!fl.ready || t.reset) {
+      // (from the driver's seat, or a double click: behind the vehicle, a little above it, looking along it)
+      const yaw = this.vehicle.yaw;
+      const back = this.def.long ? 20 : 8;
+      const p = -0.28;
+      fl.start(car.x + Math.sin(yaw) * back, car.y + (this.def.long ? 7 : 3.2), car.z + Math.cos(yaw) * back, -Math.sin(yaw) * Math.cos(p), Math.sin(p), -Math.cos(yaw) * Math.cos(p));
+    }
+    if (fl.update(dt, t, (x, z) => this.app.tiles.heightAt(x, z))) this.touchStick?.badge(tr('fly.speed', this.settings.lang, { v: Math.round(fl.speed * 3.6) }));
+    cam.position.set(fl.x, fl.y, fl.z);
+    cam.quaternion.setFromEuler(new THREE.Euler(fl.pitch, fl.yaw, 0, 'YXZ'));
+    this.camSnap = false;
+  }
+
+  /** Is the vehicle to stand still for the flying camera (see flyParked)? */
+  private flyHold(): boolean {
+    const d = Math.hypot(this.fly.x - this.mpos[0], this.fly.z - this.mpos[2]);
+    const far = this.flyFree() && this.fly.ready && ((Math.abs(this.vehicle.speed) < 0.5 && d > 250) || d > 600);
+    if (far) this.flyParked = true;
+    else if (this.flyParked && !Number.isNaN(this.app.tiles.heightAt(this.mpos[0], this.mpos[2])) && this.app.map.ready(this.mpos[0], this.mpos[2], 60)) this.flyParked = false;
+    return this.flyParked;
+  }
+
+  /** May the player be put at a place tapped on the picture (ui/worldtap.ts)?  In a drive of one's own, in a vehicle on the road or on foot. */
+  private canTeleport(): boolean {
+    if (!this.settings.teleportTap || this.state !== 'drive' || this.lesson || this.task || this.demo?.active || this.watcher || this.showOn) return false;
+    if (this.doorT >= 0 || this.opens.busy || this.riding || this.busRide || this.wrecked) return false;
+    if (this.walker) return true;
+    return !this.aircraft && !this.tram && !this.forklift && !this.crane?.operating;
+  }
+
+  /** "Teleport here": somebody on foot to that very place; a vehicle into the lane of the road nearest it, facing along it (the way the camera looked, where it may). */
+  private teleportHere(x: number, y: number, z: number, yaw: number): void {
+    if (!this.canTeleport()) return;
+    const w = this.walker;
+    if (w) {
+      const gy = this.footGround(x, z, y + 1.5);
+      if (!Number.isFinite(gy)) return;
+      this.walkCtl.cancel();
+      w.x = x;
+      w.y = gy;
+      w.z = z;
+      this.camSnap = true;
+      return;
+    }
+    let spot = this.freeSpot(x, z, yaw, 0);
+    if (!spot || Math.hypot(spot.x - x, spot.z - z) > 30) {
+      // (no lane within a few metres: the road nearest within 150 m)
+      const road = this.roadSpot(x, z, '', 150);
+      spot = road && !road.rough ? (this.freeSpot(road.x, road.z, road.yaw, 0) ?? { x: road.x, y: this.footGround(road.x, road.z, this.app.tiles.heightAt(road.x, road.z) + 3), z: road.z, yaw: road.yaw }) : null;
+    }
+    if (!spot || !Number.isFinite(spot.y)) {
+      this.tipText = tr('teleportNoRoad', this.settings.lang);
+      this.tipUntil = this.time + 4;
+      return;
+    }
+    this.putOnRoad(spot);
+    this.path.breakLine();
+    this.camSnap = true;
+  }
+
+  /** Tap to walk (game/walkmodes.ts): off to the place tapped, along the pavements of the roads round there. */
+  private tapToWalk(x: number, z: number): void {
+    const w = this.walker;
+    if (!w || this.riding || this.busRide || this.state !== 'drive' || this.doorT >= 0) return;
+    if (walkModeOf(this.settings.walkControls, this.inputMode === 'touch') !== 'tap' || Math.hypot(x - w.x, z - w.z) > 400) return;
+    const roads: FootRoad[] = [];
+    this.app.world.edgesInBox(Math.min(x, w.x) - 30, Math.min(z, w.z) - 30, Math.max(x, w.x) + 30, Math.max(z, w.z) + 30, (e) => {
+      if (!LaneGraph.drivable(e, false)) return;
+      roads.push({ pl: e.pl, half: e.width / 2, swL: e.swL, swR: e.swR, xings: e.xings.filter((c) => c.k === XING.SIGNAL || c.k === XING.ZEBRA).map((c) => c.s) });
+    });
+    this.walkCtl.goTo(planFootPath(w.x, w.z, x, z, roads));
+  }
+
   private stepWalk(dt: number): void {
     const w = this.walker;
     if (!w) return;
     const look = this.input.takeCam();
-    const r = w.update(dt, this.input.walkInput(), look, (x, z, yRef) => this.footGround(x, z, yRef), (x, y, z, rad) => this.collider.circleBlocked(x, y, z, rad));
+    // (the way of walking chosen in the settings, a way being walked after a tap: game/walkmodes.ts)
+    const mode = walkModeOf(this.settings.walkControls, this.inputMode === 'touch');
+    const move = this.walkCtl.step(dt, this.input.walkInput(mode), w, look.yaw !== 0 || look.pitch !== 0);
+    if (this.walkCtl.blocked) {
+      this.walkCtl.blocked = false;
+      this.tipText = tr('walk.blocked', this.settings.lang);
+      this.tipUntil = this.time + 3;
+    }
+    const r = w.update(dt, move, look, (x, z, yRef) => this.footGround(x, z, yRef), (x, y, z, rad) => this.collider.circleBlocked(x, y, z, rad));
     if (r.step) this.audio.click('step');
     if (r.checked) {
       this.audio.click('tick');
@@ -5552,6 +6124,7 @@ export class Game {
     const app = this.app;
     const tiles = app.tiles;
     this.spawnCars?.frame();
+    this.footFlyFrame();
 
     // the road network around where things happen (it may come in pieces), and the signal heads of what is loaded
     if (this.state === 'placing') app.map.update(this.spawn!.x, this.spawn!.z, 40);
@@ -5577,10 +6150,11 @@ export class Game {
       this.inputMode = want === 'on' ? 'touch' : want === 'off' ? 'keys' : this.input.mode;
       this.hud.setInputMode(this.inputMode);
       setKeyStyle(this.inputMode);
-      // The arcade mode lets the time run faster while the autopilot drives: the world is stepped
-      // several times a picture – as often as the picture can wait for (the world's clock goes on
-      // by what was really stepped).  Anything else, or the player at the wheel: the real pace.
-      const rate = gameClock.rate > 1 && this.autopilotDriving() ? gameClock.rate : 1;
+      // The arcade mode lets the time run faster – while the autopilot drives, and since 1.7.0 with the
+      // player at the wheel too: the world is stepped several times a picture, as often as the picture
+      // can wait for (the world's clock goes on by what was really stepped); none of the steps is longer
+      // than a tenth of a second, and the vehicle's physics divides each into its own small steps.
+      const rate = gameClock.rate > 1 ? gameClock.rate : 1;
       if (gameClock.rate > 1 && rate === 1) {
         gameClock.setRate(1);
         if (gameClock.real) this.clockJumped();
@@ -5694,7 +6268,7 @@ export class Game {
       if (t && this.truck && this.def.kind === 'truck') this.truck.setTrailer(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, t.coupled);
       if (t && this.carTrailer && this.def.model !== 'truck') this.carTrailer.place(t.x, t.y, t.z, t.yaw, t.pitch, t.wheelSpin, this.lastVisual);
       // a motorcycle leans into the bend: as far as it must for the speed and the curve
-      if (model instanceof PlayerBike) model.setLean(Math.atan(Math.max(-8, Math.min(8, v.accLat)) / 9.81));
+      if (model instanceof PlayerBike) model.setLean(bikeLean(v.speed, v.angVel[1]));
       // the aeroplane: where the flight has it, turned every way it is
       if (this.aircraft && this.planeModel) {
         const ac = this.aircraft;
@@ -5765,6 +6339,7 @@ export class Game {
       this.railActors.update(rp.railList as unknown as RailVehicle[], this.rail.lines);
     } else {
       this.actors.update(this.traffic.cars, this.traffic.peds, this.time, this.traffic.cyclists.list);
+      this.wildView.update(this.traffic.wild?.animals ?? []);
       this.railActors.update(this.rail.vehicles, this.rail.lines);
     }
     // the stops, the overhead line, the tram signals, the people at the stops – around the camera
@@ -5793,8 +6368,12 @@ export class Game {
     // the roadworks and the demonstrations of the day around the camera
     this.roadworks.crowdCap = this.settings.quality === 'low' ? 70 : this.settings.quality === 'medium' ? 140 : 220;
     this.roadworks.update(this.roadEvents, this.signs, cam.x, cam.z, this.time, dt);
+    // the level crossings around the camera: their lights, barriers and bells
+    this.crossingView.update(this.levelCrossings, this.signs, cam.x, cam.z, this.time);
     if (this.explosion.active) this.explosion.update(this.state === 'drive' ? dt : 0);
     this.headlights(dt, haveCar && !rp ? model : null);
+    // the server: the progress kept in step, the own vehicle sent, the other players drawn (net/online.ts)
+    this.online?.frame(dt, haveCar && !rp ? this.netSelf() : null);
 
     if (this.state === 'reality') {
       // the panel covers the window: only a 360° panorama is drawn, not the world behind it
@@ -5944,6 +6523,8 @@ export class Game {
     fuelPrices.key = this.settings.fuelKey;
     fuelPrices.refresh(x, z);
     this.ground.weatherGrip = od.grip;
+    // (the road physics switched off in the arcade options: every surface as dry asphalt)
+    this.ground.even = this.settings.evenRoads;
     // (bare winter crowns throw no full shadows: the trees' shadows go while they are bare)
     this.props.setShadows(this.settings.graphics.propShadows && !od.look.thinCrowns);
   }
@@ -6070,7 +6651,7 @@ export class Game {
       this.speak(h.what, h.dist, navText);
       // § 9 StVO: get in lane in good time – the route goes on from a particular lane
       if (h.lane !== 0) navText += ` – ${tr(h.lane < 0 ? 'laneLeft' : 'laneRight', lang)}`;
-    } else if (this.lesson?.kind === 'basics' || this.task) navText = this.lessonLine;
+    } else if (this.lesson?.kind === 'basics' || this.task || this.drill) navText = this.lessonLine;
     else if (this.lesson?.kind === 'bus') navText = `${this.lessonLine} · ${this.busNav}`;
     let tip = this.time < this.tipUntil ? this.tipText : '';
     // on a touch screen the tip says what to tap – and is itself the button for it
@@ -6116,7 +6697,7 @@ export class Game {
       zone: ctx.zone,
       junction: ctx.junction,
       navText,
-      navSub: this.task ? this.taskSub : this.lesson && this.lesson.kind !== 'basics' ? this.lessonLine : ctx.roadName,
+      navSub: this.task || this.drill ? this.taskSub : this.lesson && this.lesson.kind !== 'basics' ? this.lessonLine : ctx.roadName,
       navArrow: h.arrow,
       navActive: (!!this.lesson || !!demo) && h.dist >= 0 && h.what !== 'navFollow' && h.what !== 'routeDone',
       tip,
@@ -6154,6 +6735,8 @@ export class Game {
       hs.navSub = tr(touch ? 'navSubTouch' : 'navSubKeys', lang);
       hs.navArrow = 0;
     }
+    // a lesson watched: the instructor says what the car does and why
+    if (this.lessonWatch && this.lesson) hs.navSub = this.lessonWatch.text((k) => tr(k, lang));
     const tram = this.tram;
     if (tram) {
       // the tram: the next stop, the controller, the switch asked for, the doors
@@ -6331,11 +6914,8 @@ export class Game {
     const key = `${what}:${stage}:${this.targetIdx}`;
     if (!stage || what === 'navFollow' || key === this.lastNavSpoken) return;
     this.lastNavSpoken = key;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = localeOf(this.settings.lang);
-    u.volume = this.settings.volume;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    // (the voice, the text made speakable, the queue: audio/speech.ts)
+    speech.say(text, this.settings.lang, this.settings);
   }
 
   /** on foot: how far the head is turned by the glance keys (smoothed) */
@@ -6356,6 +6936,15 @@ export class Game {
     this.input.zoom.update(dt, this.settings.zoomRelease, zoomable);
     if (this.watcher) {
       this.watcher.camera(cam, this.input.c, dt);
+      return;
+    }
+    // the developer's view (?cam=… or devView()): a camera standing anywhere – for comparing the world with photos
+    if (this.cameraMode === 'dev') {
+      cam.near = 0.3;
+      cam.fov = this.devFov;
+      cam.position.copy(this.free.pos);
+      cam.rotation.set(this.free.pitch, this.free.yaw, 0, 'YXZ');
+      cam.updateProjectionMatrix();
       return;
     }
     const car = this.model.root;
@@ -6437,7 +7026,7 @@ export class Game {
       cam.position.copy(this.eyeWorld);
       // looking over the shoulder also moves the head a little towards that side
       // (on a demonstration drive the head turns as the driver looks over the shoulder – not in a jerk)
-      const want = this.demo?.active ? this.demo.look * 0.8 : 0;
+      const want = this.demo?.active ? this.demo.look * 0.8 : this.lessonWatch && this.lesson ? this.lessonWatch.look * 0.8 : 0;
       this.demoHead += Math.max(-dt * 5, Math.min(dt * 5, want - this.demoHead));
       // (a rider looks a little down the road: the instruments, the bar and the mirrors in view)
       const gaze = this.model instanceof PlayerBike ? this.model.gaze : this.aircraft ? 0.17 : 0;
@@ -6479,6 +7068,8 @@ export class Game {
       cam.position.copy(target);
       this.camSnap = false;
       cam.lookAt(fx, car.position.y + up, fz);
+    } else if (this.cameraMode === 'free' && this.flyFree()) {
+      this.flyCamera(cam, dt);
     } else if (this.cameraMode === 'free') {
       cam.near = 0.3;
       cam.fov = 55;

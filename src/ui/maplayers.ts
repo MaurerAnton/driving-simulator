@@ -7,15 +7,28 @@
  * are drawn and found under a finger.
  */
 
-export type LayerId = 'works' | 'demos' | 'emergency' | 'fuel' | 'wash';
-export const LAYERS: readonly LayerId[] = ['emergency', 'works', 'demos', 'fuel', 'wash'];
-export const LAYER_KEYS: Record<LayerId, string> = { emergency: 'layerEmergency', works: 'layerWorks', demos: 'layerDemos', fuel: 'layerFuel', wash: 'layerWash' };
+export type LayerId = 'works' | 'demos' | 'emergency' | 'fuel' | 'wash' | 'photos';
+export const LAYERS: readonly LayerId[] = ['emergency', 'works', 'demos', 'fuel', 'wash', 'photos'];
+export const LAYER_KEYS: Record<LayerId, string> = { emergency: 'layerEmergency', works: 'layerWorks', demos: 'layerDemos', fuel: 'layerFuel', wash: 'layerWash', photos: 'net.layerPhotos' };
+
+/**
+ * Layers brought by other parts of the game: the players' photos of a server
+ * (net/online.ts) – drawn after the icons, found under a finger before them –
+ * and a place to be picked: while `pick` is set, a tap on the map hands its
+ * place over instead of anything else (ui/bigmap.ts).
+ */
+export interface ExtraLayer {
+  draw(g: CanvasRenderingContext2D, W: number, H: number, scale: number, sx: (x: number) => number, sy: (z: number) => number): void;
+  /** what a tap at (px, py) opens – null: nothing there */
+  at(px: number, py: number, scale: number, sx: (x: number) => number, sy: (z: number) => number): (() => void) | null;
+}
+export const extraLayers: { photos: ExtraLayer | null; pick: ((x: number, z: number) => void) | null } = { photos: null, pick: null };
 
 const KEY = 'fahrsim.mapLayers';
 
 /** Which layers are shown (all, unless the player hid some). */
 export function loadLayers(): Record<LayerId, boolean> {
-  const out = { works: true, demos: true, emergency: true, fuel: true, wash: true };
+  const out = { works: true, demos: true, emergency: true, fuel: true, wash: true, photos: true };
   try {
     const raw = globalThis.localStorage?.getItem(KEY);
     const j = raw ? (JSON.parse(raw) as Partial<Record<LayerId, unknown>>) : {};
@@ -110,6 +123,7 @@ export function drawLayerIcons(
     }
   }
   g.restore();
+  if (shown.photos && extraLayers.photos) extraLayers.photos.draw(g, W, H, scale, sx, sy);
 }
 
 /** What icon is under a point of the map (null: none) – the emergency vehicles first. */
@@ -122,7 +136,9 @@ export function layerIconAt(
   services: readonly MapService[],
   emergencies: readonly MapEmergency[],
   shown: Record<LayerId, boolean>,
-): { em: MapEmergency } | { service: MapService } | null {
+): { em: MapEmergency } | { service: MapService } | { extra: () => void } | null {
+  const extra = shown.photos && extraLayers.photos ? extraLayers.photos.at(px, py, scale, sx, sy) : null;
+  if (extra) return { extra };
   let best: { em: MapEmergency } | { service: MapService } | null = null;
   let bd = 16;
   if (shown.emergency) {

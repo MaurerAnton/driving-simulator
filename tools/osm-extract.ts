@@ -32,8 +32,13 @@ import { pointInRing } from '../src/core/geom.ts';
 import { latLonToWorld, worldToLatLon } from '../src/geo/utm.ts';
 import { BLOCK, Coverage, HALO, gridIndex, gridRect, grow } from './mapgen/store.ts';
 import type { Rect } from './mapgen/store.ts';
-import { readPbf } from './osm/pbf.ts';
+import { readPbf as readPbfCorrected } from './osm/pbf.ts';
+import type { OsmHandlers } from './osm/pbf.ts';
 import type { OsmMember, Tags } from './osm/pbf.ts';
+
+// The extracts keep the coordinates as mapped: the shifts of tools/mapgen/observed-roads.json are applied
+// when they are read (OsmData.load), so that changing the list needs no new extract.
+const readPbf = (path: string, h: OsmHandlers): void => readPbfCorrected(path, h, { raw: true, tags: true });
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const input = resolve(root, process.argv[2] ?? 'data/raw/osm/hessen-latest.osm.pbf');

@@ -38,7 +38,7 @@ export const COVER_COLORS: readonly number[] = [
   0x77706a, // railway ballast
   0x9c8b70, // bare earth
   0x5f9a55, // sports pitch
-  0x55565a, // asphalt (car parks)
+  0x5f6063, // asphalt (car parks: a little lighter than the roads' – worn, dusty)
   0xa39f97, // paved squares
   0x4d7089, // water
 ];

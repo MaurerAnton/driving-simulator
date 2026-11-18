@@ -43,6 +43,8 @@ export interface CarouselContext {
   address: (pick: (hit: AddressHit) => void) => HTMLElement;
   /** the other pages: settings, controls, log, what's new, about */
   tools: Array<[string, () => void]>;
+  /** the learning modes (ui/learn.ts): a row of their own – a tap opens one */
+  learn?: Array<{ title: string; desc: string; run: () => void }>;
   version: string;
   start: (req: StartRequest) => void;
   preview: (p: MenuPreview) => void;
@@ -367,6 +369,7 @@ export function carouselMenu(c: CarouselContext): HTMLElement {
   const lessons = LESSONS.filter((l) => (l.vehicles ? l.vehicles.includes(kind) : l.vehicle ? l.vehicle === kind : kind !== 'tram' && kind !== 'pedestrian' && kind !== 'plane' && kind !== 'forklift' && !(l.notFor ?? []).includes(kind)) && (l.kind !== 'yard' || c.hasYard)).sort((a, b) => rank(a.kind) - rank(b.kind));
   for (const l of lessons) mode(lessonTitle(l.id, c.lang), l.id === 'exam' ? c.t('examDesc') : lessonIntro(l.id, c.lang), l.id);
   rows.append(row(`modes-${kind}`, c.t('start'), modes));
+  if (c.learn && c.learn.length > 0) rows.append(row('learn', c.t('learn.title'), c.learn.map((l) => card('cm-mode', false, [el('b', '', l.title), el('small', '', l.desc)], l.run))));
 
   root.append(top, rows);
   if (preview) c.preview(preview);

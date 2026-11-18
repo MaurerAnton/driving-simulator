@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { makePolyline } from '../../src/core/geom.ts';
 import { seasonOf } from '../../src/game/clock.ts';
 import { FIXED_WEATHER, climateWeather, gripFactor, weatherFromOpenMeteo } from '../../src/game/weather.ts';
-import { SEASON_PRESETS, SEASON_SETTINGS, SeasonLook, coverColor, coverPalette, crownLook, dayOfYear, isSeasonSetting, seasonAt, seasonFor, seasonGround, snowCover } from '../../src/render/season.ts';
+import { BARE_CROWN, BARE_FLAT, SEASON_PRESETS, SEASON_SETTINGS, SeasonLook, coverColor, coverPalette, crownLook, dayOfYear, isSeasonSetting, seasonAt, seasonFor, seasonGround, snowCover } from '../../src/render/season.ts';
 import { HALF_TRACK, SnowTracks } from '../../src/render/snowtracks.ts';
 import { COVER, COVER_COLORS } from '../../src/world/cover.ts';
 import type { Lane } from '../../src/world/lanes.ts';
@@ -117,6 +117,44 @@ test('winter: bare crowns (the twigs, seen through), dull grass, brown fields, l
   // the pure function and the palette agree
   const g = seasonGround(lin(COVER_COLORS[COVER.MEADOW]), wi);
   assert.equal(new THREE.Color().setRGB(g[0], g[1], g[2]).getHex(), coverColor(COVER.MEADOW, wi));
+});
+
+test('November: bare crowns read as light grey-brown twigs, lit evenly – not black balls; summer stays green', () => {
+  // (late November in Baunatal: the leaves are down)
+  const nov = seasonAt(new Date(2026, 10, 18));
+  assert.ok(nov.leaves < 0.1, `leaves ${nov.leaves}`);
+  // the twigs' colour: a light grey-brown – sRGB luminance well above the summer crown's green, below pale grey
+  const [r, g, b] = rgb(BARE_CROWN);
+  const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  assert.ok(luma > 0.5 && luma < 0.75, `bare crown luminance ${luma}`);
+  assert.ok(r >= g && g >= b && r - b < 40, `grey-brown, not saturated: ${rgb(BARE_CROWN)}`);
+  const green = rgb(0x4c7a36);
+  assert.ok(luma > (0.2126 * green[0] + 0.7152 * green[1] + 0.0722 * green[2]) / 255 + 0.15, 'lighter than the leaves');
+  const c = crownLook(nov, 'deciduous', 0.5, 0.5);
+  const drawn = c.tint.map((t, i) => t * lin(0x4c7a36)[i]);
+  const want = lin(BARE_CROWN);
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(drawn[i] - want[i]) < 0.02, `crownLook mirrors the twig colour: ${drawn}`);
+  // and the light: the bare crown's normal bends towards the sky, so its side away from a low sun is not black
+  assert.ok(BARE_FLAT >= 0.6 && BARE_FLAT <= 1);
+  const look = new SeasonLook();
+  const tree = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const conifer = new THREE.MeshLambertMaterial({ vertexColors: true });
+  look.patch(tree, 'deciduous');
+  look.patch(conifer, 'evergreen');
+  const shader = (m: THREE.Material) => {
+    const s = { vertexShader: THREE.ShaderLib.lambert.vertexShader, fragmentShader: THREE.ShaderLib.lambert.fragmentShader, uniforms: {} } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    m.onBeforeCompile(s, null as unknown as THREE.WebGLRenderer);
+    return s;
+  };
+  const fs = shader(tree).fragmentShader;
+  const bend = fs.indexOf('normal = normalize(mix(normal, fsUpB, vFsBare');
+  assert.ok(bend > fs.indexOf('#include <normal_fragment_maps>') && bend < fs.indexOf('#include <lights_fragment_begin>'), 'bent after the normal is known, before the light');
+  assert.ok(bend > fs.indexOf('fsSnowCover('), 'the snow still sees the crown as it is');
+  assert.ok(shader(tree).vertexShader.includes('vFsBare = (1.0 - fsHas) * fsCrown;'));
+  assert.ok(shader(conifer).vertexShader.includes('vFsBare = 0.0;'), 'conifers keep their shading');
+  // summer: full leaves, nothing bare, the summer green as always
+  const su = crownLook(seasonAt(new Date(2027, 6, 15)), 'deciduous', 0.5, 0.5);
+  assert.deepEqual(su.tint, [1, 1, 1]);
 });
 
 test('snow lies on what faces the sky, in patches where it is thin', () => {

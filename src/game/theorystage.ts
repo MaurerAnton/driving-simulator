@@ -241,6 +241,28 @@ export interface Stage {
   paths: Record<string, Path>;
   /** a box round everything (min x, min z, max x, max z) */
   bounds: [number, number, number, number];
+  /** things beside and on the road (render/theoryprops.ts): trees, posts, a warning triangle, barriers, a tunnel */
+  props?: PropPlace[];
+}
+
+/**
+ * A thing of a place: a tree, a guide post (Leitpfosten), a warning
+ * triangle, a barrier across a lane, a traffic cone, a heap of earth – at
+ * (x, z), turned by `yaw`, `size` times its usual size – or a tunnel over
+ * the road from (x, z) to (x1, z1): its walls at those x, its ends at those
+ * z, its roof `h` high.  `from` / `to`: only between these times of the script.
+ */
+export interface PropPlace {
+  kind: 'tree' | 'post' | 'triangle' | 'barrier' | 'cone' | 'heap' | 'tunnel';
+  x: number;
+  z: number;
+  yaw?: number;
+  size?: number;
+  x1?: number;
+  z1?: number;
+  h?: number;
+  from?: number;
+  to?: number;
 }
 
 export function emptyStage(): Stage {

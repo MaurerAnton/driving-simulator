@@ -110,7 +110,12 @@ vec3 fsWtrSky(vec3 r) {
 /** the terrain, before emissivemap_fragment (after the season's colours): which pixels are water, and their colour */
 const FRAG_COLOR_TERRAIN = /* glsl */ `
 {
+#ifdef FS_COVER_EDGE
+  // (the cover with its smooth edges – render/coveredge.ts)
+  fsWtrK = fsWtrMask(fsCoverRGB);
+#else
   fsWtrK = fsWtrMask(texture2D(map, vMapUv).rgb);
+#endif
   if (fsWtrK > 0.001) {
     // (the coarse mipmap: how much of the surroundings is water – the middle of a river or a lake is deep)
     fsWtrDeep = smoothstep(0.0, 0.07, dot(textureLod(map, vMapUv, 3.0).rgb, vec3(0.0, -1.0, 1.0)));

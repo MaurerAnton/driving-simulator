@@ -6,8 +6,11 @@
  * Only what the map pipeline needs is decoded: ids, coordinates, tags, way
  * node references and relation members.  Author/changeset metadata is skipped.
  */
-import { closeSync, fstatSync, openSync, readSync } from 'node:fs';
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
+import { latLonToWorld, worldToLatLon } from '../../src/geo/utm.ts';
+import { additions, correctTags, geometryCorrections, hasGeometryCorrections, nodeShifts, roadCorrections } from '../mapgen/observedroads.ts';
+import type { Shift } from '../mapgen/observedroads.ts';
 
 export type Tags = Record<string, string>;
 
@@ -331,8 +334,83 @@ function parseRelation(r: Reader, strings: string[], h: OsmHandlers): void {
   );
 }
 
+/**
+ * How far the nodes of the ways the corrections move are moved (null: none
+ * are).  The nodes of those ways are looked up in the PBF once and kept
+ * beside it (`<pbf>.shift-refs.json`, until the PBF changes or a way is added
+ * to the list).
+ */
+export function pbfNodeShifts(path: string): Map<number, Shift> | null {
+  const geo = geometryCorrections();
+  if (!hasGeometryCorrections(geo)) return null;
+  const st = statSync(path);
+  const cacheFile = `${path}.shift-refs.json`;
+  let cache: { size: number; mtime: number; ways: Record<string, number[]> } = { size: st.size, mtime: st.mtimeMs, ways: {} };
+  if (existsSync(cacheFile)) {
+    try {
+      const c = JSON.parse(readFileSync(cacheFile, 'utf8')) as typeof cache;
+      if (c.size === st.size && c.mtime === st.mtimeMs && c.ways) cache = c;
+    } catch {
+      // (read again)
+    }
+  }
+  const missing = new Set([...geo.ways.keys()].filter((id) => cache.ways[id] === undefined));
+  if (missing.size > 0) {
+    console.log(`[pbf] finding the nodes of ${missing.size} shifted ways (tools/mapgen/observed-roads.json) …`);
+    readPbf(
+      path,
+      {
+        way(id, refs) {
+          if (missing.has(id)) cache.ways[id] = refs.slice();
+        },
+      },
+      { raw: true },
+    );
+    for (const id of missing) if (cache.ways[id] === undefined) cache.ways[id] = [];
+    try {
+      writeFileSync(cacheFile, JSON.stringify(cache));
+    } catch {
+      // (a read-only place: found again next time)
+    }
+  }
+  const ways = [...geo.ways.keys()].map((id) => ({ id, refs: cache.ways[id] ?? [] }));
+  return nodeShifts(ways, geo);
+}
+
+/** Options of readPbf. */
+export interface ReadPbfOptions {
+  /** true: the data as mapped, without the corrections of tools/mapgen/observed-roads.json (tags and geometry) */
+  raw?: boolean;
+  /** with `raw`: still correct the tags (the extracts: their coordinates stay as mapped, OsmData.load moves them) */
+  tags?: boolean;
+}
+
 /** Stream a .osm.pbf file through the given handlers (synchronous). */
-export function readPbf(path: string, handlers: OsmHandlers): void {
+export function readPbf(path: string, given: OsmHandlers, opts: ReadPbfOptions = {}): void {
+  // (the corrections of what was seen on site go over the tags of the ways: tools/mapgen/observedroads.ts)
+  const fixes = opts.raw && !opts.tags ? new Map() : roadCorrections();
+  // (ways that are not there are left out – not in the extracts, which keep them for OsmData.load to drop)
+  const removed = opts.raw ? new Set<number>() : additions().remove;
+  const way = given.way;
+  let handlers: OsmHandlers =
+    way && (fixes.size > 0 || removed.size > 0)
+      ? { ...given, way: (id, refs, tags) => (removed.has(id) ? undefined : way(id, refs, fixes.has(id) ? () => correctTags(tags(), fixes.get(id)) : tags)) }
+      : given;
+  // (and where a way lies off the road, its nodes are moved)
+  const node = given.node;
+  const shifts = node && !opts.raw ? pbfNodeShifts(path) : null;
+  if (node && shifts && shifts.size > 0) {
+    handlers = {
+      ...handlers,
+      node(id, lat, lon, tags) {
+        const sh = shifts.get(id);
+        if (!sh) return node(id, lat, lon, tags);
+        const [x, z] = latLonToWorld(lat, lon);
+        const [la, lo] = worldToLatLon(x + sh[0], z + sh[1]);
+        node(id, la, lo, tags);
+      },
+    };
+  }
   const fd = openSync(path, 'r');
   try {
     const total = fstatSync(fd).size;

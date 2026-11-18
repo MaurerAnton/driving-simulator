@@ -10,6 +10,7 @@ restoreAfterOldVersion(document.baseURI);
 import { loadSettings } from './game/settings.ts';
 import { setWasmMode } from './wasm/kernels.ts';
 import { loadLang, tr } from './i18n/index.ts';
+import { netBeforeStart } from './net/online.ts';
 
 // (WebAssembly for the tiles and the quickest way, or JavaScript only: src/wasm/kernels.ts)
 setWasmMode(loadSettings().wasm);
@@ -46,16 +47,21 @@ function hasWebGl2(): boolean {
 }
 
 if (!hasWebGl2()) giveUp('webglMissing');
-else {
-  try {
-    const game = new Game(canvas, ui);
-    window.__fs = { ready: false, game, info: () => game.debugInfo() };
-    game.boot(new URLSearchParams(location.search)).catch((err: unknown) => {
-      console.error(err);
-      giveUp('loadError', { e: String(err) });
+// (a server set by the player – or ?server= –: the ?tk= token taken out of the address, and the progress kept there
+// pulled before the game reads it – at most 2.5 s; without a server at once: net/online.ts)
+else
+  void netBeforeStart()
+    .catch((err: unknown) => console.warn(err))
+    .then(() => {
+      try {
+        const game = new Game(canvas, ui);
+        window.__fs = { ready: false, game, info: () => game.debugInfo() };
+        game.boot(new URLSearchParams(location.search)).catch((err: unknown) => {
+          console.error(err);
+          giveUp('loadError', { e: String(err) });
+        });
+      } catch (err) {
+        console.error(err);
+        giveUp('loadError', { e: String(err) });
+      }
     });
-  } catch (err) {
-    console.error(err);
-    giveUp('loadError', { e: String(err) });
-  }
-}

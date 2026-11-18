@@ -1,5 +1,5 @@
 {
- "about": "Wall and roof colours and wall materials of single buildings as they are on site, where the map build's palettes would guess otherwise. Keyed by the building's identifier in the Hessian LoD2 models. Facts only - no pictures are kept here. Observed from street-level panoramas (2026-11).",
+ "about": "Wall and roof colours and wall materials of single buildings as they are on site, where the map build's palettes would guess otherwise. Keyed by the building's identifier in the Hessian LoD2 models. Facts only - no pictures are kept here. Observed from street-level panoramas (2026-11). \"add\": buildings seen on the official aerial photographs (2026-11) that neither the LoD2 models nor OpenStreetMap have - outline in world metres (x east, z south), height to the eaves, roof flat|gable|hip; \"remove\": LoD2 models (or \"w<OSM id>\" footprints) that are not there. Per building also \"roofShape\": \"flat\" (the model's sloped roof cut flat, \"flatAt\" 0 = at the eaves … 1 = at the ridge) and \"roofMaterial\": green|flat|gravel|metal|tiles (green: a flat planted roof).",
  "buildings": [
   {
    "id": "GUID_1488958994062_25980754",
@@ -266,10 +266,10 @@
   },
   {
    "id": "DEHE061800006Lvv",
-   "wall": "#f2f0ea",
+   "wall": "#eee4c8",
    "roof": "#4b4b4e",
    "material": "render",
-   "note": "Baunatal centre: white walls, anthracite roof"
+   "note": "Theodor-Heuss-Allee (vp27): cream/pale yellow render with dark grey window bands"
   },
   {
    "id": "DEHE061800006LwI",
@@ -357,7 +357,7 @@
    "wall": "#f2f0ea",
    "roof": "#5c4b46",
    "material": "render",
-   "note": "Baunatal centre: white walls, greybrown roof"
+   "note": "Theodor-Heuss-Allee (vp29): white render, brown tiled roof"
   },
   {
    "id": "GUID_1488958994062_26860573",
@@ -560,7 +560,7 @@
    "wall": "#f2f0ea",
    "roof": "#4b4b4e",
    "material": "render",
-   "note": "Baunatal centre: white walls, anthracite roof"
+   "note": "Nikolaus-Otto-Ring (vp26): white render, anthracite roof"
   },
   {
    "id": "UUID_46c4cfb1-1618-4b4f-a718-1ed41cda2961",
@@ -607,7 +607,7 @@
    "wall": "#f2f0ea",
    "roof": "#7a3f30",
    "material": "render",
-   "note": "Baunatal centre: white walls, redbrown roof"
+   "note": "Werner-von-Siemens-Straße (vp23): white render, light brown tiles"
   },
   {
    "id": "GUID_1488958994062_26860566",
@@ -738,7 +738,9 @@
    "id": "GUID_1488958994062_25982449",
    "wall": "#f2f0ea",
    "material": "render",
-   "note": "Baunatal centre: white walls"
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "Baunatal centre: white walls; aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
   },
   {
    "id": "DEHE06180001k6BR",
@@ -754,10 +756,10 @@
   },
   {
    "id": "UUID_d31d212d-7d53-46f5-b695-c3e10f5eea08",
-   "wall": "#e3b9a0",
-   "roof": "#9a5540",
-   "material": "render",
-   "note": "Baunatal centre: salmon walls, red roof"
+   "wall": "#b4583e",
+   "roof": "#777774",
+   "material": "brick",
+   "note": "Haydnstraße (vp21): red brick, grey roof"
   },
   {
    "id": "UUID_48bb483a-e4b1-49fe-b61e-8eeacd613a87",
@@ -893,9 +895,10 @@
   },
   {
    "id": "UUID_0d60fbb9-f37e-452b-8767-49456ff641d3",
-   "wall": "#f2f0ea",
+   "wall": "#eee4c8",
+   "roof": "#7a3f30",
    "material": "render",
-   "note": "Baunatal centre: white walls"
+   "note": "Rudolf-Diesel-Straße (vp34): cream/pale yellow render, brown tiled roof"
   },
   {
    "id": "DEHE061800006Ll8",
@@ -1062,9 +1065,10 @@
   },
   {
    "id": "UUID_0c73831d-2444-4746-8ab7-62897076190d",
-   "wall": "#c3cbd0",
-   "material": "render",
-   "note": "Baunatal centre: bluegrey walls"
+   "wall": "#55575a",
+   "roof": "#777774",
+   "material": "plain",
+   "note": "Friedrich-Ebert-Allee (vp32): dark blue-grey glass curtain wall, grey flat roof"
   },
   {
    "id": "DEHE061800006rHU",
@@ -1088,8 +1092,9 @@
   {
    "id": "DEHE061800006Lon",
    "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
    "material": "render",
-   "note": "Baunatal centre: white walls"
+   "note": "Beethovenstraße (vp30): white rendered ground floor, anthracite slate-clad upper storey, anthracite low roof"
   },
   {
    "id": "DEHE061800006LCp",
@@ -1102,6 +1107,539 @@
    "wall": "#f2f0ea",
    "material": "render",
    "note": "Baunatal centre: white walls"
+  },
+  {
+   "id": "DEHE061800006LCU",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Im Wiesental (street view vp20): white render with yellow and red accent stripes"
+  },
+  {
+   "id": "DEHE061800006LEr",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Im Wiesental (vp20): white render, anthracite roof"
+  },
+  {
+   "id": "GUID_1488958994062_25981928",
+   "wall": "#f2f0ea",
+   "material": "render",
+   "note": "Haydnstraße (vp21): white render"
+  },
+  {
+   "id": "UUID_be37c2e9-215d-48af-93d9-0b90a6df6324",
+   "wall": "#f2f0ea",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Haydnstraße (vp21): white render, brown tiled roof"
+  },
+  {
+   "id": "DEHE061800006KYj",
+   "wall": "#f2f0ea",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Beethovenstraße (vp22): white render, grey flat roof"
+  },
+  {
+   "id": "DEHE061800006Lxk",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Werner-von-Siemens-Straße (vp23): white render, anthracite roof"
+  },
+  {
+   "id": "GUID_1488958994062_25982813",
+   "wall": "#f2f0ea",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Kirchbaunaer Straße (vp24): white/light grey rendered office, grey flat roof"
+  },
+  {
+   "id": "DEHE061800006Luz",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Brahmsstraße (vp25): white render, dark brown roof"
+  },
+  {
+   "id": "DEHE061800006L1C",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Brahmsstraße (vp25): white render, anthracite roof"
+  },
+  {
+   "id": "DEHE061800006LtO",
+   "wall": "#f2f0ea",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Brahmsstraße (vp25): white render, brown tiled roof"
+  },
+  {
+   "id": "DEHE061800006LMF",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Nikolaus-Otto-Ring (vp26): white render, dark brown roof"
+  },
+  {
+   "id": "DEHE061800006KZV",
+   "wall": "#e2d3b5",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Brahmsstraße (vp28): beige/cream walls, dark brown roof"
+  },
+  {
+   "id": "GUID_1488958994062_25982040",
+   "wall": "#f2f0ea",
+   "roof": "#4b4b4e",
+   "material": "render",
+   "note": "Brahmsstraße (vp28): white render, anthracite roof"
+  },
+  {
+   "id": "GUID_1488958994062_25980765",
+   "wall": "#f2f0ea",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Theodor-Heuss-Allee (vp29): white render, grey flat roof"
+  },
+  {
+   "id": "DEHE061800006LKS",
+   "wall": "#8e4a3a",
+   "roof": "#777774",
+   "material": "brick",
+   "note": "Rudolf-Diesel-Straße (vp31): dark red-brown brick, grey flat roof"
+  },
+  {
+   "id": "DEHE061800006LGe",
+   "wall": "#efe2a8",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Kirchbaunaer Straße (vp33): pale yellow/cream, grey flat roof"
+  },
+  {
+   "id": "DEHE061800006KVy",
+   "wall": "#7a5a40",
+   "roof": "#57504c",
+   "material": "plain",
+   "note": "Kirchbaunaer Straße (vp33): dark brown timber/brick pavilion, dark brown roof"
+  },
+  {
+   "id": "DEHE06180001bb4Y",
+   "wall": "#f2f0ea",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Beethovenstraße (vp35): white render, grey flat roof"
+  },
+  {
+   "id": "GUID_1592389822899_19656468",
+   "wall": "#f2f0ea",
+   "roof": "#777774",
+   "material": "render",
+   "note": "Marktstraße car park (vp36): white render, grey flat roof"
+  },
+  {
+   "id": "DEHE061800006KXR",
+   "roof": "#4b4b4e",
+   "note": "Brahmsstraße (vp37): anthracite tiled roof (walls hidden by bushes)"
+  },
+  {
+   "id": "DEHE061800006LpI",
+   "wall": "#f2f0ea",
+   "roof": "#57504c",
+   "material": "render",
+   "note": "Haydnstraße (vp39): white render, dark brown tiled roof"
+  },
+  {
+   "id": "DEHE061800006L3h",
+   "wall": "#f2f0ea",
+   "roof": "#7a3f30",
+   "material": "render",
+   "note": "Haydnstraße (vp39): white render, brown tiled roof"
+  },
+  {
+   "id": "DEHE061800006LJ0",
+   "roof": "#8f8a80",
+   "roofShape": "flat",
+   "flatAt": 0.8,
+   "note": "aerial photo (square 0-0): block of flats with a flat roof and solar panels; the model has a 45° gable roof"
+  },
+  {
+   "id": "UUID_48df928c-284e-4a0f-b28e-b55fa430feba",
+   "roof": "#c9c6bf",
+   "roofShape": "flat",
+   "flatAt": 0.6,
+   "note": "aerial photo (square 1-1): light flat roof with rooftop boxes; the models have pitched and hipped roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861350",
+   "roof": "#c9c6bf",
+   "roofShape": "flat",
+   "flatAt": 0.6,
+   "note": "aerial photo (square 1-1): light flat roof with rooftop boxes; the models have pitched and hipped roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861348",
+   "roof": "#c9c6bf",
+   "roofShape": "flat",
+   "flatAt": 0.6,
+   "note": "aerial photo (square 1-1): light flat roof with rooftop boxes; the models have pitched and hipped roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861352",
+   "roof": "#c9c6bf",
+   "roofShape": "flat",
+   "flatAt": 0.6,
+   "note": "aerial photo (square 1-1): light flat roof with rooftop boxes; the models have pitched and hipped roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861347",
+   "roof": "#c9c6bf",
+   "roofShape": "flat",
+   "flatAt": 0.6,
+   "note": "aerial photo (square 1-1): light flat roof with rooftop boxes; the models have pitched and hipped roofs"
+  },
+  {
+   "id": "UUID_a1ed2acf-c243-4f43-b4e7-b7af31843e30",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_25982456",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_25982453",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_25982454",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_25982457",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_25982458",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_25982451",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_25982450",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "DEHE061800006LjN",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 1-2): church centre with flat planted (green) roofs; the models have mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861853",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-0): flat planted (green) roof with a light walkway; the models have a ring of mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861856",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-0): flat planted (green) roof with a light walkway; the models have a ring of mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861857",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-0): flat planted (green) roof with a light walkway; the models have a ring of mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861852",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-0): flat planted (green) roof with a light walkway; the models have a ring of mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861855",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-0): flat planted (green) roof with a light walkway; the models have a ring of mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861850",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-0): flat planted (green) roof with a light walkway; the models have a ring of mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861848",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-0): flat planted (green) roof with a light walkway; the models have a ring of mono-pitch roofs"
+  },
+  {
+   "id": "GUID_1488958994062_26861849",
+   "roofMaterial": "green",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-0): flat planted (green) roof with a light walkway; the models have a ring of mono-pitch roofs"
+  },
+  {
+   "id": "DEHE061800006Lob",
+   "roof": "#45464a",
+   "roofShape": "flat",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-3): terrace with dark, nearly flat roofs; the models have low gables"
+  },
+  {
+   "id": "DEHE061800006Lo8",
+   "roof": "#45464a",
+   "roofShape": "flat",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-3): terrace with dark, nearly flat roofs; the models have low gables"
+  },
+  {
+   "id": "DEHE061800006Lok",
+   "roof": "#45464a",
+   "roofShape": "flat",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-3): terrace with dark, nearly flat roofs; the models have low gables"
+  },
+  {
+   "id": "DEHE061800006Lq6",
+   "roof": "#45464a",
+   "roofShape": "flat",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-3): terrace with dark, nearly flat roofs; the models have low gables"
+  },
+  {
+   "id": "DEHE061800006Lq9",
+   "roof": "#45464a",
+   "roofShape": "flat",
+   "flatAt": 0.5,
+   "note": "aerial photo (square 2-3): terrace with dark, nearly flat roofs; the models have low gables"
+  },
+  {
+   "id": "UUID_f612b1d7-ab93-4332-b5eb-6c3f18b4bad8",
+   "roof": "#6f706f",
+   "roofMaterial": "metal",
+   "note": "aerial photo (square 4-2): grey low-pitched sheet roof, not tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25980035",
+   "roof": "#6f706f",
+   "roofMaterial": "metal",
+   "note": "aerial photo (square 4-2): grey low-pitched sheet roof, not tiles"
+  },
+  {
+   "id": "GUID_1488958994062_25980036",
+   "roof": "#6f706f",
+   "roofMaterial": "metal",
+   "note": "aerial photo (square 4-2): grey low-pitched sheet roof, not tiles"
+  }
+ ],
+ "add": [
+  {
+   "id": "obs-b1",
+   "pts": [
+    [
+     721,
+     114
+    ],
+    [
+     737,
+     116
+    ],
+    [
+     736,
+     147
+    ],
+    [
+     719,
+     146
+    ]
+   ],
+   "height": 6,
+   "roof": "flat",
+   "wall": "#d0cdc4",
+   "roofColour": "#d6d7d3",
+   "note": "aerial photo (square 2-2): long building with a light ridged roof west of the park wood; not in LoD2 or OSM (OSM still has a pitch there)"
+  },
+  {
+   "id": "obs-b2",
+   "pts": [
+    [
+     1104,
+     52
+    ],
+    [
+     1139,
+     51.5
+    ],
+    [
+     1146,
+     80
+    ],
+    [
+     1104,
+     88
+    ]
+   ],
+   "height": 8,
+   "roof": "flat",
+   "wall": "#a0604a",
+   "roofColour": "#b4ada2",
+   "note": "aerial photo (squares 4-1/4-2): flat-roofed building, red-brown edge, skylights, north of way 22775586; not in LoD2 or OSM"
+  },
+  {
+   "id": "obs-b3",
+   "pts": [
+    [
+     1228,
+     350
+    ],
+    [
+     1233,
+     350
+    ],
+    [
+     1237,
+     382
+    ],
+    [
+     1232,
+     382
+    ]
+   ],
+   "height": 4,
+   "roof": "flat",
+   "wall": "#bdbab2",
+   "roofColour": "#c8c8c4",
+   "note": "aerial photo (square 4-3): covered stand along the east side of the sports pitch"
+  },
+  {
+   "id": "obs-b4",
+   "pts": [
+    [
+     1245,
+     363
+    ],
+    [
+     1248,
+     363
+    ],
+    [
+     1249,
+     391
+    ],
+    [
+     1246,
+     391
+    ]
+   ],
+   "height": 3,
+   "roof": "flat",
+   "wall": "#bdbab2",
+   "roofColour": "#c8c8c4",
+   "note": "aerial photo (square 4-3): second long narrow structure east of the pitch"
+  },
+  {
+   "id": "obs-b5",
+   "pts": [
+    [
+     1054,
+     -31
+    ],
+    [
+     1062,
+     -31
+    ],
+    [
+     1062,
+     -23
+    ],
+    [
+     1054,
+     -23
+    ]
+   ],
+   "height": 3,
+   "roof": "flat",
+   "note": "aerial photo (square 3-1): small building north of the car park east of the main road"
+  },
+  {
+   "id": "obs-b6",
+   "pts": [
+    [
+     1063,
+     -9
+    ],
+    [
+     1070,
+     -9
+    ],
+    [
+     1070,
+     -2
+    ],
+    [
+     1063,
+     -2
+    ]
+   ],
+   "height": 2.4,
+   "roof": "flat",
+   "note": "aerial photo (square 3-1): carport / garage"
+  },
+  {
+   "id": "obs-b7",
+   "pts": [
+    [
+     1204,
+     275
+    ],
+    [
+     1211,
+     275
+    ],
+    [
+     1211,
+     285
+    ],
+    [
+     1204,
+     285
+    ]
+   ],
+   "height": 3,
+   "roof": "gable",
+   "ridge": 2,
+   "roofColour": "#9a5540",
+   "note": "aerial photo (square 4-3): small red-roofed building at the top edge"
+  }
+ ],
+ "remove": [
+  {
+   "id": "DEHE061800006KVv",
+   "note": "aerial photo (square 3-1): the model is a low pyramid-roofed hut in the middle of the car park south of way 185822017; only parked cars there"
   }
  ]
 }

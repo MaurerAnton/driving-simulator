@@ -476,6 +476,8 @@ export class RailTraffic {
   private spawnT = 0;
   private readonly random: () => number;
   private readonly obstacles: RailObstacle[] = [];
+  /** how far ahead of a vehicle a level crossing is that is not secured yet – it brakes before it (src/sim/levelcrossing.ts; Infinity: none) */
+  hold: ((v: RailVehicle) => number) | null = null;
 
   constructor(rails: readonly RailJson[], random: () => number = Math.random) {
     this.net = new RailNetwork(rails);
@@ -997,6 +999,9 @@ export class RailTraffic {
     if (stopIn < Infinity) target = Math.min(target, stopFor(stopIn, 0.3, c.brake * 0.8));
     if (endIn < Infinity) target = Math.min(target, stopFor(endIn, 1.5, c.brake * 0.8));
     if (blockIn < Infinity) target = Math.min(target, stopFor(blockIn, 4.5, c.brake * 1.6));
+    // (a level crossing whose barriers are not down yet: it waits before it)
+    const holdIn = this.hold?.(v) ?? Infinity;
+    if (holdIn < Infinity) target = Math.min(target, stopFor(holdIn, 12, c.brake * 0.9));
     if (v.speed < target) v.speed = Math.min(target, v.speed + c.accel * dt);
     else v.speed = Math.max(target, v.speed - (blockIn < Infinity ? c.brake * 2 : c.brake) * dt);
     if (v.speed < 0.05 && target < 0.3) v.speed = 0;

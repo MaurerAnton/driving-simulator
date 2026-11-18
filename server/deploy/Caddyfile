@@ -1,0 +1,9 @@
+# Caddy in front of the Fahrsim Baunatal server: HTTPS (certificate fetched by itself), WebSockets pass through.
+{$FAHRSIM_DOMAIN} {
+	encode zstd gzip
+	# uploads up to 25 MB plus a thumbnail
+	request_body {
+		max_size 30MB
+	}
+	reverse_proxy fahrsim:8080
+}

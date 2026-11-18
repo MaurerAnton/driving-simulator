@@ -5,21 +5,24 @@
  *   node tools/old-versions.ts --out dist [--cache .old-versions] [--budget 1000000000] [--pack data/work/old-versions]
  *
  * Run after the newest version was built into `--out` (npm run build, with
- * the map in it).  For every tag vX.Y.Z older than package.json's version it
- * puts that version's app under <out>/v/X.Y.Z/ – the app only: each reads
+ * the map in it).  For every tag vX.Y.Z older than package.json's version –
+ * and every development version of src/game/releases.ts (0.x, before 1.0.0:
+ * a commit without a tag, `commit` there) – it puts that version's app under
+ * <out>/v/X.Y.Z/ – the app only: each reads
  * the one map at the top of the site (GitHub Pages holds 1 GB, and the map
  * is most of it), and the traffic signs there too where its own are the same
  * as today's.  Then it writes <out>/versions.json, the list the game shows
  * (src/game/versions.ts).
  *
- * A version is built once: from the tag (in a git worktree of its own, with
+ * A version is built once: from the tag or commit (in a git worktree of its own, with
  * the packages its package-lock.json names), with two lines changed so that
  * it finds the map (and the signs) two folders up, without source maps, and
  * with a small link back to the newest version on its page.  The result is
  * kept in `--cache` (the workflow keeps that folder between runs – actions/
  * cache) and, if it is not there, looked for as a file of the version's
  * release (app-X.Y.Z-rN.tar.gz, written with --pack: upload it there and no
- * build ever has to make it again).  RECIPE counts the way of building:
+ * build ever has to make it again; a development version has no release –
+ * its build is kept in the cache only, under a name with its commit).  RECIPE counts the way of building:
  * raise it when this file builds differently, and every version is built
  * anew.
  *
@@ -33,6 +36,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { RELEASES } from '../src/game/releases.ts';
 import { compareVersions } from '../src/game/versions.ts';
 import type { HostedVersion, VersionList } from '../src/game/versions.ts';
 
@@ -40,13 +44,17 @@ import type { HostedVersion, VersionList } from '../src/game/versions.ts';
 export const RECIPE = 1;
 /**
  * The oldest version that reads the map of today.  The form of the map has
- * not changed since 1.0.0 (map.json, the chunks w/…, net.bin.gz and the
- * tiles .fsb: src/world/loader.ts, netfile.ts, tilefmt.ts): later maps only
- * added files (stops, lines, the far view, …), which older versions do not
- * ask for, and building styles (a facing-brick wall: a plain wall to them).
+ * not changed since the development version 0.8.0 (map.json, the chunks w/…,
+ * net.bin.gz and the tiles .fsb: src/world/loader.ts, netfile.ts and
+ * tilefmt.ts are the same in 0.8.0, 0.9.0 and 1.0.0, and so is the code
+ * that reads the tiles, render/tiles.ts): later maps only added files
+ * (stops, lines, the far view, …), which older versions do not ask for, and
+ * building styles (a facing-brick wall: a plain wall to them).  Before 0.8.0
+ * the map was one world.json and tiles without the coding of their numbers –
+ * neither of which a map has any more.
  * Raise it when a map comes that older versions cannot read.
  */
-export const MAP_READABLE_FROM = '1.0.0';
+export const MAP_READABLE_FROM = '0.8.0';
 /** GitHub Pages: a site of at most 1 GB */
 const DEFAULT_BUDGET = 1_000_000_000;
 
@@ -98,6 +106,22 @@ export function olderTags(tags: string[], latest: string): string[] {
     .sort((a, b) => compareVersions(b, a));
 }
 
+/** A development version (0.x before 1.0.0, no tag): its commit. */
+export interface DevVersion {
+  version: string;
+  commit: string;
+}
+
+/** The development versions of src/game/releases.ts. */
+export const DEV_VERSIONS: readonly DevVersion[] = RELEASES.flatMap((r) => (r.dev && r.commit ? [{ version: r.version, commit: r.commit }] : []));
+
+/** All earlier versions: the older tags and the development versions, newest first (a tag wins over a development version of the same number). */
+export function earlierVersions(tags: string[], dev: readonly DevVersion[], latest: string): string[] {
+  const all = new Set(olderTags(tags, latest));
+  for (const d of dev) if (compareVersions(d.version, latest) < 0) all.add(d.version);
+  return [...all].sort((a, b) => compareVersions(b, a));
+}
+
 /**
  * Which versions go on the site: newest first, as long as they fit into what
  * is left of the budget.  `sizes`: the bytes of each built one (absent: not built).
@@ -135,16 +159,16 @@ function fromRelease(v: string, into: string): boolean {
   return existsSync(join(into, 'index.html'));
 }
 
-/** Build version `v` from its tag into `into`. */
-function build(v: string, into: string, work: string): void {
+/** Build version `v` from its tag or commit (`ref`) into `into`. */
+function build(v: string, ref: string, into: string, work: string): void {
   const tree = join(work, `tree-${v}`);
   rmSync(tree, { recursive: true, force: true });
   spawnSync('git', ['worktree', 'prune'], { cwd: root });
-  run('git', ['worktree', 'add', '--detach', '--force', tree, `v${v}`]);
+  run('git', ['worktree', 'add', '--detach', '--force', tree, ref]);
   try {
     // the map – and the signs, where they are today's – two folders up: <site>/v/<version>/ → <site>/
     patch(join(tree, 'src/game/app.ts'), "new URL('map/', document.baseURI)", "new URL('../../map/', document.baseURI)");
-    const sameSigns = spawnSync('git', ['diff', '--quiet', '--diff-filter=DM', `v${v}`, 'HEAD', '--', 'public/signs'], { cwd: root }).status === 0;
+    const sameSigns = spawnSync('git', ['diff', '--quiet', '--diff-filter=DM', ref, 'HEAD', '--', 'public/signs'], { cwd: root }).status === 0;
     if (sameSigns) patch(join(tree, 'src/game/game.ts'), "new URL('signs/', document.baseURI)", "new URL('../../signs/', document.baseURI)");
     run('npm', ['ci', '--no-audit', '--no-fund', '--loglevel=error'], tree);
     rmSync(into, { recursive: true, force: true });
@@ -174,10 +198,19 @@ function main(): void {
   const packDir = process.argv.includes('--pack') ? resolve(root, arg('pack', 'data/work/old-versions')) : null;
   if (!existsSync(join(out, 'index.html'))) throw new Error(`${out}: build the newest version first (npm run build)`);
   const latest = (JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { version: string }).version;
-  const tags = olderTags(run('git', ['tag', '-l', 'v*']).split('\n'), latest);
+  const tagList = run('git', ['tag', '-l', 'v*']).split('\n');
+  const tagged = new Set(olderTags(tagList, latest));
+  const tags = earlierVersions(tagList, DEV_VERSIONS, latest);
+  // (a development version: its commit – by its sha, kept apart in the cache, no release to fetch from)
+  const devCommit = (v: string): string | undefined => (tagged.has(v) ? undefined : DEV_VERSIONS.find((d) => d.version === v)?.commit);
+  const refOf = (v: string): string => devCommit(v) ?? `v${v}`;
+  const dirOf = (v: string): string => {
+    const c = devCommit(v);
+    return join(cache, c ? `${v}-${c.slice(0, 12)}-r${RECIPE}` : `${v}-r${RECIPE}`);
+  };
   const when = (v: string): string | undefined => {
     try {
-      return run('git', ['log', '-1', '--format=%cI', `v${v}`]).trim() || undefined;
+      return run('git', ['log', '-1', '--format=%cI', refOf(v)]).trim() || undefined;
     } catch {
       return undefined;
     }
@@ -187,17 +220,17 @@ function main(): void {
   const sizes = new Map<string, number>();
   for (const v of tags) {
     if (compareVersions(v, MAP_READABLE_FROM) < 0) continue;
-    const dir = join(cache, `${v}-r${RECIPE}`);
+    const dir = dirOf(v);
     if (!existsSync(join(dir, 'index.html'))) {
       rmSync(dir, { recursive: true, force: true });
-      if (fromRelease(v, dir)) console.log(`[old] ${v}: from the release`);
+      if (!devCommit(v) && fromRelease(v, dir)) console.log(`[old] ${v}: from the release`);
       else {
-        console.log(`[old] ${v}: building`);
-        build(v, dir, work);
+        console.log(`[old] ${v}: building from ${refOf(v)}`);
+        build(v, refOf(v), dir, work);
       }
     } else console.log(`[old] ${v}: cached`);
     sizes.set(v, folderSize(dir));
-    if (packDir) {
+    if (packDir && !devCommit(v)) {
       mkdirSync(packDir, { recursive: true });
       run('tar', ['-czf', join(packDir, assetName(v)), '-C', dir, '.']);
       console.log(`[old] ${join(packDir, assetName(v))}: for the release v${v}`);
@@ -209,7 +242,7 @@ function main(): void {
   rmSync(join(out, 'v'), { recursive: true, force: true });
   const room = budget - folderSize(out) - 64 * 1024;
   const hosted = chooseHosted(tags, sizes, room);
-  for (const v of hosted) cpSync(join(cache, `${v}-r${RECIPE}`), join(out, 'v', v), { recursive: true });
+  for (const v of hosted) cpSync(dirOf(v), join(out, 'v', v), { recursive: true });
   const list: VersionList = {
     latest,
     versions: tags.map((v): HostedVersion => {

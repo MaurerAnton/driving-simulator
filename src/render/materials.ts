@@ -4,6 +4,7 @@
  * in the fragment shader), so the game ships without a single texture file.
  */
 import * as THREE from 'three';
+import { COVER_EDGE_GLSL } from './coveredge.ts';
 
 const NOISE_GLSL = /* glsl */ `
 float fsHash(vec2 p) {
@@ -76,6 +77,9 @@ vec3 fsGround(float m, vec3 wp, float dist) {
     c = vec3(0.62, 0.59, 0.54) * (1.0 + 0.1 * patch_ * mid) + grain * 0.06;
   } else if (m < 13.5) {               // cycle path (red asphalt)
     c = vec3(0.56, 0.30, 0.26) * (1.0 + 0.12 * patch_ * mid) + grain * 0.05;
+  } else if (m < 14.5) {               // parking bays beside the road (light paving)
+    c = vec3(0.62, 0.61, 0.58) * (1.0 + 0.10 * patch_ * mid) + grain * 0.05;
+    c *= 1.0 - 0.30 * fsJoints(p, vec2(0.2, 0.2), 0.5, 0.012) * fine;
   } else if (m < 20.5) {               // white paint
     c = vec3(0.93, 0.93, 0.91) * (0.9 + 0.1 * fsNoise(p * 6.0)) + grain * 0.06;
   } else if (m < 21.5) {               // yellow paint
@@ -138,7 +142,7 @@ export function makeTerrainMaterial(cover: THREE.Texture): THREE.Material {
     injectWorldPos(shader, false);
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <map_fragment>',
-      /* glsl */ `#include <map_fragment>
+      /* glsl */ `${COVER_EDGE_GLSL}
       {
         float d = distance(vFsWorld, cameraPosition);
         float fine = 1.0 - smoothstep(8.0, 50.0, d);

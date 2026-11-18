@@ -23,6 +23,12 @@ import {
 import type { PolyProjection, PolySample, Polyline3 } from '../core/geom.ts';
 import { CLASS_TIER, CTRL, EF, KERB_H, ROLE, SURF } from './types.ts';
 import type { CrossingJson, EdgeJson, NodeJson, SignalControllerJson, WorldChunkJson, WorldJson } from './types.ts';
+import { kerbHeight, sideInner } from './xsection.ts';
+import { calmLift, flushMouth } from './roadfeatures.ts';
+import { narrowingsOf } from './narrowing.ts';
+import type { Narrowing } from './narrowing.ts';
+import { SegGrid } from './seggrid.ts';
+import type { RoadSideJson } from './xsection.ts';
 
 export interface Edge {
   id: number;
@@ -40,6 +46,17 @@ export interface Edge {
   width: number;
   /** paved strip outside the lanes on each side */
   margin: number;
+  /** what lies between the outermost lane and the kerb on the left / right of a→b: the hard strip, a cycle lane, parked cars (src/world/xsection.ts) */
+  marginL: number;
+  marginR: number;
+  /** the cross-section beyond the lanes, left and right of a→b (src/world/xsection.ts) */
+  xl: RoadSideJson | undefined;
+  xr: RoadSideJson | undefined;
+  /** a carriageway of a dual road: what lies on its left (MEDIAN bits) */
+  median: number;
+  /** height of the kerb on the left / right */
+  kerbL: number;
+  kerbR: number;
   maxF: number;
   maxB: number;
   zone: number;
@@ -54,6 +71,12 @@ export interface Edge {
   turnF: string;
   turnB: string;
   osm: number;
+  /** traffic calming across the carriageway (EdgeJson.cm; src/world/roadfeatures.ts), null: none */
+  calm: number[] | null;
+  /** kerb build-outs narrowing the carriageway (EdgeJson.bo; src/world/narrowing.ts), null: none */
+  narrow?: Narrowing[] | null;
+  /** 1: meets other roads over a continuous pavement (EdgeJson.mk) */
+  mouth: number;
   armA: Arm;
   armB: Arm;
   /** blend lengths over which the surface relaxes from junction plane to profile */
@@ -178,6 +201,7 @@ export function newSurfaceHit(): SurfaceHit {
 }
 
 const tmpSample = newPolySample();
+const NO_CODES: readonly number[] = [];
 const tmpProj: PolyProjection = { s: 0, off: 0, d2: 0, seg: 0 };
 
 /** Point on an arm at distance `d` from its node. */
@@ -209,6 +233,8 @@ function computeArmDirection(arm: Arm): void {
 
 /** Desired kerb radius between two arms (before length limits). */
 function desiredFilletRadius(a: Arm, b: Arm): number {
+  // (a mouth over a continuous pavement has no kerbed corners: src/world/roadfeatures.ts)
+  if (flushMouth(a) || flushMouth(b)) return 0.6;
   const t = Math.min(a.edge.tier, b.edge.tier);
   let r = t >= 3 ? 8 : t >= 2 ? 5.5 : t >= 1 ? 3.5 : 3;
   const sw = Math.max(a.swL, b.swR);
@@ -488,8 +514,18 @@ export class World {
   readonly crossings: CrossingJson[] = [];
   /** what was read first: the description of the map (and, for a map in one piece, all of it) */
   readonly json: WorldJson;
-  /** edge segments: value = edgeId * 4096 + segmentIndex */
-  private readonly segGrid = new Grid2<number>(40);
+  /**
+   * edge segments: value = edgeId * 4096 + segmentIndex – and beside each the
+   * bounding box of that segment (src/world/seggrid.ts), padded by half the
+   * carriageway + the wider sidewalk + 0.5 m.  That is wider than anything
+   * `surfaceAt` accepts from the segment (at most half + the sidewalk of that
+   * side, or √(reach² + 0.04) at the open end of a road), so the box only
+   * turns away points the projection would turn away too – it saves fetching
+   * the edge and projecting.  Put in and taken out with the segments in
+   * `indexEdge`; it depends on the centre line, the width and the sidewalks
+   * only, which an edge keeps for its life (the cuts do not matter to it).
+   */
+  private readonly segGrid = new SegGrid(40);
   private readonly nodeGrid = new Grid2<Node>(40);
 
   /**
@@ -581,6 +617,13 @@ export class World {
       laneW: ej.lw,
       width: ej.w,
       margin: ej.mg ?? 0,
+      marginL: (ej.mg ?? 0) + sideInner(ej.xl),
+      marginR: (ej.mg ?? 0) + sideInner(ej.xr),
+      xl: ej.xl,
+      xr: ej.xr,
+      median: ej.md ?? 0,
+      kerbL: kerbHeight(ej.xl),
+      kerbR: kerbHeight(ej.xr),
       maxF: ej.mf,
       maxB: ej.mb,
       zone: ej.z ?? 0,
@@ -595,6 +638,8 @@ export class World {
       turnF: ej.tf ?? '',
       turnB: ej.tb ?? '',
       osm: ej.o ?? 0,
+      calm: ej.cm ?? null,
+      mouth: ej.mk ?? 0,
       armA: null as unknown as Arm,
       armB: null as unknown as Arm,
       blendA: 0,
@@ -605,6 +650,7 @@ export class World {
       maxZ: 0,
       xings: (ej.x ?? []).map((x) => ({ ...x, e: id })),
     };
+    if (ej.bo) e.narrow = narrowingsOf(e, ej.bo);
     e.armA = this.newArm(a, e, true);
     e.armB = this.newArm(b, e, false);
     // (of a junction that is not loaded itself, the roads are kept in the order they came)
@@ -749,6 +795,7 @@ export class World {
     const pts = e.pl.pts;
     const n = e.pl.cum.length;
     const pad = e.width / 2 + Math.max(e.swL, e.swR) + 1;
+    const segPad = e.width / 2 + Math.max(e.swL, e.swR) + 0.5;
     let minX = Infinity;
     let maxX = -Infinity;
     let minZ = Infinity;
@@ -767,7 +814,7 @@ export class World {
         const z0 = Math.min(z, z2) - pad;
         const x1 = Math.max(x, x2) + pad;
         const z1 = Math.max(z, z2) + pad;
-        if (on) this.segGrid.insertBox(x0, z0, x1, z1, e.id * 4096 + i);
+        if (on) this.segGrid.insertBox(x0, z0, x1, z1, e.id * 4096 + i, Math.min(x, x2) - segPad, Math.min(z, z2) - segPad, Math.max(x, x2) + segPad, Math.max(z, z2) + segPad);
         else this.segGrid.removeBox(x0, z0, x1, z1, e.id * 4096 + i);
       }
     }
@@ -869,12 +916,18 @@ export class World {
     }
 
     // 2) edges: carriageway between the cuts, plus sidewalks
-    const segs = this.segGrid.at(x, z);
+    const cell = this.segGrid.cellAt(x, z);
+    const segs = cell ? cell.codes : NO_CODES;
+    const boxes = cell ? cell.boxes : NO_CODES;
     for (let i = 0; i < segs.length; i++) {
+      // (the segment's own box first: most segments of a cell lie far away – see `segGrid`)
+      const o = i * 4;
+      if (x < boxes[o] || x > boxes[o + 2] || z < boxes[o + 1] || z > boxes[o + 3]) continue;
       const code = segs[i];
-      const edge = this.edges[(code / 4096) | 0];
-      if (x < edge.minX || x > edge.maxX || z < edge.minZ || z > edge.maxZ) continue;
+      const id = (code / 4096) | 0;
       const seg = code % 4096;
+      const edge = this.edges[id];
+      if (x < edge.minX || x > edge.maxX || z < edge.minZ || z > edge.maxZ) continue;
       projectOnPolyline(edge.pl, x, z, tmpProj, seg, seg);
       const s = tmpProj.s;
       const off = tmpProj.off;
@@ -904,7 +957,9 @@ export class World {
       if (inJunctionZone && lateral > half) continue; // corner sidewalks are handled below
       let y = this.edgeY(edge, s, x, z);
       const onSidewalk = lateral > half;
-      if (onSidewalk) y += KERB_H;
+      // (raised tables and humps lift the carriageway: src/world/roadfeatures.ts)
+      if (edge.calm && !onSidewalk) y += calmLift(edge, s);
+      if (onSidewalk) y += off > 0 ? edge.kerbL : edge.kerbR;
       if (y > ceiling) continue;
       this.consider(
         out,

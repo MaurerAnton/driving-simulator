@@ -8,7 +8,10 @@ import type { VehicleKind } from './vehicles.ts';
 import type { TramSet } from '../sim/rail.ts';
 import type { LessonArea, LessonPlaceMode } from './lessonplaces.ts';
 import { ZOOM_RELEASES } from '../input/camzoom.ts';
+import { cleanSpeechPrefs } from '../audio/voicepick.ts';
+import type { SpeechPref } from '../audio/voicepick.ts';
 import type { ZoomRelease } from '../input/camzoom.ts';
+import { normaliseServerUrl } from '../net/client.ts';
 
 export type Transmission = 'assist' | 'manual' | 'automatic';
 /** a preset of the graphics – or 'custom': the advanced settings chosen one by one */
@@ -89,6 +92,10 @@ export interface Settings {
   limiter: boolean;
   /** the autopilot lets the player take over for a moment and drives on to its places when let go (else taking over ends it) */
   autopilotAssist: boolean;
+  /** arcade driving (game/arcadedrive.ts): the automatic gearbox, D and R by the pedals, no handbrake, the engine always running – none of it judged */
+  arcadeDrive: boolean;
+  /** the road physics off (sim/ground.ts WorldGround.even): every road and land, in any weather, grips as dry asphalt */
+  evenRoads: boolean;
   /** the main-beam assist: at night the main beam goes on and off by itself (game/beamplay.ts) */
   beamAssist: boolean;
   /** the light of day: the game's fair afternoon always, or the sun as it stands at the time (night at night) */
@@ -107,6 +114,10 @@ export interface Settings {
   runSpeed: number;
   /** on foot: through one's own eyes, or seen from behind (the camera key switches) */
   footView: 'eyes' | 'behind';
+  /** how one walks (game/walkmodes.ts): 'auto' – the classic way on a touch screen, as before with keys –, the classic way (stick or W A S D, look by dragging), as before 1.7.0 (pedals and bar, A D turn), or tap to walk */
+  walkControls: 'auto' | 'classic' | 'tank' | 'tap';
+  /** a tap (or click) on a place in the 3D picture offers "Teleport here" for a few seconds (ui/worldtap.ts) */
+  teleportTap: boolean;
   /** the tram the player drives: one unit, two coupled units, or one with a trailer car */
   tramSet: TramSet;
   /** the main menu: the vehicle large in the 3D picture with icons round it (the default since 1.4.0), rows of cards over the 3D scene, or the simple list of before */
@@ -140,6 +151,8 @@ export interface Settings {
   /** spoken instructor (browser speech synthesis) */
   voice: boolean;
   volume: number;
+  /** per language: the voice chosen ('' = the best there is), rate and pitch (audio/voicepick.ts) */
+  speech?: Record<string, SpeechPref>;
   /** traffic density 0 … 1 */
   traffic: number;
   drawDistance: number;
@@ -189,8 +202,12 @@ export interface Settings {
   lessonPlaceAsked: boolean;
   /** the district chosen for the lessons (lessonPlace 'area'); null: the home town */
   lessonArea: LessonArea | null;
+  /** the lessons are watched: the autopilot drives them, the instructor says what it does (game/lessonwatch.ts) – chosen at each lesson's start */
+  lessonWatch: boolean;
   /** the computations that have a WebAssembly twin (src/wasm/kernels.ts – tiles, the quickest way): 'auto' in WebAssembly where the browser has it, 'off' in JavaScript only */
   wasm: 'auto' | 'off';
+  /** the Fahrsim Baunatal server the player chose (net/client.ts: accounts, progress, photos, playing together) – '' none: the game needs none */
+  server: string;
   /** what the stored settings were written by (SETTINGS_VERSION): older ones are brought up to date once, in merge */
   version: number;
 }
@@ -207,6 +224,8 @@ export const DEFAULT_SETTINGS: Settings = {
   powers: {},
   limiter: true,
   autopilotAssist: true,
+  arcadeDrive: false,
+  evenRoads: false,
   beamAssist: false,
   daylight: 'day',
   fuelKey: '',
@@ -217,6 +236,8 @@ export const DEFAULT_SETTINGS: Settings = {
   musicVolume: 1,
   runSpeed: 12,
   footView: 'eyes',
+  walkControls: 'auto',
+  teleportTap: true,
   tramSet: 'single',
   // (new players get the stage; a list chosen before stays – the rows, 1.3.0's default, become the stage once)
   menuStyle: 'stage',
@@ -257,7 +278,9 @@ export const DEFAULT_SETTINGS: Settings = {
   lessonPlace: 'start',
   lessonPlaceAsked: false,
   lessonArea: null,
+  lessonWatch: false,
   wasm: 'auto',
+  server: '',
   version: SETTINGS_VERSION,
 };
 
@@ -266,7 +289,7 @@ const KEY = 'fahrsim-baunatal.settings.v2';
 const OLD_KEY = 'fahrsim-baunatal.settings.v1';
 
 function fresh(): Settings {
-  return { ...DEFAULT_SETTINGS, powers: {}, tourPrefs: { ...DEFAULT_TOUR_PREFS }, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality }, lastStart: { ...DEFAULT_SETTINGS.lastStart }, insideMirror: { ...DEFAULT_SETTINGS.insideMirror } };
+  return { ...DEFAULT_SETTINGS, graphics: { ...DEFAULT_SETTINGS.graphics }, powers: {}, tourPrefs: { ...DEFAULT_TOUR_PREFS }, wheel: { ...DEFAULT_SETTINGS.wheel }, reality: { ...DEFAULT_SETTINGS.reality }, lastStart: { ...DEFAULT_SETTINGS.lastStart }, insideMirror: { ...DEFAULT_SETTINGS.insideMirror } };
 }
 
 /** Defaults, overlaid with what was stored – whatever is missing or implausible keeps its default. */
@@ -284,6 +307,8 @@ function merge(parsed: Partial<Settings>): Settings {
   if (!vehicleKind(s.vehicle)) s.vehicle = d.vehicle;
   if (!RUN_SPEEDS.includes(s.runSpeed)) s.runSpeed = d.runSpeed;
   if (s.footView !== 'eyes' && s.footView !== 'behind') s.footView = d.footView;
+  if (!(['auto', 'classic', 'tank', 'tap'] as const).includes(s.walkControls)) s.walkControls = d.walkControls;
+  if (typeof s.teleportTap !== 'boolean') s.teleportTap = d.teleportTap;
   if (s.tramSet !== 'single' && s.tramSet !== 'double' && s.tramSet !== 'trailer') s.tramSet = d.tramSet;
   if (s.menuStyle !== 'stage' && s.menuStyle !== 'carousel' && s.menuStyle !== 'classic') s.menuStyle = d.menuStyle;
   s.tourPrefs = { ...DEFAULT_TOUR_PREFS, ...(typeof parsed.tourPrefs === 'object' && parsed.tourPrefs ? parsed.tourPrefs : {}) };
@@ -325,6 +350,8 @@ function merge(parsed: Partial<Settings>): Settings {
   if (s.screenTap !== 'bigmap' && s.screenTap !== 'minimap') s.screenTap = d.screenTap;
   if (!ZOOM_RELEASES.includes(s.zoomRelease)) s.zoomRelease = d.zoomRelease;
   if (s.wasm !== 'auto' && s.wasm !== 'off') s.wasm = d.wasm;
+  s.server = normaliseServerUrl(s.server) ?? d.server;
+  s.speech = cleanSpeechPrefs(parsed.speech);
   {
     const m = s.insideMirror;
     if (m.mode !== 'car' && m.mode !== 'hud') m.mode = d.insideMirror.mode;
@@ -342,6 +369,8 @@ function merge(parsed: Partial<Settings>): Settings {
   s.version = SETTINGS_VERSION;
   if (typeof s.autopilotAssist !== 'boolean') s.autopilotAssist = d.autopilotAssist;
   if (typeof s.beamAssist !== 'boolean') s.beamAssist = d.beamAssist;
+  if (typeof s.arcadeDrive !== 'boolean') s.arcadeDrive = d.arcadeDrive;
+  if (typeof s.evenRoads !== 'boolean') s.evenRoads = d.evenRoads;
   if (s.daylight !== 'day' && s.daylight !== 'clock') s.daylight = d.daylight;
   if (s.music !== 'off' && s.music !== 'quiet' && s.music !== 'on') s.music = d.music;
   if (typeof s.fuelKey !== 'string') s.fuelKey = d.fuelKey;
@@ -356,7 +385,26 @@ function merge(parsed: Partial<Settings>): Settings {
   if (typeof s.lessonPlaceAsked !== 'boolean') s.lessonPlaceAsked = d.lessonPlaceAsked;
   const la = s.lessonArea;
   s.lessonArea = la && typeof la === 'object' && typeof la.name === 'string' && Number.isFinite(la.x) && Number.isFinite(la.z) ? { name: la.name, x: la.x, z: la.z } : null;
+  if (typeof s.lessonWatch !== 'boolean') s.lessonWatch = d.lessonWatch;
   return s;
+}
+
+/**
+ * The settings put back to their defaults ("Reset settings"), except what is
+ * the player's own rather than a choice: the language, where the last drive
+ * began, the map stored from files, the keys typed in (Tankerkönig,
+ * Mapillary) and the answers already given to the game's questions.
+ */
+export function resetSettings(s: Settings): Settings {
+  const r = fresh();
+  r.lang = s.lang;
+  r.lastStart = { ...s.lastStart };
+  r.mapPack = s.mapPack;
+  r.fuelKey = s.fuelKey;
+  r.server = s.server;
+  r.reality.mapillaryToken = s.reality.mapillaryToken;
+  r.lessonPlaceAsked = s.lessonPlaceAsked;
+  return r;
 }
 
 /** Are there settings of an earlier visit (has this browser played before)? */

@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { RELEASES, VERSION, newsDue } from '../../src/game/releases.ts';
+import { RELEASES, VERSION, newsDue, sizeWords } from '../../src/game/releases.ts';
 import { LANGS } from '../../src/i18n/index.ts';
 
 test('the newest release is the version of the game, and the versions go down the list', () => {
@@ -28,8 +28,51 @@ test('every note of every release is there in every language', async () => {
   for (const lang of LANGS) {
     // (the language's own file: the game would fall back to English for what is missing)
     const dict = ((await import(`../../src/i18n/${lang.code}.ts`)) as { default: Record<string, string> }).default;
-    for (const r of RELEASES) for (const key of [...r.items, ...(r.intro ? [r.intro] : []), 'news', 'newsVersion']) assert.ok(dict[key], `${lang.code}: ${key}`);
+    for (const r of RELEASES) for (const key of [...r.items, ...(r.intro ? [r.intro] : []), 'news', 'newsVersion', 'news.size', ...(r.dev ? ['news.dev', 'news.devIntro'] : [])]) assert.ok(dict[key], `${lang.code}: ${key}`);
   }
+});
+
+test('the development versions come below the releases, oldest last, each with its commit', () => {
+  const firstDev = RELEASES.findIndex((r) => r.dev);
+  assert.ok(firstDev > 0, 'there are development versions, and they are not the newest');
+  for (let i = 0; i < RELEASES.length; i++) {
+    const r = RELEASES[i];
+    assert.equal(r.dev === true, i >= firstDev, `${r.version}: all development versions together, below the releases`);
+    if (r.dev) {
+      assert.ok(r.version.startsWith('0.'), `${r.version}: before 1.0.0`);
+      assert.match(r.commit ?? '', /^[0-9a-f]{40}$/, `${r.version}: its commit`);
+      assert.ok(r.at !== '', `${r.version}: the moment of its commit`);
+    } else assert.equal(r.commit, undefined, `${r.version}: a release is found by its tag`);
+  }
+  assert.equal(RELEASES[RELEASES.length - 1].version, '0.1.0');
+});
+
+test('every version says how big the game was – and it grew', () => {
+  for (const [i, r] of RELEASES.entries()) {
+    // (the newest: counted right before its release – node tools/release-stats.ts --fill X.Y.Z --worktree)
+    if (r.size === null) {
+      assert.ok(i === 0 && r.at === '', `${r.version}: the numbers are missing (node tools/release-stats.ts --fill ${r.version})`);
+      continue;
+    }
+    const s = r.size;
+    for (const k of ['lines', 'code', 'tests', 'i18n', 'bytes'] as const) assert.ok(Number.isInteger(s[k]) && s[k] >= 0, `${r.version}: ${k}`);
+    assert.ok(s.code + s.tests + s.i18n <= s.lines, `${r.version}: the parts are lines among all`);
+    assert.ok(s.code > 10_000 && s.lines < s.bytes, `${r.version}: plausible`);
+  }
+  const counted = RELEASES.filter((r) => r.size !== null);
+  for (let i = 1; i < counted.length; i++) {
+    const newer = counted[i - 1].size!;
+    const older = counted[i].size!;
+    const what = `${counted[i].version} → ${counted[i - 1].version}`;
+    // (a version may tidy up a little, not lose a tenth)
+    assert.ok(newer.lines >= older.lines * 0.9, `${what}: lines`);
+    assert.ok(newer.code >= older.code * 0.9, `${what}: code`);
+    assert.ok(newer.bytes >= older.bytes * 0.9, `${what}: bytes`);
+    assert.ok(newer.lines <= older.lines * 3, `${what}: not more than three times as many lines at once`);
+  }
+  const w = sizeWords({ lines: 172000, code: 120400, tests: 17000, i18n: 36000, bytes: 11_600_000 }, 'en-GB');
+  assert.deepEqual(w, { lines: '172,000', code: '120k', tests: '17k', texts: '36k', bytes: '11.6 MB' });
+  assert.equal(sizeWords({ lines: 1, code: 1, tests: 1, i18n: 1, bytes: 1_450_000 }, 'de-DE').bytes, '1,5 MB');
 });
 
 test('“What’s new” comes once after an update – not for whoever comes for the first time', () => {

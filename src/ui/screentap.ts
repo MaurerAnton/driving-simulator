@@ -34,6 +34,8 @@ export class ScreenTap {
    * now; `openMap`: opens the big map.
    */
   constructor(canvas: HTMLCanvasElement, camera: THREE.Camera, mode: () => 'bigmap' | 'minimap', openMap: () => void) {
+    this.canvas = canvas;
+    this.camera = camera;
     canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       Object.assign(this.down, { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() });
@@ -50,6 +52,16 @@ export class ScreenTap {
       if (mode() === 'minimap') this.peek = !this.peek;
       else openMap();
     });
+  }
+
+  private readonly canvas: HTMLCanvasElement;
+  private readonly camera: THREE.Camera;
+
+  /** Would a tap at (x, y) land on the vehicle's screen now (for the other taps on the picture to leave it alone: ui/worldtap.ts)? */
+  covers(x: number, y: number): boolean {
+    const screen = performance.now() - this.setAt < 500 ? this.screen : null;
+    const mesh = screen?.hitMesh?.() ?? null;
+    return !!mesh && this.hit(mesh, this.camera, this.canvas, x, y);
   }
 
   /** Each frame: the vehicle's screen in view in the driver's seat (null: none – then the corner map is the map anyway). */

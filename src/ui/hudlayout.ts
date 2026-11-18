@@ -2,7 +2,8 @@
 /**
  * Arranging the HUD: the player drags its parts where they suit them.
  *
- * "Arrange the display" (in the settings while driving) lays a layer over
+ * "Arrange the display" (a tile of the pause menu, a button of the settings
+ * while driving – or a long press on a part of the display) lays a layer over
  * the picture: each part of the HUD named below is outlined and can be
  * dragged with a finger or the mouse – also parts that are hidden just now
  * (shown dimmed meanwhile), and the buttons on the corner map, which can be
@@ -16,9 +17,25 @@
  * the screen, one set for the keyboard layout and one for the touch layout
  * of the HUD (as the corner map's own place, ui/minimap.ts – the map itself
  * is moved by dragging its rim).
+ *
+ * So that the player finds it: a long press (a finger held still for a
+ * moment) on one of the display's read-outs – the street name, the speed,
+ * the score, the clock … – begins arranging (not on the on-screen controls,
+ * which are held while driving), and once, some seconds into the first
+ * drive, a short notice says so.
  */
 
 const KEY = 'fahrsim-baunatal.hudlayout.v1';
+/** set once the notice about arranging was shown (or the player found it alone) */
+const HINT_KEY = 'fahrsim-baunatal.hudlayout.hinted';
+/** how long (ms) a finger is held still to begin arranging */
+export const LONG_PRESS_MS = 650;
+/** how far (px) it may wander meanwhile */
+const LONG_PRESS_SLOP = 10;
+/** the parts a long press on which begins arranging: read-outs, never controls that are held while driving */
+export const LONG_PRESS_IDS: readonly string[] = ['nav', 'assist', 'dash', 'tip', 'score', 'keys', 'fps', 'clock'];
+/** seconds into the drive the notice about arranging is shown */
+const HINT_AFTER = 20;
 
 /** A part of the HUD that can be moved. */
 interface Item {
@@ -65,6 +82,14 @@ interface Pos {
 }
 type Saved = Record<string, Record<string, Pos>>;
 
+function hintedBefore(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 function load(): Saved {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Saved;
@@ -91,11 +116,20 @@ export class HudLayout {
   private bar: HTMLElement | null = null;
   private shield: HTMLElement | null = null;
   private drag: { id: number; item: Item; el: HTMLElement; x: number; y: number; px: number; py: number; k: number; moved: boolean } | null = null;
+  /** a finger (or the mouse) held on a part: arranging begins when it stays */
+  private press: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** the notice about arranging (null: none to give) */
+  private readonly hint: ((text: string) => void) | null;
+  private hinted = hintedBefore();
+  private hintFrom = -1;
 
-  constructor(hud: HTMLElement, t: (key: string) => string) {
+  constructor(hud: HTMLElement, t: (key: string) => string, hint: ((text: string) => void) | null = null) {
     this.hud = hud;
     this.t = t;
+    this.hint = hint;
     window.addEventListener('resize', () => this.applyAll());
+    // a long press on a read-out begins arranging (on the window: the read-outs let the fingers through to the picture)
+    window.addEventListener('pointerdown', this.pressDown, true);
     // while arranging: a finger on a part drags it – its own buttons and handlers get nothing
     hud.addEventListener('pointerdown', this.down, true);
     hud.addEventListener('click', this.swallow, true);
@@ -114,6 +148,7 @@ export class HudLayout {
 
   /** Called with the HUD's update (seconds): finds parts that appeared, follows the layout (keys / touch). Cheap: twice a second. */
   tick(now: number): void {
+    if (!this.hinted && Number.isFinite(now)) this.tickHint(now);
     const layout = this.layoutNow();
     if (layout === this.layout && now - this.lastCheck < 0.5 && now >= this.lastCheck) return;
     this.lastCheck = now;
@@ -179,9 +214,28 @@ export class HudLayout {
     if (b.parent && b.parent.isConnected && el.parentNode !== b.parent) b.parent.insertBefore(el, b.next && b.next.parentNode === b.parent ? b.next : null);
   }
 
+  /** Once, some seconds into a drive: a notice that the display can be arranged (not to one who has arranged it already). */
+  private tickHint(now: number): void {
+    if (this.hintFrom < 0 || now < this.hintFrom) this.hintFrom = now;
+    if (now - this.hintFrom < HINT_AFTER || this.hud.style.display === 'none') return;
+    this.markHinted();
+    if (Object.keys(this.saved).length === 0) this.hint?.(this.t('hudLayout.firstHint'));
+  }
+
+  private markHinted(): void {
+    this.hinted = true;
+    try {
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      /* (kept for this page only) */
+    }
+  }
+
   /** Begin arranging: the parts outlined and draggable, a bar with "Done" and "Reset layout". */
   arrange(): void {
+    this.endPress();
     if (this.arranging) return;
+    if (!this.hinted) this.markHinted();
     this.tick(Number.POSITIVE_INFINITY);
     this.lastCheck = -1;
     this.hud.classList.add('arranging');
@@ -264,7 +318,46 @@ export class HudLayout {
     this.drag = { id: e.pointerId, item, el, x: e.clientX, y: e.clientY, px, py, k, moved: false };
   };
 
+  /** The part of the display under a point that a long press begins arranging on, if any. */
+  private readOutAt(x: number, y: number): Item | null {
+    for (const id of LONG_PRESS_IDS) {
+      const b = this.bound.get(id);
+      if (!b || !b.el.isConnected) continue;
+      const r = b.el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return ITEMS.find((i) => i.id === id) ?? null;
+    }
+    return null;
+  }
+
+  private readonly pressDown = (e: PointerEvent): void => {
+    this.endPress();
+    if (this.arranging || e.button > 0 || this.hud.style.display === 'none' || !this.hud.isConnected) return;
+    const target = e.target instanceof Element ? e.target : null;
+    // (the controls on the screen, the corner map, the mirror, the menus: theirs)
+    if (target && target.closest('.touch, .map, .mirrorbtn, .mirrorzoom, .overlay, select, input')) return;
+    if (!this.readOutAt(e.clientX, e.clientY)) return;
+    const id = e.pointerId;
+    this.press = {
+      id,
+      x: e.clientX,
+      y: e.clientY,
+      timer: setTimeout(() => {
+        if (this.press?.id !== id) return;
+        this.press = null;
+        (navigator as { vibrate?: (ms: number) => boolean }).vibrate?.(25);
+        this.arrange();
+      }, LONG_PRESS_MS),
+    };
+  };
+
+  private endPress(): void {
+    if (this.press) clearTimeout(this.press.timer);
+    this.press = null;
+  }
+
   private readonly move = (e: PointerEvent): void => {
+    const p = this.press;
+    if (p && p.id === e.pointerId && Math.hypot(e.clientX - p.x, e.clientY - p.y) > LONG_PRESS_SLOP) this.endPress();
     const d = this.drag;
     if (!d || d.id !== e.pointerId) return;
     const dx = e.clientX - d.x;
@@ -304,6 +397,7 @@ export class HudLayout {
   };
 
   private readonly up = (e: PointerEvent): void => {
+    if (this.press?.id === e.pointerId) this.endPress();
     const d = this.drag;
     if (!d || d.id !== e.pointerId) return;
     this.drag = null;

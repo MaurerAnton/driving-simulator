@@ -9,8 +9,9 @@
  *    stays clean;
  *  - dragging it looks round: its middle moves away from the vehicle, and
  *    comes back to it a few seconds after the finger has let go – or at once
- *    with the button that appears meanwhile.  A plain tap does what it did
- *    (the real photographs of the place; its lower button the big map);
+ *    with the button that appears meanwhile.  A plain tap opens the big map,
+ *    full screen (as its lower button does; the real photographs of the
+ *    place are in the pause menu);
  *  - dragging its rim moves the whole map to another place on the screen,
  *    which is kept (one place for the keyboard layout, one for the touch
  *    layout of the HUD); a double tap on the rim puts it back.

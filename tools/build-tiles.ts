@@ -24,6 +24,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync, gunzipSync, gzipSync } from 'node:zlib';
 import { POST_CLEAR, WALL_CLEAR, clearObjects, clearSigns, postInLane, ringSidesInLanes } from '../src/sim/clearlanes.ts';
+import { COVER } from '../src/world/cover.ts';
 import { LaneGraph } from '../src/world/lanes.ts';
 import type { PathFoot } from '../src/world/lanes.ts';
 import { packFaces } from '../src/world/facade.ts';
@@ -31,9 +32,10 @@ import { CODING, RING_SCALE, TREE_HEIGHT_SCALE, TREE_SCALE, encodeSection, packT
 import type { CodedSection, SectionArray } from '../src/world/tilefmt.ts';
 import type { WorldJson, YardJson } from '../src/world/types.ts';
 import { World } from '../src/world/world.ts';
+import type { Edge, Node } from '../src/world/world.ts';
 import { addLod2Buildings, addOsmBuildings, lod2Units } from './mapgen/buildings.ts';
 import type { BuildingStats } from './mapgen/buildings.ts';
-import { buildCover } from './mapgen/cover.ts';
+import { buildCover, mergeLegacyCover } from './mapgen/cover.ts';
 import { Dgm } from './mapgen/dgm.ts';
 import { detailSections } from './mapgen/facadedetail.ts';
 import { TileSet, meshSections } from './mapgen/meshacc.ts';
@@ -41,8 +43,24 @@ import { addBarriersAndRails, addLamps, addVegetation, buildingMask } from './ma
 import { OsmData } from './mapgen/osm.ts';
 import type { ONode } from './mapgen/osm.ts';
 import { RoadMesher } from './mapgen/roadmesh.ts';
+import { RoadMesher as LegacyRoadMesher } from './mapgen/legacy/roadmesh.ts';
+import { buildCover as buildLegacyCover } from './mapgen/legacy/cover.ts';
+import { addOsmBuildings as addLegacyOsmBuildings } from './mapgen/legacy/buildings.ts';
+import { areaInDetail, inDetail, lineInDetail, rectInDetail } from './mapgen/detailregion.ts';
+import { addParkedCars } from './mapgen/parking.ts';
+import { addMedians } from './mapgen/median.ts';
+import { addIslands } from './mapgen/islands.ts';
+import { addPaths } from './mapgen/paths.ts';
+import { addFrontage, addTreeBulbs, findStripTrees } from './mapgen/roadside.ts';
+import { packParked } from '../src/world/parked.ts';
 import type { EdgeFeature } from './mapgen/roads.ts';
 import { SignPlacer } from './mapgen/signs.ts';
+import { SignPlacer as LegacySignPlacer } from './mapgen/legacy/signs.ts';
+import type { TileData } from './mapgen/meshacc.ts';
+import type { SignPost } from '../src/world/tilefmt.ts';
+import { addTaggedCrossings } from './mapgen/streetpaint.ts';
+import { addWoodEdges } from './mapgen/woodedge.ts';
+import { addGreenery } from './mapgen/greenery.ts';
 import { BLOCK, Coverage, HALO, TILE, gridIndex, gridRect, grow } from './mapgen/store.ts';
 import { buildTerrain } from './mapgen/terrain.ts';
 import { findYard } from './mapgen/yard.ts';
@@ -50,8 +68,11 @@ import { pointInRing } from '../src/core/geom.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = resolve(root, process.env.MAP_OUT ?? 'public/map');
-const workDir = resolve(root, 'data/work/graph');
+// (MAP_WORK=<folder>: the network of a test build – tools/build-graph.ts with the same)
+const workDir = resolve(root, process.env.MAP_WORK ?? 'data/work/graph');
 const TERRAIN_CELL = 5;
+/** the tiles whose signs are those of 1.4.0 in the published map (the 1.6.0 patch); the others have 1.3.0's */
+const SIGNS_NOW = new Set((JSON.parse(readFileSync(resolve(root, 'tools/mapgen/legacy/patch-1.6.0-tiles.json'), 'utf8')) as { tiles: string[] }).tiles);
 
 interface BlockFile {
   block: [number, number];
@@ -62,6 +83,10 @@ interface BlockFile {
   edgeFeatures: EdgeFeature[][];
   municipalities: Array<{ name: string; sign: string; lod2: boolean; rings: number[][] }>;
   yardNear: { x: number; z: number } | null;
+  /** the roads (indices into world.edges) built anew in the detail region (tools/mapgen/detailgraph.ts) */
+  fresh?: number[];
+  /** per road: its index in this block as the published map had it (−1: new) – where the detail region changed the list */
+  legacyIndex?: number[];
 }
 
 export interface BlockResult {
@@ -118,19 +143,49 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
   const inWindow = (x: number, z: number): boolean => x >= window.minX && x <= window.maxX && z >= window.minZ && z <= window.maxZ;
   const inWorld = (x: number, z: number): boolean => inWindow(x, z) && coverage.covered(x, z);
 
-  const cover = buildCover(osm, window.minX, window.minZ, window.maxX, window.maxZ);
+  // The detail region (mapgen/detailregion.ts): the roads built anew there and their junctions, the tiles that
+  // reach into it, the things of OpenStreetMap that lie in it are built as the map build does it now; all
+  // else as the published map has it (tools/mapgen/legacy/*), to the byte.
+  const freshSet = new Set(info.fresh ?? []);
+  const freshEdge = (e: Edge): boolean => freshSet.has(e.id);
+  const freshNode = (n: Node): boolean => n.arms.some((a) => freshSet.has(a.edge.id));
+  const tileFresh = (x: number, z: number): boolean => {
+    const r = gridRect(gridIndex(x, TILE), gridIndex(z, TILE), TILE);
+    return rectInDetail(r.minX, r.minZ, r.maxX, r.maxZ);
+  };
+  const blockFresh = freshSet.size > 0 || rectInDetail(window.minX, window.minZ, window.maxX, window.maxZ);
+  const cover = mergeLegacyCover(
+    buildLegacyCover(osm, window.minX, window.minZ, window.maxX, window.maxZ),
+    blockFresh ? buildCover(osm, window.minX, window.minZ, window.maxX, window.maxZ) : null,
+    window.minX,
+    window.minZ,
+    window.maxX,
+    window.maxZ,
+    tileFresh,
+  );
   const world = new World(info.world);
   const lanes = new LaneGraph(world);
   const inLane = (x1: number, z1: number, x2: number, z2: number, y: number): boolean => lanes.wallInLane(x1, z1, x2, z2, y, WALL_CLEAR);
   const terrain = buildTerrain(dgm, world, window, TERRAIN_CELL);
   const tiles = new TileSet(window.minX, window.minZ, window.maxX, window.maxZ, TILE);
-  const mesher = new RoadMesher(world, tiles, { ground: (x, z) => terrain.at(x, z), inLane });
-  mesher.build();
+  // (the mapped trees standing in parking strips: their bays become tree bulbs – mapgen/roadside.ts)
+  const stripTrees = findStripTrees(world, osm, info.edgeFeatures);
+  const legacyMesher = new LegacyRoadMesher(world, tiles, { ground: (x, z) => terrain.at(x, z), inLane, only: { edge: (e) => !freshEdge(e), node: (n) => !freshNode(n) } });
+  legacyMesher.build();
+  const mesher = new RoadMesher(world, tiles, { ground: (x, z) => terrain.at(x, z), inLane, features: info.edgeFeatures, stripTrees: stripTrees.byEdge, only: { edge: freshEdge, node: freshNode } });
+  if (blockFresh) mesher.build();
+  for (const k of ['edges', 'junctions', 'paintQuads', 'bridges'] as const) mesher.stats[k] += legacyMesher.stats[k];
+  // (crossing ways mapped red, painted where they cross a carriageway – mapgen/streetpaint.ts)
+  const redCrossings = blockFresh ? addTaggedCrossings(osm, world, tiles, (pts) => lineInDetail(pts)) : 0;
 
   // ---- buildings: the official models where they were fetched, footprints of OpenStreetMap elsewhere ----
   const bstats: BuildingStats = { lod2Units: 0, osmFallback: 0, triangles: 0, footprints: 0 };
-  addLod2Buildings(lod2Units(resolve(root, 'data/work/lod2'), grow(window, 150)), tiles, bstats);
-  addOsmBuildings(osm, tiles, terrain, inWorld, info.municipalities.filter((m) => m.lod2).flatMap((m) => m.rings), bstats);
+  const lod2Foot = addLod2Buildings(lod2Units(resolve(root, 'data/work/lod2'), grow(window, 150)), tiles, bstats, undefined, undefined, inDetail);
+  const lod2Rings = info.municipalities.filter((m) => m.lod2).flatMap((m) => m.rings);
+  // (outside the municipalities with models; in the detail region inside them too, where no model covers an OSM
+  // footprint, and the buildings seen on the photographs)
+  addLegacyOsmBuildings(osm, tiles, terrain, inWorld, lod2Rings, bstats, (x, z) => !inDetail(x, z));
+  if (blockFresh) addOsmBuildings(osm, tiles, terrain, inWorld, lod2Rings, bstats, lod2Foot, undefined, inDetail);
 
   // ---- signs, walls, vegetation, street furniture ----
   const signs = new SignPlacer(world, tiles, info.world.places);
@@ -142,13 +197,58 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
     }
     return null;
   };
+  // (the signs of the published map first – game 1.3.0's, tools/mapgen/legacy/signs.ts – kept in the tiles that
+  // have them there: all but those of the 1.6.0 patch and of the detail region)
+  const oldSigns = new LegacySignPlacer(world, tiles, info.world.places);
+  oldSigns.municipalityAt = signs.municipalityAt;
+  oldSigns.build({ edgeFeatures: info.edgeFeatures, nodeOsm: info.nodeOsm }, cover);
+  const signsThen = new Map<TileData, SignPost[]>();
+  for (const t of tiles.tiles.values()) {
+    signsThen.set(t, t.signs.slice());
+    t.signs.length = 0;
+  }
   // (the ways the roads were made of – the times on their signs – and the signs mapped beside the roads)
   signs.osm = osm;
   signs.build({ edgeFeatures: info.edgeFeatures, nodeOsm: info.nodeOsm }, cover);
+  for (const t of tiles.tiles.values()) {
+    const [x, z] = tiles.centre(t);
+    if (SIGNS_NOW.has(tileKey(gridIndex(x, TILE), gridIndex(z, TILE))) || tileFresh(x, z)) continue;
+    t.signs.length = 0;
+    t.signs.push(...(signsThen.get(t) ?? []));
+  }
   const bmask = buildingMask(tiles, cover);
-  const extra = addBarriersAndRails(osm, world, cover, terrain, tiles, inWorld, inLane);
-  const veg = addVegetation(osm, world, cover, terrain, tiles, bmask, window);
-  const lamps = addLamps(osm, world, terrain, tiles);
+  // the paths mapped on their own (mapgen/paths.ts; no scattered tree on them)
+  const inRegion = (pts: number[]): boolean => lineInDetail(pts);
+  const paths = blockFresh ? addPaths(osm, world, cover, terrain, tiles, inWorld, bmask, inRegion) : { ways: 0, km: 0 };
+  const extra = addBarriersAndRails(osm, world, cover, terrain, tiles, inWorld, inLane, inRegion);
+  // hedges, fences, walls and lawns behind the pavements, young trees in the verges (mapgen/roadside.ts)
+  const occupied = (x: number, z: number): boolean => {
+    const ix = Math.floor((x - cover.minX) / cover.cell);
+    const iz = Math.floor((z - cover.minZ) / cover.cell);
+    return ix < 0 || iz < 0 || ix >= cover.w || iz >= cover.h || bmask[iz * cover.w + ix] !== 0;
+  };
+  // (not on driveways and forecourts mapped as paved areas)
+  const frontage = addFrontage(world, tiles, inLane, occupied, (x, z) => {
+    const c = cover.at(x, z);
+    return c === COVER.ASPHALT || c === COVER.PAVED;
+  });
+  const veg = addVegetation(osm, world, cover, terrain, tiles, bmask, window, stripTrees.used);
+  // (wood and scrub up to the verges – mapgen/woodedge.ts)
+  const woodEdges = blockFresh ? addWoodEdges(world, cover, terrain, tiles, occupied, window, freshEdge) : { trees: 0, shrubs: 0 };
+  // (tree groups, woods and rows seen on the aerial photographs – mapgen/greenery.ts)
+  const greenTrees = blockFresh ? addGreenery(world, cover, terrain, tiles, occupied, window, undefined, (pts, row) => (row ? lineInDetail(pts) : areaInDetail(pts))) : { trees: 0 };
+  // (lamps are spaced by the road's index in the block: as in the published map, where the region changed the list)
+  const legacyIndex = info.legacyIndex;
+  const lamps = addLamps(osm, world, terrain, tiles, legacyIndex ? (e) => (legacyIndex[e.id] >= 0 ? legacyIndex[e.id] : e.id) : undefined);
+  // cars parked along the streets and what fills the medians of dual roads, around the posts and trees
+  // (mapgen/parking.ts, mapgen/median.ts)
+  // traffic islands and the tree bulbs of the parking strips first: no car stands on their posts and trees
+  const islands = blockFresh
+    ? addIslands(osm, world, tiles, terrain, lanes, info.edgeFeatures, inWorld, { area: (ring) => areaInDetail(ring), edge: freshEdge })
+    : { mapped: 0, points: 0, splits: 0, dropped: 0, signs: 0 };
+  const bulbs = addTreeBulbs(world, tiles, info.edgeFeatures, stripTrees.byEdge);
+  const parking = addParkedCars(world, tiles, info.edgeFeatures, stripTrees.byEdge);
+  const medians = addMedians(world, tiles);
   const yard = info.yardNear ? findYard(cover, terrain, world, osm, bmask, inWorld, info.yardNear) : null;
 
   // ---- the tiles of the block ----
@@ -195,6 +295,17 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
         const row = (lz * coverN + j) * cover.w + lx * coverN;
         cov.set(cover.data.subarray(row, row + coverN), j * coverN);
       }
+      // (how far each cell's centre lies inside its class – the renderer draws the edges between them smooth from it,
+      // src/render/coveredge.ts; a section versions before 1.7.0 do not ask for)
+      let cedge: Uint8Array | null = null;
+      // (in the tiles of the detail region only: mapgen/detailregion.ts)
+      if (cover.edge && tileFresh(cx, cz)) {
+        cedge = new Uint8Array(coverN * coverN);
+        for (let j = 0; j < coverN; j++) {
+          const row = (lz * coverN + j) * cover.w + lx * coverN;
+          cedge.set(cover.edge.subarray(row, row + coverN), j * coverN);
+        }
+      }
       const yBase = Math.round((tMin + tMax) / 2);
 
       // Nothing of the scenery stands in a lane (src/sim/clearlanes.ts): posts beside it, lamps
@@ -220,6 +331,7 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
       // (the measured details of walls: sections versions before 1.6.0 do not ask for – mapgen/facadedetail.ts)
       detailSections(t, cx, cz, yBase, plain);
       const sections: Record<string, SectionArray | CodedSection> = { hgt: smallest(hgt, terrainN, [CODING.GRID]), cov };
+      if (cedge) sections.cedge = cedge;
       // what the faces of the buildings need for their facades: stored only where it does not follow from their corners
       if (plain.bldg_a16 && plain.bldg_pos && plain.bldg_idx) {
         const f = packFaces(plain.bldg_pos as Int16Array, plain.bldg_idx as Uint16Array | Uint32Array, plain.bldg_a16 as Int16Array);
@@ -262,6 +374,11 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
         if (skip) sections.collSkip = skip;
       }
       if (t.collSeg.length) sections.collSeg = Float32Array.from(t.collSeg);
+      if (t.parked.length) {
+        const p = packParked(t.parked, cx, cz, yBase);
+        sections.parked = smallest(p.parked, 4, [CODING.RAW, CODING.PLANES, CODING.DELTA]);
+        sections.parkedK = p.parkedK;
+      }
       const bin = packTile(
         { v: 2, ix, iz, cx, cz, yBase, size: TILE, terrainN, terrainMin, terrainScale, coverN, signs: t.signs, objects: t.objects, clr: 1 },
         sections,
@@ -279,7 +396,18 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
     `${mesher.stats.edges} ribbons, ${mesher.stats.junctions} junction areas, ${mesher.stats.bridges} bridges; ` +
     `${bstats.lod2Units} building models, ${bstats.osmFallback} footprints` +
     `${corners ? ` (facades of ${((ruled / corners) * 100).toFixed(1)} % of the corners by rule)` : ''}; ${signs.stats.posts} sign posts, ${lamps} lamps, ` +
-    `${veg.mapped + veg.rows + veg.forest + veg.garden} trees, ${extra.barriers} walls and hedges, ${extra.guardKm.toFixed(1)} km of guard rail`;
+    `${veg.mapped + veg.rows + veg.forest + veg.garden} trees, ${extra.barriers} walls and hedges, ${extra.guardKm.toFixed(1)} km of guard rail; ` +
+    `${parking.cars} parked cars in ${parking.bays} bays on ${parking.sides} sides of streets (${parking.dropped} left out), ` +
+    `${medians.km.toFixed(1)} km of medians (${medians.cars} cars, ${medians.trees} trees, ${medians.hedgeKm.toFixed(2)} km of hedge); ` +
+    `${paths.km.toFixed(1)} km of paths (${paths.ways} ways); ${islands.mapped + islands.points + islands.splits} traffic islands ` +
+    `(${islands.mapped} mapped, ${islands.points} at crossings, ${islands.splits} between branches; ${islands.dropped} left out, ${islands.signs} keep-right signs); ` +
+    `${bulbs.bulbs} tree bulbs; frontage ${frontage.hedgeKm.toFixed(2)} km hedge, ${frontage.fenceKm.toFixed(2)} km fence, ${frontage.wallKm.toFixed(2)} km wall, ` +
+    `${frontage.lawnKm.toFixed(2)} km lawn, ${frontage.vergeTrees} trees in verges; ` +
+    `${woodEdges.trees} trees and ${woodEdges.shrubs} shrubs at wood edges, ${greenTrees.trees} trees seen on the aerial photographs; ` +
+    (mesher.detail
+      ? `${mesher.detail.tables} raised tables, ${mesher.detail.buildOuts} build-outs, ${mesher.detail.mouths} mouths over the pavement, ` +
+        `${mesher.detail.zigzags} zigzags, ${mesher.detail.texts} road texts, ${mesher.detail.cycleCrossings} cycle crossings, ${redCrossings} red crossing ways`
+      : '');
   writeFileSync(resolve(workDir, `r_${name}.json`), JSON.stringify(result));
   return result;
 }

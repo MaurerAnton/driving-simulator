@@ -113,7 +113,21 @@ export function lessonPlaceRows(t: T, s: Settings, spawns: readonly SpawnJson[],
   };
   row.append(el('label', '', t('lessonPlace.title')), sel);
   areaRow.append(el('label', '', t('lessonPlace.areaLabel')), area);
-  return [row, areaRow, el('p', 'note', t('lessonPlace.note'))];
+  // … and whether they are driven or watched (asked again at each lesson's start: ui/lessonstart.ts)
+  const howRow = el('div', 'row');
+  const how = el('select');
+  for (const [v, k] of [['drive', 'lessonStart.drive'], ['watch', 'lessonStart.watch']] as const) {
+    const op = el('option', '', t(k));
+    op.value = v;
+    how.append(op);
+  }
+  how.value = s.lessonWatch ? 'watch' : 'drive';
+  how.onchange = () => {
+    s.lessonWatch = how.value === 'watch';
+    changed();
+  };
+  howRow.append(el('label', '', t('lessonStart.how')), how);
+  return [row, areaRow, howRow, el('p', 'note', t('lessonPlace.note'))];
 }
 
 /**

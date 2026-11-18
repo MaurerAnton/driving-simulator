@@ -7,6 +7,7 @@ import { CLS, CTRL, EF, ROLE } from '../world/types.ts';
 import type { Edge, Node, World } from '../world/world.ts';
 import { quickest, quickestToEdge, wayOf } from '../world/routegraph.ts';
 import type { RouteGraph } from '../world/routegraph.ts';
+import type { DrillId } from './drills.ts';
 import type { VehicleKind } from './vehicles.ts';
 
 export interface NavHint {
@@ -434,6 +435,8 @@ export interface LessonDef {
   notFor?: VehicleKind[];
   /** tasks on the practice yard, done one after the other before the drive (see game/ce.ts) */
   tasks?: Array<'couple' | 'corner' | 'ramp'>;
+  /** the basic tasks of class B on the practice yard, one after the other (see game/drills.ts; 'exam': three tasks as in the test – one of group a, two of group b, Anlage 7 FeV Nr. 2.1.4.2) */
+  drills?: Array<DrillId | 'exam'>;
 }
 
 export const LESSONS: LessonDef[] = [
@@ -450,6 +453,14 @@ export const LESSONS: LessonDef[] = [
   { id: 'ceCouple', kind: 'yard', targets: [], vehicles: ['truck', 'semi'], tasks: ['couple'] },
   { id: 'ceCorner', kind: 'yard', targets: [], vehicles: ['truck', 'semi'], tasks: ['corner'] },
   { id: 'ceRamp', kind: 'yard', targets: [], vehicles: ['truck', 'semi'], tasks: ['ramp'] },
+  // class B: the basic tasks of the practical test on the practice yard (game/drills.ts) – the hill start and the emergency stop with the vans and the car with a trailer too
+  { id: 'bParallel', kind: 'yard', targets: [], vehicle: 'car', drills: ['parallel'] },
+  { id: 'bBay', kind: 'yard', targets: [], vehicle: 'car', drills: ['bayFwd', 'bayBack'] },
+  { id: 'bReverse', kind: 'yard', targets: [], vehicle: 'car', drills: ['backStraight', 'backCorner'] },
+  { id: 'bTurn', kind: 'yard', targets: [], vehicle: 'car', drills: ['turn'] },
+  { id: 'bHill', kind: 'yard', targets: [], vehicles: ['car', 'carTrailer', 'lightTruck', 'minibus'], drills: ['hill'] },
+  { id: 'bBrake', kind: 'yard', targets: [], vehicles: ['car', 'carTrailer', 'lightTruck', 'minibus'], drills: ['brake'] },
+  { id: 'bDrills', kind: 'yard', targets: [], vehicle: 'car', drills: ['exam'] },
   // the tram: a line with its stops (sim/tramdrive.ts)
   { id: 'tramLine', kind: 'tram', targets: [], vehicle: 'tram' },
   // the bus on a line: five stops on the way, with their doors and passengers

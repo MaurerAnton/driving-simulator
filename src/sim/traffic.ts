@@ -25,7 +25,12 @@ import type { SignalSystem } from './signals.ts';
 import type { Emergencies, EmergencyCar } from './emergency.ts';
 import type { RoadEvents } from './roadevents.ts';
 import { PastBlocks, offsetAt } from './pastblock.ts';
+import { Narrowings } from './narrowings.ts';
+import type { LevelCrossings } from './levelcrossing.ts';
+import type { Wildlife } from './wildlife.ts';
 import type { PastState } from './pastblock.ts';
+import { chordHalf, chordYaw, easePose } from './smoothpose.ts';
+import type { EasedPose } from './smoothpose.ts';
 
 export interface TrafficCar {
   id: number;
@@ -91,6 +96,15 @@ export interface TrafficCar {
   past?: PastState;
   crashed: number;
   wheelSpin: number;
+  /**
+   * Where it is drawn, and seen when watched (src/sim/smoothpose.ts): its
+   * place and heading eased – turning gradually through the corners of its
+   * way – and its front wheels' angle.  (x, z, yaw above are where its way
+   * puts it: what the simulation reckons with.)  Unset until it first moved.
+   */
+  drawn?: EasedPose;
+  /** the path through the junction it came by (its heading is taken over the end of that while it is near) */
+  lastConn?: Connector | null;
 }
 
 /**
@@ -253,6 +267,12 @@ export class Traffic {
   roadEvents: RoadEvents | null = null;
   /** getting past what blocks a lane: a car standing behind something that does not move goes round it (src/sim/pastblock.ts) */
   readonly pastBlocks: PastBlocks = new PastBlocks(this);
+  /** the narrowings kerb build-outs make: through the gap, slowly, one direction after the other (src/sim/narrowings.ts) */
+  readonly narrowings: Narrowings = new Narrowings(this);
+  /** the level crossings: waiting while their lights are on or a train comes, never stopping on the tracks (src/sim/levelcrossing.ts – null: none) */
+  levelCrossings: LevelCrossings | null = null;
+  /** deer and wild boar crossing the country roads at dusk: the cars brake for them (src/sim/wildlife.ts – null: none) */
+  wild: Wildlife | null = null;
 
   constructor(world: World, graph: LaneGraph, signals: SignalSystem) {
     this.world = world;
@@ -867,6 +887,7 @@ export class Traffic {
 
   clear(): void {
     this.cyclists.clear();
+    this.wild?.clear();
     this.cars.length = 0;
     this.busSchedule?.reset();
     this.crowd.clear();
@@ -1373,6 +1394,12 @@ export class Traffic {
   // --- main update -----------------------------------------------------------------
   update(dt: number, player: PlayerState): void {
     this.events.length = 0;
+    this.narrowings.player = player;
+    // the level crossings: what the trains near them make them show (src/sim/levelcrossing.ts)
+    if (this.levelCrossings) {
+      this.levelCrossings.player = player;
+      this.levelCrossings.update(dt, player.x, player.z);
+    }
     // the roadworks and closures of the day: who is in or before each zone – and their fences, barriers and crowds are in the way, too
     this.roadEvents?.step(dt, this.cars, player);
     const obstacles = this.roadEvents ? this.roadEvents.withBlocks(this.obstacles, player) : this.obstacles;
@@ -1392,6 +1419,11 @@ export class Traffic {
     }
     // … and the people on foot who are on the carriageway
     this.crowd.addBlocks(blocks);
+    // … and the animals crossing the road
+    if (this.wild) {
+      this.wild.update(dt, player);
+      for (const b of this.wild.boxes) blocks.push(b);
+    }
     // … and the cars that go round something, off their lanes (src/sim/pastblock.ts)
     this.pastBlocks.boxes(this.cars, blocks);
     this.spawnTimer -= dt;
@@ -1448,6 +1480,13 @@ export class Traffic {
     if (!Number.isFinite(limit)) limit = 36; // Richtgeschwindigkeit 130 km/h
     let v0 = limit * car.temper;
     if (works && works.cap < v0) v0 = works.cap;
+    // a kerb build-out narrowing the road: slowly through the gap, and the oncoming traffic first where it is on our side (src/sim/narrowings.ts)
+    const narrow = lane ? this.narrowings.gate(lane, car.s + car.length / 2, car.v, car.length, car) : null;
+    const narrowStop = narrow ? narrow.stop : Infinity;
+    if (narrow && narrow.cap < v0) v0 = narrow.cap;
+    // a level crossing ahead: its lights, its barriers, a train – and room behind the tracks (src/sim/levelcrossing.ts)
+    const lx = lane && this.levelCrossings ? this.levelCrossings.gate(lane, car.s + car.length / 2, car.v, car.length, car.next, car) : null;
+    if (lx && lx.cap < v0) v0 = lx.cap;
     if (lane && lane.edge.zone === 7) v0 = Math.min(v0, 2.2);
     if ((lane && lane.edge.flags & EF.ROUNDABOUT) || (conn && conn.node.ctrl === CTRL.ROUNDABOUT)) v0 = Math.min(v0, 7.2);
     if (conn) {
@@ -1654,6 +1693,14 @@ export class Traffic {
       // (waiting at a site light or for the oncoming traffic is not being stuck: a red there may last a minute or two)
       if (works.why === 'light' || works.why === 'oncoming') car.stuck = 0;
     }
+    if (narrowStop < stopDist) {
+      stopDist = narrowStop;
+      car.stuck = 0;
+    }
+    if (lx && lx.stop < stopDist) {
+      stopDist = lx.stop;
+      car.stuck = 0;
+    }
     if (stopDist < Infinity) {
       brakeFor(stopDist + 0.4, 0, 0.6);
       if (stopDist < 1.2 && car.v < 0.4) {
@@ -1694,6 +1741,7 @@ export class Traffic {
         if (car.s < car.conn.len) break;
         car.s -= car.conn.len;
         car.lane = car.conn.to;
+        car.lastConn = car.conn;
         car.conn = null;
         if (car.bus) this.busOnLane(car, car.lane);
         car.next = this.nextFor(car.bus?.line, car.lane, car);
@@ -1736,7 +1784,8 @@ export class Traffic {
       lanePoint(car.lane!, car.s, tmp);
       tmp.y = this.world.edgeY(car.lane!.edge, car.lane!.s0 + car.lane!.dir * car.s, tmp.x, tmp.z);
     }
-    let yaw = Math.atan2(-tmp.tx, -tmp.tz);
+    const tangent = Math.atan2(-tmp.tx, -tmp.tz);
+    let yaw = tangent;
     if (car.slide) {
       // just moved over to another lane: it slides across from where it was, turned a little towards it
       car.slide -= Math.sign(car.slide) * Math.min(Math.abs(car.slide), 1.2 * dt);
@@ -1768,8 +1817,25 @@ export class Traffic {
         yaw += Math.atan2(re.shift(pl, car.s + 0.5) - re.shift(pl, car.s - 0.5), 1);
       }
     }
+    // past a kerb build-out: over in its gap, turned a little while it moves across (src/sim/narrowings.ts)
+    if (pl && pl.edge.narrow) {
+      const nw = this.narrowings;
+      const hw = car.width / 2;
+      const hl = car.length / 2;
+      const ns = nw.shift(pl, car.s, hw, hl);
+      if (ns !== 0) {
+        tmp.x += tmp.tz * ns;
+        tmp.z -= tmp.tx * ns;
+        yaw += Math.atan2(nw.shift(pl, car.s + 0.5, hw, hl) - nw.shift(pl, car.s - 0.5, hw, hl), 1);
+      }
+    }
     // slope from the height change since the last frame
     if (ds > 0.01) car.pitch += (Math.atan2(tmp.y - car.y, ds) - car.pitch) * Math.min(1, dt * 6);
+    // how it is drawn: turning gradually through the corners of its way, drifting rather than jumping sideways (src/sim/smoothpose.ts)
+    let way = this.wayYaw(car, chordHalf(car.length));
+    if (!Number.isFinite(way)) way = tangent;
+    const drawn = (car.drawn ??= { x: car.x, z: car.z, yaw: car.yaw });
+    easePose(drawn, tmp.x, tmp.z, way, yaw - tangent, ds, dt, car.bus ? 5.9 : car.length * 0.6);
     car.x = tmp.x;
     car.y = tmp.y;
     car.z = tmp.z;
@@ -1785,6 +1851,46 @@ export class Traffic {
         car.v = 0;
       }
     }
+  }
+
+  /**
+   * The heading of a car's way where it is: the chord from `h` metres behind
+   * it to `h` ahead (as its axles would stand) – on a lane along the middle of
+   * its road (whose bends do not shift it sideways); near the ends, over into
+   * the path through the junction it came by or takes next.
+   */
+  private wayYaw(car: TrafficCar, h: number): number {
+    const c = car.conn;
+    if (c) {
+      const a = car.s - h;
+      const b = car.s + h;
+      if (a >= 0) samplePolyline(c.pl, a, tmp2);
+      else lanePoint(c.from, c.from.len + a, tmp2);
+      const ax = tmp2.x;
+      const az = tmp2.z;
+      if (b <= c.len) samplePolyline(c.pl, b, tmp2);
+      else lanePoint(c.to, b - c.len, tmp2);
+      return chordYaw(ax, az, tmp2.x, tmp2.z);
+    }
+    const l = car.lane;
+    if (!l) return NaN;
+    const back = car.s - h < 0 && car.lastConn?.to === l ? car.lastConn : null;
+    const on = car.s + h > l.len ? car.next : null;
+    if (!back && !on) {
+      // (along the middle of its road)
+      samplePolyline(l.edge.pl, l.s0 + l.dir * clamp(car.s - h, 0, l.len), tmp2);
+      const ax = tmp2.x;
+      const az = tmp2.z;
+      samplePolyline(l.edge.pl, l.s0 + l.dir * clamp(car.s + h, 0, l.len), tmp2);
+      return chordYaw(ax, az, tmp2.x, tmp2.z);
+    }
+    if (back) samplePolyline(back.pl, back.len + car.s - h, tmp2);
+    else lanePoint(l, car.s - h, tmp2);
+    const ax = tmp2.x;
+    const az = tmp2.z;
+    if (on) samplePolyline(on.pl, car.s + h - l.len, tmp2);
+    else lanePoint(l, car.s + h, tmp2);
+    return chordYaw(ax, az, tmp2.x, tmp2.z);
   }
 
   /** Is a car inside the junction on a path that crosses or joins connector `c` ahead of its conflict point? */

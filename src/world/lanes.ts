@@ -202,7 +202,8 @@ export class LaneGraph {
     const fwd: Lane[] = [];
     const back: Lane[] = [];
     const W = e.width;
-    const oR = -W / 2 + e.margin;
+    // (beside the lanes, up to the kerb: the hard strip, a cycle lane, parked cars – src/world/xsection.ts)
+    const oR = -W / 2 + e.marginR;
     const oD = oR + e.lanesF * e.laneW;
     const sA = e.cutA;
     const sB = e.len - e.cutB;
@@ -233,7 +234,7 @@ export class LaneGraph {
     }
     for (let k = 0; k < e.lanesB; k++) {
       // right-most backward lane is the left-most seen along a→b
-      const off = e.lanesF > 0 ? W / 2 - e.margin - (k + 0.5) * e.laneW : oD + (e.lanesB - k - 0.5) * e.laneW;
+      const off = e.lanesF > 0 ? W / 2 - e.marginL - (k + 0.5) * e.laneW : oD + (e.lanesB - k - 0.5) * e.laneW;
       const lane: Lane = {
         id: this.nextLane++,
         edge: e,

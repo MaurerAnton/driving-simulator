@@ -86,6 +86,21 @@ export const VIOLATION_REFS: Record<string, string> = {
   ceLights: 'Anlage 7 FeV, Nr. 2.1.3',
   ceHeight: 'Anlage 7 FeV, Nr. 2.1.3',
   ceFast: 'Anlage 7 FeV, Nr. 2.1.3',
+  // class B: the basic tasks of the practical test on the practice yard (src/game/drills.ts; Anlage 7 FeV, Nr. 2.1.4.2) –
+  // the hill start is no basic task of class B: practice for the test drive (Nr. 2.1.5)
+  drillKerbTouch: 'Anlage 7 FeV, Nr. 2.1.4.2',
+  drillKerbOver: 'Anlage 7 FeV, Nr. 2.1.4.2',
+  drillKerbFar: 'Anlage 7 FeV, Nr. 2.1.4.2',
+  drillTouch: '§ 1 Abs. 2 StVO',
+  drillCorrections: 'Anlage 7 FeV, Nr. 2.1.4.2',
+  drillLine: 'Anlage 7 FeV, Nr. 2.1.4.2',
+  drillRollback: '§ 1 Abs. 2 StVO',
+  drillHillBrake: 'Anlage 7 FeV, Nr. 2.1.5',
+  drillStall: 'Anlage 7 FeV, Nr. 2.1.5',
+  drillBrakeSpeed: 'Anlage 7 FeV, Nr. 2.1.4.2',
+  drillBrakeLate: 'Anlage 7 FeV, Nr. 2.1.4.2',
+  drillBrakeSoft: 'Anlage 7 FeV, Nr. 2.1.4.2',
+  drillBrakeLong: 'Anlage 7 FeV, Nr. 2.1.4.2',
   // (the articulated lorry: driving it so that the semi-trailer swings round against the cab – no command of the vehicle)
   semiJackknife: 'Anlage 7 FeV, Nr. 2.1.4.5.2',
   truckRightTurn: '§ 9 Abs. 6 StVO',
@@ -93,6 +108,17 @@ export const VIOLATION_REFS: Record<string, string> = {
   // roadworks and the closures for demonstrations (src/sim/roadevents.ts)
   worksLane: 'Anlage 4 StVO, Zeichen 600, 605',
   worksYield: 'Anlage 2 StVO, Zeichen 208',
+  // a kerb build-out narrowing the road on the driver's side (src/sim/narrowings.ts)
+  narrowYield: '§ 6 Satz 1 StVO',
+  // level crossings (src/sim/levelcrossing.ts): wait before the St Andrew's cross (§ 19 Abs. 2), not onto the tracks
+  // without room behind them (Abs. 3), a moderate speed and no overtaking from the warning sign on (Abs. 1)
+  levelCrossingRed: '§ 19 Abs. 2 Nr. 2 StVO',
+  levelCrossingYellow: '§ 19 Abs. 2 Nr. 2 StVO',
+  levelCrossingBarrier: '§ 19 Abs. 2 Nr. 3 StVO',
+  levelCrossingTrain: '§ 19 Abs. 1 Satz 1, Abs. 2 Nr. 1 StVO',
+  levelCrossingStop: '§ 19 Abs. 3, § 12 Abs. 1 Nr. 4 StVO',
+  levelCrossingOvertake: '§ 19 Abs. 1 Satz 3 StVO',
+  levelCrossingSpeed: '§ 19 Abs. 1 Satz 2 StVO',
   closedRoad: '§ 36 Abs. 1 StVO; Anlage 2 StVO, Zeichen 250',
   // emergency vehicles with blue lights and siren: make way at once (§ 38 Abs. 1), the corridor in slow traffic on a road
   // with two or more lanes in a direction (§ 11 Abs. 2) – src/sim/emergency.ts
@@ -136,6 +162,8 @@ export const VIOLATION_REFS: Record<string, string> = {
 const STVO_URL = 'https://www.gesetze-im-internet.de/stvo_2013/';
 const BOSTRAB_URL = 'https://www.gesetze-im-internet.de/strabbo_1987/';
 const FEV_URL = 'https://www.gesetze-im-internet.de/fev_2010/';
+/** the criminal code (first aid: § 323c StGB, in the theory lessons) */
+const STGB_URL = 'https://www.gesetze-im-internet.de/stgb/';
 
 export interface CitationPart {
   text: string;
@@ -155,9 +183,9 @@ export function citationParts(ref: string): CitationPart[] {
   let last = 0;
   for (const m of ref.matchAll(re)) {
     if (m.index > last) parts.push({ text: ref.slice(last, m.index) });
-    // (a paragraph belongs to the law named after it: the StVO, or the tram regulation BOStrab)
-    const law = m[1] ? (/\b(StVO|FeV|BOStrab)\b/.exec(ref.slice(m.index))?.[1] ?? 'StVO') : '';
-    parts.push({ text: m[0], url: m[1] ? `${law === 'BOStrab' ? BOSTRAB_URL : STVO_URL}__${m[1]}.html` : `${m[3] === 'FeV' ? FEV_URL : STVO_URL}anlage_${m[2]}.html` });
+    // (a paragraph belongs to the law named after it: the StVO, the tram regulation BOStrab, the criminal code StGB)
+    const law = m[1] ? (/\b(StVO|FeV|BOStrab|StGB)\b/.exec(ref.slice(m.index))?.[1] ?? 'StVO') : '';
+    parts.push({ text: m[0], url: m[1] ? `${law === 'BOStrab' ? BOSTRAB_URL : law === 'StGB' ? STGB_URL : STVO_URL}__${m[1]}.html` : `${m[3] === 'FeV' ? FEV_URL : STVO_URL}anlage_${m[2]}.html` });
     last = m.index + m[0].length;
   }
   if (last < ref.length) parts.push({ text: ref.slice(last) });

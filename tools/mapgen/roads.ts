@@ -7,7 +7,12 @@
 import { angleOf, clamp } from '../../src/core/geom.ts';
 import { ACCESS, CLASS_LANE_WIDTH, CLASS_TIER, CLS, CTRL, EF, ROLE, SURF } from '../../src/world/types.ts';
 import type { EdgeJson, NodeJson } from '../../src/world/types.ts';
+import { GM } from '../../src/world/tilefmt.ts';
 import type { ONode, OWay, OsmData, Tags } from './osm.ts';
+import { sideInner, sideIsPlain, sideOuter } from '../../src/world/xsection.ts';
+import type { RoadSideJson } from '../../src/world/xsection.ts';
+import { FootwayIndex, measureSeparateWalk, taggedSides } from './xsection.ts';
+import { addRoadExtras } from './roadextras.ts';
 
 const DRIVE_CLASS: Record<string, number> = {
   motorway: CLS.MOTORWAY,
@@ -55,6 +60,8 @@ export interface RoadGraph {
   nodeIndex: Map<number, number>;
   /** OSM way id → edge indices in way order */
   wayEdges: Map<number, number[]>;
+  /** per edge: built the new way (cross-sections, calming …) – false where MapArea.fresh said no (mapgen/detailregion.ts) */
+  edgeNew: boolean[];
 }
 
 function num(v: string | undefined): number {
@@ -95,10 +102,259 @@ interface Attrs {
   tf: string;
   tb: string;
   urban: boolean;
+  /** the cross-section beyond the lanes, left and right along the stored direction (src/world/xsection.ts) */
+  xl: RoadSideJson;
+  xr: RoadSideJson;
+  /** median:contents (MEDIAN bits) */
+  md: number;
+  /** may a separate pavement beside it be taken as its own (tagged separate, or not tagged at all)? */
+  walkFromL: boolean;
+  walkFromR: boolean;
+  vergeTaggedL: boolean;
+  vergeTaggedR: boolean;
 }
 
 /** Derive all per-road attributes from OSM tags. `urbanHint` comes from the built-up mask. */
 export function roadAttrs(tags: Tags, urbanHint: boolean): Attrs | null {
+  const hw = tags.highway;
+  const cls = DRIVE_CLASS[hw];
+  if (cls === undefined) return null;
+  if (tags.area === 'yes') return null;
+  if (cls === CLS.TRACK && (tags.tracktype === 'grade4' || tags.tracktype === 'grade5')) return null;
+  if (cls === CLS.SERVICE && (tags.indoor === 'yes' || tags.location === 'underground' || num(tags.layer) < -1)) return null;
+  if (tags.parking === 'underground' || tags.parking === 'multi-storey') return null;
+
+  const tier = CLASS_TIER[cls];
+  const isLink = hw.endsWith('_link');
+  const roundabout = tags.junction === 'roundabout' || tags.junction === 'circular';
+  let reversed = false;
+  let oneway = false;
+  const ow = tags.oneway;
+  if (ow === 'yes' || ow === 'true' || ow === '1') oneway = true;
+  else if (ow === '-1' || ow === 'reverse') {
+    oneway = true;
+    reversed = true;
+  } else if (ow !== 'no' && (cls === CLS.MOTORWAY || roundabout || (isLink && cls === CLS.MOTORWAY_LINK))) oneway = true;
+
+  // --- built-up area / speed regime ---
+  const src = `${tags['source:maxspeed'] ?? ''}|${tags['maxspeed:type'] ?? ''}|${tags['zone:maxspeed'] ?? ''}|${tags['zone:traffic'] ?? ''}|${tags.maxspeed ?? ''}`;
+  let zone = 0;
+  if (cls === CLS.LIVING_STREET || /living_street/.test(src)) zone = 7;
+  else if (/zone:?30|DE:30\b/.test(src)) zone = 30;
+  else if (/zone:?20|DE:20\b/.test(src)) zone = 20;
+  let urban: boolean;
+  if (/DE:urban/.test(src) || zone > 0) urban = true;
+  else if (/DE:rural|DE:motorway/.test(src) || cls <= CLS.TRUNK_LINK) urban = false;
+  else if (cls === CLS.RESIDENTIAL || cls === CLS.LIVING_STREET) urban = true;
+  else urban = urbanHint;
+
+  let ms = parseMaxspeed(tags.maxspeed);
+  if (Number.isNaN(ms)) {
+    if (zone === 7) ms = 7;
+    else if (zone > 0) ms = zone;
+    else if (cls === CLS.MOTORWAY || cls === CLS.MOTORWAY_LINK) ms = cls === CLS.MOTORWAY ? 0 : 80;
+    else if (cls === CLS.TRACK) ms = 30;
+    else if (cls === CLS.SERVICE) ms = 30;
+    else ms = urban ? 50 : 100;
+  } else if (ms >= 60 && !/DE:urban/.test(src) && zone === 0 && cls !== CLS.RESIDENTIAL) {
+    // an explicit 60+ limit is strong evidence for "outside built-up area"
+    if (!urbanHint) urban = false;
+  }
+  let mf = parseMaxspeed(tags['maxspeed:forward']);
+  let mb = parseMaxspeed(tags['maxspeed:backward']);
+  if (Number.isNaN(mf)) mf = ms;
+  if (Number.isNaN(mb)) mb = ms;
+
+  // --- lanes ---
+  const lanesTag = num(tags.lanes);
+  let lf = num(tags['lanes:forward']);
+  let lb = num(tags['lanes:backward']);
+  let singleTrack = false;
+  if (oneway) {
+    lf = Number.isNaN(lanesTag) ? (cls === CLS.MOTORWAY ? 2 : 1) : Math.max(1, Math.round(lanesTag));
+    lb = 0;
+  } else if (!Number.isNaN(lf) && !Number.isNaN(lb)) {
+    lf = Math.max(1, Math.round(lf));
+    lb = Math.max(1, Math.round(lb));
+  } else if (!Number.isNaN(lanesTag)) {
+    const l = Math.max(1, Math.round(lanesTag));
+    if (l === 1) {
+      singleTrack = true;
+      lf = 1;
+      lb = 1;
+    } else {
+      lf = Number.isNaN(lf) ? Math.ceil(l / 2) : lf;
+      lb = l - lf;
+      if (lb < 1) {
+        lb = 1;
+        lf = Math.max(1, l - 1);
+      }
+    }
+  } else {
+    lf = 1;
+    lb = 1;
+    if (cls === CLS.SERVICE || cls === CLS.TRACK) singleTrack = true;
+  }
+
+  // --- what lies beside the lanes: parking, cycle lanes, verges, kerbs (tools/mapgen/xsection.ts) ---
+  const xs = taggedSides(tags, oneway, reversed);
+  const xl = xs.left.side;
+  const xr = xs.right.side;
+  const extras = sideInner(xl) + sideInner(xr);
+
+  // --- width ---
+  let lw = CLASS_LANE_WIDTH[cls];
+  let w: number;
+  let mg = 0;
+  const widthTag = num(tags.width);
+  if (singleTrack) {
+    const def =
+      cls === CLS.TRACK
+        ? 3.0
+        : cls === CLS.SERVICE
+          ? tags.service === 'parking_aisle'
+            ? 5.6
+            : tags.service === 'driveway'
+              ? 3.2
+              : 4.0
+          : cls === CLS.LIVING_STREET
+            ? 4.6
+            : 4.2;
+    // (a width that holds the parking and cycle lanes, or one of the lanes alone)
+    const drive = widthTag - extras;
+    w = !Number.isNaN(widthTag) && drive >= 2.2 && drive <= 9 ? drive : !Number.isNaN(widthTag) && widthTag >= 2.2 && widthTag <= 9 ? widthTag : def;
+    lw = w / 2;
+  } else {
+    const n = lf + lb;
+    if (extras > 0 && !Number.isNaN(widthTag) && (widthTag - extras) / n >= 2.3 && (widthTag - extras) / n <= 4.6) {
+      w = widthTag - extras;
+      lw = w / n;
+    } else if (!Number.isNaN(widthTag) && widthTag / n >= 2.3 && widthTag / n <= 4.6) {
+      w = widthTag;
+      lw = w / n;
+    } else if (!Number.isNaN(widthTag) && (widthTag - extras) / n > 4.6 && (widthTag - extras) / n <= 9 && cls > CLS.TRUNK_LINK) {
+      // (far wider than its lanes – two carriageways merged into one, a wide avenue: the lanes at their
+      // usual width, the asphalt beyond them on both sides)
+      lw = Math.min(3.5, Math.max(lw, 3.25));
+      mg = (widthTag - extras - n * lw) / 2;
+      w = widthTag - extras;
+    } else {
+      w = n * lw;
+    }
+    if (cls === CLS.MOTORWAY || cls === CLS.MOTORWAY_LINK || cls === CLS.TRUNK || cls === CLS.TRUNK_LINK) {
+      // hard strips outside the edge lines
+      mg = cls === CLS.MOTORWAY ? 1.5 : 0.75;
+      w = n * lw + 2 * mg;
+    } else if (oneway && n === 1) {
+      // single-lane one-way streets are wider than one bare lane
+      w = Math.max(w, roundabout ? 5.5 : 3.6);
+      lw = w;
+    }
+  }
+  // the carriageway from kerb to kerb: the lanes, and the parking and cycle lanes beside them
+  w += extras;
+
+  // --- surface ---
+  let surf: number = SURF.ASPHALT;
+  const s = tags.surface;
+  if (s) {
+    if (/^concrete/.test(s)) surf = SURF.CONCRETE;
+    else if (/paving_stones|paved$|bricks?/.test(s) && s !== 'paved') surf = SURF.PAVING;
+    else if (/sett|cobblestone/.test(s)) surf = SURF.SETT;
+    else if (/gravel|compacted|pebblestone/.test(s)) surf = SURF.GRAVEL;
+    else if (/unpaved|dirt|ground|earth|mud|sand/.test(s)) surf = SURF.DIRT;
+    else if (/grass/.test(s)) surf = SURF.GRASS;
+  } else if (cls === CLS.TRACK) {
+    surf = tags.tracktype === 'grade1' ? SURF.ASPHALT : tags.tracktype === 'grade3' ? SURF.DIRT : SURF.GRAVEL;
+  } else if (cls === CLS.LIVING_STREET) {
+    surf = SURF.PAVING;
+  }
+
+  // --- sidewalks ---
+  const dual = oneway && !isLink && !roundabout && tier >= 3;
+  // (left and right along the stored direction: the tags' sides are swapped for a way stored against its drawing)
+  const side = (key: 'left' | 'right'): number => {
+    const tagged = key === 'left' ? xs.left : xs.right;
+    let has = tagged.walk.has;
+    const outer = sideOuter(tagged.side);
+    if (has === null) {
+      // default: built-up public streets have a pavement on both sides
+      const eligible =
+        urban &&
+        (cls === CLS.RESIDENTIAL ||
+          cls === CLS.UNCLASSIFIED ||
+          cls === CLS.TERTIARY ||
+          cls === CLS.SECONDARY ||
+          cls === CLS.PRIMARY);
+      has = eligible && !((dual || roundabout) && key === 'left');
+    }
+    // (cars on the pavement need one, whatever else is said)
+    if (!has) return outer > 0 ? outer + (tagged.side.p ? 1.0 : 0) : 0;
+    const walk = Number.isNaN(tagged.walk.width) ? (tier >= 3 ? 2.2 : 1.8) : tagged.walk.width;
+    return outer + walk;
+  };
+  let swL = side('left');
+  let swR = side('right');
+  if (tags.bridge && tags.bridge !== 'no' && cls <= CLS.TRUNK_LINK) {
+    swL = 0;
+    swR = 0;
+  }
+
+  // --- flags ---
+  let flags = 0;
+  if (tags.bridge && tags.bridge !== 'no') flags |= EF.BRIDGE;
+  if (tags.tunnel === 'yes' || tags.tunnel === 'culvert' || tags.covered === 'yes') flags |= EF.TUNNEL;
+  if (roundabout) flags |= EF.ROUNDABOUT;
+  if (isLink) flags |= EF.LINK;
+  if (urban) flags |= EF.URBAN;
+  if (dual) flags |= EF.DUAL;
+  if (tags.bicycle_road === 'yes') flags |= EF.BICYCLE_ROAD;
+  if (cls === CLS.SERVICE && (tags.service === 'parking_aisle' || tags.service === 'driveway' || tags.service === 'alley' || tags.service === 'drive-through')) {
+    flags |= EF.MINOR_SERVICE;
+  }
+  if (tags.lit === 'yes' || (tags.lit === undefined && urban && tier >= 2)) flags |= EF.LIT;
+  const marked =
+    tags.lane_markings === 'yes' ||
+    (tags.lane_markings !== 'no' &&
+      !singleTrack &&
+      zone === 0 &&
+      (tier >= 3 || isLink || (lf + lb >= 2 && !Number.isNaN(lanesTag) && cls === CLS.UNCLASSIFIED && !urban)));
+  if (marked) flags |= EF.MARKED;
+  if ((marked && !urban && tier >= 3) || cls <= CLS.TRUNK_LINK) flags |= EF.EDGE_LINES;
+  if (tags.overtaking === 'no' || tags['overtaking:forward'] === 'no') flags |= EF.SOLID_CENTER;
+
+  // --- access ---
+  const av = tags.motor_vehicle ?? tags.motorcar ?? tags.vehicle ?? tags.access;
+  let access: number = ACCESS.YES;
+  if (av === 'destination') access = ACCESS.DESTINATION;
+  else if (av === 'agricultural' || av === 'forestry' || av === 'agricultural;forestry') access = ACCESS.AGRICULTURAL;
+  else if (av === 'no' || av === 'private' || av === 'delivery' || av === 'military' || av === 'emergency' || av === 'bus') {
+    access = ACCESS.PRIVATE;
+  } else if (av === undefined && cls === CLS.TRACK) access = ACCESS.AGRICULTURAL;
+  if (hw === 'busway' || tags.service === 'emergency_access') access = ACCESS.PRIVATE;
+
+  const layerNum = num(tags.layer);
+  const layer = Number.isNaN(layerNum) ? (flags & EF.BRIDGE ? 1 : flags & EF.TUNNEL ? -1 : 0) : layerNum;
+
+  const tf = tags['turn:lanes:forward'] ?? (oneway ? tags['turn:lanes'] : undefined) ?? '';
+  const tb = tags['turn:lanes:backward'] ?? '';
+
+  // (a bridge too: its footway bridges beside it become its raised walkways – separateWalks)
+  const walkFrom = (t: (typeof xs)['left']): boolean => cls > CLS.TRUNK_LINK && !(flags & EF.TUNNEL) && (t.walk.separate || t.walk.has === null);
+  return {
+    cls, oneway, reversed, lf, lb, lw, w, mg, mf, mb, zone, surf, swL, swR, flags, access, layer, tf, tb, urban,
+    xl, xr, md: oneway ? xs.median : 0,
+    walkFromL: walkFrom(xs.left), walkFromR: walkFrom(xs.right),
+    vergeTaggedL: xs.left.vergeTagged, vergeTaggedR: xs.right.vergeTagged,
+  };
+}
+
+/**
+ * roadAttrs as the published map was built with it (before the cross-sections of
+ * mapgen/xsection.ts): for the roads outside the detail region (mapgen/detailregion.ts),
+ * which must come out as they are in that map.  Kept as it was, line by line.
+ */
+export function roadAttrsLegacy(tags: Tags, urbanHint: boolean): Attrs | null {
   const hw = tags.highway;
   const cls = DRIVE_CLASS[hw];
   if (cls === undefined) return null;
@@ -306,8 +562,9 @@ export function roadAttrs(tags: Tags, urbanHint: boolean): Attrs | null {
   const tf = tags['turn:lanes:forward'] ?? (oneway ? tags['turn:lanes'] : undefined) ?? '';
   const tb = tags['turn:lanes:backward'] ?? '';
 
-  return { cls, oneway, reversed, lf, lb, lw, w, mg, mf, mb, zone, surf, swL, swR, flags, access, layer, tf, tb, urban };
+  return { cls, oneway, reversed, lf, lb, lw, w, mg, mf, mb, zone, surf, swL, swR, flags, access, layer, tf, tb, urban, xl: {}, xr: {}, md: 0, walkFromL: false, walkFromR: false, vergeTaggedL: false, vergeTaggedR: false };
 }
+
 
 /** Counter-clockwise angle of an edge as seen from one of its end nodes (probe 8 m along, matching world.ts). */
 export function armAngle(e: EdgeJson, fromA: boolean): number {
@@ -448,6 +705,14 @@ function featureOf(n: ONode, wayDir: number): EdgeFeature | null {
 export interface MapArea {
   inWorld(x: number, z: number): boolean;
   builtUp(x: number, z: number): boolean;
+  /**
+   * Is the road along these points (flat x, z: the nodes of an edge) built the
+   * way the map build does it now – cross-sections, separate pavements,
+   * calming and markings – or as the published map was (roadAttrsLegacy,
+   * nothing of mapgen/roadextras.ts)?  Without: every road the new way.  (The
+   * detail region: mapgen/detailregion.ts.)
+   */
+  fresh?(pts: number[]): boolean;
 }
 
 export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
@@ -457,12 +722,15 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
   interface Run {
     way: OWay;
     attrs: Attrs;
+    /** with MapArea.fresh: the attributes the new way, for the edges it says yes to (attrs: as the published map) */
+    fresh: Attrs | null;
     /** node ids; synthetic boundary nodes are negative */
     ids: number[];
   }
   const synth = new Map<number, { x: number; z: number }>();
   let synthId = -1;
-  const pos = (id: number): { x: number; z: number } => (id < 0 ? synth.get(id)! : osm.nodes.get(id)!);
+  // (synthetic nodes are negative; so are the nodes added by tools/mapgen/observed-roads.json, which are in osm.nodes)
+  const pos = (id: number): { x: number; z: number } => synth.get(id) ?? osm.nodes.get(id)!;
   const runs: Run[] = [];
 
   for (const way of osm.ways) {
@@ -476,13 +744,16 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
       const n = osm.nodes.get(id)!;
       if (area.builtUp(n.x, n.z)) builtVotes++;
     }
-    const attrs = roadAttrs(way.tags, builtVotes * 2 > ids0.length);
+    // (with a detail region: the runs as the published map has them, the edges in it the new way – addEdge)
+    const urbanHint = builtVotes * 2 > ids0.length;
+    const attrs = area.fresh ? roadAttrsLegacy(way.tags, urbanHint) : roadAttrs(way.tags, urbanHint);
     if (!attrs) continue;
+    const fresh = area.fresh ? roadAttrs(way.tags, urbanHint) : null;
     const ids = attrs.reversed ? ids0.slice().reverse() : ids0;
 
     let cur: number[] = [];
     const flush = (): void => {
-      if (cur.length >= 2) runs.push({ way, attrs, ids: cur });
+      if (cur.length >= 2) runs.push({ way, attrs, fresh, ids: cur });
       cur = [];
     };
     for (let i = 0; i < ids.length; i++) {
@@ -544,6 +815,7 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
     edgeFeatures: [],
     nodeIndex: new Map(),
     wayEdges: new Map(),
+    edgeNew: [],
   };
   const nodeOf = (id: number): number => {
     let idx = graph.nodeIndex.get(id);
@@ -551,13 +823,14 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
       idx = graph.nodes.length;
       const p = pos(id);
       graph.nodes.push({ x: p.x, y: 0, z: p.z, t: CTRL.NONE, arms: [] });
-      graph.nodeOsm.push(id < 0 ? null : osm.nodes.get(id)!);
-      graph.nodeMapEnd.push(id < 0);
+      graph.nodeOsm.push(synth.has(id) ? null : osm.nodes.get(id)!);
+      graph.nodeMapEnd.push(synth.has(id));
       graph.nodeIndex.set(id, idx);
     }
     return idx;
   };
 
+  const edgeAttrs: Attrs[] = [];
   const addEdge = (r: Run, ids: number[]): void => {
     if (ids.length < 2) return;
     if (ids[0] === ids[ids.length - 1]) {
@@ -569,11 +842,13 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
       addEdge(r, ids.slice(mid));
       return;
     }
-    const a = r.attrs;
     const raw: P2[] = ids.map((id) => {
       const p = pos(id);
       return [p.x, p.z];
     });
+    // (the new way – or, outside the detail region, as the published map was: MapArea.fresh)
+    const isNew = !area.fresh || (r.fresh !== null && area.fresh(raw.flat()));
+    const a = isNew && r.fresh ? r.fresh : r.attrs;
     const tier = CLASS_TIER[a.cls];
     const refined = refineCenterline(raw, tier >= 3 ? 22 : tier >= 2 ? 9 : 5, 8);
     const len = polyLength(refined);
@@ -594,7 +869,8 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
       f: a.flags,
       ca: 0,
       cb: 0,
-      o: r.way.id,
+      // (a part of a way cut by tools/mapgen/observed-roads.json is named after the way it was cut from)
+      o: r.way.of ?? r.way.id,
     };
     if (r.way.tags.name) edge.n = r.way.tags.name;
     if (r.way.tags.ref) edge.r = r.way.tags.ref;
@@ -607,10 +883,14 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
     if (a.layer) edge.ly = a.layer;
     if (a.tf) edge.tf = a.tf;
     if (a.tb) edge.tb = a.tb;
+    if (!sideIsPlain(a.xl)) edge.xl = { ...a.xl };
+    if (!sideIsPlain(a.xr)) edge.xr = { ...a.xr };
+    if (a.md) edge.md = a.md;
 
     const feats: EdgeFeature[] = [];
     for (let i = 1; i < ids.length - 1; i++) {
-      if (ids[i] < 0) continue;
+      // (the cut at the edge of the map has nothing on it; the nodes of observed-roads.json may: waysplit.ts points)
+      if (synth.has(ids[i])) continue;
       const n = osm.nodes.get(ids[i])!;
       const f = featureOf(n, a.reversed ? -1 : 1);
       if (!f) continue;
@@ -618,12 +898,14 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
       feats.push(f);
     }
     const idx = graph.edges.length;
+    edgeAttrs.push(a);
+    graph.edgeNew.push(isNew);
     graph.edges.push(edge);
     graph.edgeWay.push(r.way);
     graph.edgeRefs.push(ids);
     graph.edgeFeatures.push(feats);
-    let list = graph.wayEdges.get(r.way.id);
-    if (!list) graph.wayEdges.set(r.way.id, (list = []));
+    let list = graph.wayEdges.get(r.way.of ?? r.way.id);
+    if (!list) graph.wayEdges.set(r.way.of ?? r.way.id, (list = []));
     list.push(idx);
   };
 
@@ -637,7 +919,15 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
     }
   }
 
-  // ---- 3. arms, sorted counter-clockwise -----------------------------------
+  // calming, mouths over the pavement, give-way lines, zigzags, road text (mapgen/roadextras.ts) – on the roads built the new way
+  if (graph.edgeNew.some(Boolean)) {
+    addRoadExtras(graph);
+
+    // ---- 3. pavements mapped as ways of their own: the road's pavement reaches to them ----
+    separateWalks(graph, edgeAttrs, new FootwayIndex(osm), new FootwayIndex(osm, true));
+  }
+
+  // ---- 4. arms, sorted counter-clockwise -----------------------------------
   const armAngles: Array<Array<{ e: number; ang: number }>> = graph.nodes.map(() => []);
   graph.edges.forEach((e, i) => {
     armAngles[e.a].push({ e: i, ang: armAngle(e, true) });
@@ -654,6 +944,49 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
   });
 
   return graph;
+}
+
+/**
+ * Where a road's pavement is mapped as a way of its own (footway=sidewalk)
+ * beside it, the road's pavement is drawn out to that way – with a verge
+ * between kerb and footway where there is room – instead of a second one, or
+ * none, beside it.
+ */
+function separateWalks(graph: RoadGraph, attrs: Attrs[], sidewalks: FootwayIndex, bridges?: FootwayIndex): void {
+  if (sidewalks.count === 0 && !bridges?.count) return;
+  graph.edges.forEach((e, i) => {
+    const a = attrs[i];
+    if (!a.walkFromL && !a.walkFromR) return;
+    // (on a bridge: the footway bridges beside it, and its walkways right at the kerb – no verge on a deck)
+    const onBridge = (e.f & EF.BRIDGE) !== 0;
+    const index = onBridge ? bridges : sidewalks;
+    if (!index?.count) return;
+    const pts: number[] = [];
+    for (let k = 0; k < e.p.length; k += 3) pts.push(e.p[k], e.p[k + 2]);
+    for (const left of [true, false]) {
+      if (!(left ? a.walkFromL : a.walkFromR)) continue;
+      let m = measureSeparateWalk(index, pts, e.w / 2, left);
+      if (!m) continue;
+      const side: RoadSideJson = { ...((left ? e.xl : e.xr) ?? {}) };
+      const other = sideOuter(side) - (side.v ?? 0);
+      if (onBridge) m = { ...m, verge: 0 };
+      if (!(left ? a.vergeTaggedL : a.vergeTaggedR)) {
+        const v = Math.round((m.verge - other) * 100) / 100;
+        if (v >= 0.5) side.v = v;
+        else delete side.v;
+      }
+      // (the pavement drawn out to the separate way is made of what that way is, unless the road says)
+      if (side.wm === undefined && m.mat !== undefined && m.mat !== GM.SIDEWALK) side.wm = m.mat;
+      const beyond = Math.round(Math.max(m.beyond, sideOuter(side) + 1.0) * 100) / 100;
+      if (left) {
+        e.sl = beyond;
+        if (!sideIsPlain(side)) e.xl = side;
+      } else {
+        e.sr = beyond;
+        if (!sideIsPlain(side)) e.xr = side;
+      }
+    }
+  });
 }
 
 /** Total centreline length per class, for the build report. */

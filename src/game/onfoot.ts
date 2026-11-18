@@ -126,6 +126,8 @@ export interface WalkMove {
   fwd: number;
   turn: number;
   run: boolean;
+  /** a step to the right (+) or left, −1 … 1 (game/walkmodes.ts: the classic way of walking) */
+  side?: number;
 }
 
 export interface WalkLook {
@@ -225,8 +227,11 @@ export class OnFoot {
     const s = Math.sin(this.yaw);
     const c = Math.cos(this.yaw);
     // forwards = (−sin, −cos), to the right = (cos, −sin)
-    const ahead = move.fwd * speed * dt + look.fwd * 4;
-    const right = look.right * 4;
+    // (forwards and sideways at once: no quicker than straight on)
+    const side = move.side ?? 0;
+    const norm = Math.max(1, Math.hypot(move.fwd, side));
+    const ahead = (move.fwd / norm) * speed * dt + look.fwd * 4;
+    const right = (side / norm) * speed * dt + look.right * 4;
     const dx = -s * ahead + c * right;
     const dz = -c * ahead - s * right;
     let step = false;

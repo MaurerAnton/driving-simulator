@@ -368,9 +368,9 @@ export class RuleMonitor {
 
       // --- keep right ---
       // (not where a side closed for roadworks is passed on the oncoming lane)
-      if (lane && !oneWayAgainst && !inJunctionZone && Math.abs(headingCos) > 0.8 && edge.lanesF > 0 && edge.lanesB > 0 && edge.laneW >= 2.5 && moving && p.speed > 3 && !works?.passing(edge, hit.s, dir)) {
+      if (lane && !oneWayAgainst && !inJunctionZone && Math.abs(headingCos) > 0.8 && edge.lanesF > 0 && edge.lanesB > 0 && edge.laneW >= 2.5 && moving && p.speed > 3 && !works?.passing(edge, hit.s, dir) && !this.traffic.narrowings?.passing(edge, hit.s, dir)) {
         const myOff = hit.off * dir; // + = left of our direction
-        const centre = (dir > 0 ? -edge.width / 2 + edge.margin + edge.lanesF * edge.laneW : edge.width / 2 - edge.margin - edge.lanesB * edge.laneW) * dir;
+        const centre = (dir > 0 ? -edge.width / 2 + edge.marginR + edge.lanesF * edge.laneW : edge.width / 2 - edge.marginL - edge.lanesB * edge.laneW) * dir;
         // car centre beyond the middle of the road
         if (myOff > centre + 0.45) {
           this.wrongSide += dt;
@@ -413,6 +413,10 @@ export class RuleMonitor {
       else if (!lane) this.lane = null;
       // the site light, the narrowing (Zeichen 208), the fenced strip, a road closed for a march
       works?.judge(this, p, edge, hit.s, hit.off, dir, dt);
+      // into a narrowing on the side of its kerb build-out while somebody comes the other way (§ 6 StVO; src/sim/narrowings.ts)
+      this.traffic.narrowings?.judge(this, p, edge, hit.s, dir);
+      // level crossings: the lights, the barriers, a train; not on the tracks, no overtaking before them (src/sim/levelcrossing.ts)
+      this.traffic.levelCrossings?.judge(this, p, edge, hit.s, dir, dt);
     } else {
       ctx.limit = -1;
       this.wrongWayT = 0;

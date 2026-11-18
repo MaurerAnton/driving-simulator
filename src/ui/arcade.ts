@@ -5,12 +5,18 @@
  * The world follows the real clock – the trams and buses by their
  * timetables, the sun where it stands now.  Here the player sets another
  * day and hour to see a place as it will be then, and lets the time run
- * faster while the autopilot drives (the timetables are not kept while it
- * does; back at the real speed the world is at the real time again).
- * "Now" puts everything back.  The game's clock itself is game/clock.ts.
+ * faster – while the autopilot drives or while driving oneself (the
+ * timetables are not kept while it does; back at the real speed the world
+ * is at the real time again).  "Now" puts everything back.  The game's
+ * clock itself is game/clock.ts.
+ *
+ * And the simulator's chores can be left out here: arcade driving (D and R
+ * by the pedals, no handbrake, no stalling – game/arcadedrive.ts) and the
+ * road physics (every surface, in any weather, as dry asphalt).
  */
 
 import { RATES } from '../game/clock.ts';
+import { closeX } from './closex.ts';
 
 export interface ArcadeHost {
   /** a text of the game's language */
@@ -26,7 +32,7 @@ export interface ArcadeHost {
   /** set the world to a moment – null: back to the real time and speed */
   setTime(ms: number | null): void;
   setRate(rate: number): void;
-  /** does the autopilot drive now? (only then may the time run faster) */
+  /** does the autopilot drive now? */
   autopilot(): boolean;
   /** the seasons and weathers one may choose ([value, name]), the ones chosen, and choosing one */
   seasons(): ReadonlyArray<readonly [string, string]>;
@@ -35,6 +41,11 @@ export interface ArcadeHost {
   weathers(): ReadonlyArray<readonly [string, string]>;
   weather(): string;
   setWeather(v: string): void;
+  /** arcade driving and the road physics switched off (settings arcadeDrive, evenRoads) */
+  arcadeDrive(): boolean;
+  setArcadeDrive(v: boolean): void;
+  evenRoads(): boolean;
+  setEvenRoads(v: boolean): void;
   /** close the panel (back to the drive) */
   close(): void;
 }
@@ -88,7 +99,24 @@ export function clockBadge(ms: number, rate: number, locale: string): string {
 export function arcadePanel(host: ArcadeHost): HTMLElement {
   const p = el('div', 'panel narrow arcade');
   const head = el('h1', '', host.t('arcadeTitle'));
-  p.append(head, el('p', 'note', host.t('arcadeHint')));
+  p.append(closeX(host.t('resume'), () => host.close()), head, el('p', 'note', host.t('arcadeHint')));
+
+  // --- the simulator's chores left out ---
+  const easy = el('div', 'arc-block');
+  easy.append(el('b', '', host.t('arcadeEasy')));
+  const toggle = (label: string, on: () => boolean, set: (v: boolean) => void): void => {
+    const row = el('label', 'row arc-toggle');
+    const c = el('input');
+    c.type = 'checkbox';
+    c.checked = on();
+    c.onchange = () => set(c.checked);
+    row.append(c, el('span', '', label));
+    easy.append(row);
+  };
+  toggle(host.t('arcadeDrive'), () => host.arcadeDrive(), (v) => host.setArcadeDrive(v));
+  easy.append(el('small', '', host.t('arcadeDriveNote')));
+  toggle(host.t('evenRoads'), () => host.evenRoads(), (v) => host.setEvenRoads(v));
+  p.append(easy);
 
   // --- the moment ---
   const when = el('div', 'arc-block');
@@ -134,16 +162,15 @@ export function arcadePanel(host: ArcadeHost): HTMLElement {
   when.append(now, input, chips, back);
   p.append(when);
 
-  // --- the speed of time (while the autopilot drives) ---
+  // --- the speed of time (the autopilot driving, or the player) ---
   const speed = el('div', 'arc-block');
-  speed.append(el('b', '', host.t('arcadeSpeed')), el('small', '', host.t(host.autopilot() ? 'arcadeSpeedHint' : 'arcadeSpeedNeedsAuto')));
+  speed.append(el('b', '', host.t('arcadeSpeed')), el('small', '', host.t('arcadeSpeedAny')));
   const rates = el('div', 'arc-chips');
   const rateButtons: HTMLButtonElement[] = [];
   for (const r of RATES) {
     const b = el('button', 'btn ghost chip', `${r}×`);
     b.type = 'button';
     b.dataset.rate = String(r);
-    b.disabled = r > 1 && !host.autopilot();
     b.onclick = () => {
       host.setRate(r);
       refresh();

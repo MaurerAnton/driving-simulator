@@ -38,10 +38,12 @@ export interface Controls {
 /** door: get out of the vehicle, or in again (on foot beside it) */
 /** scrolled on and on, the camera behind the vehicle goes this many times further back than usual: a view from high above */
 const ZOOM_FAR = 5;
+/** the keys that fly the flying camera (they do not drive meanwhile) */
+const FLY_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown']);
 
 /** mirror: look into the next mirror, large over the picture (ui/mirrorzoom.ts) */
 /** service: fill up at a pump, wash at a car wash, call for help with an empty tank, skip the loading of a truck (game/serviceworld.ts) */
-export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto' | 'mirror' | 'service' | 'wiper' | 'open';
+export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto' | 'mirror' | 'service' | 'wiper' | 'open' | 'hud';
 
 const TAU = Math.PI * 2;
 /** O held longer than this (ms) is the flasher, not a switch of the main beam */
@@ -120,7 +122,17 @@ export class Input {
    * looks at in parts of the distance to it – by dragging, pinching and the
    * wheel – and flying with the keys (Alt held) in seconds of key time.
    */
-  private readonly cam = { yaw: 0, pitch: 0, right: 0, fwd: 0, dolly: 0, keyRight: 0, keyFwd: 0, keyUp: 0, fast: false, reset: false };
+  private readonly cam = { yaw: 0, pitch: 0, right: 0, fwd: 0, dolly: 0, keyRight: 0, keyFwd: 0, keyUp: 0, fast: false, reset: false, lift: 0, speed: 0 };
+  /**
+   * The free camera flies (game/flycam.ts – set by the game while it is the view): the keys W A S D, Q E,
+   * the arrows and Page Up / Down fly it without Alt, the wheel and a pinch set its speed, two fingers
+   * lift or lower it – and the vehicle is held where it is.
+   */
+  flyCam = false;
+  /** the stick on the screen (ui/touchstick.ts): to the right (+) and forwards (+), −1 … 1 each */
+  readonly stick = { x: 0, y: 0 };
+  /** on foot: running switched on (Caps Lock, the runner's button by the stick) */
+  runToggle = false;
   /** fingers on the view */
   private readonly fingers = new Map<number, { x: number; y: number }>();
   private pinch = 0;
@@ -218,7 +230,11 @@ export class Input {
         const scale = this.pinch > 8 && spread > 8 ? spread / this.pinch : 1;
         this.pinch = spread;
         if (this.viewZoom) this.zoom.pinch(scale);
-        else if (this.freeCam) {
+        else if (this.flyCam) {
+          // (the flying camera: both fingers up or down lift or lower it – each moves the middle by half –, a pinch sets the speed)
+          this.cam.lift -= (dy * 0.5) / Math.max(240, window.innerHeight);
+          this.cam.speed += Math.log(scale) * 4;
+        } else if (this.freeCam) {
           // (each finger moves the middle between the two by half of what it moves)
           const k = 0.5 / Math.max(240, window.innerHeight);
           this.cam.right -= dx * k;
@@ -236,6 +252,12 @@ export class Input {
     canvas.addEventListener(
       'wheel',
       (e) => {
+        // (the flying camera: the wheel sets how fast it flies – a notch a step)
+        if (this.flyCam && this.enabled) {
+          e.preventDefault();
+          this.cam.speed -= clamp(e.deltaY, -120, 120) / 100;
+          return;
+        }
         // (on foot and in the driver's seat the wheel zooms the view)
         if (this.viewZoom && this.enabled) {
           e.preventDefault();
@@ -274,11 +296,17 @@ export class Input {
    * the controls of the vehicle: its steering wheel stays where it is when
    * nobody holds it.)
    */
-  walkInput(): { fwd: number; turn: number; run: boolean } {
+  walkInput(mode: 'classic' | 'tank' | 'tap' = 'tank'): { fwd: number; turn: number; side: number; run: boolean } {
+    // (classic, and tap to walk: A D a step to the side, the arrows ← → turn – game/walkmodes.ts)
+    const classic = mode !== 'tank';
     let fwd = (this.key('KeyW', 'ArrowUp') ? 1 : 0) - (this.key('KeyS', 'ArrowDown') ? 1 : 0);
-    let turn = (this.key('KeyA', 'ArrowLeft') ? 1 : 0) - (this.key('KeyD', 'ArrowRight') ? 1 : 0);
-    let run = this.key('ShiftLeft', 'ShiftRight');
-    if (this.key('AltLeft', 'AltRight')) fwd = turn = 0;
+    let turn = classic ? (this.key('ArrowLeft') ? 1 : 0) - (this.key('ArrowRight') ? 1 : 0) : (this.key('KeyA', 'ArrowLeft') ? 1 : 0) - (this.key('KeyD', 'ArrowRight') ? 1 : 0);
+    let side = classic ? (this.key('KeyD') ? 1 : 0) - (this.key('KeyA') ? 1 : 0) : 0;
+    let run = this.key('ShiftLeft', 'ShiftRight') || this.runToggle;
+    if (this.key('AltLeft', 'AltRight')) fwd = turn = side = 0;
+    // the stick on the screen (shown for the classic way and tap to walk)
+    fwd += this.stick.y;
+    side += this.stick.x;
     if (this.touch.active) {
       fwd += this.touch.throttle - this.touch.brake;
       turn -= this.touch.steer;
@@ -288,10 +316,15 @@ export class Input {
     const pad = this.readPad();
     if (pad) {
       fwd += pad.throttle - pad.brake;
-      if (Math.abs(pad.steer) > 0.12) turn -= pad.steer;
+      if (classic && pad.kind === 'standard') {
+        // (the left stick walks and steps aside; the right one turns)
+        if (Math.abs(pad.pitch) > 0.12) fwd -= pad.pitch;
+        if (Math.abs(pad.steer) > 0.12) side += pad.steer;
+        if (Math.abs(pad.lookX) > 0.15) turn -= pad.lookX;
+      } else if (Math.abs(pad.steer) > 0.12) turn -= pad.steer;
       run ||= pad.throttle > 0.95;
     }
-    return { fwd: clamp(fwd, -1, 1), turn: clamp(turn, -1, 1), run };
+    return { fwd: clamp(fwd, -1, 1), turn: clamp(turn, -1, 1), side: clamp(side, -1, 1), run };
   }
 
   /**
@@ -346,7 +379,7 @@ export class Input {
     return { pitch: clamp(pitch, -1, 1), roll: clamp(roll, -1, 1), yaw: clamp(yaw, -1, 1), throttle: clamp(throttle, -1, 1), brake: clamp(brake, 0, 1) };
   }
 
-  takeCam(): Readonly<{ yaw: number; pitch: number; right: number; fwd: number; dolly: number; keyRight: number; keyFwd: number; keyUp: number; fast: boolean; reset: boolean }> {
+  takeCam(): Readonly<{ yaw: number; pitch: number; right: number; fwd: number; dolly: number; keyRight: number; keyFwd: number; keyUp: number; fast: boolean; reset: boolean; lift: number; speed: number }> {
     const c = this.cam;
     const o = this.camOut;
     o.yaw = c.yaw;
@@ -359,12 +392,14 @@ export class Input {
     o.keyUp = c.keyUp;
     o.fast = c.fast;
     o.reset = c.reset;
-    c.yaw = c.pitch = c.right = c.fwd = c.dolly = c.keyRight = c.keyFwd = c.keyUp = 0;
+    o.lift = c.lift;
+    o.speed = c.speed;
+    c.yaw = c.pitch = c.right = c.fwd = c.dolly = c.keyRight = c.keyFwd = c.keyUp = c.lift = c.speed = 0;
     c.reset = false;
     return o;
   }
 
-  private readonly camOut = { yaw: 0, pitch: 0, right: 0, fwd: 0, dolly: 0, keyRight: 0, keyFwd: 0, keyUp: 0, fast: false, reset: false };
+  private readonly camOut = { yaw: 0, pitch: 0, right: 0, fwd: 0, dolly: 0, keyRight: 0, keyFwd: 0, keyUp: 0, fast: false, reset: false, lift: 0, speed: 0 };
 
   /** Looking around with the mouse or a finger; the stops depend on what is turning: a head or a camera. */
   /** Where the glance keys (or their buttons) turn the head now: left, right, back over the shoulder (radians, 0: ahead). */
@@ -471,11 +506,18 @@ export class Input {
         e.preventDefault();
         this.fire('help');
       }
+      // F2: hide or show the whole display (ui/viewbuttons.ts)
+      if (code === 'F2') {
+        e.preventDefault();
+        this.fire('hud');
+      }
       // "Foto": what does this place really look like? (also from the pause menu)
       if (code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) this.fire('reality');
       if (!this.enabled) return;
-      // Alt held with the free camera: the keys fly the camera, they do not drive
-      if (this.freeCam && e.altKey) {
+      // (on foot: Caps Lock switches running on or off)
+      if (code === 'CapsLock') this.runToggle = !this.runToggle;
+      // Alt held with the free camera – or the flying camera: the keys fly the camera, they do not drive
+      if ((this.freeCam && e.altKey) || (this.flyCam && FLY_KEYS.has(code))) {
         e.preventDefault();
         return;
       }
@@ -616,16 +658,29 @@ export class Input {
     const pad = this.readPad();
     const absSpeed = Math.abs(speed);
     // the free camera, flown with the keys while Alt is held (the car rolls on by itself meanwhile)
-    const fly = this.freeCam && this.key('AltLeft', 'AltRight');
+    const fly = (this.freeCam && this.key('AltLeft', 'AltRight')) || this.flyCam;
     if (fly) {
       const cam = this.cam;
       cam.keyFwd += ((this.key('KeyW', 'ArrowUp') ? 1 : 0) - (this.key('KeyS', 'ArrowDown') ? 1 : 0)) * dt;
       cam.keyRight += ((this.key('KeyD', 'ArrowRight') ? 1 : 0) - (this.key('KeyA', 'ArrowLeft') ? 1 : 0)) * dt;
-      cam.keyUp += ((this.key('KeyE', 'PageUp') ? 1 : 0) - (this.key('KeyQ', 'PageDown') ? 1 : 0)) * dt;
+      cam.keyUp += ((this.key('KeyE', 'PageUp', 'FlyUp') ? 1 : 0) - (this.key('KeyQ', 'PageDown', 'FlyDown') ? 1 : 0)) * dt;
       cam.fast = this.key('ShiftLeft', 'ShiftRight');
+      // (the stick on the screen, and a gamepad's left stick)
+      cam.keyFwd += this.stick.y * dt;
+      cam.keyRight += this.stick.x * dt;
+      if (this.flyCam && pad && pad.kind === 'standard') {
+        cam.keyFwd -= pad.pitch * dt;
+        cam.keyRight += pad.steer * dt;
+        cam.keyUp += (pad.throttle - pad.brake) * dt;
+      }
     }
 
-    if (pad && pad.kind === 'wheel') {
+    if (this.flyCam) {
+      // the camera flies: nobody drives – the vehicle is braked to a stop and waits (the clutch down: the engine does not stall)
+      c.throttle = 0;
+      c.brake = approach(c.brake, 1, dt * 2);
+      c.clutch = approach(c.clutch, 1, dt * 7);
+    } else if (pad && pad.kind === 'wheel') {
       c.device = 'wheel';
       c.steer = pad.steer;
       c.throttle = pad.throttle;

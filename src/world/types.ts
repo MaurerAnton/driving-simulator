@@ -6,6 +6,7 @@
  * shape; `hydrateWorld()` (world.ts) turns it into the linked `World` used at
  * runtime (lanes, connectors, spatial index, surface queries).
  */
+import type { RoadSideJson } from './xsection.ts';
 
 export const ROAD_CLASSES = [
   'motorway',
@@ -472,6 +473,25 @@ export interface EdgeJson {
   x?: EdgeCrossingJson[];
   /** forbidden movements from this edge, in chunks: via node, to edge, via node, to edge, … */
   bn?: number[];
+  /** the cross-section beyond the lanes on the left and right of a→b – parking, cycle lanes, verge, kerb (src/world/xsection.ts) */
+  xl?: RoadSideJson;
+  xr?: RoadSideJson;
+  /** a one-way carriageway of a dual road: what lies on its left, towards the other one (MEDIAN bits) */
+  md?: number;
+  /** traffic calming across the carriageway: per entry station, CALM kind, length, height (src/world/roadfeatures.ts) */
+  cm?: number[];
+  /** kerb build-outs narrowing the carriageway: per entry station, side, length, depth, BO flags (src/world/narrowing.ts) */
+  bo?: number[];
+  /** 1: meets the roads at its ends over a continuous pavement – a lowered kerb across its mouth (src/world/roadfeatures.ts) */
+  mk?: number;
+  /** give-way line (Zeichen 341) at a yield: 1 painted, 0 not; absent: as the road's markings say */
+  gl?: number;
+  /** zigzag lines (Zeichen 299) along the kerb: 1 left, 2 right of a→b (bits) */
+  zz?: number;
+  /** text painted on the carriageway: [text, station, +1 read going a→b / −1 going b→a], … */
+  rt?: Array<[string, number, number]>;
+  /** zigzag lines over a stretch only: [from station, to station, side bits], … (a bus stop's) */
+  zs?: number[];
 }
 
 /** A crossing as part of its edge's record (CrossingJson without the edge). */

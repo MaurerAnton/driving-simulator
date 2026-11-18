@@ -164,6 +164,17 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   Stapler (Kamera, Klicks, Aussteigen, freie Fahrt), vom Turmdrehkran absteigen, schwere Fahrzeuge lenken wirklich
   langsam; Zoom mit zwei Fingern, verschiebbarer Innenspiegel, eine frei anordenbare Anzeige; ein klareres Pausenmenü;
   WebAssembly für Kartenteile und lange Routen.
+- **Neu in 1.7.0:** Die Straßen von Baunatal-Mitte, wie sie sind – mit Straßenpanoramen und den amtlichen Luftbildern
+  von Hand verglichen: Breiten, Fahrstreifen, Gehwege nur wo sie sind, parkende Autos, Radstreifen, Rinnen, Inseln mit
+  Zeichen 222, Aufpflasterungen, Einengungen (der Verkehr wartet nach § 6), Markierungen, Wege, Plätze, Bäume und Hecken
+  an ihren Orten, Rasen statt grauer Flächen, flache und grüne Dächer; Bahnübergänge mit Lichtzeichen, Schranken und
+  Glocke; Wild auf Landstraßen in der Dämmerung. **Lernen:** eine Theorieprüfung wie die echte (eigene Fragen, 30 in
+  45 Minuten, Fehlerpunkte), ein Zeichentrainer, „Gefahr erkennen“ und ein Lernstand; 16 neue Theoriestunden und die
+  Grundfahraufgaben der Klasse B auf dem Übungsplatz. Jedes Fahrzeug zusehen und übernehmen, Arcade-Fahren, schnellere
+  Zeit, Einstellungen zurücksetzen, drei Arten zu gehen, eine fliegende freie Kamera, „Hierher teleportieren“, bessere
+  Stimmen, Vollbild und Anzeige ausblenden (F2). **Gemeinsam spielen:** ein eigener Server (Konten mit Zugangscode,
+  Fortschritt auf allen Geräten, Fotos und 360°-Panoramen, mehrere Spieler in einer Welt) – siehe `server/`.
+  In „Neu“ auch die Entwicklungsversionen 0.1.0–0.9.0 (0.8.0 und 0.9.0 spielbar) und die Größe jeder Version.
 - **Jedes Modell:** ein Testplatz auf dem Übungsplatz mit allen Fahrzeugen des Spiels nebeneinander (jede
   Führerscheinklasse, mit und ohne Anhänger), den Autos, Radfahrern und Leuten des Verkehrs, zwei Straßenbahnen
   und dem Flugzeug – zu Fuß oder mit dem eigenen Fahrzeug zwischen ihnen.
@@ -475,7 +486,7 @@ muss man zum Spielen und Entwickeln nicht.
 ### Tests
 
 ```bash
-npm test             # 723 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
+npm test             # 926 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
                      # Tank und Waschanlage, Wetter, Jahreszeiten, Ampel-Uhren, Autopilot des Flugzeugs, Karten, Klänge; Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
                      # Klassen mit jeder Motorleistung (77), Flugphysik (25), Flugplätze (3), Straßenbahn fahren, ihr
                      # Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne im Verkehr (10), Fahrpläne
@@ -498,7 +509,9 @@ Spiel unter „Was ist neu“ – in allen Sprachen:
 1. `version` in `package.json` erhöhen und oben in [`src/game/releases.ts`](src/game/releases.ts) einen Eintrag
    mit den Schlüsseln seiner Neuerungen anlegen; die Texte `news.<version>.*` in `en.ts` schreiben und in alle
    Sprachen übersetzen (`npm run i18n:check`). `npm test` prüft, dass Version und Neuerungen zusammenpassen.
-2. Committen, `git tag vX.Y.Z`, `git push origin main --tags`, `gh release create vX.Y.Z`.
+2. Unmittelbar vor dem Commit die Größe der Version eintragen (Zeilen Code/Tests/Texte, Bytes der Dateien –
+   im Eintrag steht bis dahin `size: null`): `node tools/release-stats.ts --fill X.Y.Z --worktree`.
+3. Committen, `git tag vX.Y.Z`, `git push origin main --tags`, `gh release create vX.Y.Z`.
 
 ## Karte neu erzeugen
 
@@ -553,7 +566,7 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 723 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
+- **Automatisch geprüft:** 926 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
   Straßenbahn mit Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne, Buslinien, die Wiederholung, Bus auf der Linie, zu Fuß an Fußgängerampel und Zebrastreifen, Fernsicht, Anhänger, Aufgaben der Klasse CE,
   Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
   Umgebungsverkehrs (seit 1.4.0 auch Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen und Demonstrationen,
@@ -595,7 +608,7 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 - **Straßenbahnen und Züge:** fahren ihre Linien (wo deren Weg in OpenStreetMap Lücken hat, wählen sie selbst),
   die Straßenbahnen und RegioTrams nach dem Fahrplan einer typischen Woche (Montag bis Freitag, Samstag, Sonntag –
   die Zusatzfahrten der Nacht zum Samstag fehlen), die Züge ohne Fahrplan; sie beachten einander und Fahrzeuge auf
-  dem Gleis, aber keine Signale; Schranken an Bahnübergängen gibt es nicht. Wer auf eine Bahn wartet, sieht sie erst,
+  dem Gleis, aber keine Signale; an Bahnübergängen schalten sie Lichtzeichen und Schranken. Wer auf eine Bahn wartet, sieht sie erst,
   wenn sie in den Umkreis von gut einem halben Kilometer kommt.
 - **Buslinien:** Abbiegeverbote der Karte gelten auch für Busse, Busspuren und Busstraßen fehlen – dort weicht ein
   Bus vom echten Weg ab; ein Drittel der Linien ist nur teilweise auf der Karte (sie führen aus Nordhessen hinaus).
@@ -636,6 +649,15 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
   hessische Kreise genügt ein neuer Kartenlauf; andere Bundesländer brauchen einen angepassten Abruf und
   Leser für Höhenmodell und Gebäude, andere Staaten zusätzlich ein eigenes Regelwerk – das gibt es noch
   nicht.
+
+## Vorgemerkt (fernere Zukunft)
+
+- **Grafikstufe „Ohne Gnade“ (geplant für Version 3.0.0, wann ist offen):** eine Stufe über „Sehr hoch“, die aus der Grafikkarte alles herausholt (höchste
+  Auflösung der Schatten und Spiegelungen, dichteste Vegetation, volle Sichtweite, aufwendigste Effekte); der Regen
+  auf der Scheibe mit Scheibenwischern wandert dorthin.
+- **Koppelnavigation zu Fuß:** feinere Schritte zwischen zwei GPS-Ortungen aus den Bewegungssensoren – erst in einer
+  eigenen App verlässlich möglich.
+- **Freie Offline-Stimmen** für Sprachen ohne gute Stimme im Browser (z. B. Piper-Stimmen zum Nachladen).
 
 ## Lizenz
 
@@ -760,6 +782,15 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   trams and buses keep their timetables; any version since 1.0.0 playable; maps loaded from files; set routes; lessons
   in real places; a car here; start where you are; forklift and crane fixes; realistic heavy-vehicle steering; zoom,
   a movable inside mirror, an arrangeable display; a clearer pause menu; WebAssembly for map pieces and long routes.
+- **New in 1.7.0:** Baunatal centre's streets as they are, compared by hand with street panoramas and the official
+  aerial photos (widths, lanes, pavements only where they are, parked cars, cycle lanes, gutters, islands, tables,
+  narrowings with § 6 give-way, markings, paths, squares, trees and hedges in place, lawns, flat and green roofs);
+  level crossings with lights, barriers and bells; wildlife at dusk. Learn: a theory exam like the real one with our own
+  questions, a sign trainer, "spot the danger", a lesson log; 16 new theory lessons and the class B basic driving tasks.
+  Watch and take over any vehicle, arcade driving, faster time, reset settings, three ways to walk, a flying free
+  camera, "Teleport here", better voices, full screen and hiding the display (F2). Play together: an own server
+  (accounts with access codes, progress on all devices, photos and 360° panoramas, several players in one world) –
+  see `server/`. "What's new" lists the development versions 0.1.0–0.9.0 and every version's size.
 - **Every model:** a test place on the practice yard with every vehicle of the game side by side, the cars,
   cyclists and people of the traffic, two trams and the aeroplane – walk or drive among them.
 - **Flying:** a light two-seat high-wing aeroplane (100 to 180 PS) takes off from the 21 airfields of
@@ -823,7 +854,7 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 723 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
+Verified automatically by 926 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
 fuel and car washes, weather and seasons, signal timers, the aeroplane's autopilot, maps and sounds; vehicle dynamics of every vehicle with every engine power, the tram with its pantograph and
 coupled units, the trailer, the class-CE tasks, cyclists, traffic lights, on foot and the pedestrian lights, trams with their lines and
 timetables, bus lines, replays, the bus line, flight physics, airfields, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
@@ -849,3 +880,11 @@ of this project rather than in the repository (`map.release` names the release; 
 it); see [docs/MAP_DATA.md](docs/MAP_DATA.md). Only the surroundings are ever loaded: tiles within sight,
 the road network within about 3 km of the car. The simulator is no substitute for lessons with an
 instructor.
+
+### Planned (far future)
+
+- A **"no mercy" graphics preset** (planned for version 3.0.0, no date yet) above "Very high" that pushes the graphics card to its limit (highest shadow and
+  reflection resolution, densest vegetation, full view distance, the costliest effects); rain on the windscreen with
+  the wipers moves there.
+- **Dead reckoning on foot** from the motion sensors between GPS fixes – reliable only in a native app.
+- **Free offline voices** for languages without a good browser voice (e.g. downloadable Piper voices).

@@ -36,6 +36,8 @@ export interface RealityHost {
   maxTexture: number;
   /** the map with aerial photographs, close up on where the car is */
   openAerial(): void;
+  /** pictures of other sources near a place – the players' photos on a server (net/online.ts) */
+  extraImages?(lat: number, lon: number): Promise<StreetImage[]>;
 }
 
 type Remote = Exclude<ImageSource, 'local'>;
@@ -132,6 +134,7 @@ export class RealityPanel {
     this.openedAt = performance.now();
     this.build();
     void this.loadHosted();
+    void this.loadExtra(place);
     for (const s of REMOTE) if (this.host.settings.reality[s]) void this.search(s);
     this.refresh();
   }
@@ -348,6 +351,21 @@ export class RealityPanel {
   }
 
   // ------------------------------------------------------------ own pictures
+  /** The pictures the host adds (a server's): among the own ones, each once. */
+  private async loadExtra(place: RealityPlace): Promise<void> {
+    if (!this.host.extraImages) return;
+    try {
+      const imgs = await this.host.extraImages(place.lat, place.lon);
+      const have = new Set(this.own.map((i) => i.id));
+      const add = imgs.filter((i) => !have.has(i.id));
+      if (add.length === 0 || this.place !== place) return;
+      this.own.push(...add);
+      this.refresh();
+    } catch {
+      /* (no server, or it did not answer: nothing more to show) */
+    }
+  }
+
   /** Pictures offered by a self-hosted copy in its panos/ folder. */
   private async loadHosted(): Promise<void> {
     if (this.hostedLoaded) return;

@@ -446,7 +446,12 @@ export function deriveControl(graph: RoadGraph, osm: OsmData): ControlResult {
       const signalised = t.crossing === 'traffic_signals' || t['crossing:signals'] === 'yes';
       const zebra =
         !signalised &&
-        (t.crossing === 'zebra' || t.crossing_ref === 'zebra' || markings === 'zebra' || t.crossing === 'marked');
+        (t.crossing === 'zebra' ||
+          t.crossing_ref === 'zebra' ||
+          markings === 'zebra' ||
+          // (marked, but with other lines than a zebra's – dashes, lines, a coloured surface: none painted here;
+          // on a road built as the published map was – outside the detail region – every marked one, as then)
+          (t.crossing === 'marked' && (graph.edgeNew?.[k] === false || markings === undefined || markings === 'yes')));
       const c: CrossingJson = {
         e: k,
         s: Math.round(f.s * 10) / 10,

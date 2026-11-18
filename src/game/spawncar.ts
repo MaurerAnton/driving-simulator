@@ -337,6 +337,25 @@ export class SpawnCars {
   }
 
   /** A tap on the 3D picture: into a parked vehicle tapped – or, after the button, the car put down where the ground was tapped. */
+  /** Is a tap at (cx, cy) this module's – a place for a car being picked, or a parked vehicle tapped to get in (for the other taps on the picture: ui/worldtap.ts)? */
+  claims(cx: number, cy: number): boolean {
+    if (this.picking) return true;
+    const h = this.host;
+    if ((!this.car && !this.left) || !h.canEnter()) return false;
+    const r = h.canvas.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return false;
+    this.ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    this.ray.setFromCamera(this.ndc, h.camera);
+    const o = this.ray.ray.origin;
+    const d = this.ray.ray.direction;
+    for (const p of [this.car, this.left]) {
+      if (!p) continue;
+      const t = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, { x: p.x, y: p.y, z: p.z, yaw: p.yaw, height: p.height, ...p.outline });
+      if (t >= 0 && t < 400) return true;
+    }
+    return false;
+  }
+
   private tap(cx: number, cy: number): void {
     const h = this.host;
     const enter = h.canEnter();

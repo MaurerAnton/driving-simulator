@@ -5,7 +5,7 @@ import { COVER } from '../../src/world/cover.ts';
 import { ACCESS, CLS, EF, KERB_H } from '../../src/world/types.ts';
 import type { PlaceJson, SpawnJson } from '../../src/world/types.ts';
 import { newSurfaceHit } from '../../src/world/world.ts';
-import type { World } from '../../src/world/world.ts';
+import type { Edge, World } from '../../src/world/world.ts';
 import { CoverMap } from './cover.ts';
 import { addBand } from './meshacc.ts';
 import type { TileSet } from './meshacc.ts';
@@ -14,6 +14,8 @@ import { isClosedWay } from './osm.ts';
 import type { TerrainGrid } from './terrain.ts';
 import { loadObservedTrees } from './observed.ts';
 import { BARRIER_LOOK, loadObservedBarriers } from './facadedetail.ts';
+import { greenery } from './greenery.ts';
+import { barrierHeight, fenceColour, fenceDrawn } from './roadside.ts';
 
 const tmp = newPolySample();
 
@@ -52,6 +54,8 @@ export function addVegetation(
   ts: TileSet,
   bmask: Uint8Array,
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number },
+  /** mapped trees already placed (in the tree bulbs of parking strips – mapgen/roadside.ts) */
+  placed: ReadonlySet<number> = new Set(),
 ): VegetationStats {
   const stats: VegetationStats = { mapped: 0, rows: 0, forest: 0, garden: 0 };
   const hit = newSurfaceHit();
@@ -73,6 +77,10 @@ export function addVegetation(
   const mappedTrees: number[] = [];
   for (const n of osm.nodes.values()) {
     if (n.tags?.natural !== 'tree') continue;
+    if (placed.has(n.id)) {
+      mappedTrees.push(n.x, n.z);
+      continue;
+    }
     const conifer = n.tags.leaf_type === 'needleleaved';
     const h = Number.parseFloat(n.tags.height ?? '') || 7 + hash01(n.id) * 8;
     if (put(n.x, n.z, Math.min(28, h), conifer ? 1 : 0, 0.6)) stats.mapped++;
@@ -134,16 +142,24 @@ export function addVegetation(
 }
 
 /** Street lamps along lit streets (plus the few mapped individually). */
-export function addLamps(osm: OsmData, world: World, terrain: TerrainGrid, ts: TileSet): number {
+export function addLamps(
+  osm: OsmData,
+  world: World,
+  terrain: TerrainGrid,
+  ts: TileSet,
+  /** the number a road's lamps are placed by (default its index here: with a detail region, its index in the published map's block – tools/build-tiles.ts) */
+  idOf: (e: Edge) => number = (e) => e.id,
+): number {
   let count = 0;
   for (const e of world.edges) {
     if (!(e.flags & EF.LIT) || !(e.flags & EF.URBAN) || e.tier < 2 || e.flags & (EF.BRIDGE | EF.TUNNEL)) continue;
+    const id = idOf(e);
     const s0 = e.cutA + 6;
     const s1 = e.len - e.cutB - 6;
     if (s1 - s0 < 10) continue;
     const spacing = e.tier >= 3 ? 34 : 40;
-    const first = s0 + hash01(e.id * 17 + 3) * Math.min(spacing, s1 - s0);
-    const side = hash01(e.id * 5 + 1) < 0.5 ? 1 : -1;
+    const first = s0 + hash01(id * 17 + 3) * Math.min(spacing, s1 - s0);
+    const side = hash01(id * 5 + 1) < 0.5 ? 1 : -1;
     for (let s = first; s < s1; s += spacing) {
       samplePolyline(e.pl, s, tmp);
       const sw = side > 0 ? e.swL : e.swR;
@@ -172,6 +188,12 @@ export function addBarriersAndRails(
   inWorld: (x: number, z: number) => boolean,
   /** would a wall from (x1, z1) to (x2, z2) at height y stand in a lane? (then that piece is left out) */
   inLane: (x1: number, z1: number, x2: number, z2: number, y: number) => boolean = () => false,
+  /**
+   * Which walls, hedges and fences (their points, flat x, z) are drawn as the map build does now – at their
+   * mapped height, fences at all, and the hedges of observed-greenery.json – and which as the published map
+   * had them (the detail region – mapgen/detailregion.ts).  Without: all as now.
+   */
+  fresh?: (pts: number[]) => boolean,
 ): { barriers: number; railKm: number; guardKm: number } {
   const hit = newSurfaceHit();
   let barriers = 0;
@@ -274,11 +296,18 @@ export function addBarriersAndRails(
 
   for (const w of osm.ways) {
     const t = w.tags;
+    // (at their mapped height: height=*, else what is usual – mapgen/roadside.ts; not outside the detail region)
+    const now = !fresh || ((t.barrier || t.natural === 'hedge') && fresh(osm.wayCoords(w)));
+    const hTag = now ? barrierHeight(t) : undefined;
     if (t.barrier === 'wall' || t.barrier === 'retaining_wall' || t.barrier === 'city_wall') {
-      for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.14, -0.4, t.barrier === 'retaining_wall' ? 1.2 : 1.5, [176, 170, 160], ground, true);
+      for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.14, -0.4, hTag ?? (t.barrier === 'retaining_wall' ? 1.2 : 1.5), [176, 170, 160], ground, true);
       barriers++;
     } else if (t.barrier === 'hedge' || t.natural === 'hedge') {
-      for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.45, -0.3, 1.5, [58, 92, 44], ground, true);
+      for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.45, -0.3, hTag ?? 1.5, [58, 92, 44], ground, true);
+      barriers++;
+    } else if (t.barrier === 'fence' && now && fenceDrawn(t, (x, z) => cover.at(x, z), osm.wayCoords(w))) {
+      const look = BARRIER_LOOK.fence;
+      for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, look.halfW, look.y0, hTag ?? look.h, fenceColour(t), ground, true);
       barriers++;
     } else if (t.barrier === 'guard_rail' || t.barrier === 'jersey_barrier') {
       for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.06, 0.42, 0.78, [150, 155, 160], ground, true);
@@ -335,7 +364,8 @@ export function addBarriersAndRails(
     }
   }
   // hedges, fences and walls seen on site (tools/mapgen/observed-barriers.json – mapgen/facadedetail.ts)
-  for (const b of loadObservedBarriers()) {
+  // (and the hedges seen on the aerial photographs: tools/mapgen/observed-greenery.json – mapgen/greenery.ts)
+  for (const b of [...loadObservedBarriers(), ...greenery().hedges.filter((h) => !fresh || fresh(h.pts))]) {
     const look = BARRIER_LOOK[b.kind];
     for (const part of clip(densify(b.pts, 4))) for (const run of clear(part, ground)) strip(run, look.halfW, look.y0, b.h, look.rgb, ground, true);
     barriers++;

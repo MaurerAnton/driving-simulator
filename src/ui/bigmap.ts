@@ -29,7 +29,7 @@ import type { RoadEventInfo } from '../sim/roadevents.ts';
 import { searchPlaces } from './placesearch.ts';
 import type { StopSource } from './placesearch.ts';
 import { locate } from './geolocate.ts';
-import { LAYERS, LAYER_KEYS, drawLayerIcons, layerIconAt, loadLayers, saveLayers } from './maplayers.ts';
+import { LAYERS, LAYER_KEYS, drawLayerIcons, extraLayers, layerIconAt, loadLayers, saveLayers } from './maplayers.ts';
 import type { MapEmergency, MapService } from './maplayers.ts';
 import { FUELS } from '../world/services.ts';
 import { routePresetSection } from './lessonroutes.ts';
@@ -793,6 +793,11 @@ export class BigMap {
   /** A tap at a point of the screen: the nearest place on a road. */
   private choose(px: number, py: number): void {
     const r = this.canvas.getBoundingClientRect();
+    // a place asked for (the place of a photo to upload: net/online.ts): handed over, nothing else
+    if (extraLayers.pick) {
+      extraLayers.pick(this.cx + (px - r.left - r.width / 2) / this.scale, this.cz + (py - r.top - r.height / 2) / this.scale);
+      return;
+    }
     // a tram, a bus or a stop there: its small window instead
     if (this.transit.tap(px - r.left, py - r.top)) {
       this.spot = null;
@@ -804,6 +809,11 @@ export class BigMap {
     const sxf = (x: number): number => r.width / 2 + (x - this.cx) * this.scale;
     const syf = (z: number): number => r.height / 2 + (z - this.cz) * this.scale;
     const icon = layerIconAt(px - r.left, py - r.top, this.scale, sxf, syf, this.host.services?.() ?? [], this.host.emergencies?.() ?? [], this.layers);
+    // (a photo of the players of a server: its viewer)
+    if (icon && 'extra' in icon) {
+      icon.extra();
+      return;
+    }
     if (icon && 'em' in icon) {
       this.spot = null;
       const bar = this.spotBar;

@@ -34,6 +34,7 @@ import { ACCESS, CLASS_TIER, CLS, CTRL, EF, ROLE } from '../src/world/types.ts';
 import type { EdgeJson, PlaceJson, SpawnJson, WorldChunkJson, WorldJson } from '../src/world/types.ts';
 import { World, computeAllCuts, newSurfaceHit, packEdgePoints } from '../src/world/world.ts';
 import { deriveControl } from './mapgen/control.ts';
+import { spliceDetail } from './mapgen/detailgraph.ts';
 import { Dgm } from './mapgen/dgm.ts';
 import { solveElevation } from './mapgen/elevation.ts';
 import { collectPlaces, collectSpawns } from './mapgen/objects.ts';
@@ -47,7 +48,8 @@ import { groundAt } from './mapgen/terrain.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = resolve(root, process.env.MAP_OUT ?? 'public/map');
-const workDir = resolve(root, 'data/work/graph');
+// (MAP_WORK=<folder>: where the blocks for the tile build go – for a test build beside the real one)
+const workDir = resolve(root, process.env.MAP_WORK ?? 'data/work/graph');
 const t0 = Date.now();
 // (with what is in memory after tidying up, if node was started with --expose-gc: the network of the
 // whole region is held at once, and that is what limits how large a region can be built on a machine)
@@ -60,7 +62,12 @@ const lap = (msg: string): void => {
 const gz = (v: unknown): Buffer => gzipSync(JSON.stringify(v), { level: 9 });
 
 const coverage = new Coverage(root, true);
-const osm = OsmData.load(resolve(root, 'data/work/osm/roads.json.gz'));
+// (GRAPH_OSM=<extract>,<extract>…: a part of the region from the extracts of its blocks, for a test build;
+// GRAPH_BLOCKS=<bx>_<bz>,…: only these blocks are written for the tile build)
+// (as mapped: the corrections of observed-roads.json go into the detail region only – mapgen/detailgraph.ts)
+const osm = process.env.GRAPH_OSM
+  ? OsmData.loadAll(process.env.GRAPH_OSM.split(',').map((f) => resolve(root, f)), { observed: false })
+  : OsmData.load(resolve(root, 'data/work/osm/roads.json.gz'), { observed: false });
 lap(`roads of the region: ${osm.nodes.size} nodes, ${osm.ways.length} ways, ${osm.relations.length} relations; terrain for ${coverage.count} km²`);
 
 // ---- where the region is built up (a grid of 10 m, from the extract) ----
@@ -84,12 +91,32 @@ const inWorld = (x: number, z: number): boolean => coverage.covered(x, z);
 
 // ---- the network ----
 const dgm = new Dgm(resolve(root, 'data/work/dgm2'), 500);
-const graph = buildRoadGraph(osm, { inWorld, builtUp });
+// (first the whole network as the published map was built, then the detail region anew in it: mapgen/detailregion.ts)
+const graph = buildRoadGraph(osm, { inWorld, builtUp, fresh: () => false });
 lap(`road graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges — km: ${roadStats(graph)}`);
 const elev = solveElevation(graph, dgm);
 lap(`elevation solved: max grade ${(elev.maxGrade * 100).toFixed(1)} %, ${elev.steepEdges} edges > 20 %, ${elev.lowClearances} low bridge clearances (${elev.fixedClearances} decks raised)`);
 const control = deriveControl(graph, osm);
 lap(`right-of-way: ${Object.entries(control.report).map(([k, v]) => `${v} ${k}`).join(', ')}`);
+// (the boxes of the published roads: a block's roads are listed by number, and the tile build places some things
+// by a road's place in that list – where the detail region changes the list, the blocks say what it was)
+const E0 = graph.edges.length;
+const publishedBox = new Float32Array(E0 * 4);
+graph.edges.forEach((e, i) => {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let k = 0; k < e.p.length; k += 3) {
+    if (e.p[k] < minX) minX = e.p[k];
+    if (e.p[k] > maxX) maxX = e.p[k];
+    if (e.p[k + 2] < minZ) minZ = e.p[k + 2];
+    if (e.p[k + 2] > maxZ) maxZ = e.p[k + 2];
+  }
+  publishedBox.set([minX, minZ, maxX, maxZ], i * 4);
+});
+const detail = spliceDetail(graph, control, osm, dgm, { inWorld, builtUp }, lap);
+if (detail) lap(detail.report);
 
 const bbox = coverage.bbox;
 const worldJson: WorldJson = {
@@ -229,7 +256,8 @@ worldJson.edges.forEach((e, i) => {
   waySpeed[i * 2 + 1] = e.lb > 0 ? Math.min(250, e.mb > 0 ? e.mb : 130) : 0;
 });
 const turnsOf: Array<Array<[number, number, number]> | undefined> = new Array(E * 2);
-const blocks = coverage.squares(BLOCK);
+const onlyBlocks = process.env.GRAPH_BLOCKS?.split(',').filter(Boolean);
+const blocks = coverage.squares(BLOCK).filter(([bx, bz]) => !onlyBlocks || onlyBlocks.includes(`${bx}_${bz}`));
 let lanesMade = 0;
 let pathsMade = 0;
 for (const [bx, bz] of blocks) {
@@ -403,6 +431,8 @@ rmSync(resolve(outDir, 'w'), { recursive: true, force: true });
 mkdirSync(resolve(outDir, 'w'), { recursive: true });
 const chunkNodes = new Map<string, number[]>();
 worldJson.nodes.forEach((n, i) => {
+  // (the placeholders of the detail region's splice belong to no chunk)
+  if (detail?.placeholderNodes.has(i)) return;
   const key = `${gridIndex(n.x, CHUNK)}_${gridIndex(n.z, CHUNK)}`;
   const list = chunkNodes.get(key);
   if (list) list.push(i);
@@ -444,6 +474,20 @@ const railBytes = gz({ v: 1, rails: railNet.rails });
 writeFileSync(resolve(outDir, 'rails.json.gz'), railBytes);
 lap(`wrote ${chunkList.length} chunks of the network (${(chunkBytes / 1048576).toFixed(1)} MB), net.bin.gz (${(netBytes.length / 1048576).toFixed(1)} MB), rails.json.gz (${(railBytes.length / 1048576).toFixed(1)} MB)`);
 
+/** Each road of a block's list: its index in the list the published network gave (−1: new); undefined where that is its index anyway. */
+function legacyIndexOf(edges: number[], r: Rect): number[] | undefined {
+  const pad = 40;
+  const then: number[] = [];
+  for (let i = 0; i < E0; i++) {
+    const b = publishedBox;
+    if (b[i * 4] > r.maxX + pad || b[i * 4 + 2] < r.minX - pad || b[i * 4 + 1] > r.maxZ + pad || b[i * 4 + 3] < r.minZ - pad) continue;
+    then.push(i);
+  }
+  const at = new Map(then.map((e, i) => [e, i]));
+  const out = edges.map((e) => (detail?.freshEdges.has(e) ? -1 : (at.get(e) ?? -1)));
+  return out.every((v, i) => v === i) ? undefined : out;
+}
+
 // ---- writing: what the tile build needs, block by block ----
 rmSync(workDir, { recursive: true, force: true });
 mkdirSync(workDir, { recursive: true });
@@ -463,6 +507,9 @@ for (const [bx, bz] of blocks) {
       return o ? { id: o.id, x: o.x, z: o.z, tags: o.tags } : null;
     }),
     edgeFeatures: sub.edges.map((e) => graph.edgeFeatures[e]),
+    // (the roads built anew in the detail region: the tile build treats them and their junctions the new way)
+    fresh: detail ? sub.edges.flatMap((e, i) => (detail.freshEdges.has(e) ? [i] : [])) : [],
+    legacyIndex: detail ? legacyIndexOf(sub.edges, window) : undefined,
     municipalities: municipalities
       .filter((m) => m.box.maxX > window.minX && m.box.minX < window.maxX && m.box.maxZ > window.minZ && m.box.minZ < window.maxZ)
       .map((m) => ({ name: m.name, sign: m.sign, lod2: m.lod2, rings: m.rings.map((r) => r.map((v) => Math.round(v * 10) / 10)) })),

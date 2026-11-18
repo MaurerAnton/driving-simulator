@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import { COVER_COLORS } from '../world/cover.ts';
+import { coverEdgeAlpha } from './coveredge.ts';
 import type { TileGrid } from '../world/loader.ts';
 import { mapFetch } from '../world/mappack.ts';
 import { POS_XZ_SCALE, POS_Y_SCALE, tileKey, unpackTile } from '../world/tilefmt.ts';
@@ -49,6 +50,15 @@ export type TileListener = (tile: LoadedTile, loaded: boolean) => void;
 export class TileManager {
   readonly group = new THREE.Group();
   readonly tiles = new Map<string, LoadedTile>();
+  /**
+   * The tile `heightAt` / `coverAt` looked up last – by its grid indices, so
+   * that the ground under the wheels (many lookups a frame, nearly all in the
+   * same tile) needs no key string and no map lookup.  `undefined`: that tile
+   * is not loaded.  Forgotten whenever a tile comes or goes (`forgetLast`).
+   */
+  private lastIx = NaN;
+  private lastIz = NaN;
+  private lastTile: LoadedTile | undefined = undefined;
   private readonly loading = new Set<string>();
   /** tiles that could not be fetched: how often it was tried, and when last (they are asked for again a few times) */
   private readonly failed = new Map<string, { n: number; at: number }>();
@@ -171,6 +181,7 @@ export class TileManager {
       const data = unpackTile(buf);
       const tile = this.build(key, data);
       this.tiles.set(key, tile);
+      this.forgetLast();
       this.group.add(tile.group);
       for (const l of this.listeners) l(tile, true);
     } catch (err) {
@@ -186,6 +197,23 @@ export class TileManager {
     this.group.remove(tile.group);
     for (const d of tile.disposables) d.dispose();
     this.tiles.delete(tile.key);
+    this.forgetLast();
+  }
+
+  private forgetLast(): void {
+    this.lastIx = NaN;
+    this.lastIz = NaN;
+    this.lastTile = undefined;
+  }
+
+  /** The loaded tile with these grid indices (or undefined), remembered for the next call. */
+  private tileAt(ix: number, iz: number): LoadedTile | undefined {
+    if (ix === this.lastIx && iz === this.lastIz) return this.lastTile;
+    const tile = this.tiles.get(tileKey(ix, iz));
+    this.lastIx = ix;
+    this.lastIz = iz;
+    this.lastTile = tile;
+    return tile;
   }
 
   private build(key: string, data: UnpackedTile): LoadedTile {
@@ -274,12 +302,14 @@ export class TileManager {
     const cov = data.get('cov') as Uint8Array;
     const cn = h.coverN;
     const tex = new Uint8Array(cn * cn * 4);
+    // (alpha: how far the cell's centre lies inside its class, for smooth edges – render/coveredge.ts; 0 where the map has none)
+    const cedge = data.get('cedge') as Uint8Array | null;
     for (let i = 0; i < cn * cn; i++) {
       const c = COVER_RGB[cov[i]] ?? COVER_RGB[0];
       tex[i * 4] = c[0];
       tex[i * 4 + 1] = c[1];
       tex[i * 4 + 2] = c[2];
-      tex[i * 4 + 3] = 255;
+      tex[i * 4 + 3] = coverEdgeAlpha(cedge ? cedge[i] : 0);
     }
     const coverTex = new THREE.DataTexture(tex, cn, cn, THREE.RGBAFormat);
     coverTex.colorSpace = THREE.SRGBColorSpace;
@@ -376,7 +406,7 @@ export class TileManager {
     const { x0: minX, z0: minZ, size: tileSize } = this.grid;
     const ix = Math.floor((x - minX) / tileSize);
     const iz = Math.floor((z - minZ) / tileSize);
-    const tile = this.tiles.get(tileKey(ix, iz));
+    const tile = this.tileAt(ix, iz);
     if (!tile) return 0;
     const cn = tile.header.coverN;
     const cov = tile.cover;
@@ -390,7 +420,7 @@ export class TileManager {
     const { x0: minX, z0: minZ, size: tileSize } = this.grid;
     const ix = Math.floor((x - minX) / tileSize);
     const iz = Math.floor((z - minZ) / tileSize);
-    const tile = this.tiles.get(tileKey(ix, iz));
+    const tile = this.tileAt(ix, iz);
     if (!tile) return NaN;
     const n = tile.header.terrainN;
     const step = tileSize / (n - 1);

@@ -1,6 +1,6 @@
 {
   "name": "fahrsim-baunatal",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Freier 3D-Fahrschulsimulator für Nordhessen – deutsche Verkehrsregeln lernen, mit einem Fahrzeug jeder Führerscheinklasse (AGPL-3.0-only).",
   "license": "AGPL-3.0-only",
   "private": true,
@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/vehicle/*.test.ts\" \"tests/reality/*.test.ts\" \"tests/game/*.test.ts\" \"tests/i18n/*.test.ts\" \"tests/world/*.test.ts\" \"tests/sim/*.test.ts\" \"tests/ui/*.test.ts\"",
+    "test:server": "node --test \"server/tests/*.test.ts\"",
     "i18n:check": "node tools/i18n-check.ts",
     "panos:index": "node tools/panos/index-panos.ts",
     "map:extract": "node --max-old-space-size=6144 tools/osm-extract.ts",
@@ -31,6 +32,7 @@
     "test:drive": "node tests/drive.sim.ts",
     "test:drive:truck": "node tests/drive.sim.ts --truck priority rural ceExam",
     "test:drive:traffic": "node tests/drive.sim.ts --traffic",
+    "map:detail": "node tools/build-detail.ts",
     "map:graph": "node --max-old-space-size=6144 --expose-gc tools/build-graph.ts",
     "map:check": "node --max-old-space-size=3072 tools/check-lanes.ts",
     "map:fetch": "node tools/fetch-map.ts",

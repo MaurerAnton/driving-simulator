@@ -228,6 +228,20 @@ export class AutoDriver {
     }
     // roadworks (src/sim/roadevents.ts): a lane closed ahead – over to the open one in good time, and not back before its end
     const works = traffic?.roadEvents ?? null;
+    // kerb build-outs (src/sim/narrowings.ts): through the gap they leave
+    const narrow = traffic?.narrowings ?? null;
+    const nhw = this.me.width / 2;
+    // level crossings (src/sim/levelcrossing.ts): moderately towards one without barriers; before the cross while it says so
+    const lxs = traffic?.levelCrossings ?? null;
+    const levelCrossing = (g: { stop: number; cap: number; why: string }): void => {
+      if (g.cap < limit) limit = g.cap;
+      if (!obey || g.stop === Infinity) return;
+      const dd = Math.max(0, g.stop - 0.3);
+      limit = Math.min(limit, Math.sqrt(2 * DECEL * dd));
+      if (dd < 0.6) crossStop = true;
+      remark = g.why === 'queue' ? 'follow' : 'red';
+    };
+    const nhl = this.me.length / 2;
     if (works && lane) {
       if (path && path !== lane && !works.laneOpen(path, laneS)) {
         path = lane;
@@ -415,6 +429,7 @@ export class AutoDriver {
         else {
           lanePoint(on.to, Math.min(on.to.len, sj - on.len), smp);
           works?.offset(on.to, Math.min(on.to.len, sj - on.len), smp);
+          narrow?.offset(on.to, Math.min(on.to.len, sj - on.len), smp, nhw, nhl);
         }
       });
       tx = smp.x;
@@ -426,6 +441,7 @@ export class AutoDriver {
       me.conn = next;
       me.s = proj.s;
       if (obey) scanCrossings(next.to, next.len - proj.s - FRONT);
+      if (lxs) levelCrossing(lxs.gate(next.to, -(next.len - proj.s - FRONT), speed, this.me.length, null, 'player'));
     } else if (lane) {
       const centre = laneS - FRONT;
       me.lane = lane;
@@ -441,10 +457,12 @@ export class AutoDriver {
         if (sl <= lane.len || !onward) {
           lanePoint(here, Math.min(lane.len, sl), smp);
           works?.offset(here, Math.min(lane.len, sl), smp);
+          narrow?.offset(here, Math.min(lane.len, sl), smp, nhw, nhl);
         } else if (sl - lane.len <= onward.len) samplePolyline(onward.pl, sl - lane.len, smp);
         else {
           lanePoint(onward.to, Math.min(onward.to.len, sl - lane.len - onward.len), smp);
           works?.offset(onward.to, Math.min(onward.to.len, sl - lane.len - onward.len), smp);
+          narrow?.offset(onward.to, Math.min(onward.to.len, sl - lane.len - onward.len), smp, nhw, nhl);
         }
       });
       if (centre + la <= lane.len || next) {
@@ -462,6 +480,19 @@ export class AutoDriver {
           limit = Math.min(limit, Math.sqrt(2 * DECEL * dd));
           if (dd < 0.6) crossStop = true;
           remark = g.why === 'light' ? 'red' : g.why === 'oncoming' ? 'yield' : g.why === 'closed' ? 'closed' : 'lane';
+        }
+      }
+      // a level crossing (src/sim/levelcrossing.ts): its lights and barriers, a train – and room for the whole car behind the tracks
+      if (lxs) levelCrossing(lxs.gate(lane, laneS, speed, this.me.length, next, 'player'));
+      // a kerb build-out narrowing the road (src/sim/narrowings.ts): slowly through it; where it is on our side, the oncoming traffic first
+      if (narrow) {
+        const g = narrow.gate(lane, laneS, speed, this.me.length, null);
+        if (g.cap < limit) limit = g.cap;
+        if (obey && g.stop < Infinity) {
+          const dd = Math.max(0, g.stop - 1.2);
+          limit = Math.min(limit, Math.sqrt(2 * DECEL * dd));
+          if (dd < 0.6) crossStop = true;
+          remark = 'yield';
         }
       }
       distToLine = lane.stopAt - laneS;

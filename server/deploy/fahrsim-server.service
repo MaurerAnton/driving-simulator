@@ -1,0 +1,23 @@
+# systemd unit for running the server without Docker (Node 26 installed, code in /opt/fahrsim/server).
+[Unit]
+Description=Fahrsim Baunatal server
+After=network.target
+
+[Service]
+User=fahrsim
+Group=fahrsim
+WorkingDirectory=/opt/fahrsim/server
+Environment=FAHRSIM_DATA=/var/lib/fahrsim
+Environment=FAHRSIM_HOST=127.0.0.1
+Environment=FAHRSIM_TRUST_PROXY=1
+EnvironmentFile=-/etc/fahrsim/server.env
+ExecStart=/usr/bin/node src/main.ts
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/fahrsim
+
+[Install]
+WantedBy=multi-user.target

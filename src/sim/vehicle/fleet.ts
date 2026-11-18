@@ -115,6 +115,9 @@ export const MOTORCYCLE: VehicleSpec = {
   damperRebound: [1000, 1000],
   antiRoll: [6000, 6000],
   travel: 0.14,
+  // (a car's bump stop – 260 kN/m, made for 1.4 t – threw this light machine metres into the air off a kerb
+  // or a step in the ground, like a spring: a soft, well-damped rubber stop swallows the blow instead)
+  bumpStop: { stiffness: 30000, damping: 2500 },
   muPeak: 1.1,
   torqueCurve: [
     [0, 20],
@@ -248,3 +251,15 @@ export function variants(name: string, k: number, finalDrive: number, size = k):
 export const MOPED = variants('Moped 50 cm³, 45 km/h', 0.12, 24);
 export const MOTORCYCLE_125 = variants('Leichtkraftrad 125 cm³, 11 kW', 0.3, 7.2);
 export const MOTORCYCLE_35KW = variants('Motorrad 35 kW', 0.75, 5.8);
+
+/**
+ * How far a motorcycle leans into a bend (rad, + = to the right): as far as its speed (m/s) and the turn of
+ * its heading (rad/s, + = to the left) ask – tan(lean) = v·ω / g, at most 39°.  From the heading rather than
+ * from the measured sideways acceleration, which on a bumpy or sloping road takes in the up and down of the
+ * suspension too and threw the drawn machine from side to side like a spring.
+ */
+export function bikeLean(speed: number, yawRate: number): number {
+  const a = -speed * yawRate;
+  if (!Number.isFinite(a)) return 0;
+  return Math.atan(Math.max(-8, Math.min(8, a)) / 9.81);
+}

@@ -488,7 +488,12 @@ export class Vehicle {
         vc = clamp(vc, -3, 3);
         const other = this.compPrev[i ^ 1];
         N = s.springRate[axle] * comp + (vc > 0 ? s.damperBump[axle] : s.damperRebound[axle]) * vc + s.antiRoll[axle] * (comp - other);
-        if (comp > s.travel - 0.035) N += 260000 * (comp - (s.travel - 0.035));
+        if (comp > s.travel - 0.035) {
+          const stop = s.bumpStop;
+          N += (stop ? stop.stiffness : 260000) * (comp - (s.travel - 0.035));
+          // (a rubber bump stop swallows the blow instead of handing it back)
+          if (stop) N += stop.damping * vc;
+        }
         if (N < 0) N = 0;
       }
       this.comp[i] = comp;

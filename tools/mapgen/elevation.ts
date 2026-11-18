@@ -20,7 +20,17 @@ export interface ElevationReport {
   fixedClearances: number;
 }
 
-export function solveElevation(graph: RoadGraph, dgm: Dgm): ElevationReport {
+/**
+ * Heights that are given, not solved (mapgen/detailgraph.ts: the part of the
+ * network rebuilt in the detail region meets the rest at the heights the rest
+ * has): a node's height, or the heights of all points of an edge.
+ */
+export interface ElevationPins {
+  node(i: number): number | undefined;
+  edge(k: number): ArrayLike<number> | undefined;
+}
+
+export function solveElevation(graph: RoadGraph, dgm: Dgm, pin?: ElevationPins): ElevationReport {
   const { nodes, edges } = graph;
   const E = edges.length;
   const nodeH = new Float64Array(nodes.length);
@@ -268,10 +278,43 @@ export function solveElevation(graph: RoadGraph, dgm: Dgm): ElevationReport {
       H[g] += (t - H[g]) * omega;
     }
   };
+  // (given heights: held where they are – each sweep finds them already there)
+  const pinNodes: Array<[number, number]> = [];
+  const pinPoints: Array<[number, number]> = [];
+  if (pin) {
+    for (let i = 0; i < N; i++) {
+      const v = pin.node(i);
+      if (v !== undefined) pinNodes.push([i, v]);
+    }
+    for (let k = 0; k < E; k++) {
+      const ys = pin.edge(k);
+      if (!ys || ys.length !== eh[k].length) continue;
+      for (let i = 1; i < ys.length - 1; i++) pinPoints.push([base[k] + i - 1, ys[i]]);
+    }
+  }
+  const holdPins = (): void => {
+    for (const [i, v] of pinNodes) {
+      for (let q = nStart[i]; q < nStart[i + 1]; q++) nW[q] = 0;
+      nC0[i] = v;
+      isFree[i] = 0;
+    }
+    for (const [g, v] of pinPoints) {
+      c0[g] = v;
+      c1[g] = 0;
+      c2[g] = 0;
+      isFree[g] = 0;
+    }
+  };
+  const loadPins = (): void => {
+    for (const [i, v] of pinNodes) H[i] = v;
+    for (const [g, v] of pinPoints) H[g] = v;
+  };
   const solve = (structIters: number, fullIters: number): void => {
     assemble();
+    if (pin) holdPins();
     collectFree();
     load();
+    if (pin) loadPins();
     for (let it = 0; it < structIters; it++) sweepFree(1.8);
     for (let it = 0; it < fullIters; it++) sweepAll(1.5, (it & 1) === 1);
     for (let it = 0; it < 12; it++) sweepAll(1.0, (it & 1) === 1);

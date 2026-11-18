@@ -27,7 +27,7 @@ import type { BlockResult } from './build-tiles.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = resolve(root, process.env.MAP_OUT ?? 'public/map');
-const workDir = resolve(root, 'data/work/graph');
+const workDir = resolve(root, process.env.MAP_WORK ?? 'data/work/graph');
 const argv = process.argv.slice(2);
 const flag = (name: string): boolean => argv.includes(name);
 const value = (name: string): string | undefined => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);

@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Fahrsim Baunatal server behind Caddy (automatic HTTPS from Let's Encrypt).
+#
+#   cp .env.example .env    # set FAHRSIM_DOMAIN and FAHRSIM_PEPPER
+#   docker compose up -d --build
+#
+# Data: the volume "fahrsim-data" (database + images) – back it up (see README).
+services:
+  fahrsim:
+    build: ..
+    restart: unless-stopped
+    environment:
+      FAHRSIM_PEPPER: ${FAHRSIM_PEPPER:?set FAHRSIM_PEPPER in .env}
+      FAHRSIM_TRUST_PROXY: "1"          # exactly one proxy (Caddy) in front
+      FAHRSIM_ORIGINS: ${FAHRSIM_ORIGINS:-https://maureranton.github.io,http://localhost:*}
+      FAHRSIM_REGISTRATION: ${FAHRSIM_REGISTRATION:-false}
+      FAHRSIM_MOTD: ${FAHRSIM_MOTD:-}
+    volumes:
+      - fahrsim-data:/data
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [fahrsim]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      FAHRSIM_DOMAIN: ${FAHRSIM_DOMAIN:?set FAHRSIM_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  fahrsim-data:
+  caddy-data:
+  caddy-config:

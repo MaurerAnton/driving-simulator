@@ -183,7 +183,13 @@ die Karte in einem anderen Ordner und kann am Ende in einem Zug gegen `public/ma
 Bis hierher für das ganze Gebiet auf einmal; ab hier **Block für Block** (8 km, mit einem Rand von einer
 Kachel, damit an den Blockgrenzen von beiden Seiten dasselbe herauskommt):
 
-7. **Bodenbedeckung** (`mapgen/cover.ts`): OSM-Flächen als 2-m-Raster (Wiese, Acker, Wald, Wohngebiet …).
+7. **Bodenbedeckung** (`mapgen/cover.ts`): OSM-Flächen als 2-m-Raster (Wiese, Acker, Wald, Wohngebiet …),
+   gemalt in einem dreimal feineren Raster: Je Zelle steht in der Kachel (Abschnitt `cedge`, ältere Versionen
+   lesen ihn nicht), wie weit ihre Mitte in ihrer Klasse liegt (bis 3 m, in Zehntelmetern); daraus zeichnet das
+   Spiel die Grenzen als glatte Linien statt 2-m-Treppen (`src/render/coveredge.ts`). Trockene Becken
+   (`basin=detention|infiltration`, `intermittent=yes`) sind Wiese, kein Wasser; Bäche so breit wie `width`, mindestens
+   2,4 m. In `landuse=retail|commercial` ist nur befestigt, was bis 6 m um Gebäude, an Zufahrten (5 m) und
+   Parkplatzgassen (8 m) liegt – der Rest Rasen.
 8. **Gelände** (`mapgen/terrain.ts`): 5-m-Raster, entlang der Straßen auf Fahrbahnniveau angeglichen.
 9. **Netze** (`mapgen/roadmesh.ts`, `buildings.ts`, `objects.ts`, `signs.ts`): Fahrbahnen, Markierungen,
    Gehwege, Brücken, Gebäude, Schilder, Bäume, Laternen, Leitplanken, Gleise.
@@ -213,6 +219,217 @@ den Fahrstreifen gerückt (oder entfallen, wenn kein Platz ist), Laternen und Ba
 Hecken, Leitplanken und Brückengeländer bekommen dort eine Lücke, und von Gebäudeumrissen zählen die
 Seiten nicht als Hindernis, die in den Fahrstreifen ragen (das Gebäude selbst bleibt sichtbar).
 `npm run map:check` fährt zur Kontrolle einen wagenbreiten Kreis jeden Fahrstreifen entlang.
+
+### Straßenquerschnitt: Parken, Gehwege, Radwege, Mittelstreifen
+
+Was neben den Fahrstreifen liegt, kommt aus den Tags des Wegs (`tools/mapgen/xsection.ts`; `<side>` =
+`left` | `right` | `both`, in Zeichenrichtung des Wegs):
+
+- `parking:<side>` = `lane` | `street_side` | `half_on_kerb` | `on_kerb` | `shoulder` | `no` (auch das ältere
+  `parking:lane:*`), dazu `parking:<side>:orientation` = `parallel` | `diagonal` | `perpendicular`,
+  `parking:<side>:width` und **`parking:<side>:markings` = `yes` | `no`** (gemalte Parkstandslinien; ohne Angabe
+  nur bei `street_side`). Parkstreifen auf der Fahrbahn verbreitern sie, die Fahrstreifen bleiben frei; in die
+  Parkstände stellt der Kartenbau stehende Autos (60–80 % belegt, jede Straße gleich bei jedem Lauf), nicht
+  näher als 5 m an Kreuzungen und vor Zebrastreifen, nicht 15 m um Bushaltestellen, nicht vor Zufahrten.
+  **`parking:<side>:occupancy` = Anteil 0–1 | `n%` | `low` (15 %) | `high` (90 %) | `none`** (eigene Erweiterung):
+  so viele Parkstände sind belegt – `low`, wo nur ab und zu ein Auto steht, keine Reihe.
+- `sidewalk[:<side>]`, `sidewalk:<side>:width`, `kerb[:<side>]` = `raised` | `lowered` | `flush`.
+- **`verge:<side>` = `grass` | Breite in m** (eigene Erweiterung): Grünstreifen zwischen Bordstein und Gehweg.
+- `cycleway[:<side>]` = `lane` (Radfahrstreifen bzw. mit `cycleway:<side>:lane=advisory` Schutzstreifen,
+  mit Fahrradsymbolen; rot bei `cycleway:<side>:surface:colour=red`) | `track` (eigener Weg zwischen Bordstein
+  und Gehweg).
+- **`median:contents` = `grass` | `parking` | `hedge` | `trees` | `paving_stones`**, mit `;` kombinierbar (eigene
+  Erweiterung): an einer Richtungsfahrbahn, was links von ihr bis zur Gegenfahrbahn liegt; `paving_stones;trees`
+  ist ein gepflasterter Streifen mit jungen Bäumen.
+- **`verge:<side>`** nimmt auch `paving_stones` (gepflastert statt Gras) und `;trees` (junge Bäume darin, alle 10 m),
+  die Breite dann mit `verge:<side>:width`.
+- **`gutter[:<side>]` = `no` | `yes` | Breite in m** (eigene Erweiterung): die gepflasterte Rinne zwischen Asphalt
+  und Bordstein. Ohne Angabe 0,4 m innerorts, wo ein hoher Bordstein ist (nicht vor Parkbuchten mit eigenem
+  Pflaster); auch um die Ecken der Kreuzungen (dort die schmalste der Straßen, keine, wenn eine `no` sagt).
+- **`lane_markings:edge` = `yes` | `no` | `left` | `right` | `both`** (eigene Erweiterung): Randlinien je Seite. Ohne
+  Angabe wie bisher: auf markierten Straßen außerorts und auf Autobahnen.
+- **`parking:<side>:trees` = alle n m | `yes` (20 m)** (eigene Erweiterung): statt eines Parkstands eine
+  Baumscheibe mit Bordstein und Baum. Ebenso überall, wo OSM einen `natural=tree` im Parkstreifen hat.
+- **`frontage:<side>` = `hedge` | `fence` | `wall` | `lawn`**, `frontage:<side>:height`,
+  **`frontage:<side>:offset`** (eigene Erweiterung; Höhe ohne Angabe: Hecke 1,8 m wie eine Gartenhecke, Zaun
+  1,2 m, Mauer 1,0 m; Abstand in m hinter dem Gehweg, ohne Angabe 0,3 m – wo kein Gehweg ist, 1,0 m hinter dem
+  Bordstein, denn Vorgärten enden nicht am Asphalt): wo OSM nichts erfasst hat; Lücken an Einmündungen, erfassten
+  Zufahrten, Gebäuden und auf befestigten Flächen (Hofeinfahrten, Vorplätze als Fläche erfasst). Gilt für den
+  ganzen Weg (oder ein Stück mit `split`): wo Hecke, Mauer und Einfahrt wechseln, besser nur die Stücke taggen.
+
+Ist der Gehweg als eigener Weg erfasst (`footway=sidewalk`, die Straße mit `sidewalk=separate` oder ohne
+Angabe), reicht der Gehweg der Straße bis zu diesem Weg, mit Grünstreifen dazwischen – ein Gehweg, nicht zwei –,
+im Belag dieses Wegs (`surface`, bei Radwegen ohne Angabe Asphalt), wenn die Straße keinen sagt. Ebenso werden
+Fußweg-, Radweg- und `path`-Brücken (`bridge=*`) neben einer Straßenbrücke deren erhöhte Gehwege, ohne Grünstreifen;
+an einem Gehweg steht auf einer Brücke ein offenes Geländer auf einem niedrigen Betonrand statt der geschlossenen
+Brüstung (die bleibt, wo die Fahrbahn bis an den Rand reicht).
+Eine Breite (`width`), die weit über die Fahrstreifen hinausgeht (über 4,6 m je Streifen), legt die Fahrstreifen in
+üblicher Breite (3,25–3,5 m) in die Mitte und Asphalt zu beiden Seiten – nicht mehr verworfen.
+
+**Eigene Wege** (`tools/mapgen/paths.ts`): `highway=footway` | `cycleway` | `path` | `pedestrian` | `bridleway`
+liegen als Streifen ihrer Breite auf dem Gelände (`width`, sonst Fußweg 2,0 m, Radweg und gemeinsamer Geh- und
+Radweg 2,5 m, sonstiger `path` 1,5 m, Fußgängerzone 4,0 m), im Belag nach `surface` (asphalt, paving_stones,
+sett, concrete, compacted/fine_gravel, gravel, ground …; ohne Angabe Pflaster im Ort, Asphalt für Radwege,
+Splitt außerhalb). Weggelassen wird, was schon im Straßenmodell liegt (die Mitte auf Fahrbahn, Gehweg oder
+Kreuzung, bei `footway=sidewalk` jeder Teil), Brücken, Tunnel, Treppen, Flächen, Gras und Holz. Auf einem Weg
+wächst kein gestreuter Baum. Überwege: `crossing=zebra`, `crossing:markings=zebra` und `crossing=marked` ohne
+andere Markierung werden Zebrastreifen; `crossing=marked` mit `crossing:markings=dashes|lines|…` nicht mehr.
+
+**Verkehrsinseln** (`tools/mapgen/islands.ts`): erfasste Flächen (`area:highway=traffic_island`, geschlossene
+`traffic_calming=island`), Querungshilfen auf zweistreifigen Straßen (`crossing:island=yes` 5 m, Knoten mit
+`traffic_calming=island` 8 m lang) und die Insel, wo sich eine Straße in zwei Richtungsfahrbahnen teilt, die sich
+im selben Knoten treffen (bis 80 m davon; längere sind Mittelstreifen; nur wo sie irgendwo mindestens 2 m von
+Bordstein zu Bordstein auseinandergehen, und nicht, wo zusammengelegte Fahrbahnen – `merge` – auseinandergehen).
+Mit Bordstein, 12 cm hoch, Belag nach
+**`island:surface` = `grass` | `plants` | `paving_stones` | `cobblestone` | `asphalt`** (eigene Erweiterung, an der
+Fläche, dem Knoten oder der Fahrbahn; Standard Pflaster). Wo der Verkehr auf beiden Seiten vorbeifährt, steht an
+der Spitze Zeichen 222 zum Verkehr hin. Die Fahrstreifen werden für eine Insel nicht verbreitert: Sie bleibt
+1,1 m von der Mitte jedes Fahrstreifens weg (ihre Ecken werden zurückgeschoben, eine zu enge entfällt).
+
+**Mauern, Hecken, Zäune aus OSM** (`tools/mapgen/objects.ts`): in ihrer Höhe `height`, sonst wie bisher. Zäune
+(`barrier=fence`) erscheinen jetzt auch – außer Draht-, Stacheldraht- und Elektrozäunen; ohne `fence_type` nur in
+bebautem Land (Gärten, Höfe), nicht um Weiden.
+
+**Korrekturen vor Ort** (`tools/mapgen/observed-roads.json`): je OSM-Weg Tags, die über die erfassten gelegt
+werden (`null` löscht) – für alle Teile des Kartenbaus, die OSM lesen (`OsmData.load`, `readPbf`). Danach
+Straßennetz und Kacheln neu bauen. Außerdem:
+
+- **Lage** (wo OSM neben der Straße der Luftbilder liegt): `"ways": {"<id>": {"shift": [dx, dz]}}` verschiebt alle
+  Knoten des Wegs um dx Meter nach Osten, dz nach Süden; `"nodes": {"<id>": [dx, dz]}` einen Knoten (eine
+  Kreuzung, ein Knick) – das geht den Verschiebungen seiner Wege vor. Ein Knoten zweier verschobener Wege rückt um
+  das Mittel ihrer Verschiebungen. Die Auszüge behalten die erfasste Lage; verschoben wird beim Lesen (`OsmData.load`
+  für Straßennetz, Kacheln, Haltestellen, Adressen; `readPbf` für Schilder, Linien, Buslinien, Dienste – die Knoten
+  der verschobenen Wege sucht es einmal im PBF und merkt sie sich daneben in `<pbf>.shift-refs.json`).
+- **Ergänzen**: `"areas": [{"id": "obs-1", "tags": {"amenity": "parking"}, "pts": [[x, z], …]}]` – Flächen in
+  Weltmetern, wie erfasste Flächen mit diesen Tags behandelt (Parkplätze, `area:highway=…`, `landuse` mit
+  `surface` …); `"newWays": [{"id": "obs-w1", "tags": {"highway": "service"}, "pts": [[x, z], …], "connect": true}]` –
+  neue Wege; mit `connect` schließt jedes Ende an den nächsten Knoten eines Wegs derselben Art (Straße, Gleis …)
+  innerhalb 3 m an, oder – wenn ein Wegstück mehr als 1 m näher vorbeiführt – mitten in dieses Stück (dort entsteht
+  ein Knoten). Sie bekommen negative Nummern aus ihrem Namen (Wege −1e9 − n, Knoten −2e9 − …), die keiner OSM-Nummer
+  begegnen und bei jedem Lauf gleich sind.
+- **Entfernen**: `"remove": [<OSM-Weg-Nr.>, …]` – Wege, die es nicht gibt.
+- **Teilen** (`tools/mapgen/waysplit.ts`): `"split": [{"osm": <Weg-Nr.>, "at": [x, z]}, …]` schneidet den Weg am
+  nächstgelegenen Punkt (an seinem Knoten, wenn einer näher als 1 m liegt, sonst an einem neuen). Mehrere Einträge
+  schneiden ihn mehrfach. Die Teile heißen `"<Nr.>:1"`, `"<Nr.>:2"` … in Zeichenrichtung des Wegs; unter `"ways"`
+  bekommen sie eigene Tags (über die Tags des ganzen Wegs unter `"<Nr.>"`), `"remove": ["<Nr.>:3"]` entfernt einen
+  Teil. Das Straßennetz nennt die Straßen der Teile nach dem OSM-Weg (Buslinien, Abbiegeverbote finden sie wie
+  bisher). Verschieben (`shift`) gilt nur für den ganzen Weg.
+- **Zusammenlegen**: `"merge": [{"id": "…", "a": [Wege der einen Richtungsfahrbahn], "b": [Wege der anderen],
+  "from": [x, z], "to": [x, z], "tags": {…}}]` – zwischen den Punkten beider Fahrbahnen, die `from` und `to` am
+  nächsten liegen, werden beide durch einen Weg mit Verkehr in beide Richtungen in ihrer Mitte ersetzt. Seine Tags:
+  die der ersten Fahrbahn ohne `oneway`, `lanes*`, `turn:lanes*`, `median:contents`, darüber `tags` (`null`
+  löscht). Ohne `width` in `tags` ist er so breit wie beide Fahrbahnen zusammen (Abstand ihrer Mittellinien plus
+  je eine halbe Fahrbahn: `width` oder Fahrstreifen × 3,25 m); `"width": null` lässt die übliche Breite. Die Fahrbahnen außerhalb treffen ihn in je einem Knoten; Einmündungen und Knoten mit Tags auf der
+  Strecke rücken auf ihn. Querverbindungen zwischen den Fahrbahnen besser mit `remove` entfernen. Buslinien über
+  die Strecke flickt `map:buslines` mit seiner Suche.
+- **Punkte**: `"points": [{"id": "…", "at": [x, z], "tags": {"traffic_calming": "table"}, "way": "<Nr.>"}]` – ein
+  Knoten mit diesen Tags in der nächsten Straße (höchstens 10 m entfernt; oder im genannten Weg, auch `"<Nr.>:<n>"`),
+  wo OSM eine Aufpflasterung, eine Einengung, ein Vorfahrtschild … nicht hat.
+
+**Bauliches und Markierungen auf der Fahrbahn** (`src/world/roadfeatures.ts`, `tools/mapgen/roadextras.ts`,
+`streetpaint.ts`):
+
+- `traffic_calming=table | hump | bump | cushion` (Knoten auf der Straße, oder ein kurzer Weg ≤ 40 m, der selbst
+  die Aufpflasterung ist), dazu `length` (Tisch: Plateau, Standard 4 m; Schwelle 3,7 m; Bodenwelle 0,6 m) und
+  `height` (Standard 8 bzw. 6 cm): Die Fahrbahn – nicht der Gehweg – hebt sich dort an (Rampen 1,2 m), die Physik
+  spürt es (`World.surfaceAt`, `EdgeJson.cm`); auf den Rampen eines Tisches Haifischzähne in den Fahrstreifen, die
+  hinauffahren. Liegt sie im Kreuzungsbereich, rückt sie an dessen Rand.
+- `traffic_calming=choker | chicane` (Knoten): bepflanzte Fahrbahneinengung mit Bordstein (Einengung: beide
+  Seiten; Schikane: rechts, dann links; oder `side=left|right|both`), `length` (5 m), Tiefe 1,6 m
+  (**`traffic_calming:depth`**). Auf einer schmalen Straße ohne Fahrstreifenmarkierung (zweistreifig) engt sie die
+  Fahrbahn auf eine Spur ein – 3,2 m bleiben frei (bei einer Einengung beider Seiten zusammen), der Gegenverkehr
+  wartet; auf markierten Straßen bleibt sie 1,1 m von der Mitte des äußeren Fahrstreifens. Im Beet Sträucher und ein
+  junger Baum, wo sein Stamm nicht in einem Fahrstreifen stünde, sonst ein hoher Strauch (`planted=no`, `tree=no`:
+  ohne); mit **`beacon=yes`** (eigener Schlüssel) eine rot-weiße Bake an der Spitze. Parkstände halten 6 m Abstand.
+- **`mouth:kerb=lowered | raised`** (eigener Schlüssel, am einmündenden Weg): Einmündung über einen durchgehenden
+  Gehweg – kein Bordsteinradius, abgesenkter Bord (3 cm) quer über die Mündung, der Gehweg der Hauptstraße läuft
+  durch. Ohne Angabe so bei gepflasterten verkehrsberuhigten Bereichen (`living_street`, ohne `surface` gilt
+  Pflaster), `service=driveway` und `service=emergency_access`.
+- **`markings:give_way=yes | no`** (eigener Schlüssel): Haifischzahn-/Wartelinie (Zeichen 341) an einer
+  Einmündung mit Vorfahrt achten; ohne Angabe gemalt, wo ein `highway=give_way`/`stop` auf der Straße erfasst ist
+  (sonst wie bisher nur an markierten Straßen).
+- **`markings:zigzag=left | right | both`** (eigener Schlüssel, Seite in Zeichenrichtung): Grenzmarkierung
+  (Zeichen 299) am Bordstein über den ganzen Weg (mit `split` über ein Stück); an einer Bushaltestelle auf der Straße
+  (`highway=bus_stop` mit `markings:zigzag=yes|left|right|both`) 15 m davor und danach.
+- **`road_text=<Text>`** (eigener Schlüssel): Schrift auf der Fahrbahn (Ziffern, A–Z) in den Fahrstreifen in
+  Zeichenrichtung, **`road_text:position`** m vom Anfang des Wegs (Standard 10, mehrere mit `;`);
+  **`road_text:backward`** und **`road_text:backward:position`** (m vom Ende) für die Gegenrichtung.
+- Radfahrerfurt: Wo die Radfahrstreifen einer Straße über eine Einmündung weiterlaufen, gestrichelte Ränder quer
+  über die Mündung, rot gefüllt bei roten Streifen (`cycleway:<side>:surface:colour=red`). Erfasste Querungen
+  (`cycleway|footway|path=crossing` mit `surface:colour=red` oder `colour=red`) werden rot, wo sie auf der Fahrbahn liegen.
+- **`sidewalk:<side>:surface`** (`asphalt`, `paving_stones`, `concrete`, `sett` …) und **`sidewalk:<side>:colour`**
+  (eigener Schlüssel: `grey`, `red`, `anthracite`): Belag des Gehwegs je Seite, auch um die Kreuzungsecken. Rote
+  Pflaster werden im Rot der Radwege, anthrazitfarbene als dunkles Kleinpflaster gezeichnet, Asphalt wie
+  Asphaltwege (nicht wie die Fahrbahn, sonst sieht der Gehweg wie ein Fahrstreifen aus) – die Materialien, die
+  ältere Spielversionen kennen. Ohne Angabe: graue Platten.
+- Flächen: `amenity=parking`, `highway=*` + `area=yes` usw. (auch die Flächen der Liste) im Belag nach `surface`
+  (`asphalt` → Asphalt, `paving_stones|sett|concrete` → Pflaster, `gravel|compacted|ground` → Schotter/Erde,
+  `grass_paver` → Gras). Kleine Grünflächen (`landuse=grass|flowerbed`, `natural=scrub|wood` unter 3000 m²) liegen
+  über den befestigten Flächen um sie herum – eine bepflanzte Insel auf einem Parkplatz oder einer Tankstelle.
+- Wald und Gebüsch (`landuse=forest`, `natural=wood|scrub`, auch als Fläche der Liste) reichen bis an den
+  Straßenrand: eine Reihe Bäume bzw. Sträucher 1,4–2,6 m neben Fahrbahn und Gehweg, alle 5–8 m, nicht an Feld- und
+  Waldwegen (`tools/mapgen/woodedge.ts`).
+
+**Grün aus den Luftbildern** (`tools/mapgen/observed-greenery.json`, `tools/mapgen/greenery.ts`;
+`OBSERVED_GREENERY=<Datei>|none`): `"trees": [{"kind": "wood"|"group"|"row", "pts": [[x, z], …], "density":
+"dense"|"medium"|"sparse", "height": "small"|"medium"|"large", "leaf": "broadleaf"|"conifer"|"mixed"}]` – Flächen
+mit Bäumen alle 6,5 / 9 / 13 m, Reihen alle 9 m, 6–10 / 10–16 / 15–25 m hoch; Laubbäume, außer `leaf` sagt `conifer`
+(alle Nadelbäume) oder `mixed` (etwa ein Viertel); nicht auf Straßen, Wegen, Gebäuden und nicht dort, wo die
+Bodenbedeckung schon Wald ist. `"hedges": [{"pts": […], "height_m": 1.6}]` – Hecken wie die beobachteten an
+Gebäuden. Laubbäume zeichnet das Spiel mit Kronen, die zur Höhe passen: rund 6 m bei 7 m Höhe, 11–13 m bei 15 m,
+höchstens 14 m (`src/render/props.ts`). Kahle Kronen (Spätherbst, Winter) sind hell graubraun und gleichmäßig
+beleuchtet wie der Boden – keine Kugel mit dunkler Schattenseite (`src/render/season.ts`: `BARE_CROWN`, `BARE_FLAT`).
+
+**Gebäude aus den Luftbildern** (`tools/mapgen/observed-buildings.json`, `tools/mapgen/buildings.ts`): je LoD2-Modell
+außer Farben auch `"roofShape": "flat"` (das schräge Dach des Modells flach, `"flatAt"` 0 = in Traufhöhe … 1 = in
+Firsthöhe) und `"roofMaterial": "green"|"flat"|"gravel"|"metal"|"tiles"` (`green`: flaches begrüntes Dach, Farbe ohne
+Angabe `#5f7a4a`); `"add": [{"id": "obs-b1", "pts": [[x, z], …], "height": m, "roof": "flat"|"gable"|"hip", "wall":
+"#…", "roofColour": "#…"}]` – Gebäude, die weder LoD2 noch OSM haben; `"remove": ["<LoD2-Id>" | "w<OSM-Weg>", …]`.
+Innerhalb der Gemeinden mit LoD2 kommen OSM-Umrisse dazu, die kein Modell bedeckt (Neubauten, Gartenhütten).
+Dächer unter 15° Neigung sind nicht mit Ziegeln gedeckt (grau bis dunkel wie Flachdächer).
+
+Ergänzt wird nur beim Lesen der Auszüge (`OsmData.load`); `readPbf` lässt die entfernten Wege weg, ergänzt aber
+nichts (was das PBF direkt liest, findet seine Dinge über OSM-Nummern und Tags). Zum Ausprobieren an zwei Blöcken, ohne `public/map` anzufassen:
+
+```bash
+MAP_OUT=/tmp/m MAP_WORK=/tmp/w GRAPH_OSM=data/work/osm/b_25_24.json.gz,data/work/osm/b_25_25.json.gz \
+  GRAPH_BLOCKS=25_24,25_25 node --max-old-space-size=3072 tools/build-graph.ts
+MAP_OUT=/tmp/m MAP_WORK=/tmp/w node --max-old-space-size=3072 tools/build-tiles.ts 25_24 25_25
+```
+
+### Detailgebiet: Neues nur dort, sonst die veröffentlichte Karte Byte für Byte
+
+Alles aus dem Abschnitt davor (Querschnitte, Parken, Wege, Inseln, feinere Bodenbedeckung, Dächer, die Listen
+`observed-*.json` …) gilt nur im **Detailgebiet** (`tools/mapgen/detail-region.json`: Kästen `[minX, minZ, maxX, maxZ]`
+in Weltmetern, zuerst die Mitte Baunatals; `DETAIL_REGION=<Datei>|none|all`). Außerhalb schreibt der Kartenbau
+dieselben Bytes wie die veröffentlichte Karte (Release `karte-2026-11-16c` mit dem Patch von 1.6.0), so dass ein Release
+nur die geänderten Dateien ausliefern muss statt der ganzen Karte. Entschieden wird:
+
+- **Straßen** als Ganzes nach dem Punkt auf halber Länge (`tools/mapgen/detailgraph.ts`): `build-graph` baut zuerst das
+  ganze Netz wie damals (`roadAttrsLegacy`, ohne Korrekturen, Höhen über das ganze Netz), dann die Wege um das Gebiet
+  neu – mit den Korrekturen von `observed-roads.json`, die im Gebiet liegen – und setzt sie ein: Die neuen Straßen,
+  Knoten und Ampelsteuerungen bekommen die Nummern der ersetzten (Überzählige hinten an, übrige Nummern halten
+  Platzhalter weit außerhalb der Karte), ihre Höhen schließen an die des alten Netzes an. Alle anderen Nummern bleiben,
+  damit auch Haltestellen, Buslinien, Adressen und Schilder. Die neu gebauten Straßen stehen in den Blöcken (`fresh`),
+  der Kachelbau baut sie und ihre Kreuzungen neu, alle anderen mit `tools/mapgen/legacy/roadmesh.ts`.
+- **OSM-Dinge** (Wege, Zäune, Flächen, Gebäude, Korrekturen, Grün aus Luftbildern) nach ihrer Mitte.
+- **Bodenbedeckung** Kachel für Kachel (500 m), außerhalb mit `tools/mapgen/legacy/cover.ts`.
+- **Schilder**: außerhalb wie in der veröffentlichten Karte (`legacy/signs.ts` = Stand 1.3.0, in den Kacheln des
+  1.6.0-Patches `legacy/patch-1.6.0-tiles.json` der heutige), Gebäudefarben außerhalb aus
+  `observed-buildings.published.json`.
+
+`tools/mapgen/legacy/*` sind die Stände der veröffentlichten Karte: nicht verbessern. Den Release-Schritt macht
+
+```bash
+node tools/build-detail.ts            # Netz (~30 min, 4 GB) und Kacheln der Blöcke am Gebiet nach data/work/detail
+# → data/work/detail/tiles-patch.tar: geänderte w/*.json.gz, net.bin.gz, tiles/*.fsb, map/patch.json
+#   (dazu die Dateien früherer Patches); als tiles-patch.tar ans Karten-Release hängen
+```
+
+`tools/fetch-map.ts` packt es über die Karte aus und setzt `meta.patched` in `map.json` – Teil der Adresse jeder Datei
+der Karte (Kacheln, Netz-Stücke, `net.bin.gz`), so dass kein Browser alte behält. `rails.json.gz` bleibt das
+veröffentlichte (es enthält, was `map:stops` ergänzt). Ein Kasten mehr: in die Liste schreiben, `build-detail` laufen
+lassen.
 
 ### Andere oder weitere Gemeinden?
 

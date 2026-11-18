@@ -435,16 +435,17 @@ export class EmergencyModel {
   }
 
   /** The wheels turned by `spin` (rolled spin × 0.31 m, as the traffic counts it), the brake lamps, the indicators as they blink now. */
-  setMotion(spin: number, braking: boolean, left: boolean, right: boolean): void {
+  setMotion(spin: number, braking: boolean, left: boolean, right: boolean, steer = 0): void {
     if (this.car) {
       const r = this.car.dims.wheelRadius;
       const a = (spin * 0.31) / r;
-      this.car.setWheels([0, 0, 0, 0], [a, a, a, a], [r, r, r, r]);
+      this.car.setWheels([steer, steer, 0, 0], [a, a, a, a], [r, r, r, r]);
       this.car.setLamps({ low: true, high: false, brake: braking, reverse: false, left, right });
       return;
     }
     const a = (spin * 0.31) / this.wheelRadius;
-    for (const w of this.wheels) w.rotation.x = -a;
+    // (the front two steered: + to the right, as the car models take it)
+    this.wheels.forEach((w, i) => w.rotation.set(-a, i < 2 ? -steer : 0, 0, 'YXZ'));
     for (const b of this.brakes) b.material = braking ? STOP : TAIL;
     for (const k of this.blinkers) k.mesh.material = (k.side < 0 ? left : right) ? AMBER : AMBER_OFF;
   }
@@ -696,9 +697,11 @@ export class EmergencyFleet {
         this.shown.set(c.id, m);
         this.group.add(m.group);
       }
-      m.group.position.set(c.x, c.y, c.z);
-      m.group.rotation.set(c.pitch, c.yaw, 0, 'YXZ');
-      m.setMotion(c.wheelSpin, c.braking, blinkOn && c.blinker < 0, blinkOn && c.blinker > 0);
+      // (where it is drawn: eased through the corners of its way – sim/smoothpose.ts)
+      const d = c.drawn ?? c;
+      m.group.position.set(d.x, c.y, d.z);
+      m.group.rotation.set(c.pitch, d.yaw, 0, 'YXZ');
+      m.setMotion(c.wheelSpin, c.braking, blinkOn && c.blinker < 0, blinkOn && c.blinker > 0, c.drawn?.steer ?? 0);
       // (each in a rhythm of its own)
       m.setLights(emLit(c.style), time + (c.id % 7) * 0.13);
     }

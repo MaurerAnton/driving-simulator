@@ -192,6 +192,36 @@ export function lineWay(src: TransitSource, at: TakeOver): TourPreview | null {
   };
 }
 
+/**
+ * A bus taken over on its line (its number among the bus lines) from the
+ * line's way `k` on: the ways from there to the end of its route, and where
+ * its last stop is (null: not known).  (Any bus of the traffic on a line,
+ * too: game/takeover.ts.)
+ */
+export function lineTakeOver(src: TransitSource, index: number, k: number): { ways: number[]; end: Spot | null } {
+  const ways: number[] = [];
+  let end: Spot | null = null;
+  const line = src.busLines()?.lines[index];
+  if (!line || k < 0) return { ways, end };
+  for (let i = k; i < line.end; i++) if (line.ways[i] >= 0) ways.push(line.ways[i]);
+  const last = line.stops.filter((s) => s.k < line.end).pop();
+  const c = last ? src.wayCourse(line.ways[last.k]) : null;
+  if (last && c) {
+    // (its last stop: where along its way)
+    let left = last.m;
+    for (let i = 2; i + 1 < c.length; i += 2) {
+      const l = Math.hypot(c[i] - c[i - 2], c[i + 1] - c[i - 1]);
+      if (left <= l || i + 3 >= c.length) {
+        const f = l > 0 ? Math.min(1, left / l) : 0;
+        end = { x: c[i - 2] + (c[i] - c[i - 2]) * f, z: c[i - 1] + (c[i + 1] - c[i - 1]) * f, yaw: Math.atan2(-(c[i] - c[i - 2]), -(c[i + 1] - c[i - 1])) };
+        break;
+      }
+      left -= l;
+    }
+  }
+  return { ways, end };
+}
+
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -311,10 +341,12 @@ export class Watcher {
       const r = this.tram.cars[this.tram.cars.length - 1];
       this.setGhost(r.x, r.y, r.z, r.yaw);
     } else if (this.bus) {
-      this.at.x = this.bus.x;
+      // (as it is drawn: eased through the corners of its way – sim/smoothpose.ts)
+      const d = this.bus.drawn ?? this.bus;
+      this.at.x = d.x;
       this.at.y = this.bus.y;
-      this.at.z = this.bus.z;
-      this.at.yaw = this.bus.yaw;
+      this.at.z = d.z;
+      this.at.yaw = d.yaw;
       this.setGhost(this.bus.x, this.bus.y, this.bus.z, this.bus.yaw);
     } else if (this.spot) {
       this.at.x = this.spot.x;
@@ -505,30 +537,7 @@ export class Watcher {
     const trip = this.trip;
     const p = trip?.pattern;
     const stop = !trip || !p ? '' : trip.standing ? (p.stops[trip.from] ?? '') : (p.stops[trip.to] ?? '');
-    const ways: number[] = [];
-    let end: Spot | null = null;
-    if (this.req.kind === 'bus') {
-      const line = this.h.source.busLines()?.lines[this.req.line];
-      const k = this.bus?.bus?.line?.k ?? this.spot?.k ?? -1;
-      if (line && k >= 0) {
-        for (let i = k; i < line.end; i++) if (line.ways[i] >= 0) ways.push(line.ways[i]);
-        const last = line.stops.filter((s) => s.k < line.end).pop();
-        const c = last ? this.h.source.wayCourse(line.ways[last.k]) : null;
-        if (last && c) {
-          // (its last stop: where along its way)
-          let left = last.m;
-          for (let i = 2; i + 1 < c.length; i += 2) {
-            const l = Math.hypot(c[i] - c[i - 2], c[i + 1] - c[i - 1]);
-            if (left <= l || i + 3 >= c.length) {
-              const f = l > 0 ? Math.min(1, left / l) : 0;
-              end = { x: c[i - 2] + (c[i] - c[i - 2]) * f, z: c[i - 1] + (c[i + 1] - c[i - 1]) * f, yaw: Math.atan2(-(c[i] - c[i - 2]), -(c[i + 1] - c[i - 1])) };
-              break;
-            }
-            left -= l;
-          }
-        }
-      }
-    }
+    const { ways, end } = this.req.kind === 'bus' ? lineTakeOver(this.h.source, this.req.line, this.bus?.bus?.line?.k ?? this.spot?.k ?? -1) : { ways: [], end: null };
     // (a bus: a little to the right of the middle of its road, in its lane – so that it is put facing its way)
     const right = this.bus ? 0 : 2;
     const x = this.at.x + Math.cos(this.at.yaw) * right;

@@ -47,6 +47,12 @@ export interface PersonPose {
   lean?: number;
   /** an umbrella up (not with a walking stick or a suitcase in the hand that would hold it) */
   umbrella?: boolean;
+  /**
+   * The arms held as given (rad): the right arm swung forward and out to
+   * the side, then the left arm – a police officer's signs, hands on a
+   * rollator (the theory lessons: game/theoryscenes.ts armsAt).
+   */
+  arms?: readonly [number, number, number, number];
 }
 
 /** How high the seats are that people sit on (m): the benches of render/stopmodels.ts have this height. */
@@ -600,6 +606,24 @@ export function workerLook(id: number, vest: 'yellow' | 'orange'): Look {
   return { ...L, torso: JACKET, sleeve: LONG_SLEEVE, hair: L.seed < 0.5 ? CAP : SHORT, shoe: BOOTS, top, second: legs.clone(), legs, shoes: new THREE.Color(0x1b1b1d), hairColour: L.seed < 0.5 ? new THREE.Color(0x26324a) : L.hairColour, item: NOTHING, bow: 0, stoop: 0.02 };
 }
 
+/**
+ * A police officer (a dark blue jacket and trousers, a white cap, boots) or
+ * somebody old with nothing in the hands (for a rollator) – for the theory
+ * lessons.  `id` is the look's own number (give it to the renderer with
+ * `wear`); `seed` settles the person (height, face, skin) as for anybody.
+ */
+export function roleLook(id: number, seed: number, role: 'police' | 'senior'): Look {
+  if (role === 'police') {
+    const L = lookOf(seed);
+    const legs = new THREE.Color(0x1c2434);
+    return { ...L, id, torso: JACKET, sleeve: LONG_SLEEVE, hair: CAP, shoe: BOOTS, top: new THREE.Color(0x24375a), second: legs.clone(), legs, shoes: new THREE.Color(0x141416), hairColour: new THREE.Color(0xf0f0ec), item: NOTHING, bow: 0, stoop: 0.01 };
+  }
+  // the first old woman (in a coat) among the looks from `seed` on
+  let k = seed;
+  while (k < seed + 4000 && !(lookOf(k).stoop >= 0.1 && lookOf(k).torso === COAT)) k++;
+  return { ...lookOf(k), id, item: NOTHING, bow: 0 };
+}
+
 /** How far a knee is bent at a point of the walking cycle (0: the leg straight up, π/2: it strikes the ground ahead). */
 function kneeBend(phase: number): number {
   const w = phase - Math.floor(phase / (Math.PI * 2)) * Math.PI * 2;
@@ -917,6 +941,12 @@ export class PeopleRenderer {
       // (the right hand holds it up in front)
       armR = 0.62;
       outR = 0.08;
+    }
+    if (p.arms && !sitting) {
+      armR = p.arms[0];
+      outR = p.arms[1];
+      armL = p.arms[2];
+      outL = p.arms[3];
     }
 
     // ---- the frames, in the person's own measure: the world matrix scales them to the height

@@ -24,6 +24,8 @@ const sceneOf = (id: string): Scene => scenes.get(id) as Scene;
 const actor = (s: Scene, id: string): ActorRun => s.actors.find((a) => a.def.id === id) as ActorRun;
 const pose = (r: ActorRun, t: number): Pose => poseAt(r, t, newPose());
 const isPerson = (r: ActorRun): boolean => r.def.kind === 'person' || r.def.kind === 'child';
+/** a deer or a wild boar: from the forest over the road and away (game/theoryscenes.ts) */
+const isAnimal = (r: ActorRun): boolean => r.def.kind === 'deer' || r.def.kind === 'boar';
 
 /** Every moment of a lesson, a step of DT apart. */
 function times(l: LessonDef, from = 0): number[] {
@@ -33,7 +35,7 @@ function times(l: LessonDef, from = 0): number[] {
 }
 
 test('there are about a dozen lessons, each with its texts, steps and a rule', () => {
-  assert.ok(THEORY.length >= 10 && THEORY.length <= 16, `${THEORY.length} lessons`);
+  assert.ok(THEORY.length >= 10 && THEORY.length <= 40, `${THEORY.length} lessons`);
   assert.equal(new Set(THEORY.map((l) => l.id)).size, THEORY.length, 'no lesson twice');
   for (const key of allTheoryKeys()) assert.ok(en[key], `missing text ${key}`);
   for (const key of ['theory.title', 'theory.desc', 'theory.listText', 'theory.loading', 'theory.help', 'theory.right', 'theory.wrong', 'theory.goOn', 'theory.again', 'theory.next', 'theory.list', 'theory.done', 'theory.score', 'theory.who.me']) assert.ok(en[key], `missing text ${key}`);
@@ -130,7 +132,7 @@ test('the outlines of each place are simple: no edge crosses another (they are c
 });
 
 test('nobody goes backwards, speeds and braking stay those of the road', () => {
-  const top: Record<string, number> = { me: 17, car: 21.5, van: 15, bus: 9, truck: 17, tram: 12, bike: 7, person: 1.8, child: 1.9 };
+  const top: Record<string, number> = { me: 17, car: 21.5, van: 15, bus: 9, truck: 17, tram: 12, bike: 7, person: 1.8, child: 1.9, deer: 12, boar: 9 };
   for (const s of scenes.values()) {
     for (const r of s.actors) {
       for (const t of times(s.lesson)) {
@@ -139,7 +141,7 @@ test('nobody goes backwards, speeds and braking stay those of the road', () => {
         const what = `${s.lesson.id}/${r.def.id} at ${t.toFixed(2)}`;
         assert.ok(p.v > -0.05, `${what}: backwards`);
         assert.ok(p.v <= top[r.def.kind] + 1e-6, `${what}: ${p.v.toFixed(1)} m/s`);
-        assert.ok(Math.abs(p.a) <= (isPerson(r) ? 1.5 : 3.6), `${what}: ${p.a.toFixed(1)} m/s²`);
+        assert.ok(Math.abs(p.a) <= (isPerson(r) ? 1.5 : isAnimal(r) ? 6 : 3.6), `${what}: ${p.a.toFixed(1)} m/s²`);
       }
     }
   }
@@ -176,7 +178,7 @@ test('vehicles keep to the asphalt, people to the pavements and crossings', () =
         const c = corners(r, p);
         let inside = true;
         for (let k = 0; k < 8; k += 2) if (c[k] < x0 + 0.5 || c[k] > x1 - 0.5 || c[k + 1] < z0 + 0.5 || c[k + 1] > z1 - 0.5) inside = false;
-        if (!inside) continue;
+        if (!inside || isAnimal(r)) continue;
         if (isPerson(r)) {
           assert.ok(ground.some((g) => covers(g, p.x, p.z)), `${s.lesson.id}/${r.def.id} on nothing at ${t.toFixed(2)} (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`);
         } else {

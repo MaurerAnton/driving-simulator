@@ -27,12 +27,15 @@ import { COMPACT_DIMS } from './carBody.ts';
 import type { CarDims } from './carBody.ts';
 import { CyclistModel } from './cyclist.ts';
 import { PlayerBus } from './fleet.ts';
-import { lookOf, PeopleRenderer } from './people.ts';
+import { lookOf, PeopleRenderer, roleLook, workerLook } from './people.ts';
 import type { PersonPose } from './people.ts';
 import type { SignRenderer } from './signs.ts';
 import type { LoadedTile } from './tiles.ts';
 import { RailActors } from './trams.ts';
 import { PlayerTruck } from './truck.ts';
+import type { AnimalModel } from './animals.ts';
+import { TheoryExtras } from './theoryprops.ts';
+import { armsAt } from '../game/theoryscenes.ts';
 
 /** Where the stage lies on the map: its points and headings in the map's. */
 export interface StageFrame {
@@ -88,6 +91,8 @@ interface ActorView {
   bike?: CyclistModel;
   van?: Van;
   tram?: RailVehicle;
+  /** a deer or a boar (render/animals.ts) */
+  animal?: AnimalModel;
   look?: number;
   pose: Pose;
   /** where it is drawn (for the labels and for picking): the middle of the body in the map */
@@ -143,6 +148,8 @@ export class TheoryView {
   private readonly movers = new THREE.Group();
   private readonly people = new PeopleRenderer(24);
   private readonly rail = new RailActors();
+  /** the props, what people hold, the animals, the headlights in the dark (render/theoryprops.ts) */
+  private readonly extras = new TheoryExtras();
   private readonly signs: SignRenderer;
   private signTile: LoadedTile | null = null;
   private readonly made: Array<{ dispose(): void }> = [];
@@ -176,7 +183,7 @@ export class TheoryView {
     this.signs = signs;
     this.group.name = 'theory lessons';
     this.group.visible = false;
-    this.group.add(this.place, this.movers, this.people.group, this.rail.group);
+    this.group.add(this.place, this.movers, this.people.group, this.rail.group, this.extras.group);
     // the blind spot beside and behind the right rear of a car (its own frame: −z ahead, +x right)
     const shape = new THREE.Shape([new THREE.Vector2(0.95, -0.4), new THREE.Vector2(3.9, 1.6), new THREE.Vector2(4.3, 6.4), new THREE.Vector2(0.95, 3.4)]);
     const zg = new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2);
@@ -238,6 +245,7 @@ export class TheoryView {
     }
     for (const back of this.used) back();
     this.used = [];
+    this.extras.clear();
     this.actors = [];
     this.lights = [];
     this.people.update([], 0);
@@ -372,6 +380,8 @@ export class TheoryView {
       this.place.add(tile.group);
       this.signTile = tile;
     }
+    // trees, posts, a warning triangle, roadworks, a tunnel
+    this.extras.build(st, f, this.height);
   }
 
   /** An outline (with holes) cut into triangles of at most CELL a side, each corner on the ground plus `lift`: into `out` (x, y, z, …). */
@@ -502,7 +512,21 @@ export class TheoryView {
         case 'child':
           v.look = d.kind === 'child' ? childLook(d.look ?? 1) : (d.look ?? 1);
           v.height = d.kind === 'child' ? 1.3 : 1.8;
+          if (d.role) {
+            // (in their clothes of work or of age: a look of its own number, worn by the people renderer)
+            const id = 700000 + scene.actors.indexOf(r) * 1000 + (d.look ?? 1);
+            this.people.wear(d.role === 'police' || d.role === 'senior' ? roleLook(id, d.look ?? 1, d.role) : { ...workerLook(d.look ?? 1, 'orange'), id });
+            v.look = id;
+          }
           break;
+        case 'deer':
+        case 'boar': {
+          const a = this.extras.animal(d.kind);
+          v.animal = a;
+          v.root = a.group;
+          v.height = d.kind === 'deer' ? 1.3 : 0.9;
+          break;
+        }
       }
       if (v.root) {
         v.root.traverse((o) => {
@@ -528,6 +552,8 @@ export class TheoryView {
       const root = v.root;
       if (!p.visible) {
         if (root) root.visible = false;
+        this.extras.drop(i);
+        this.extras.light(i, r.def, -1, 0, 0, 0, 0, 0);
         return;
       }
       const [x, z] = f.toWorld(p.x, p.z);
@@ -535,8 +561,10 @@ export class TheoryView {
       const lift = actorLift(scene, r, p.x, p.z);
       if (r.def.kind === 'person' || r.def.kind === 'child') {
         const y = this.height(x, z) + lift;
-        this.poses.push({ x, y, z, yaw, walk: p.v > 0.05 ? p.s : -1, look: v.look ?? 1 });
+        const arms = armsAt(r.def, t);
+        this.poses.push(arms ? { x, y, z, yaw, walk: p.v > 0.05 ? p.s : -1, look: v.look ?? 1, arms, head: 0 } : { x, y, z, yaw, walk: p.v > 0.05 ? p.s : -1, look: v.look ?? 1 });
         v.at.set(x, y + v.height * 0.6, z);
+        this.extras.hold(i, r.def, t, x, y, z, yaw);
         return;
       }
       if (v.tram) {
@@ -591,8 +619,11 @@ export class TheoryView {
       } else if (v.bike) {
         // (the pedals go round once in about four metres, the wheels as they roll)
         v.bike.pose(p.s * 1.6, p.s / 0.34, false);
-      }
+      } else if (v.animal) v.animal.pose(p.s, p.v);
+      // the light of its headlights on the road, in the dark
+      if (r.def.beam) this.extras.light(i, r.def, t, x, y, z, yaw, r.foot.front);
     });
+    this.extras.update(t);
     this.people.update(this.poses, now);
     this.rail.update(trams);
     // the lamps of the lights
@@ -692,6 +723,14 @@ export class TheoryView {
     this.zone.position.copy(v.root.position);
     this.zone.position.y += 0.03;
     this.zone.rotation.set(0, f.yawToWorld(v.pose.yaw), 0);
+    // (drawn for a car: a lorry's is as much wider and longer as the lorry is, and begins at its cab – beside the front)
+    const foot = FOOT[scene.actors[i].def.kind];
+    this.zone.scale.set(foot.width / FOOT.car.width, 1, foot.length / FOOT.car.length);
+    if (scene.actors[i].def.kind === 'truck') {
+      const yaw = f.yawToWorld(v.pose.yaw);
+      this.zone.position.x -= Math.sin(yaw) * foot.front;
+      this.zone.position.z -= Math.cos(yaw) * foot.front;
+    }
   }
 
   /** The gap beside a vehicle passing another, with its width written over it (null: none); returns the gap (m). */

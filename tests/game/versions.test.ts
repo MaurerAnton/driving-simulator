@@ -12,7 +12,7 @@ import test from 'node:test';
 import { RELEASES } from '../../src/game/releases.ts';
 import { compareVersions, keepForReturn, loadVersions, parseVersions, playable, restoreAfterOldVersion, siteRoot, versionHref, versionOfPath } from '../../src/game/versions.ts';
 import { missingPart, packSources } from '../../src/world/mappack.ts';
-import { backLink, chooseHosted, olderTags } from '../../tools/old-versions.ts';
+import { DEV_VERSIONS, MAP_READABLE_FROM, backLink, chooseHosted, earlierVersions, olderTags } from '../../tools/old-versions.ts';
 
 test('versions compare as numbers, not as text', () => {
   assert.equal(compareVersions('1.10.0', '1.9.2'), 1);
@@ -74,6 +74,24 @@ test('the earlier versions are the older tags, newest first, and the newest get 
   ]);
   assert.deepEqual([...chooseHosted(['1.5.0', '1.4.0', '1.3.0', '1.2.0', '1.1.0'], sizes, 15)], ['1.5.0', '1.4.0', '1.2.0']);
   assert.match(backLink('1.2.0'), /href="\.\.\/\.\.\/"/);
+});
+
+test('the development versions are earlier versions too – built from their commits, those from 0.8.0 on with today\'s map', () => {
+  assert.deepEqual(
+    DEV_VERSIONS.map((d) => d.version),
+    ['0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.0', '0.4.0', '0.3.0', '0.2.0', '0.1.0'],
+  );
+  for (const d of DEV_VERSIONS) assert.match(d.commit, /^[0-9a-f]{40}$/, d.version);
+  const dev = [
+    { version: '0.9.0', commit: 'a'.repeat(40) },
+    { version: '0.1.0', commit: 'b'.repeat(40) },
+    { version: '1.0.0', commit: 'c'.repeat(40) },
+  ];
+  assert.deepEqual(earlierVersions(['v1.0.0', 'v1.1.0', 'v1.2.0'], dev, '1.2.0'), ['1.1.0', '1.0.0', '0.9.0', '0.1.0']);
+  // which can read the map of today: 0.8.0 on (before it: world.json and tiles of another coding)
+  assert.equal(MAP_READABLE_FROM, '0.8.0');
+  const readable = DEV_VERSIONS.filter((d) => compareVersions(d.version, MAP_READABLE_FROM) >= 0).map((d) => d.version);
+  assert.deepEqual(readable, ['0.9.0', '0.8.0']);
 });
 
 test('every release has the moment it was published, on its day', () => {

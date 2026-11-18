@@ -156,9 +156,19 @@ const tint = (hex: number): RGB => {
 const CROWN_SPRING = tint(0x64953a);
 const CROWN_AUTUMN: readonly RGB[] = [tint(0xc9a227), tint(0xc8641e), tint(0xa5321e), tint(0x7a5a2e)];
 const CROWN_BLOSSOM = tint(0xf0dce4);
-const CROWN_TWIGS = tint(0x8c7f74);
+/**
+ * the bare twigs' colour (sRGB): a light grey-brown – a bare crown is twigs with the sky between them, so it
+ * reads lighter than bark (0x8c7f74, drawn as a solid, shaded mass, read as black blobs against the sky)
+ */
+export const BARE_CROWN = 0xa39788;
+const CROWN_TWIGS = tint(BARE_CROWN);
 /** the bare twigs' own colour (linear) – what a bare crown is drawn in, whatever its green was */
-const TWIGS_ABS = lin(0x8c7f74);
+const TWIGS_ABS = lin(BARE_CROWN);
+/**
+ * how far a bare crown's light ignores the shape of its crown (0 … 1): a mass of twigs has no shaded side –
+ * it is lit nearly as the ground is, instead of a ball whose half away from a low sun goes dark
+ */
+export const BARE_FLAT = 0.85;
 /** how much of a bare crown is drawn: all of it – a soft grey-brown mass of twigs (drawn see-through,
  *  against a bright sky a crown only showed as speckles) */
 const TWIG_COVER = 1;
@@ -342,7 +352,7 @@ vec3 fsSeasonGround(vec3 c) {
 
 /** the trees: after color_vertex – the crown's colour and how much of it is drawn, per tree */
 function treeVertex(kind: TreeKind): string {
-  if (kind === 'evergreen') return 'vFsLeafCover = 1.0;';
+  if (kind === 'evergreen') return 'vFsLeafCover = 1.0;\nvFsBare = 0.0;';
   return /* glsl */ `
 {
 #ifdef USE_INSTANCING
@@ -368,9 +378,18 @@ function treeVertex(kind: TreeKind): string {
   // what is bare of the crown: the grey-brown of its twigs, whatever green it had (a tint of the green went black)
   vColor.rgb = mix(vColor.rgb, ${v3(TWIGS_ABS)} * (0.85 + 0.3 * fsR2), (1.0 - fsHas) * fsCrown);
   vFsLeafCover = mix(1.0, ${TWIG_COVER.toFixed(3)} + ${(1 - TWIG_COVER).toFixed(3)} * fsHas, fsCrown);
+  vFsBare = (1.0 - fsHas) * fsCrown;
 }
 `;
 }
+
+/** a bare crown is lit evenly, nearly as the ground (after the snow, which still looks at the crown's shape) */
+const BARE_LIGHT_FRAG = /* glsl */ `
+{
+  vec3 fsUpB = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+  normal = normalize(mix(normal, fsUpB, vFsBare * ${BARE_FLAT.toFixed(3)}));
+}
+`;
 
 /** a bare crown is drawn see-through: every other pixel or so (only compiled while some crowns are thin) */
 const THIN_FRAG = /* glsl */ `
@@ -506,11 +525,11 @@ export class SeasonLook {
       prevCompile.call(material, shader, renderer);
       Object.assign(shader.uniforms, u);
       let vs = shader.vertexShader
-        .replace('#include <common>', `#include <common>\n${SEASON_VERT_PARS}${tree ? 'varying float vFsLeafCover;\n' : ''}`)
+        .replace('#include <common>', `#include <common>\n${SEASON_VERT_PARS}${tree ? 'varying float vFsLeafCover;\nvarying float vFsBare;\n' : ''}`)
         .replace('#include <project_vertex>', `#include <project_vertex>\n${SEASON_VERT_WORLD}`);
       let fs = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\n${SEASON_FRAG_PARS}${tree ? 'varying float vFsLeafCover;\n' : ''}`)
-        .replace('#include <emissivemap_fragment>', `${seasonFragment(target)}\n#include <emissivemap_fragment>`);
+        .replace('#include <common>', `#include <common>\n${SEASON_FRAG_PARS}${tree ? 'varying float vFsLeafCover;\nvarying float vFsBare;\n' : ''}`)
+        .replace('#include <emissivemap_fragment>', `${seasonFragment(target)}\n${tree ? BARE_LIGHT_FRAG : ''}#include <emissivemap_fragment>`);
       if (tree) {
         vs = vs.replace('#include <color_vertex>', `#include <color_vertex>\n${treeVertex(target)}`);
         fs = (this.thin && target !== 'evergreen' ? '#define FS_THIN\n' : '') + fs.replace('#include <alphatest_fragment>', `#include <alphatest_fragment>\n${THIN_FRAG}`);

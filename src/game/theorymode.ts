@@ -22,7 +22,8 @@ import { TheoryView } from '../render/theory.ts';
 import type { StageFrame } from '../render/theory.ts';
 import { TheoryPanel } from '../ui/theory.ts';
 import type { TheoryBar } from '../ui/theory.ts';
-import { formatUnit, localeOf, tr } from '../i18n/index.ts';
+import { formatUnit, tr } from '../i18n/index.ts';
+import { speech } from '../audio/speech.ts';
 import { THEORY, TheoryRun, actorName, answerKey, prepare, theoryKeys } from './theory.ts';
 import type { LessonDef, Scene } from './theory.ts';
 
@@ -80,6 +81,8 @@ export class TheoryMode {
   private down: { x: number; y: number; t: number; id: number } | null = null;
   /** frames drawn since the lesson's place was laid out (for the automated pictures) */
   private builtFrames = 0;
+  /** the sky as it was before a lesson with a sky of its own (dusk, night, fog) – given back after it */
+  private skyKept: { el: number; az: number; near: number; far: number } | null = null;
   /** ?theoryAt=<s>: the first lesson opened starts at that moment of its script (for pictures of it) */
   private jump = typeof location === 'undefined' ? NaN : Number(new URLSearchParams(location.search).get('theoryAt') ?? NaN);
 
@@ -127,6 +130,7 @@ export class TheoryMode {
 
   /** Out of the mode (the main menu takes over). */
   close(): void {
+    this.ownSky(undefined);
     this.phase = 'off';
     this.view.hide();
     this.panel.hide();
@@ -143,6 +147,7 @@ export class TheoryMode {
   }
 
   private showList(): void {
+    this.ownSky(undefined);
     this.phase = 'list';
     this.view.hide();
     this.scene = null;
@@ -158,6 +163,7 @@ export class TheoryMode {
   }
 
   private start(i: number): void {
+    this.ownSky(undefined);
     this.index = Math.max(0, Math.min(THEORY.length - 1, i));
     this.phase = 'loading';
     this.scene = prepare(THEORY[this.index]);
@@ -204,6 +210,8 @@ export class TheoryMode {
     const run = this.run;
     if (!run || !scene) return;
     this.builtFrames++;
+    // (each frame: the game places the sun of its own clock now and then)
+    if (this.lesson.sky) this.ownSky(this.lesson.sky);
     if (run.advance(dt)) this.stopped();
     this.view.update(run.t, now);
     // the names over the vehicles the open question is about; "you" over the learner's car all along
@@ -394,19 +402,50 @@ export class TheoryMode {
     cam.updateProjectionMatrix();
   }
 
+  // ---------------------------------------------------------------------- sky
+  /**
+   * A lesson's own sky: the sun that low (dusk, night) and fog that thick –
+   * the game's sky kept and given back when `sky` is undefined.
+   */
+  private ownSky(sky: LessonDef['sky']): void {
+    const s = this.host.app.sky;
+    const kept = this.skyKept;
+    if (!sky) {
+      if (!kept) return;
+      s.setSun(kept.el, kept.az);
+      s.fog.near = kept.near;
+      s.fog.far = kept.far;
+      this.skyKept = null;
+      return;
+    }
+    let k = kept;
+    if (!k) {
+      // (where the sun stands now: the light shines from it onto its target)
+      const d = s.sun.position.clone().sub(s.sun.target.position).normalize();
+      k = { el: (Math.asin(d.y) * 180) / Math.PI, az: (Math.atan2(d.x, -d.z) * 180) / Math.PI, near: s.fog.near, far: s.fog.far };
+      this.skyKept = k;
+    }
+    s.setSun(sky.sun ?? k.el, sky.sun !== undefined ? 250 : k.az);
+    if (sky.fog) {
+      // (fog: as far as one sees, the world is gone; its colour a pale grey)
+      s.fog.near = 2;
+      s.fog.far = sky.fog * 1.25;
+      s.fog.color.setHex(0xb9bdc0);
+    } else {
+      s.fog.near = k.near;
+      s.fog.far = k.far;
+    }
+  }
+
   // -------------------------------------------------------------------- voice
   /** Read a text out – when the spoken instructions are on (as the directions of a drive are). */
   private speak(text: string): void {
     const s = this.host.settings;
-    if (!s.voice || typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = localeOf(this.lang);
-    u.volume = s.volume;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    if (!s.voice || typeof window === 'undefined' || !text) return;
+    speech.say(text, this.lang, s);
   }
 
   private silence(): void {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window && this.host.settings.voice) window.speechSynthesis.cancel();
+    if (typeof window !== 'undefined' && this.host.settings.voice) speech.stop();
   }
 }

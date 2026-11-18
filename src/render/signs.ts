@@ -87,6 +87,9 @@ export function signSize(code: string, aspect: number, big: boolean): [number, n
   if (base === '457.1') return [0.9 * k, 0.56 * k];
   // (a beacon stands tall and narrow, a guide plate or a barrier lies wide; the detour signs are a little larger)
   if (base.startsWith('605-')) return [0.25 * k, 1.0 * k];
+  // (the beacons before a level crossing: a narrow plate a metre tall – the one with three stripes carries the warning sign above them)
+  if (/^(159|162)-[12]0$/.test(base)) return [0.3 * k, 1.0 * k];
+  if (/^156-[12]0$/.test(base)) return [0.6 * k, (0.6 * k) / (aspect || 1)];
   if (base.startsWith('626-') || base === '600') w = 1.0;
   else if (base.startsWith('454-') || base.startsWith('455.') || base === '457.2') w = 0.9;
   else if (n >= 1000) w = 0.6;
@@ -120,6 +123,8 @@ export class SignRenderer {
   private readonly perTile = new Map<string, THREE.Object3D>();
   private dirty = false;
   missing = new Set<string>();
+  /** a post of the map's tiles as it is to be drawn – without what is drawn elsewhere instead (src/sim/levelcrossing.ts); null: not at all */
+  editPost: ((p: SignPost) => SignPost | null) | null = null;
 
   constructor(baseUrl: string, maxAnisotropy: number) {
     this.baseUrl = baseUrl;
@@ -466,7 +471,8 @@ export class SignRenderer {
   }
 
   add(tile: LoadedTile): void {
-    const posts = tile.header.signs;
+    const edit = this.editPost;
+    const posts = edit ? tile.header.signs?.map((p) => edit(p)).filter((p): p is SignPost => p !== null) : tile.header.signs;
     if (!posts || posts.length === 0) return;
     const { group, disposables } = this.build(posts, tile.header.cx, tile.header.yBase, tile.header.cz);
     tile.group.add(group);

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hash01 } from '../core/geom.ts';
+import { ParkedCarRenderer } from './parked.ts';
 import type { LoadedTile } from './tiles.ts';
 
 function colored(geo: THREE.BufferGeometry, color: number, darkenBottom = 0): THREE.BufferGeometry {
@@ -34,6 +35,19 @@ function merged(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return g;
 }
 
+/**
+ * How wide a tree is drawn (the scale across of its unit shape) for its
+ * height `h` and a random number `r` in [0, 1).  A broadleaf tree's crown is
+ * as wide as real ones: about 6 m at 7 m high, 8–9 m at 10 m, 11–13 m at
+ * 15 m, at most 14 m (the unit crown is 0.6 across); the other kinds keep
+ * their shape's proportions.
+ */
+export function treeWidth(kind: number, h: number, r: number): number {
+  if (kind !== 0) return h * (0.85 + 0.4 * r);
+  const crown = Math.min(14, 0.6 * h + 2.2) * (0.9 + 0.2 * r);
+  return Math.max(h * 0.85, crown / 0.6);
+}
+
 /** Unit-height tree shapes (1 = full tree height), detailed and reduced. */
 function treeGeometries(): { hi: THREE.BufferGeometry[]; lo: THREE.BufferGeometry[] } {
   const trunk = (h: number, r: number): THREE.BufferGeometry => colored(new THREE.CylinderGeometry(r * 0.7, r, h, 5, 1, true).translate(0, h / 2, 0), 0x4a3b2c);
@@ -42,7 +56,8 @@ function treeGeometries(): { hi: THREE.BufferGeometry[]; lo: THREE.BufferGeometr
   const cone = (y0: number, y1: number, r: number, color: number, sides: number): THREE.BufferGeometry =>
     colored(new THREE.ConeGeometry(r, y1 - y0, sides, 1, true).translate(0, (y0 + y1) / 2, 0), color, 0.3);
   const hi = [
-    merged([trunk(0.42, 0.035), blob(0.66, 0.3, 0.34, 1, 0x4c7a36)]),
+    // (broadleaf: drawn wider than high – treeWidth – so its trunk is slim in the unit shape)
+    merged([trunk(0.42, 0.02), blob(0.66, 0.3, 0.34, 1, 0x4c7a36)]),
     merged([trunk(0.2, 0.03), cone(0.14, 0.62, 0.23, 0x2f5a34, 7), cone(0.42, 1.0, 0.16, 0x356338, 7)]),
     merged([blob(0.5, 0.62, 0.5, 1, 0x4f7a3a)]),
     merged([trunk(0.5, 0.04), blob(0.72, 0.36, 0.3, 1, 0x5d8c3d)]),
@@ -80,6 +95,8 @@ export class PropRenderer {
   private readonly perTile = new Map<string, TileProps>();
   /** global multiplier for how many trees are drawn (quality setting) */
   density = 1;
+  /** the cars parked along the streets (render/parked.ts): on every graphics level, in detail from medium on */
+  readonly parked = new ParkedCarRenderer();
   private shadows = false;
 
   /** The season on the trees: broadleaf and the other deciduous kind, conifers, fruit trees (game/outdoors.ts). */
@@ -128,7 +145,7 @@ export class PropRenderer {
           const h = trees[i * 5 + 3];
           const r = hash01(i * 13 + kind);
           q.setFromAxisAngle(up, r * 6.283);
-          const wide = h * (0.85 + 0.4 * hash01(i * 29 + 5));
+          const wide = treeWidth(kind, h, hash01(i * 29 + 5));
           m4.compose(new THREE.Vector3(trees[i * 5], trees[i * 5 + 1] - 0.15, trees[i * 5 + 2]), q, new THREE.Vector3(wide, h, wide));
           mesh.setMatrixAt(k, m4);
           const v = 0.82 + 0.36 * hash01(i * 3 + 11);
@@ -161,6 +178,7 @@ export class PropRenderer {
       mesh.name = 'lamps';
       group.add(mesh);
     }
+    this.parked.add(tile, group);
     tile.group.add(group);
     this.perTile.set(tile.key, props);
   }
@@ -168,6 +186,7 @@ export class PropRenderer {
   remove(tile: LoadedTile): void {
     const p = this.perTile.get(tile.key);
     if (!p) return;
+    this.parked.remove(tile);
     for (const t of p.trees) t.mesh.dispose();
     for (const c of p.group.children) if (c instanceof THREE.InstancedMesh) c.dispose();
     this.perTile.delete(tile.key);
@@ -175,6 +194,9 @@ export class PropRenderer {
 
   /** Choose tree detail and density per tile from the viewer distance. */
   update(x: number, z: number): void {
+    // (the low preset draws a fifth of the trees: its parked cars are plain boxes)
+    this.parked.detail = this.density >= 0.5;
+    this.parked.update(x, z);
     for (const p of this.perTile.values()) {
       const d = Math.hypot(p.cx - x, p.cz - z);
       const near = d < 420;

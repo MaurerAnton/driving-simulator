@@ -21,8 +21,15 @@ export class WorldGround implements Ground {
   private lastY = 0;
   /** global grip multiplier (rain, ice) */
   weatherGrip = 1;
+  /**
+   * The road physics switched off (an arcade option, game/arcadedrive.ts): every road and every
+   * piece of land grips and rolls as dry asphalt, whatever the weather – water stays water.
+   */
+  even = false;
   /** places that are paved for the time being, whatever the map says (the practice yard laid over a field) */
   paved: ((x: number, z: number) => boolean) | null = null;
+  /** how much a thing laid on the ground for the time being raises it (m – the ramp of the hill start on the practice yard, game/drillplay.ts) */
+  raise: ((x: number, z: number) => number) | null = null;
   /** how deep the water is at a place where the cover is water (m; game/wading.ts) – the wheels go down to its bed */
   waterDepth: ((x: number, z: number) => number) | null = null;
 
@@ -60,13 +67,13 @@ export class WorldGround implements Ground {
         out.ny = 1;
         out.nz = 0;
       }
-      out.grip = SURF_GRIP[hit.surf] * this.weatherGrip;
-      out.rolling = SURF_ROLLING[hit.surf];
+      out.grip = this.even ? 1 : SURF_GRIP[hit.surf] * this.weatherGrip;
+      out.rolling = this.even ? 1 : SURF_ROLLING[hit.surf];
       this.lastY = out.y;
       return;
     }
     const t = this.terrain;
-    const y = t.heightAt(x, z);
+    let y = t.heightAt(x, z);
     if (Number.isNaN(y)) {
       // tile not loaded (yet): pretend the last known ground continues
       out.y = this.lastY;
@@ -82,6 +89,11 @@ export class WorldGround implements Ground {
     let hz = t.heightAt(x, z + e);
     if (Number.isNaN(hx)) hx = y;
     if (Number.isNaN(hz)) hz = y;
+    if (this.raise) {
+      y += this.raise(x, z);
+      hx += this.raise(x + e, z);
+      hz += this.raise(x, z + e);
+    }
     const nx = -(hx - y) / e;
     const nz = -(hz - y) / e;
     const l = Math.hypot(nx, 1, nz);
@@ -106,6 +118,10 @@ export class WorldGround implements Ground {
     } else {
       out.grip = 0.5 * this.weatherGrip;
       out.rolling = 3.5;
+    }
+    if (this.even) {
+      out.grip = 1;
+      out.rolling = 1;
     }
     this.lastY = y;
   }

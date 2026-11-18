@@ -148,6 +148,9 @@ export const GM = {
   RAIL_BALLAST: 11,
   PATH: 12,
   CYCLE: 13,
+  /** parking bays beside the carriageway (lighter paving) */
+  /** (not written by the map build: versions before 1.7.0 read the map too and draw 14 and above as paint – bays use PAVING) */
+  BAY: 14,
   /** paint (`mark` mesh) */
   PAINT_WHITE: 20,
   PAINT_YELLOW: 21,

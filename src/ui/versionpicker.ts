@@ -22,6 +22,47 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
 
 const root = (): string => siteRoot(document.baseURI);
 
+/**
+ * The warning on a button that plays an earlier version: only the game is of
+ * that version, the map is today's.  As its tooltip and in its label – and,
+ * on a touch screen (no tooltip there), as a note under it at the first tap;
+ * the second tap goes.  `version()`: the version it plays now (a choice).
+ */
+function warnOnPlay(b: HTMLButtonElement, version: () => string, latest: string, t: T, go: () => void): HTMLButtonElement {
+  const label = (b.textContent ?? '').replace(/^▶\s*/, '');
+  let note: HTMLElement | null = null;
+  let shownFor = '';
+  const describe = (): void => {
+    if (version() === latest) {
+      // (the newest: its map is its own)
+      b.removeAttribute('title');
+      b.removeAttribute('aria-label');
+    } else {
+      b.title = t('version.playNote', { v: version() });
+      b.setAttribute('aria-label', `${label}. ${b.title}`);
+    }
+    if (note && shownFor !== version()) {
+      note.remove();
+      shownFor = '';
+    }
+  };
+  describe();
+  b.onclick = () => {
+    const touch = typeof matchMedia === 'function' && matchMedia('(hover: none)').matches;
+    if (touch && version() !== latest && shownFor !== version()) {
+      shownFor = version();
+      note ??= el('p', 'note');
+      note.textContent = `ⓘ ${t('version.playNote', { v: shownFor })}`;
+      // (in the settings the button sits in a row with the choice: the note goes under the row)
+      (b.parentElement?.classList.contains('row') ? b.parentElement : b).after(note);
+      return;
+    }
+    go();
+  };
+  b.addEventListener('fs-describe', describe);
+  return b;
+}
+
 /** Go to (play) a version. */
 export function openVersion(version: string, latest: string): void {
   // (an earlier version would reset what it does not know: the settings are put back on return – game/versions.ts)
@@ -36,16 +77,22 @@ export function siteVersions(): Promise<VersionList | null> {
 
 /**
  * A button to play `version` (for "What's new"): hidden until the site's
- * list says that version can be played; none for the version running.
+ * list says that version can be played; none for the version running.  For
+ * a version the list has as unable to read today's map: a note saying so.
  */
 export function playVersionButton(version: string, t: T): HTMLElement | null {
   if (version === VERSION) return null;
   const b = el('button', 'btn ghost chip', `▶ ${t('version.play', { v: version })}`);
   b.hidden = true;
   void siteVersions().then((list) => {
+    // (one built for a map of another form – the development versions before 0.8.0 – is listed: said so in place of the button)
+    if (list?.versions.some((e) => e.version === version && !e.map)) {
+      b.replaceWith(el('p', 'note', t('version.oldMap')));
+      return;
+    }
     if (!list || !playable(list, version)) return;
     b.hidden = false;
-    b.onclick = () => openVersion(version, list.latest);
+    warnOnPlay(b, () => version, list.latest, t, () => openVersion(version, list.latest));
   });
   return b;
 }
@@ -82,9 +129,11 @@ export function versionSettings(t: T, formatTime: (iso: string) => string): HTML
     if (sel.value !== VERSION) sel.value = list.latest;
     const refresh = (): void => {
       go.disabled = sel.value === VERSION;
+      // (the warning, for the version chosen)
+      go.dispatchEvent(new Event('fs-describe'));
     };
     sel.onchange = refresh;
-    go.onclick = () => openVersion(sel.value, list.latest);
+    warnOnPlay(go, () => sel.value, list.latest, t, () => openVersion(sel.value, list.latest));
     refresh();
     row.hidden = false;
     note.textContent = `${t('version.running', { v: VERSION })} ${t('version.note')}`;

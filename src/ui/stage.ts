@@ -338,6 +338,8 @@ const ICONS: Record<string, string> = {
   lesson: '<path d="M2.5 9.5L12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5V16c0 1.3 2.5 2.5 5.5 2.5s5.5-1.2 5.5-2.5v-4.5M21.5 9.5V15"/>',
   exam: '<rect x="5" y="4.5" width="14" height="17" rx="2"/><path d="M9 4.5V2.8h6v1.7M8.5 13.5l2.5 2.5 5-5"/>',
   theory: '<path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5zM12 6.5v13"/>',
+  /** the learning modes: a card with ticks */
+  learn: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M7.5 8.5l1.5 1.5 3-3M7.5 15l1.5 1.5 3-3M14.5 9h2.5M14.5 15.5h2.5"/>',
   takeoff: '<path d="M2.5 20.5h19M4 14.5l2.8 1.2 12.4-5.6c1.2-.5 1.8-1.8 1.2-2.6-.5-.8-1.8-.9-3-.4l-4 1.8-6.6-3-1.8.8 4.6 4-3.4 1.6-2.4-1.3-1.4.6 1.6 2.9"/>',
   basics: '<circle cx="7.5" cy="12" r="4"/><circle cx="7.5" cy="12" r="1.3"/><path d="M11.5 12h10M18 12v3.2M21 12v2.2"/>',
   couple: '<path d="M2.5 15.5h6.5V8H2.5M9 12.5h4"/><circle cx="14.5" cy="12.5" r="1.6"/><path d="M16.1 12.5h5.4V7M21.5 16v-3.5"/><circle cx="5.5" cy="17.5" r="1.8"/>',
@@ -417,6 +419,8 @@ export interface StageExtraMode {
   /** only where the map has a practice yard */
   yard?: boolean;
   run?: () => void;
+  /** in the "Learn" group (a sheet of its own; a tap runs it at once) */
+  learn?: boolean;
 }
 
 export interface StageContext {
@@ -447,7 +451,7 @@ export interface StageContext {
   redraw: () => void;
 }
 
-type Sheet = 'place' | 'mode' | 'lessons' | 'options' | 'more';
+type Sheet = 'place' | 'mode' | 'lessons' | 'learn' | 'options' | 'more';
 
 /**
  * What the menu keeps while it is drawn anew after each choice: the sheet
@@ -674,13 +678,13 @@ export function stageMenu(c: StageContext): HTMLElement {
     if (!st.keys) return;
     // (keys or a gamepad: into the sheet – to what is chosen in it –, and back to the button that opened it)
     if (k) (sheetHost.querySelector<HTMLElement>('.on[data-k]') ?? sheetHost.querySelector<HTMLElement>('[data-k]'))?.focus();
-    else if (was) root.querySelector<HTMLElement>(`[data-k="${was === 'lessons' ? 'mode' : was}"]`)?.focus();
+    else if (was) root.querySelector<HTMLElement>(`[data-k="${was === 'lessons' || was === 'learn' ? 'mode' : was}"]`)?.focus();
   }
 
   /** A choice was made in a sheet: keep it, close the sheet (unless `stay`), draw the menu anew. */
   const chosenIn = (stay = false): void => {
     if (!stay && st.sheet) {
-      st.focus = st.sheet === 'lessons' ? 'mode' : st.sheet;
+      st.focus = st.sheet === 'lessons' || st.sheet === 'learn' ? 'mode' : st.sheet;
       st.sheet = null;
     }
     save();
@@ -704,12 +708,13 @@ export function stageMenu(c: StageContext): HTMLElement {
       place: [icon('pin'), t('startPoint')],
       mode: [icon('free'), t('stageMode')],
       lessons: [icon('lesson'), t('stageLessons')],
+      learn: [icon('learn'), t('learn.title')],
       options: [icon('sliders'), t('menuOptions')],
       more: [icon('more'), t('stageMore')],
     };
     const [picture, heading] = titles[k];
     box.setAttribute('aria-label', heading);
-    if (k === 'lessons') head.append(iconButton('st-small st-back', icon('prev'), t('back'), 'back', () => open('mode')));
+    if (k === 'lessons' || k === 'learn') head.append(iconButton('st-small st-back', icon('prev'), t('back'), 'back', () => open('mode')));
     else {
       const p = el('span', 'st-headpic');
       p.innerHTML = picture;
@@ -719,6 +724,7 @@ export function stageMenu(c: StageContext): HTMLElement {
     box.append(head);
     if (k === 'place') fillPlace(box);
     else if (k === 'mode' || k === 'lessons') fillModes(box, k === 'lessons');
+    else if (k === 'learn') fillLearn(box);
     else if (k === 'options') fillOptions(box);
     else fillMore(box);
     return [scrim, box];
@@ -920,8 +926,17 @@ export function stageMenu(c: StageContext): HTMLElement {
         grid.append(b);
       }
       for (const m of modes) if (m.group === 'exam') add(m.id);
-      for (const m of extras) add(m.id);
+      for (const m of extras) if (!m.learn) add(m.id);
+      // the learning modes (ui/learn.ts): a sheet of their own
+      if (extras.some((m) => m.learn)) grid.append(tile(icon('learn'), t('learn.title'), false, 'learn', () => open('learn'), t('learn.hint')));
     }
+    box.append(grid);
+  }
+
+  /** The learning modes: the theory exam, the sign trainer, spotting dangers, the lesson log – each opens its page at once. */
+  function fillLearn(box: HTMLElement): void {
+    const grid = el('div', 'st-tiles');
+    for (const m of extras) if (m.learn) grid.append(tile(m.icon ? `<svg ${LINE}>${m.icon}</svg>` : icon('learn'), m.label, false, `mode-${m.id}`, () => away(() => m.run?.())));
     box.append(grid);
   }
 
@@ -1004,7 +1019,7 @@ export function stageMenu(c: StageContext): HTMLElement {
     go: start,
     close: () => {
       if (!st.sheet) return false;
-      open(st.sheet === 'lessons' ? 'mode' : null);
+      open(st.sheet === 'lessons' || st.sheet === 'learn' ? 'mode' : null);
       return true;
     },
   };

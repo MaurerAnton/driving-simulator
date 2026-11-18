@@ -1,0 +1,6 @@
+{
+  "about": "Where the map build applies what came after the published map (release karte-2026-11-16c, Fahrsim 1.6.0): cross-sections, parking and parked cars, pavements, verges, cycle lanes, medians, gutters, paths, islands, tree bulbs, frontage, fences, the finer ground cover, roofs, OSM buildings inside the LoD2 municipalities, calming, markings, and the corrections of observed-roads.json, observed-greenery.json and the newer entries of observed-buildings.json. Outside these boxes the build writes the same bytes as the published map, so that a release replaces only the files the region touches (tools/build-detail.ts). Boxes in world metres, [minX, minZ, maxX, maxZ] (x east, z south); the first is Baunatal centre. DETAIL_REGION=<file> | none | all builds with another list, without any region, or with the whole map as one.",
+  "boxes": [
+    [286, -400, 1286, 673]
+  ]
+}

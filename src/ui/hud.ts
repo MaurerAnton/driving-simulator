@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /** Menus and the in-game HUD (plain DOM, no framework). */
+import { viewButtons } from './viewbuttons.ts';
+import type { ViewButtons } from './viewbuttons.ts';
 import type { AddressHit, AddressIndex } from '../game/address.ts';
 import { LESSONS } from '../game/nav.ts';
 import { ROAD_VEHICLE_KINDS, VEHICLES, VEHICLE_KINDS, powerOf } from '../game/vehicles.ts';
 import { lessonPlaceRows, routePresetPage } from './lessonroutes.ts';
 import { routeMode } from '../game/routepresets.ts';
 import type { VehicleKind } from '../game/vehicles.ts';
-import { RELEASES, VERSION } from '../game/releases.ts';
+import { RELEASES, VERSION, sizeWords } from '../game/releases.ts';
 import type { Settings } from '../game/settings.ts';
-import { FAR_VIEWS, GRAPHICS_PRESETS, LOW_RESOLUTIONS, RUN_SPEEDS, VIEW_DISTANCES, saveSettings } from '../game/settings.ts';
+import { FAR_VIEWS, GRAPHICS_PRESETS, LOW_RESOLUTIONS, RUN_SPEEDS, VIEW_DISTANCES, resetSettings, saveSettings } from '../game/settings.ts';
+import { closeX } from './closex.ts';
 import { setWasmMode, wasmSupported } from '../wasm/kernels.ts';
 import type { Input } from '../input/input.ts';
 import type { Violation } from '../sim/rules.ts';
@@ -31,6 +34,8 @@ import { locate } from './geolocate.ts';
 import { downloaded, formatBytes } from '../game/netstats.ts';
 import { WEATHER_ATTRIBUTION } from '../game/weather.ts';
 import { playVersionButton, versionSettings } from './versionpicker.ts';
+import { voiceSettings } from './voicesettings.ts';
+import { speech } from '../audio/speech.ts';
 import { mapPackSettings } from './mappacks.ts';
 
 /** the weathers and seasons one may choose, and the names of each */
@@ -168,6 +173,8 @@ const ICON: Record<string, string> = {
 
 export class Hud {
   private readonly root: HTMLElement;
+  /** full screen and hiding the display (ui/viewbuttons.ts) */
+  view: ViewButtons | null = null;
   private readonly settings: Settings;
   private readonly world: World;
   private overlay: HTMLElement | null = null;
@@ -270,6 +277,9 @@ export class Hud {
   /** where the vehicle is (for the search for addresses: what lies near comes first) */
   where: () => { x: number; z: number } | null = () => null;
   onSettingsChanged: () => void = () => {};
+  /** "Account / server" in the settings and "Play together" in the pause menu (net/online.ts; null: not offered) */
+  onAccount: ((back: () => void) => void) | null = null;
+  onTogether: (() => void) | null = null;
   routeLanes: Lane[] = [];
   /** the stops trams call at, by town and name – null until the map's list of stops is read */
   private tramStops: TramStopChoice[] | null = null;
@@ -285,7 +295,7 @@ export class Hud {
     this.hud = this.buildHud();
     this.root.append(this.hud);
     this.setHudVisible(false);
-    this.layout = new HudLayout(this.hud, (k) => this.t(k));
+    this.layout = new HudLayout(this.hud, (k) => this.t(k), (text) => this.message(text));
   }
 
   /** the player's arrangement of the HUD's parts (ui/hudlayout.ts) */
@@ -342,6 +352,11 @@ export class Hud {
   setTramStops(list: TramStopChoice[]): void {
     this.tramStops = list;
     if (this.menuRedraw && VEHICLES[this.settings.vehicle]?.kind === 'tram') this.menuRedraw();
+  }
+
+  /** A panel of another part of the game in the place of the menus (null: none) – the server's (ui/netpanels.ts). */
+  showPanel(node: HTMLElement | null): void {
+    this.setOverlay(node);
   }
 
   private setOverlay(node: HTMLElement | null): void {
@@ -658,6 +673,22 @@ export class Hud {
     const note = def.caps ? `${this.t('lesson.capNote', { vehicle: this.t(def.name), rural: def.caps.rural, motorway: def.caps.motorway })} ` : def.noMotorway ? `${this.t('lesson.slowNote', { vehicle: this.t(def.name), max: def.governed })} ` : '';
     for (const l of lessons) card(lessonTitle(l.id, this.lang), l.id === 'exam' ? this.t('examDesc') : `${l.kind === 'route' ? note : ''}${lessonIntro(l.id, this.lang)}`, l.id);
     p.append(cards);
+    // the learning modes (ui/learn.ts): the theory exam, the sign trainer, spotting dangers, the lesson log
+    const learnHead = el('h2');
+    learnHead.textContent = this.t('learn.title');
+    p.append(learnHead);
+    const learn = el('div', 'cards');
+    for (const m of this.learnModes(() => this.showMenu(spawns))) {
+      const c = el('button', 'card');
+      const b = el('b');
+      b.textContent = m.title;
+      const d = el('small');
+      d.textContent = m.desc;
+      c.append(b, d);
+      c.onclick = m.run;
+      learn.append(c);
+    }
+    p.append(learn);
 
     const b = el('div', 'buttons');
     const bs = el('button', 'btn ghost', this.t('settings'));
@@ -676,6 +707,22 @@ export class Hud {
     o.append(p);
     this.setOverlay(o);
     this.menuRedraw = () => this.showMenu(spawns);
+  }
+
+  /** A learning mode (ui/learn.ts – fetched when first opened): the theory exam, the sign trainer, spotting dangers, the lesson log, or their overview. */
+  private showLearn(screen: 'hub' | 'exam' | 'signs' | 'danger' | 'log', back: () => void): void {
+    void import('./learn.ts').then((m) => m.openLearn({ t: (k, v) => this.t(k, v), lang: this.lang, screen, show: (p) => this.setOverlay(p), back, signBase: new URL('signs/', document.baseURI).href }));
+  }
+
+  /** The learning modes as the menus list them (the "Learn" group). */
+  private learnModes(back: () => void): Array<{ id: string; title: string; desc: string; icon: string; run: () => void }> {
+    const mode = (id: 'exam' | 'signs' | 'danger' | 'log', icon: string): { id: string; title: string; desc: string; icon: string; run: () => void } => ({ id: `learn-${id}`, title: this.t(`learn.${id}`), desc: this.t(`learn.${id}Desc`), icon, run: () => this.showLearn(id, back) });
+    return [
+      mode('exam', '<rect x="5" y="4.5" width="14" height="17" rx="2"/><path d="M9 4.5V2.8h6v1.7M8.5 10h7M8.5 14h7M8.5 18h4"/>'),
+      mode('signs', '<path d="M12 2.5l9.5 16.5h-19z"/><path d="M12 9v4.5M12 16.5h.01"/>'),
+      mode('danger', '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5M11 8v3.5M11 14h.01"/>'),
+      mode('log', '<rect x="4.5" y="3" width="15" height="18" rx="2"/><path d="M8 8l1.3 1.3L12 6.7M8 13l1.3 1.3L12 11.7M14 8h2.5M14 13h2.5M8 17.5h8.5"/>'),
+    ];
   }
 
   /** The main menu in rows of cards over the 3D scene (ui/carousel.ts). */
@@ -708,6 +755,7 @@ export class Hud {
           [this.t('news'), () => this.showNews(redraw)],
           [this.t('about'), () => this.showAbout(redraw)],
         ],
+        learn: this.learnModes(redraw),
         version: this.t('newsVersion', { v: VERSION }),
         start: (req) => this.onStart(req),
         preview: (p) => this.onMenuPreview(p),
@@ -761,6 +809,8 @@ export class Hud {
           { id: 'routes', label: this.t('routes.title'), kinds: ROAD_VEHICLE_KINDS, icon: '<path d="M5 20c0-6 14-4 14-10a4 4 0 0 0-8 0"/><circle cx="5" cy="20" r="1.5"/><circle cx="11" cy="10" r="1.5"/>', run: () => this.setOverlay(routePresetPage((k, v) => this.t(k, v), (id) => this.onStart({ mode: routeMode(id), spawn: 0 }), () => this.showMenu(spawns))) },
           // the forklift's work on its yard (game/forkliftplay.ts: FORK_WORK_MODE) – its free drive begins at the place chosen
           { id: 'forklift', label: this.t('forkWork'), kinds: ['forklift'], icon: '<rect x="7" y="6" width="11" height="8" rx="1"/><path d="M3 18h18M6 14v4M12.5 14v4M19 14v4M2 11h4"/>' },
+          // the learning modes (ui/learn.ts): the "Learn" group – the exam, the signs, spotting dangers, the lesson log
+          ...this.learnModes(redraw).map((m) => ({ id: m.id, label: m.title, icon: m.icon, learn: true, run: m.run })),
         ],
         version: this.t('newsVersion', { v: VERSION }),
         start: (req) => this.onStart(req),
@@ -825,7 +875,7 @@ export class Hud {
     const s = this.settings;
     const o = el('div', 'overlay');
     const p = el('div', 'panel narrow');
-    p.append(el('h1', '', this.t('settings')));
+    p.append(closeX(this.t('back'), back), el('h1', '', this.t('settings')));
     const select = (label: string, value: string, options: Array<[string, string]>, set: (v: string) => void): void => {
       const row = el('div', 'row');
       const sel = el('select');
@@ -890,6 +940,10 @@ export class Hud {
     }));
     check(this.t('limiter'), s.limiter, (v) => (s.limiter = v));
     check(this.t('autopilotAssist'), s.autopilotAssist, (v) => (s.autopilotAssist = v));
+    // the simulator's chores left out (game/arcadedrive.ts) and the road physics off (sim/ground.ts) – also in the arcade panel
+    check(this.t('arcadeDrive'), s.arcadeDrive, (v) => (s.arcadeDrive = v));
+    p.append(el('p', 'note', this.t('arcadeDriveNote')));
+    check(this.t('evenRoads'), s.evenRoads, (v) => (s.evenRoads = v));
     // the main beam on and off by itself at night (game/beamplay.ts)
     check(this.t('beam.assist'), s.beamAssist, (v) => (s.beamAssist = v));
     // the aeroplane by hand: how much the help does
@@ -1001,6 +1055,9 @@ export class Hud {
     // where a drive begins: where the player is (asked of the browser when the game starts), and exactly at the place chosen
     check(this.t('startHere'), s.startHere, (v) => (s.startHere = v));
     check(this.t('placeExact'), s.placeExact, (v) => (s.placeExact = v));
+    // how one walks (game/walkmodes.ts), and the button offered after a tap on the picture (ui/worldtap.ts)
+    select(this.t('walkControls'), s.walkControls, (['auto', 'classic', 'tank', 'tap'] as const).map((k): [string, string] => [k, this.t(`walkControls.${k}`)]), (v) => (s.walkControls = v as Settings['walkControls']));
+    check(this.t('teleportTap'), s.teleportTap, (v) => (s.teleportTap = v));
     check(this.t('mapOnScreen'), s.mapOnScreen, (v) => (s.mapOnScreen = v));
     // a tap on the vehicle's screen (ui/screentap.ts), the zoom of the view (input/camzoom.ts), the inside mirror (ui/hudmirror.ts)
     select(this.t('screenTap'), s.screenTap, [['bigmap', this.t('screenTap.bigmap')], ['minimap', this.t('screenTap.minimap')]], (v) => (s.screenTap = v as Settings['screenTap']));
@@ -1032,15 +1089,41 @@ export class Hud {
     check(this.t('signalTimers'), s.signalTimers, (v) => (s.signalTimers = v));
     check(this.t('queueLabels'), s.queueLabels, (v) => (s.queueLabels = v));
     check(this.t('hudGear'), s.hudGear, (v) => (s.hudGear = v));
-    check(this.t('voice'), s.voice, (v) => (s.voice = v));
+    // the voice of the spoken instructions – which, how fast, a test (ui/voicesettings.ts): while they are on
+    const voiceBox = voiceSettings(s, this.lang, (k, v) => this.t(k, v), () => saveSettings(s));
+    voiceBox.hidden = !s.voice;
+    check(this.t('voice'), s.voice, (v) => {
+      s.voice = v;
+      voiceBox.hidden = !v;
+      if (!v) speech.stop();
+    });
+    p.append(voiceBox);
     // the version of the game (an earlier one is a page of its own: ui/versionpicker.ts) and the map (one stored from files: ui/mappacks.ts)
     {
       const when = new Intl.DateTimeFormat(localeOf(this.lang), { dateStyle: 'medium', timeStyle: 'short' });
       p.append(versionSettings((k, v) => this.t(k, v), (iso) => when.format(new Date(iso))), mapPackSettings(s, (k, v) => this.t(k, v), localeOf(this.lang)));
     }
+    // the server: an account, the progress kept there, photos, playing together (ui/netpanels.ts)
+    if (this.onAccount) {
+      const go = this.onAccount;
+      const acc = el('button', 'btn ghost', `👤 ${this.t('net.account')}`);
+      acc.onclick = () => go(() => this.showSettings(back));
+      p.append(acc);
+    }
     // settings live in the browser's storage; say so if this browser keeps none
     if (!saveSettings(s)) p.append(el('p', 'note warn', this.t('settingsNotSaved')));
     const b = el('div', 'buttons');
+    // everything back to the defaults – but the language and what is the player's own (game/settings.ts resetSettings); asked first
+    const reset = el('button', 'btn ghost', this.t('settingsReset'));
+    reset.onclick = () => {
+      if (!confirm(this.t('settingsResetAsk'))) return;
+      Object.assign(s, resetSettings(s));
+      setWasmMode(s.wasm);
+      saveSettings(s);
+      this.onSettingsChanged();
+      this.showSettings(back);
+    };
+    b.append(reset);
     const bb = el('button', 'btn', this.t('back'));
     bb.onclick = back;
     b.append(bb);
@@ -1078,12 +1161,13 @@ export class Hud {
           [k('Digit9'), 'ctl.service'],
           [k('KeyV'), 'ctl.camera'],
           [k('KeyG'), 'ctl.door'],
-          [['Alt + ', ...k('KeyW', 'KeyA', 'KeyS', 'KeyD')], 'ctl.freeCam'],
+          [k('KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'), 'ctl.freeCam'],
           [k('KeyT'), 'ctl.reset'],
           [k('KeyF'), 'ctl.reality'],
           [k('KeyM'), 'ctl.map'],
           [k('Escape'), 'ctl.pause'],
           [k('F1'), 'ctl.help'],
+          [k('F2'), 'ctl.f2'],
         ],
       ],
       [
@@ -1210,7 +1294,7 @@ export class Hud {
     ];
     const o = el('div', 'overlay');
     const p = el('div', 'panel');
-    p.append(el('h1', '', this.t('controls')));
+    p.append(closeX(this.t('back'), back), el('h1', '', this.t('controls')));
     for (const [title, rows] of sections) {
       p.append(el('h2', '', this.t(title)));
       const table = el('table', 'keys');
@@ -1251,19 +1335,30 @@ export class Hud {
   showNews(back: () => void): void {
     const o = el('div', 'overlay');
     const p = el('div', 'panel news');
-    p.append(el('h1', '', this.t('news')));
+    p.append(closeX(this.t('back'), back), el('h1', '', this.t('news')));
     const date = new Intl.DateTimeFormat(localeOf(this.lang), { day: 'numeric', month: 'long', year: 'numeric' });
     // (the moment of the release, where it is known: in the reader's time zone)
     const dateTime = new Intl.DateTimeFormat(localeOf(this.lang), { day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    let devPart: HTMLElement | null = null;
     for (const r of RELEASES) {
-      p.append(el('h2', '', `${this.t('newsVersion', { v: r.version })} · ${r.at ? dateTime.format(new Date(r.at)) : date.format(new Date(`${r.date}T12:00:00`))}`));
+      // the development versions (before 1.0.0): a part of their own below the releases, set apart by a line
+      if (r.dev && !devPart) {
+        devPart = el('div', 'news-dev');
+        devPart.append(el('h2', 'news-dev-title', this.t('news.dev')), el('p', 'note', this.t('news.devIntro')));
+        p.append(devPart);
+      }
+      const card = devPart ?? p;
+      const head = el('h2', '', `${this.t('newsVersion', { v: r.version })} · ${r.at ? dateTime.format(new Date(r.at)) : date.format(new Date(`${r.date}T12:00:00`))}`);
+      // how big the game was then (tools/release-stats.ts)
+      if (r.size) head.append(el('span', 'news-size', this.t('news.size', sizeWords(r.size, localeOf(this.lang)))));
+      card.append(head);
       // every version can be played again (ui/versionpicker.ts) – the button shows where the site has it
       const play = playVersionButton(r.version, (k, v) => this.t(k, v));
-      if (play) p.append(play);
-      if (r.intro) p.append(el('p', '', this.t(r.intro)));
+      if (play) card.append(play);
+      if (r.intro) card.append(el('p', '', this.t(r.intro)));
       const list = el('ul');
       for (const key of r.items) list.append(el('li', '', this.t(key)));
-      p.append(list);
+      card.append(list);
     }
     const b = el('div', 'buttons');
     const ok = el('button', 'btn', this.t('back'));
@@ -1282,7 +1377,7 @@ export class Hud {
       e.textContent = this.t(key);
       p.append(e);
     };
-    p.append(el('h1', '', this.t('about')));
+    p.append(closeX(this.t('back'), back), el('h1', '', this.t('about')));
     text('about.text');
     p.append(el('h2', '', this.t('credits')));
     text('about.dataOsm');
@@ -1334,6 +1429,7 @@ export class Hud {
       grid.append(t);
     };
     tile('🗺️', this.t('mapTitle'), () => this.onMap());
+    if (typeof document.documentElement.requestFullscreen === 'function') tile(document.fullscreenElement ? '🗗' : '⛶', this.t(document.fullscreenElement ? 'view.fullscreenOff' : 'view.fullscreen'), () => this.view?.toggleFullscreen());
     tile('📷', this.t('realityButton'), () => this.onReality());
     if (this.canTeleport) {
       tile('📍', this.t('teleport'), () => this.showTeleport());
@@ -1355,6 +1451,17 @@ export class Hud {
       const go = this.onGetOut;
       tile('🚪', this.t('getOut'), () => go());
     }
+    // playing together on a server (ui/netpanels.ts)
+    if (this.onTogether) {
+      const go = this.onTogether;
+      tile('👥', this.t('net.together'), () => go());
+    }
+    // the parts of the display moved where they suit (ui/hudlayout.ts): over the picture, back in the drive
+    if (this.hud.style.display !== 'none')
+      tile('✥', this.t('hudLayout.arrange'), () => {
+        this.onResume();
+        this.layout.arrange();
+      });
     const bar = el('div', 'pause-bar');
     const small = (icon: string, label: string, act: () => void, cls = ''): HTMLButtonElement => {
       const b = el('button', `btn ghost pause-small${cls ? ` ${cls}` : ''}`, `${icon} ${label}`);
@@ -1556,7 +1663,9 @@ export class Hud {
     const play = btn('⏸', this.t('replayPause'), () => bar.toggle());
     const speed = btn('1×', this.t('replaySpeed'), () => bar.speed());
     const cam = btn('', this.t('tbCamera'), () => bar.camera());
-    buttons.append(btn('⏪ 10 s', this.t('replayBack'), () => bar.step(-10)), play, btn('10 s ⏩', this.t('replayOn'), () => bar.step(10)), speed, cam, btn('✕', this.t('back'), () => bar.exit()));
+    const close = btn('✕', this.t('back'), () => bar.exit());
+    close.classList.add('replay-x');
+    buttons.append(btn('⏪ 10 s', this.t('replayBack'), () => bar.step(-10)), play, btn('10 s ⏩', this.t('replayOn'), () => bar.step(10)), speed, cam, close);
     root.append(top, line, buttons, el('div', 'replay-help', this.t('replayHelp')));
     this.root.append(root);
     this.replayBox = { root, play, speed, cam, time, note, range, marks, shown: '' };
@@ -1653,11 +1762,11 @@ export class Hud {
     this.mapCanvas = el('canvas');
     this.mapCanvas.width = 220;
     this.mapCanvas.height = 220;
-    // tap / click on the map: real photographs of this place (the F key of the keyboard)
-    map.append(this.mapCanvas, el('span', 'cam', '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 4 7.5 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.5L15 4H9zm3 4.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>'));
-    map.title = this.t('realityButton');
-    map.onclick = () => this.onReality();
-    // … and a corner of it opens the whole map
+    // tap / click on the map: the whole map, full screen (the real photographs are in the pause menu and on the F key)
+    map.append(this.mapCanvas);
+    map.title = this.t('mapTitle');
+    map.onclick = () => this.onMap();
+    // … as does its button
     const expand = el('button', 'expand', '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>');
     expand.type = 'button';
     expand.title = this.t('mapTitle');
@@ -1701,6 +1810,11 @@ export class Hud {
     this.wreckBtn.onclick = () => this.onNewVehicle();
     this.fpsBox.hidden = true;
     h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox, this.fpsBox, this.clockBox, this.wreckBtn);
+    // full screen and hiding the display, in the top middle (ui/viewbuttons.ts)
+    if (!this.view) {
+      this.view = viewButtons(this.root, (k) => this.t(k));
+      this.root.append(this.view.node);
+    }
     return h;
   }
 

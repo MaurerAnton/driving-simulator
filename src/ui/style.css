@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+/* The hidden attribute always hides – also where a rule sets display (a flex button stayed visible: 1.7.0) */
+[hidden] { display: none !important; }
 :root {
   color-scheme: dark;
   --bg: #16202b;
@@ -509,6 +511,11 @@ kbd { direction: ltr; unicode-bidi: isolate; }
 /* ---------- what is new, and the version under the menu ---------- */
 .panel.news ul { margin: 4px 0 14px; padding-inline-start: 20px; }
 .panel.news li { margin: 4px 0; line-height: 1.4; }
+.panel.news h2 .news-size { display: block; margin-top: 3px; font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.85; }
+/* the development versions (before 1.0.0): set apart by a line in the accent colour, their notes dimmer */
+.panel.news .news-dev { margin-top: 26px; padding-top: 4px; border-top: 3px solid var(--accent); }
+.panel.news .news-dev .news-dev-title { color: var(--accent); margin-top: 12px; }
+.panel.news .news-dev > h2:not(.news-dev-title), .panel.news .news-dev > ul, .panel.news .news-dev > p:not(.note) { opacity: 0.72; }
 .panel .version { margin: 10px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
 
 /* the map is on the vehicle's own screen (driver's seat): not in the corner as well */
@@ -1026,7 +1033,7 @@ span.st-cls { cursor: default; }
 .hud > .hud-free svg { display: block; width: 100%; height: 100%; }
 .hud > .hud-free:hover { background: rgba(255, 204, 0, 0.9); color: #111; }
 /* ("my position", taken out of the map onto the screen, is always there) */
-.hud > .mini-back.hud-free[hidden] { display: block; }
+.hud > .mini-back.hud-free[hidden] { display: block !important; }
 .hud.arranging > .hud-arrange-shield { position: absolute; inset: 0; pointer-events: auto; background: rgba(0, 0, 0, 0.25); touch-action: none; }
 .hud.arranging [data-hud-move] { pointer-events: auto !important; touch-action: none; cursor: move; outline: 2px dashed #ffcc00; outline-offset: 2px; animation: none; }
 .hud.arranging [data-hud-move][hidden], .hud.arranging [data-hud-move][style*='display: none'] { display: block !important; opacity: 0.55; min-width: 44px; min-height: 32px; }
@@ -1061,3 +1068,64 @@ span.st-cls { cursor: default; }
   .pause-icon { font-size: 22px; }
   .pause-label { font-size: 12.5px; }
 }
+
+/* ---- the red × that closes (ui/closex.ts – and the close buttons that have classes of their own:
+   the big map's, its pop-ups', the mirror's, the main menu's sheets', the replay's) ---- */
+:root { --close: #d93a3a; --close-hover: #f05050; }
+button.x-close.x-close.x-close, .bm-tools .btn.ghost.bm-close, button.bm-x.bm-x, .hud .mirrorzoom button.mz-close, button.st-ico.st-close, .replay-buttons button.replay-x {
+  background: var(--close); color: #fff; border: 1px solid rgba(255, 255, 255, 0.35); cursor: pointer;
+}
+button.x-close.x-close.x-close:hover, .bm-tools .btn.ghost.bm-close:hover, button.bm-x.bm-x:hover, .hud .mirrorzoom button.mz-close:hover, button.st-ico.st-close:hover, .replay-buttons button.replay-x:hover {
+  background: var(--close-hover); color: #fff; border-color: #fff;
+}
+/* in the corner of a panel: stays there while the panel scrolls */
+.panel > .panel-x { position: sticky; top: 0; z-index: 2; float: right; width: 44px; height: 44px; margin: -10px -14px 4px 10px; padding: 0; border-radius: 50%; font-size: 20px; line-height: 1; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.arcade .arc-toggle { margin: 0; min-height: 44px; }
+.arcade .arc-toggle input[type='checkbox'] { width: 22px; height: 22px; }
+.arcade .arc-toggle span { flex: 1; min-width: 0; }
+
+/* ---- full screen and hiding the display (ui/viewbuttons.ts) ---- */
+.view-btns { position: absolute; top: 8px; right: calc(50% - 46px); display: flex; gap: 6px; z-index: 7; pointer-events: auto; }
+.view-btn {
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(18, 26, 36, 0.55); color: #fff; font-size: 20px; line-height: 1; cursor: pointer; padding: 0;
+}
+.view-btn:hover, .view-btn:focus-visible { border-color: var(--accent); outline: none; }
+/* hidden display: everything but menus and the button that brings it back */
+.hud-off > *:not(.view-btns):not(.overlay) { visibility: hidden !important; }
+.hud-off .view-btns .view-btn:first-child { display: none; }
+.hud-off .view-btns { opacity: 0.35; }
+.hud-off .view-btns:hover { opacity: 1; }
+
+/* the server's panels and the viewer of its pictures (ui/netpanels.ts, ui/photoviewer.ts) */
+.net-panel h2 { font-size: 15px; margin: 18px 0 6px; }
+.net-input { flex: 1; min-width: 0; min-height: 40px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); color: var(--text); font: inherit; }
+textarea.net-input { min-height: 0; resize: vertical; }
+.net-panel .row .btn { min-height: 40px; }
+.net-list { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
+.net-list.net-sub { margin: -2px 0 6px 18px; }
+.net-item { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.net-item > span { min-width: 0; overflow-wrap: anywhere; }
+.net-who { display: flex; flex-direction: column; min-width: 0; }
+.net-who small { color: var(--muted); }
+.net-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.net-acts .btn.small, .net-item > .btn.small { min-height: 36px; }
+.btn.warn { color: var(--warn); border-color: var(--warn); }
+.net-secret { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.net-secret code { padding: 6px 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.35); user-select: all; overflow-wrap: anywhere; }
+.net-code { font-size: 34px; font-weight: 800; letter-spacing: 6px; text-align: center; margin: 4px 0 8px; user-select: all; }
+.net-chat { max-height: 180px; overflow-y: auto; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+.net-chat .sys { color: var(--muted); font-style: italic; }
+.net-motd { padding: 8px 10px; border-left: 3px solid var(--accent); background: rgba(255, 255, 255, 0.05); }
+.net-me { font-weight: 600; }
+.net-thumb { display: block; max-width: 100%; max-height: 180px; margin: 8px auto; border-radius: 8px; }
+.net-file { max-width: 100%; }
+.overlay.net-viewer { background: #05080c; display: block; padding: 0; z-index: 60; }
+.net-viewer-stage { position: absolute; inset: 0 0 64px 0; overflow: hidden; touch-action: none; display: flex; align-items: center; justify-content: center; }
+.net-viewer-stage canvas { width: 100%; height: 100%; display: block; }
+.net-viewer-photo { max-width: 100%; max-height: 100%; transform-origin: center; user-select: none; }
+.net-viewer-status { position: absolute; color: #fff; font-size: 28px; }
+.net-viewer .x-close { position: absolute; top: 12px; right: 12px; z-index: 2; }
+.net-viewer-cap { position: absolute; left: 16px; right: 16px; bottom: 44px; color: #dfe6ee; font-size: 13px; text-align: center; }
+.net-viewer-bar { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; gap: 10px; justify-content: center; }
+.net-viewer-bar .btn { min-height: 36px; }

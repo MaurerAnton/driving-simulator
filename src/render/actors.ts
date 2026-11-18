@@ -79,13 +79,17 @@ export class TrafficRenderer {
           this.buses.set(c.id, b);
           this.group.add(b.root);
         }
-        b.root.position.set(c.x, c.y, c.z);
-        b.root.rotation.set(c.pitch, c.yaw, 0, 'YXZ');
+        // (where it is drawn: eased through the corners of its way – sim/smoothpose.ts)
+        const d = c.drawn ?? c;
+        b.root.position.set(d.x, c.y, d.z);
+        b.root.rotation.set(c.pitch, d.yaw, 0, 'YXZ');
         // its line and where it goes, on the displays (drawn anew only when they change)
         const line = c.bus?.line;
         b.setLine(line?.ref ?? '', line?.to ?? '');
         const st = this.busState;
         st.wheelSpin.fill(c.wheelSpin);
+        // (its front wheels steered as it turns: sim/smoothpose.ts)
+        st.wheelSteer[0] = st.wheelSteer[1] = c.drawn?.steer ?? 0;
         st.indicator = c.blinker;
         st.blinkOn = blinkOn;
         st.braking = c.braking;
@@ -101,10 +105,12 @@ export class TrafficRenderer {
         this.cars.set(c.id, m);
         this.group.add(m.group);
       }
-      m.group.position.set(c.x, c.y, c.z);
-      m.group.rotation.set(c.pitch, c.yaw, 0, 'YXZ');
+      const d = c.drawn ?? c;
+      m.group.position.set(d.x, c.y, d.z);
+      m.group.rotation.set(c.pitch, d.yaw, 0, 'YXZ');
       const r = m.dims.wheelRadius;
-      m.setWheels([0, 0, 0, 0], [c.wheelSpin, c.wheelSpin, c.wheelSpin, c.wheelSpin], [r, r, r, r]);
+      const steer = c.drawn?.steer ?? 0;
+      m.setWheels([steer, steer, 0, 0], [c.wheelSpin, c.wheelSpin, c.wheelSpin, c.wheelSpin], [r, r, r, r]);
       m.setLamps({ low: true, high: this.highOf?.(c.id) ?? false, brake: c.braking, reverse: false, left: blinkOn && c.blinker < 0, right: blinkOn && c.blinker > 0 });
     }
     for (const [id, m] of this.cars) {
