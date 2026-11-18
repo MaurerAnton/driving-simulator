@@ -5,30 +5,38 @@
       "tags": {
         "sidewalk:left": "no",
         "sidewalk:right:width": "2",
-        "sidewalk:right:surface": "asphalt"
+        "sidewalk:right:surface": "asphalt",
+        "width": "5",
+        "median:contents": "grass;trees"
       },
-      "note": "Theodor-Heuss-Allee eastbound (vp00, vp27, aerial 2-2): no pavement on the median side; south pavement ~2 m (asphalt). East of x≈656 both directions are really one carriageway – see not-fixable. — round 2: asphalt pavement (vp27)"
+      "note": "Theodor-Heuss-Allee eastbound (vp00, vp27, aerial 2-2): no pavement on the median side; south pavement ~2 m (asphalt). East of x≈656 both directions are really one carriageway – see not-fixable. — round 2: asphalt pavement (vp27) — round 3: dual parts x≈603–656 and x≈705–785: one lane ~5 m, kerbed grass median ~4–5 m with a row of large trees on the left (vp083, vp145, vp148, vp204; aerial 2-2)"
     },
     "21121334": {
       "tags": {
-        "sidewalk:left": "no"
+        "sidewalk:left": "no",
+        "width": "5.5",
+        "median:contents": "grass;trees",
+        "parking:right": "street_side",
+        "parking:right:orientation": "perpendicular"
       },
-      "note": "Theodor-Heuss-Allee westbound (vp27, aerial 2-2): no pavement on the median side"
+      "note": "Theodor-Heuss-Allee westbound (vp27, aerial 2-2): no pavement on the median side — round 3: dual parts: ~5–5.5 m, grass median with trees on the left, perpendicular bays on grey pavers between trees along the north edge (vp086, vp145, vp148, vp206; aerial 1-2/2-2)"
     },
     "1201944113": {
       "tags": {
         "sidewalk:left": "no",
         "parking:right": "street_side",
-        "parking:right:orientation": "parallel"
+        "parking:right:orientation": "perpendicular"
       },
-      "note": "Theodor-Heuss-Allee westbound east of Schubertstraße (vp00, aerial 2-2): parallel parking lay-by along the north kerb, no pavement on the south (median) side"
+      "note": "Theodor-Heuss-Allee westbound east of Schubertstraße (vp00, aerial 2-2): parallel parking lay-by along the north kerb, no pavement on the south (median) side — round 3: bays perpendicular (vp027, vp210, aerial 2-2); the way is merged anyway (merge tha-east)"
     },
     "1201944112": {
       "tags": {
         "parking:right": "street_side",
-        "parking:right:orientation": "parallel"
+        "parking:right:orientation": "perpendicular",
+        "width": "5.5",
+        "median:contents": "grass;trees"
       },
-      "note": "Theodor-Heuss-Allee westbound west of the big junction (aerial 3-2): parallel parking strip on the north kerb"
+      "note": "Theodor-Heuss-Allee westbound west of the big junction (aerial 3-2): parallel parking strip on the north kerb — round 3: the bays on the north edge are perpendicular paver bays, not a parallel strip (vp149, vp146, aerial 3-2 re-checked: cars stand across); ~5.5 m; ~5 m grass median with a row of large trees (vp146, vp149)"
     },
     "802163194": {
       "tags": {
@@ -54,12 +62,12 @@
     },
     "22757384": {
       "tags": {
-        "width": "6",
+        "width": "5.5",
         "sidewalk:left:width": "2",
         "sidewalk:right:width": "1.5",
         "frontage:right": "fence"
       },
-      "note": "Lohweg (vp03): ~6 m; pavement 2 m south-west, 1.5 m north-east with a wooden fence right behind it (the parked cars change sides along the way – left out) — round 2: split: parked cars on the north-east kerb in the east part (vp03), on the south kerb in the west part (aerial 4-0)"
+      "note": "Lohweg (vp03): ~6 m; pavement 2 m south-west, 1.5 m north-east with a wooden fence right behind it (the parked cars change sides along the way – left out) — round 2: split: parked cars on the north-east kerb in the east part (vp03), on the south kerb in the west part (aerial 4-0) — round 3: ~5.5 m (vp117, vp121, vp178, vp057)"
     },
     "200434448": {
       "tags": {
@@ -73,25 +81,27 @@
     "58643495": {
       "tags": {
         "width": "3.75",
-        "median:contents": "paving_stones;trees",
+        "median:contents": "paving_stones",
         "verge:right": "paving_stones;trees",
         "verge:right:width": "2.5"
       },
-      "note": "Friedrich-Ebert-Allee eastbound (vp05): one lane ~3.75 m; paver median with young trees on the left, paver strip ~2.5 m with young trees before the foot/cycle path on the right"
+      "note": "Friedrich-Ebert-Allee eastbound (vp05): one lane ~3.75 m; paver median with young trees on the left, paver strip ~2.5 m with young trees before the foot/cycle path on the right — round 3: median plain pavers, no trees (vp243 photo checked – the tree seen in round 1 stands north of the westbound carriageway; vp60, vp173); south paver strip with young trees in pits confirmed (vp243)"
     },
     "193666833": {
       "tags": {
-        "median:contents": "paving_stones;trees"
+        "median:contents": "paving_stones"
       },
-      "note": "Friedrich-Ebert-Allee westbound (vp05): paver median with young trees"
+      "note": "Friedrich-Ebert-Allee westbound (vp05): paver median with young trees — round 3: same median as 58643495: pavers, no trees (vp60, vp173, vp243)"
     },
     "21351807": {
       "tags": {
-        "width": "5.5",
-        "sidewalk:right": "no",
-        "frontage:right": "hedge"
+        "width": "5",
+        "sidewalk:right": "yes",
+        "sidewalk:right:width": "1.8",
+        "verge:right": "grass;trees",
+        "verge:right:width": "1.5"
       },
-      "note": "Gustav-Heinemann-Allee (vp06, vp18): ~5-5.5 m, no pavement on the south side – hedges and planted strip right behind a low kerb (north side varies: pavement only in the west part – left as is) — round 2: split at x≈317: red-paver pavement on the north side only west of it (vp06); east of it hedges at both kerbs (vp18)"
+      "note": "Gustav-Heinemann-Allee (vp06, vp18): ~5-5.5 m, no pavement on the south side – hedges and planted strip right behind a low kerb (north side varies: pavement only in the west part – left as is) — round 2: split at x≈317: red-paver pavement on the north side only west of it (vp06); east of it hedges at both kerbs (vp18) — round 3: Gustav-Heinemann-Allee (way runs east, right = south): ~5 m (vp32,151,153,212,213,215 vs 5.5 at vp29,89,92); on the south a 1–2.5 m planted strip with a row of street trees at the kerb and a paver pavement behind it – vp89,92,213,215 (vp155: asphalt footway behind; vp32: an access road behind). Replaces round-1 sidewalk:right=no and frontage:right=hedge (the 'hedge' is the planted strip)"
     },
     "200224345": {
       "tags": {
@@ -101,11 +111,12 @@
     },
     "244044353": {
       "tags": {
-        "width": "5.75",
+        "width": "5",
         "sidewalk:left:width": "1.7",
-        "sidewalk:left:surface": "paving_stones"
+        "sidewalk:left:surface": "paving_stones",
+        "sidewalk:right": "no"
       },
-      "note": "Händelstraße (vp08): ~5.75 m, north pavement ~1.7 m — round 2: north pavement grey pavers (vp08)"
+      "note": "Händelstraße (vp08): ~5.75 m, north pavement ~1.7 m — round 2: north pavement grey pavers (vp08) — round 3: Händelstraße east: no pavement on the east/south side (vp6, vp126, vp187, vp189, vp194; only vp8 sees ~1 m), ~5 m wide (vp6, vp8, vp189: 5; vp126, vp187: 5.5; vp194: 4.5; was 5.75)"
     },
     "24436902": {
       "tags": {
@@ -117,24 +128,24 @@
     },
     "22741558": {
       "tags": {
-        "width": "8",
+        "width": "7",
         "parking:right": "lane",
         "parking:right:orientation": "parallel",
         "verge:right": "grass",
         "verge:right:width": "1.8",
         "sidewalk:left:width": "2.5"
       },
-      "note": "Marktstraße (vp10): ~8-8.5 m with parallel parking on the east kerb and a grass verge before the east pavement; west pavement 2.5 m — round 2: split ~20 m from the junction: zigzag no-parking marking along the east kerb on the first stretch (vp10)"
+      "note": "Marktstraße (vp10): ~8-8.5 m with parallel parking on the east kerb and a grass verge before the east pavement; west pavement 2.5 m — round 2: split ~20 m from the junction: zigzag no-parking marking along the east kerb on the first stretch (vp10) — round 3: Marktstraße: 7 m (vp167) and 6.5 m (vp170, photo checked) vs round-1 8-8.5"
     },
     "184873567": {
       "tags": {
         "width": "7.5",
-        "cycleway:left": "lane",
-        "cycleway:left:lane": "advisory",
-        "cycleway:left:width": "1.5",
-        "sidewalk:left:width": "2"
+        "sidewalk:left:width": "2",
+        "lane_markings": "no",
+        "parking:left": "lane",
+        "parking:left:orientation": "parallel"
       },
-      "note": "Theodor-Heuss-Allee (vp11, vp29, aerial 0-3): ~7.5 m, no centre line, an advisory cycle lane (broad dashed line ~1.5 m from the kerb) on the south-east side; south-east pavement ~2 m (the cycle lane ends east of x≈500 – see not-fixable) — round 2: split at x≈502: the advisory cycle lane runs only west of it (vp29, aerial 0-3); east of it 6.5 m, grass verge and pavement on the south, forecourts directly at the north kerb (vp11)"
+      "note": "Theodor-Heuss-Allee (vp11, vp29, aerial 0-3): ~7.5 m, no centre line, an advisory cycle lane (broad dashed line ~1.5 m from the kerb) on the south-east side; south-east pavement ~2 m (the cycle lane ends east of x≈500 – see not-fixable) — round 2: split at x≈502: the advisory cycle lane runs only west of it (vp29, aerial 0-3); east of it 6.5 m, grass verge and pavement on the south, forecourts directly at the north kerb (vp11) — round 3: Theodor-Heuss-Allee west: no centre line and NO advisory cycle lane – a white line ~2 m from the south kerb marks a parallel parking strip with kerbed tree build-outs, no bicycle symbols (vp78, vp137, vp140, vp196, vp199, vp202; vp16 photo: broad broken line, young trees in the strip; vp20). cycleway:left* of round 1 removed."
     },
     "22701025": {
       "tags": {
@@ -178,9 +189,10 @@
     },
     "30690471": {
       "tags": {
-        "lane_markings:edge": "no"
+        "lane_markings:edge": "no",
+        "width": "7.5"
       },
-      "note": "Kirchbaunaer Straße K 22 (vp17): no edge lines"
+      "note": "Kirchbaunaer Straße K 22 (vp17): no edge lines — round 3: K 22 town section: ~7.5 m (vp141)"
     },
     "22775582": {
       "tags": {
@@ -190,13 +202,13 @@
     },
     "22741556": {
       "tags": {
-        "width": "7",
+        "width": "6",
         "sidewalk:both:width": "2",
         "parking:right": "lane",
         "parking:right:orientation": "parallel",
         "sidewalk:both:surface": "paving_stones"
       },
-      "note": "Im Wiesental (vp20, aerial 3-0/4-0): ~6-7.5 m, pavements ~2 m both sides — round 2: parallel parking on the right (west/inner side of the curve, north side of the straight west part) – vp20 and aerial 4-0 agree once the drawing direction is taken into account, so no split; grey concrete-paver pavements"
+      "note": "Im Wiesental (vp20, aerial 3-0/4-0): ~6-7.5 m, pavements ~2 m both sides — round 2: parallel parking on the right (west/inner side of the curve, north side of the straight west part) – vp20 and aerial 4-0 agree once the drawing direction is taken into account, so no split; grey concrete-paver pavements — round 3: Im Wiesental: 5.5-6 m at all 12 round-3 viewpoints (43,46,50,53,103,162,164,165,168,226,230,233), was 7"
     },
     "1201933087": {
       "tags": {
@@ -206,12 +218,13 @@
     },
     "41751814": {
       "tags": {
-        "width": "6",
+        "width": "5.5",
         "sidewalk:left": "yes",
-        "sidewalk:left:width": "2",
-        "sidewalk:right": "no"
+        "sidewalk:left:width": "1.5",
+        "sidewalk:right": "no",
+        "surface": "concrete"
       },
-      "note": "Im Ährenfeld (vp20, aerial 4-0): ~5.5-6.5 m — round 2: pavement on the east/left side only (vp20, aerial 4-0); the corner plot has a hedge at the kerb"
+      "note": "Im Ährenfeld (vp20, aerial 4-0): ~5.5-6.5 m — round 2: pavement on the east/left side only (vp20, aerial 4-0); the corner plot has a hedge at the kerb — round 3: Im Ährenfeld: 5-5.5 m (vp106,109,171,174,236,240), pavement only on the west (left) ~1.5 m (all), road of concrete slabs with joints (vp106,109,236,240; photos 109-0, 240-1 checked)"
     },
     "22701024": {
       "tags": {
@@ -292,7 +305,7 @@
     },
     "48869075": {
       "tags": {
-        "width": "7",
+        "width": "6.5",
         "lane_markings": "yes",
         "parking:left": "street_side",
         "parking:left:orientation": "perpendicular",
@@ -300,26 +313,25 @@
         "verge:right": "grass",
         "verge:right:width": "3"
       },
-      "note": "Rudolf-Diesel-Straße south (vp31, aerial 1-0): ~7 m with a dashed centre line, perpendicular parking directly off the carriageway on the west side (no bay lines), grass verge ~3 m with a row of trees on the east"
+      "note": "Rudolf-Diesel-Straße south (vp31, aerial 1-0): ~7 m with a dashed centre line, perpendicular parking directly off the carriageway on the west side (no bay lines), grass verge ~3 m with a row of trees on the east — round 3: width 7 → 6.5 (vp48,105,108,111; the round-1 viewpoint vp31 is the same place as vp108); rest unchanged"
     },
     "190728411": {
       "tags": {
         "width": "3.75",
-        "median:contents": "paving_stones;trees",
+        "median:contents": "paving_stones",
         "parking:right": "on_kerb",
         "parking:right:orientation": "parallel",
-        "parking:right:trees": "yes",
         "kerb": "lowered",
         "lane_markings:edge": "no"
       },
-      "note": "Friedrich-Ebert-Allee eastbound (vp32): one lane ~3.75 m, no edge lines, low kerbs; ~4 m paver median with small trees; on the south a raised paver parking strip (parallel) with small trees"
+      "note": "Friedrich-Ebert-Allee eastbound (vp32): one lane ~3.75 m, no edge lines, low kerbs; ~4 m paver median with small trees; on the south a raised paver parking strip (parallel) with small trees — round 3: median is plain beige pavers WITHOUT trees (vp55, vp59, vp115, vp119, vp242 – photos 055/059 checked); the young trees stand in a grass strip south of the raised paver parking strip, not in it → parking:right:trees removed (game drew trees in the car line, vp59)"
     },
     "193670972": {
       "tags": {
-        "median:contents": "paving_stones;trees",
+        "median:contents": "paving_stones",
         "kerb": "lowered"
       },
-      "note": "Friedrich-Ebert-Allee westbound (vp32): paver median with small trees, low kerbs"
+      "note": "Friedrich-Ebert-Allee westbound (vp32): paver median with small trees, low kerbs — round 3: paver median without trees (vp115, vp119; same median as 190728411)"
     },
     "40635659": {
       "tags": {
@@ -387,9 +399,10 @@
     },
     "1314623312": {
       "tags": {
-        "mouth:kerb": "lowered"
+        "mouth:kerb": "lowered",
+        "surface": "asphalt"
       },
-      "note": "parking aisle at Beethovenstraße (vp30): joins over the continuous pavement, lowered kerb"
+      "note": "parking aisle at Beethovenstraße (vp30): joins over the continuous pavement, lowered kerb — round 3: forecourt/parking south of the Schubertstraße junction is asphalt, one surface with the road (vp79)"
     },
     "1201955652": {
       "tags": {
@@ -512,9 +525,11 @@
       "tags": {
         "parking:left": "lane",
         "parking:left:orientation": "parallel",
-        "frontage:right": null
+        "sidewalk:left": "no",
+        "sidewalk:right:width": "1.8",
+        "sidewalk:right:surface": "asphalt"
       },
-      "note": "Lohweg west part (aerial 4-0): parked cars on the south kerb"
+      "note": "Lohweg west part (aerial 4-0): parked cars on the south kerb — round 3: west part: the pavement is on the north-east side (asphalt ~1.8 m, wooden fence right behind it), none on the south-west where cars park along hedges and a paver bay strip (vp121, vp178 – photos checked); the fence is on this part too (frontage null dropped)"
     },
     "22701025:1": {
       "tags": {
@@ -528,14 +543,10 @@
     },
     "22701025:2": {
       "tags": {
-        "parking:left": "lane",
-        "parking:left:orientation": "parallel",
-        "parking:left:occupancy": "low",
-        "sidewalk:left:surface": "paving_stones",
-        "road_text": "30",
-        "road_text:position": "59"
+        "sidewalk:left": "no",
+        "sidewalk:right:surface": "asphalt"
       },
-      "note": "Beethovenstraße bend and east part (vp22, aerial 0-3): cars on the north/inner kerb; north-west pavement grey pavers; '30' in the eastbound lane at x≈369 — round 2 (vp07, vp10): only now and then a single car there, no row – occupancy low"
+      "note": "round 3 (parts renumbered by new cuts): Beethovenstraße bend x 329–363: inner (north-east) side only a 0–0.5 m paver strip and a lattice fence, outer side ~2 m grey asphalt pavement (vp190 photo, vp193, vp188). NEW numbering: the old part :2 is now :2+:3."
     },
     "22775582:1": {
       "tags": {
@@ -560,38 +571,46 @@
         "parking:left:orientation": "parallel",
         "parking:left:trees": "yes",
         "parking:right": "lane",
-        "parking:right:orientation": "parallel"
+        "parking:right:orientation": "parallel",
+        "parking:right:trees": "yes"
       },
-      "note": "Friedrich-Ebert-Allee west end, x≈245–296 (vp01): kerbside parking between kerbed tree bulb-outs on the north, parking strip behind a solid line on the south"
+      "note": "Friedrich-Ebert-Allee west end, x≈245–296 (vp01): kerbside parking between kerbed tree bulb-outs on the north, parking strip behind a solid line on the south — round 3: vp113 (photo view 1 checked): kerbed grass tree build-outs also in the south parking strip behind the solid line"
     },
     "802163194:2": {
       "tags": {
         "parking:right": "lane",
-        "parking:right:orientation": "parallel"
+        "parking:right:orientation": "parallel",
+        "parking:right:trees": "yes"
       },
-      "note": "Friedrich-Ebert-Allee x≈296–336 (vp01, aerial 0-0): parked cars on the south strip"
+      "note": "Friedrich-Ebert-Allee x≈296–336 (vp01, aerial 0-0): parked cars on the south strip — round 3: vp175: small kerbed planter with a tree in the south parking strip"
     },
     "802163194:3": {
       "tags": {
         "cycleway:right": "lane",
         "cycleway:right:lane": "exclusive",
-        "cycleway:right:width": "1.8"
+        "cycleway:right:width": "1.8",
+        "width": "10"
       },
-      "note": "Friedrich-Ebert-Allee x≈336–490 (vp38): lane ~1.8 m behind a solid line along the south kerb"
+      "note": "Friedrich-Ebert-Allee x≈336–490 (vp38): lane ~1.8 m behind a solid line along the south kerb — round 3: width ~10 m (vp237 9.5, vp241 10, vp172 10, vp179 10-11, vp114 ~11); solid line ~1.5-2 m from the south kerb confirmed (237, 241); no edge line on the north"
     },
     "802163194:4": {
       "tags": {
-        "width": "10",
+        "width": "12",
+        "lanes": "3",
+        "lanes:forward": "2",
+        "lanes:backward": "1",
+        "turn:lanes:forward": "left|through",
+        "overtaking": "no",
         "cycleway:both": "lane",
         "cycleway:both:lane": "advisory",
         "cycleway:both:width": "1.7",
         "cycleway:both:surface:colour": "red"
       },
-      "note": "Friedrich-Ebert-Allee x≈490–526 (vp14, aerial 0-0): red advisory cycle lanes on both sides"
+      "note": "Friedrich-Ebert-Allee x≈490–526 (vp14, aerial 0-0): red advisory cycle lanes on both sides — round 3: approach to the Rudolf-Diesel-Straße junction: two eastbound lanes (left-turn arrow in the left one, dashed lane line), one westbound, solid/double centre line, red cycle lane on the south (vp176 photo checked, vp58, vp118); with the red lanes the carriageway is ~12 m (vp176 ~12-13, vp58 10.5 without lanes). The pocket starts a little west of the split at x≈490 (vp176 at x≈482 already has it) – kept the split"
     },
     "184873567:1": {
       "tags": {
-        "width": "6.5",
+        "width": "7",
         "cycleway:left": null,
         "cycleway:left:lane": null,
         "cycleway:left:width": null,
@@ -600,31 +619,37 @@
         "sidewalk:left:surface": "asphalt",
         "sidewalk:right": "no"
       },
-      "note": "Theodor-Heuss-Allee x≈502–603 (vp11): ~6.5 m, no cycle lane; south: ~2 m grass verge, then a dark asphalt pavement; north: paved forecourts directly at the kerb"
+      "note": "Theodor-Heuss-Allee x≈502–603 (vp11): ~6.5 m, no cycle lane; south: ~2 m grass verge, then a dark asphalt pavement; north: paved forecourts directly at the kerb — round 3: x 502–603: ~7 m (vp20, vp142, vp202; was 6.5)"
     },
     "184873567:2": {
       "tags": {
         "sidewalk:left:surface": "paving_stones",
         "sidewalk:left:colour": "anthracite",
-        "sidewalk:right:surface": "paving_stones"
+        "sidewalk:right:surface": "paving_stones",
+        "parking:left:trees": "yes"
       },
-      "note": "Theodor-Heuss-Allee x≈252–502 (vp29): advisory lane on the south-east; dark (anthracite) paver pavement south-east, grey/red pavers north-west"
+      "note": "Theodor-Heuss-Allee x≈252–502 (vp29): advisory lane on the south-east; dark (anthracite) paver pavement south-east, grey/red pavers north-west — round 3: x 252–502: kerbed build-outs with young trees between the bays of the south strip (vp16, vp78, vp140, vp199)"
     },
     "21351807:1": {
+      "tags": {
+        "sidewalk:left": "no",
+        "frontage:left": "hedge",
+        "sidewalk:right:width": "2",
+        "sidewalk:right:surface": "paving_stones",
+        "sidewalk:right:colour": "red",
+        "verge:right": null,
+        "verge:right:width": null
+      },
+      "note": "round 3 (parts renumbered by new cuts): west of x≈272 (NEW split): red-brown paver pavement ~2 m at the south kerb with small street trees in it, tall hedge right at the north kerb – vp212 (pair 212-1 checked; the game draws the red pavement on the north there)"
+    },
+    "21351807:2": {
       "tags": {
         "sidewalk:left": "yes",
         "sidewalk:left:width": "2.5",
         "sidewalk:left:surface": "paving_stones",
         "sidewalk:left:colour": "red"
       },
-      "note": "Gustav-Heinemann-Allee west of x≈317 (vp06): ~2.5 m red concrete-paver pavement on the north side"
-    },
-    "21351807:2": {
-      "tags": {
-        "sidewalk:left": "no",
-        "frontage:left": "hedge"
-      },
-      "note": "Gustav-Heinemann-Allee east of x≈317 (vp06, vp18): no pavement, hedges and shrubs directly behind the north kerb"
+      "note": "round 3 (parts renumbered by new cuts): x≈272–317: round-2 red pavement on the north kept (was part :1; pair 029-1 shows red pavers on the north near x≈310); south planted strip with trees from the whole-way tags"
     },
     "22741558:1": {
       "tags": {
@@ -649,15 +674,397 @@
     "802160513:2": {
       "tags": {
         "sidewalk:left:surface": "paving_stones",
-        "sidewalk:left:colour": "red"
+        "sidewalk:left:colour": "grey"
       },
-      "note": "Haydnstraße north–south leg (vp13): red-brown concrete-paver pavement on the inner side"
+      "note": "Haydnstraße north–south leg (vp13): red-brown concrete-paver pavement on the inner side — round 3: Haydnstraße N–S leg: pavement grey / grey-brown pavers, not red (vp71 – same spot as round-1 vp13 –, vp133, vp136, vp198, vp201); round 2's colour=red corrected"
+    },
+    "1201944114": {
+      "tags": {
+        "width": "5",
+        "median:contents": "grass;trees",
+        "sidewalk:right:surface": "asphalt"
+      },
+      "note": "round 3: ~5 m, grass median with large trees on the left, asphalt south pavement (vp146, vp149)"
+    },
+    "22701019": {
+      "tags": {
+        "width": "5.5"
+      },
+      "note": "round 3: Schubertstraße ~5.5–6 m (vp79, vp81, vp143, vp207); game ~4.5 m"
+    },
+    "22701022": {
+      "tags": {
+        "width": "5.5",
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "1.8",
+        "sidewalk:right": "no",
+        "sidewalk:left:surface": "paving_stones"
+      },
+      "note": "round 3: Händelstraße west (526→605): pavement of small grey concrete pavers on the north only, kerb + grass strip/driveways on the south (vp3 – reviewer's own check: north in view 1, vp65, vp128); game draws wide slab pavements both sides"
+    },
+    "22775663": {
+      "tags": {
+        "width": "6",
+        "sidewalk:both:width": "1.8",
+        "sidewalk:both:surface": "paving_stones"
+      },
+      "note": "round 3: Wagnerstraße: ~5.5–6 m, pavements ~1.8 m of grey pavers both sides (vp19, vp20, vp76); game ~4.5–5 m with ~3 m light slabs"
+    },
+    "22775793": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "round 3: Robert-Koch-Straße living street: grey concrete pavers, game asphalt (vp89) — round 3: Robert-Koch-Straße living street: grey concrete pavers, mapped surface=paved renders as asphalt – vp89, vp215"
+    },
+    "1064398975": {
+      "tags": {
+        "sidewalk:both:surface": "asphalt"
+      },
+      "note": "round 3: Dürerstraße south: asphalt pavements, no separate footway to inherit from (vp152)"
+    },
+    "1064398976": {
+      "tags": {
+        "sidewalk:both:surface": "asphalt"
+      },
+      "note": "round 3: Dürerstraße north: asphalt pavements (vp87, vp152)"
+    },
+    "1351530679": {
+      "tags": {
+        "surface": "paving_stones"
+      },
+      "note": "round 3: private path across the north verge of THA: grey/red pavers (vp202)"
+    },
+    "191282070:2": {
+      "tags": {
+        "sidewalk:right": "yes",
+        "sidewalk:right:width": "1.7"
+      },
+      "note": "round 3: Brahmsstraße north of the Händelstraße mouth (z 488→401): pavement on BOTH sides – east ~1.5–1.8 m behind which the hedges stand (vp5, vp66 photo checked, vp129, vp191); south of the mouth west only stays (vp2, vp4, vp124, vp185, vp186). Part :1 = south part keeps the whole-way tags."
+    },
+    "191282068:1": {
+      "tags": {
+        "sidewalk:right": "yes",
+        "sidewalk:right:width": "1.8",
+        "kerb:right": null,
+        "frontage:right": null
+      },
+      "note": "round 3: Beethovenstraße x 498–594 (west of Wagnerstraße): pavements on both sides ~1.5–2 m, low fence/shrubs behind the south one (vp13, vp70, vp132). East of Wagnerstraße the south side has no pavement (planting strip / hedge at the kerb: vp73 photo, vp200 photo) – part :2 keeps the whole-way tags."
+    },
+    "191282068:2": {
+      "tags": {
+        "road_text": null,
+        "road_text:position": null
+      },
+      "note": "round 3: the '30' at 50 m lies on part :1 (x≈543)"
+    },
+    "191282069:1": {
+      "tags": {
+        "sidewalk:right": "yes",
+        "sidewalk:right:width": "2",
+        "sidewalk:right:surface": "paving_stones",
+        "parking:right": null,
+        "parking:right:orientation": null,
+        "road_text": null,
+        "road_text:position": null,
+        "road_text:backward:position": "18"
+      },
+      "note": "round 3: Beethovenstraße x 691–795 (west of Schubertstraße): full ~2 m grey-paver pavement on the south, cars on the carriageway, not half on the kerb (vp74 photo, vp17). The half-on-kerb strip of round 1 (vp30 = vp77 photo, x≈807) stays on part :2. Backward '30' (was 232 m from the way end = x≈776, seen in vp74) is 18 m from this part's end."
+    },
+    "191282069:2": {
+      "tags": {
+        "road_text:position": "18",
+        "road_text:backward": null,
+        "road_text:backward:position": null
+      },
+      "note": "round 3: forward '30' (was 124 m = x≈812, seen in vp77 photo) is 18 m from this part's start"
+    },
+    "22701025:3": {
+      "tags": {
+        "parking:left": "lane",
+        "parking:left:orientation": "parallel",
+        "parking:left:occupancy": "low",
+        "sidewalk:left:surface": "paving_stones",
+        "road_text": "30",
+        "road_text:position": "6"
+      },
+      "note": "round 3: old 22701025:2 tags (round 2, vp22) moved to the part east of the new cut at (363.4,442.9); '30' was 59 m from (329,406) = 5.7 m into this part"
+    },
+    "22701019:2": {
+      "tags": {
+        "sidewalk:left": "no",
+        "sidewalk:right:width": "1.8",
+        "sidewalk:right:surface": "asphalt",
+        "parking:left": "street_side",
+        "parking:left:orientation": "perpendicular"
+      },
+      "note": "round 3: Schubertstraße z 233→174 (THA end): west side perpendicular bays on grey pavers directly off the carriageway, no pavement; east ~1.6–1.8 m dark asphalt pavement (vp81, vp207 photos both views). North part (vp79, vp143) has pavements both sides."
+    },
+    "22876339": {
+      "tags": {
+        "width": "5.5"
+      },
+      "note": "round 3: Nikolaus-Otto-Ring ~5-5.5 m (vp45,101,107,161,169,228,231,234); no entry before"
+    },
+    "25557685": {
+      "tags": {
+        "width": "6.5",
+        "sidewalk:right": "no",
+        "sidewalk:left:width": "2.5",
+        "parking:right": "street_side",
+        "parking:right:orientation": "perpendicular",
+        "parking:right:trees": "yes"
+      },
+      "note": "round 3: Johann-Siegmund-Schuckert-Straße (way runs south, right = west): perpendicular paver bays with planters and trees on the west, grey paver pavement ~2.5 m on the east only – vp177 (pair 177-0 checked); single viewpoint, applied to the whole way (it ends at the supermarket car park)"
+    },
+    "48869076": {
+      "tags": {
+        "sidewalk": "no"
+      },
+      "note": "round 3: Rudolf-Diesel-Straße z 59…-17 (level crossing): grass verges with large trees at both kerbs, separate shared paths behind – vp217, vp219"
+    },
+    "207649793": {
+      "tags": {
+        "mouth:kerb": "lowered"
+      },
+      "note": "round 3: garage-court access: dropped kerb across the pavement, flush paved court – vp6"
+    },
+    "406847228": {
+      "tags": {
+        "sidewalk": "no",
+        "lane_markings": "no"
+      },
+      "note": "round 3: short piece south of the level crossing: no pavements at the kerb, no centre line (game draws a dashed one) – vp219"
+    },
+    "434557654": {
+      "tags": {
+        "mouth:kerb": "lowered"
+      },
+      "note": "round 3: parking aisle: flush entrance across the pavement, game draws a kerbed street mouth – vp143"
+    },
+    "434557669": {
+      "tags": {
+        "mouth:kerb": "lowered"
+      },
+      "note": "round 3: parking aisle: flush entrance across the pavement – vp143"
+    },
+    "1351530678": {
+      "tags": {
+        "mouth:kerb": "lowered",
+        "surface": "paving_stones"
+      },
+      "note": "round 3: driveway to garages: grey pavers, dropped kerb instead of a kerbed road mouth – vp19"
+    },
+    "1367333655": {
+      "tags": {
+        "width": "7",
+        "parking:both": "street_side",
+        "parking:both:orientation": "perpendicular",
+        "parking:left:markings": "yes",
+        "parking:right:markings": "no"
+      },
+      "note": "round 3: Rudolf-Diesel-Straße z -116…-147: ~7 m, perpendicular paved bays on both sides directly beside the carriageway, white bay lines on the west – vp163 (pair 163-0 checked)"
+    },
+    "22876339:2": {
+      "tags": {
+        "sidewalk:right": "no",
+        "sidewalk:left:width": "1.8"
+      },
+      "note": "round 3: from the bend at x≈461 along the long N–S leg (way runs south, left = east): pavement only on the east side (1.5–2 m), west side front gardens/driveways/fence at the edge, no pavement – vp101,161,228,231,234 (pairs 228-0 and 045-0 checked: vp45's 'west pavement' is paved driveways). Part :1 (x 393–461, west leg) keeps pavements both sides (vp107, vp169)"
+    },
+    "244044359:1": {
+      "tags": {
+        "sidewalk:left": "no",
+        "sidewalk:right:surface": "paving_stones"
+      },
+      "note": "round 3: Werner-von-Siemens-Straße SW–NE leg x≈220–393 (way runs NE, left = north-west): no pavement at the NW kerb – 2.5–3 m planted shrub/ground-cover strip with trees or a hedge right at the edge; SE pavement 1.5 m dark grey concrete pavers – vp44,104,224,227 (pair 104-0 checked; vp166 sees a path behind the planted strip near x≈370, not at the kerb)"
+    },
+    "244044359:2": {
+      "tags": {
+        "road_text:backward": "30",
+        "road_text:backward:position": "27"
+      },
+      "note": "round 3: N–S leg x≈393 (pavements both sides as before: vp47,54,110): '30' in the southbound lane at z≈-276 (pair 054-0: ~15 m ahead of the camera at z -291), 27 m from the way's end at z -303"
+    },
+    "48869075:2": {
+      "tags": {
+        "parking:left": null,
+        "parking:left:orientation": null,
+        "parking:left:markings": null,
+        "parking:right": "street_side",
+        "parking:right:orientation": "perpendicular",
+        "verge:right": null,
+        "verge:right:width": null
+      },
+      "note": "round 3: z≈-228…-251 (way runs north, right = east): perpendicular bays on dark pavers directly at the east kerb, west side grass verge with trees and no parking – vp111 (pair 111-0 checked), vp51 view 1"
+    },
+    "48869075:3": {
+      "tags": {
+        "parking:left": null,
+        "parking:left:orientation": null,
+        "parking:left:markings": null
+      },
+      "note": "round 3: z≈-251…-270 towards Friedrich-Ebert-Allee: no perpendicular parking on the west; only an empty strip behind a solid line (pair 051-0); east grass verge at the kerb"
+    },
+    "40635659:2": {
+      "tags": {
+        "lane_markings": "no",
+        "parking:left": null,
+        "parking:left:orientation": null,
+        "parking:left:markings": null,
+        "parking:right": "street_side",
+        "parking:right:orientation": "perpendicular",
+        "parking:right:markings": "no"
+      },
+      "note": "round 3: z≈124…59 (way runs north, right = east): no centre line, perpendicular parking on a paver strip directly at the low east kerb; no kerbside parking on the west (separate car park area) – vp30,154,155 (pairs 030-0, 154-0 checked)"
+    },
+    "21351807:3": {
+      "tags": {
+        "sidewalk:left": "no",
+        "frontage:left": "hedge"
+      },
+      "note": "round 3: x≈317–370: no pavement on the north, hedge right at the road edge – vp29 (pair 029-0), vp89 (was part :2)"
+    },
+    "21351807:4": {
+      "tags": {
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "1.2",
+        "sidewalk:left:surface": "paving_stones",
+        "frontage:left": "fence"
+      },
+      "note": "round 3: x≈370–556 (NEW split): narrow ~1.2 m grey paver pavement on the north with fences behind – vp151,153,213,215 (vp92 at x 530: north paver pavement); vp32 (x 488) and vp155 (x 548) see none there – majority taken"
+    },
+    "48869074": {
+      "tags": {
+        "overtaking": "no"
+      },
+      "note": "round 3: K 22 north of the bridge: solid centre line (vp15 view 1, vp18 photo checked; vp203: dashed only at the very town end)"
+    },
+    "86280408": {
+      "tags": {
+        "lanes": "2",
+        "width": "7",
+        "turn:lanes": "left|through;right"
+      },
+      "note": "round 3: K 22 northbound z≈-47…-150: two lanes ~7 m with dashed line (vp40,42,100,102); arrows left | through+right at the Im Wiesental/Marktstraße junction (vp102; vp100 left|through mid-way)"
+    },
+    "200224198": {
+      "tags": {
+        "overtaking": "no"
+      },
+      "note": "round 3: K 22 bridge: solid centre line (vp15, vp75)"
+    },
+    "725702754": {
+      "tags": {
+        "lanes": "1",
+        "width": "4",
+        "median:contents": "paving_stones",
+        "parking:right": "on_kerb",
+        "parking:right:orientation": "parallel",
+        "parking:right:trees": "yes"
+      },
+      "note": "round 3: K 22 northbound z≈-150…-331: one lane 3.5-4.5 m (vp49,52,112,116,229), ~3 m kerbed paver median (vp49,52,112,116,229), parallel parking on the raised paver area at the east kerb with tree pits (vp112,116,229; photo 116-1). Interrupted in reality by the bus stop z≈-206 and the signal crossing z≈-251"
+    },
+    "22741556:1": {
+      "tags": {
+        "parking:right": null,
+        "parking:right:orientation": null
+      },
+      "note": "round 3: Im Wiesental east/curved part (Lohweg to Im Ährenfeld, x>1132): no kerbside parking row, at most a single car (vp50,53,103,165,168,230,233; photo 233-1 checked); parking stays on the west part :2 (north kerb: vp43,46,162,226)"
+    },
+    "41751814:1": {
+      "tags": {
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel",
+        "parking:right:occupancy": "low"
+      },
+      "note": "round 3: south part (Im Wiesental to x≈1180): occasional cars on the east kerb (vp106,109,171,174)"
+    },
+    "41751814:2": {
+      "tags": {
+        "parking:left": "lane",
+        "parking:left:orientation": "parallel"
+      },
+      "note": "round 3: north end towards Lohweg (x≈1180-1204): continuous row on the west kerb (vp57, vp240; photo 240-1)"
+    },
+    "22517854:1": {
+      "tags": {
+        "lanes": "1",
+        "width": "4",
+        "median:contents": "paving_stones",
+        "parking:right": "on_kerb",
+        "parking:right:orientation": "parallel",
+        "parking:right:trees": "yes"
+      },
+      "note": "round 3: K 22 southbound, roundabout to z≈-255: one lane 3.75-4.5 m (vp52,56,61,112,116), ~3 m kerbed paver median, no grass (vp49,52,56,112,116; photo 116-1), cars parked parallel on the raised paver pavement at the west kerb with young trees (vp56, vp116)"
+    },
+    "22517854:2": {
+      "tags": {
+        "lanes": "1",
+        "width": "3.75",
+        "median:contents": "paving_stones"
+      },
+      "note": "round 3: K 22 southbound z≈-255…-151 (petrol station): one lane ~3.5 m, paver median (vp229, vp232, vp49)"
+    },
+    "22517854:3": {
+      "tags": {
+        "lanes": "2",
+        "width": "7"
+      },
+      "note": "round 3: K 22 southbound z≈-151…-45: two lanes with a dashed lane line, ~7 m (vp40, vp42); game showed one wide unmarked surface"
+    },
+    "200434448:1": {
+      "tags": {
+        "width": "7.5",
+        "lane_markings:edge": "yes"
+      },
+      "note": "round 3: K 22 bridge to x≈1182: ~7.5 m with solid edge lines (vp12, vp75, vp195); the south part stays 6.5 m without edge lines (vp69 = round-1 vp04)"
+    },
+    "30690471:1": {
+      "tags": {
+        "lanes": "4",
+        "lanes:forward": "2",
+        "lanes:backward": "2",
+        "turn:lanes:backward": "left|through;right",
+        "width": "13"
+      },
+      "note": "round 3: K 22 signal approach z≈213-240: northbound left-turn + through/right lanes, hatched area between the directions, ~14 m (vp205 photo checked; vp203, vp141 see the extra lanes)"
+    },
+    "534301090": {
+      "tags": {
+        "median:contents": "paving_stones",
+        "kerb": "lowered"
+      },
+      "note": "round 3: paver median without trees, low kerbs with sett gutter both sides (vp242 photo checked, vp55)"
+    },
+    "534301090:2": {
+      "tags": {
+        "lanes": "2",
+        "lane_markings": "yes",
+        "width": "7"
+      },
+      "note": "round 3: last ~36 m before the Rudolf-Diesel-Straße junction: two marked westbound lanes ~7 m with arrows (vp180); east of it one lane ~3.5 m (vp242)"
     }
   },
   "nodes": {
     "243229041": [
       -5,
       2.1
+    ],
+    "245941392": [
+      -2,
+      0.5
+    ],
+    "245941400": [
+      -2.7,
+      0.7
+    ],
+    "1392010864": [
+      -3.2,
+      0.8
+    ],
+    "1392010875": [
+      -3.2,
+      0.8
     ]
   },
   "areas": [
@@ -1674,11 +2081,15 @@
     26825911,
     200568969,
     "22775781:2",
-    "244101996:2"
+    "244101996:2",
+    1201944108,
+    1201944111
   ],
   "removeNotes": {
     "26825911": "aerial 4-3: car park in closed woodland, nothing visible",
     "200568969": "aerial 2-2: the soccer pitch is gone – a long building (observed-buildings obs-b1) and a lawn stand there",
+    "1201944108": "link between the carriageways at Rembrandtstraße/Beethovenstraße: the end of merge tha-gap joins both there (round 3)",
+    "1201944111": "link between the carriageways at Mozartstraße: start of merge tha-mozart (round 3)",
     "22775781:2": "the driveway's end inside the yard (turning circle that does not exist)",
     "244101996:2": "duplicate of the asphalt path 592141817 a few metres beside it (aerial 4-4)"
   },
@@ -1794,35 +2205,189 @@
         434
       ],
       "note": "footway beside K 22 where it meets 592141817"
+    },
+    {
+      "osm": 191282070,
+      "at": [
+        526.4,
+        487.9
+      ],
+      "note": "Brahmsstraße at the Händelstraße mouth: pavement west only to the south, both sides to the north (vp5, vp66, vp124, vp185)"
+    },
+    {
+      "osm": 191282068,
+      "at": [
+        593.9,
+        354.6
+      ],
+      "note": "Beethovenstraße at Wagnerstraße: south pavement only west of it (vp13, vp70, vp73)"
+    },
+    {
+      "osm": 191282069,
+      "at": [
+        794.6,
+        288.9
+      ],
+      "note": "Beethovenstraße at Schubertstraße: full south pavement west, half-on-kerb strip east (vp74, vp77)"
+    },
+    {
+      "osm": 22701025,
+      "at": [
+        363.4,
+        442.9
+      ],
+      "note": "Beethovenstraße end of the bend: no inner pavement on the bend (vp190, vp193). Renumbers: old :2 → :2 (bend) + :3"
+    },
+    {
+      "osm": 22701019,
+      "at": [
+        790,
+        233
+      ],
+      "note": "Schubertstraße: perpendicular paver bays instead of the west pavement south of here (vp81, vp207)"
+    },
+    {
+      "osm": 22876339,
+      "at": [
+        460.8,
+        -220.2
+      ],
+      "note": "Nikolaus-Otto-Ring at the bend (node 1392010843): pavements both sides west of it, east side only along the N–S leg"
+    },
+    {
+      "osm": 244044359,
+      "at": [
+        392.7,
+        -205
+      ],
+      "note": "Werner-von-Siemens-Straße at the corner with Nikolaus-Otto-Ring (node 240697540): planted strip instead of a NW pavement on the SW–NE leg"
+    },
+    {
+      "osm": 48869075,
+      "at": [
+        545,
+        -228
+      ],
+      "note": "Rudolf-Diesel-Straße z≈-228: west perpendicular parking ends, east bays begin"
+    },
+    {
+      "osm": 48869075,
+      "at": [
+        539.5,
+        -251
+      ],
+      "note": "Rudolf-Diesel-Straße z≈-251: east bays end"
+    },
+    {
+      "osm": 40635659,
+      "at": [
+        565.8,
+        123.8
+      ],
+      "note": "Rudolf-Diesel-Straße z≈124 (node 241646242): north of it east perpendicular parking, no centre line"
+    },
+    {
+      "osm": 21351807,
+      "at": [
+        271.9,
+        120.8
+      ],
+      "note": "Gustav-Heinemann-Allee x≈272 (node 229644414): south pavement at the kerb to the west. NOTE: with the existing split at x≈317 the parts become :1 <272, :2 272–317, :3 317–370, :4 >370 – old ':1'/':2' entries must be replaced"
+    },
+    {
+      "osm": 21351807,
+      "at": [
+        370.4,
+        110.4
+      ],
+      "note": "Gustav-Heinemann-Allee x≈370 (node 244509073): north pavement east of it"
+    },
+    {
+      "osm": 22741556,
+      "at": [
+        1132.3,
+        -137.4
+      ],
+      "note": "Im Wiesental at Im Ährenfeld: kerbside parking only west of here"
+    },
+    {
+      "osm": 41751814,
+      "at": [
+        1180,
+        -273
+      ],
+      "note": "Im Ährenfeld: parked cars change from the east kerb to the west kerb (new node)"
+    },
+    {
+      "osm": 22517854,
+      "at": [
+        1035.5,
+        -254.8
+      ],
+      "note": "K 22 southbound: end of the on-pavement parking"
+    },
+    {
+      "osm": 22517854,
+      "at": [
+        993,
+        -150.7
+      ],
+      "note": "K 22 southbound at Im Wiesental: two lanes south of here"
+    },
+    {
+      "osm": 200434448,
+      "at": [
+        1181.8,
+        402.5
+      ],
+      "note": "K 22 south of the bridge: wider part with edge lines north of here"
+    },
+    {
+      "osm": 30690471,
+      "at": [
+        1092.5,
+        239.7
+      ],
+      "note": "K 22: four-lane signal approach north of here"
+    },
+    {
+      "osm": 534301090,
+      "at": [
+        561.5,
+        -319.5
+      ],
+      "note": "Friedrich-Ebert-Allee westbound: two marked lanes from here to the Rudolf-Diesel-Straße junction (vp180); node 2074581389. Parts: :1 x≈642–561, :2 x≈561–526"
     }
   ],
   "merge": [
     {
       "id": "tha-east",
       "a": [
-        1201944106,
-        1201944115
+        1201944106
       ],
       "b": [
-        1367337921,
-        1201944113,
-        21121334
+        1201944113
       ],
       "from": [
-        656,
-        194
+        785.6,
+        168.85
       ],
       "to": [
-        891,
-        170
+        844.6,
+        168.85
       ],
       "tags": {
         "lanes": "2",
+        "width": "12",
+        "lane_markings": "yes",
         "sidewalk:left": "yes",
         "sidewalk:left:width": "2",
-        "lane_markings": "yes"
+        "parking:left": "street_side",
+        "parking:left:orientation": "perpendicular",
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel"
       },
-      "note": "Theodor-Heuss-Allee x≈656–891 (vp00, vp27, aerial 2-2): one carriageway of ~9–10 m with a dashed centre line; the real median ends at an island nose at x≈656. The links between the carriageways (1201944109, 1201944110) go with them. The parking lay-by on the north kerb (x≈785–845) is not on the merged way yet."
+      "note": "Theodor-Heuss-Allee x≈785–845 (vp000, vp024, vp027, vp210, aerial 2-2): one carriageway ~12 m with a dashed centre line; perpendicular bays on a paver strip at pavement level along the north kerb, cars parked along the south kerb. — round 3: starts at Schubertstraße (x≈785) instead of x≈656: between x≈705 and 785 there is a ~4–5 m grass median with a tree row (vp083, vp086, vp145, vp148, aerial 2-2)"
     },
     {
       "id": "fea-roundabout",
@@ -1877,6 +2442,145 @@
         "cycleway:left": "separate"
       },
       "note": "Kirchbaunaer Straße K 22 south of the level crossing, z≈−8…32 (vp24, aerial 3-1): the carriageways run side by side with only a solid line between them"
+    },
+    {
+      "id": "tha-gap",
+      "a": [
+        1201944106
+      ],
+      "b": [
+        21121334
+      ],
+      "from": [
+        656,
+        194
+      ],
+      "to": [
+        704.5,
+        177.9
+      ],
+      "tags": {
+        "lanes": "2",
+        "width": "12",
+        "lane_markings": "no",
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "2",
+        "parking:right": "lane",
+        "parking:right:orientation": "parallel"
+      },
+      "note": "Theodor-Heuss-Allee x≈656–705 (vp021, vp023, vp026, vp090; aerial 1-2/2-2): one carriageway ~11.5–12.5 m without a centre line, cars parked along the south kerb; the median ends at an island nose at x≈656 and starts again east of the Rembrandtstraße/Beethovenstraße gap (x≈705). The perpendicular bays on the north are the mapped car park. — round 3: was part of tha-east (656–891); x≈705–785 is really dual (vp083, vp086, vp145, vp148)"
+    },
+    {
+      "id": "tha-east2",
+      "a": [
+        1201944115
+      ],
+      "b": [
+        1367337921
+      ],
+      "from": [
+        844.6,
+        168.85
+      ],
+      "to": [
+        891,
+        170
+      ],
+      "tags": {
+        "lanes": "2",
+        "width": "12",
+        "lane_markings": "yes",
+        "sidewalk:left": "yes",
+        "sidewalk:left:width": "2",
+        "sidewalk:right:surface": "asphalt",
+        "parking:both": "lane",
+        "parking:both:orientation": "parallel"
+      },
+      "note": "Theodor-Heuss-Allee x≈845–891 (vp024, vp084): one carriageway ~12 m, dashed centre line, cars parked parallel along both kerbs, asphalt south pavement; the median starts at a kerbed nose with a keep-right sign at x≈891. — round 3: own merge so that the parking can differ from x≈785–845"
+    },
+    {
+      "id": "tha-mozart",
+      "a": [
+        1201944119
+      ],
+      "b": [
+        1201944116
+      ],
+      "from": [
+        953.85,
+        168.1
+      ],
+      "to": [
+        995,
+        161
+      ],
+      "tags": {
+        "lanes": "5",
+        "lanes:forward": "2",
+        "lanes:backward": "3",
+        "turn:lanes:forward": "left;through|right",
+        "turn:lanes:backward": "left|through|merge_to_left",
+        "width": "16",
+        "overtaking": "no",
+        "lane_markings": "yes",
+        "sidewalk:both": "separate"
+      },
+      "note": "round 3: Theodor-Heuss-Allee between Mozartstraße (x≈954) and x≈995 (vp025, vp028, vp211; aerial 3-2 checked: one asphalt surface ~16 m, westbound and eastbound lanes side by side with only a solid line between them, no kerbed median). The game drew a raised paver median there. Foot/cycle paths are mapped separately behind the verges"
+    },
+    {
+      "id": "rds-tha",
+      "a": [
+        1201944107
+      ],
+      "b": [
+        1201944105
+      ],
+      "from": [
+        582.8,
+        170.5
+      ],
+      "to": [
+        593,
+        195
+      ],
+      "tags": {
+        "lanes": "2",
+        "width": "8",
+        "overtaking": "no",
+        "lane_markings": "yes",
+        "sidewalk": "no"
+      },
+      "note": "round 3: Rudolf-Diesel-Straße north end z≈170–195 (vp82, vp144): both directions directly side by side with a painted double solid line, no median; the game draws a ~4 m paver median. The paved traffic triangle at the Theodor-Heuss-Allee mouth (≈594,203) is beyond the end of the merge (aerial 1-2 checked: one road with a double solid line between z≈170 and ≈195)."
+    },
+    {
+      "id": "k22-crossing-south",
+      "a": [
+        395443786
+      ],
+      "b": [
+        200224342,
+        21121339
+      ],
+      "from": [
+        995,
+        32
+      ],
+      "to": [
+        1013,
+        72
+      ],
+      "tags": {
+        "lanes": "4",
+        "lanes:forward": "2",
+        "lanes:backward": "2",
+        "turn:lanes:forward": "through|through;right",
+        "width": "14",
+        "overtaking": "no",
+        "lane_markings": "yes",
+        "sidewalk:left": "separate",
+        "cycleway:left": "separate"
+      },
+      "note": "round 3: vp94, vp216, vp33: no grass median between z≈32 and ≈75 – painted solid line (+ hatched wedge); aerial a-3-1 (x 986-1026, z 23-73) shows only painted lanes, the grass median starts at z≈78 (osm-3-2). The game has a grass median island there. Continues merge k22-crossing (ends at [995,32]); untested whether two adjacent merges chain – build-check before adopting, else extend k22-crossing's 'to' instead."
     }
   ],
   "points": [
@@ -1995,6 +2699,129 @@
         "side": "right"
       },
       "note": "Theodor-Heuss-Allee x≈436 (vp29): kerb build-out with grass and cobble edging on the north-west side"
+    },
+    {
+      "id": "choker-brahms-465",
+      "way": "191282070",
+      "at": [
+        519.3,
+        465
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "right",
+        "beacon": "yes"
+      },
+      "note": "Brahmsstraße z≈465 (vp66 photo, vp5): planted build-out with young tree and beacon on the east side"
+    },
+    {
+      "id": "choker-brahms-426",
+      "way": "22701021",
+      "at": [
+        426,
+        611.6
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "left",
+        "beacon": "yes"
+      },
+      "note": "Brahmsstraße x≈426 (vp184 photo): build-out with young tree and beacon on the north (pavement) side"
+    },
+    {
+      "id": "choker-beethoven-565",
+      "way": "191282068",
+      "at": [
+        565,
+        369
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "left",
+        "beacon": "yes"
+      },
+      "note": "Beethovenstraße x≈565 (vp13, vp132): kerbed planter with granite setts, tree and beacon at the north kerb"
+    },
+    {
+      "id": "choker-haydn-737",
+      "way": "802160513",
+      "at": [
+        737,
+        410.6
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "right",
+        "beacon": "yes"
+      },
+      "note": "Haydnstraße x≈737 (vp11 photo): planter with young tree and beacon on the south side"
+    },
+    {
+      "id": "choker-haendel-413",
+      "way": "244044353",
+      "at": [
+        705.7,
+        413
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "left",
+        "beacon": "yes"
+      },
+      "note": "Händelstraße z≈413 (vp194, vp8): kerbed bed with young tree and beacon on the west side"
+    },
+    {
+      "id": "choker-schubert-266",
+      "way": "22701019",
+      "at": [
+        792.6,
+        266
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "right",
+        "beacon": "yes"
+      },
+      "note": "Schubertstraße z≈266 (vp79 photo, vp81): planted build-out with beacon on the east side"
+    },
+    {
+      "id": "choker-schubert-186",
+      "way": "22701019",
+      "at": [
+        786.3,
+        186
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "right",
+        "beacon": "yes"
+      },
+      "note": "Schubertstraße at the THA mouth (vp207 photo view 1): planter with young tree and beacon on the east side"
+    },
+    {
+      "id": "give-way-schubert",
+      "way": "22701019",
+      "at": [
+        785.9,
+        177
+      ],
+      "tags": {
+        "highway": "give_way"
+      },
+      "note": "Schubertstraße at Theodor-Heuss-Allee: give-way sign (vp207 photo, vp81); THA has the priority sign (vp21)"
+    },
+    {
+      "id": "choker-wagner-280",
+      "way": "22775663",
+      "at": [
+        560,
+        280
+      ],
+      "tags": {
+        "traffic_calming": "choker",
+        "side": "left"
+      },
+      "note": "Wagnerstraße z≈280 (vp19): kerbed planter with tree and a black post at the west kerb (no beacon reported)"
     }
   ]
 }
