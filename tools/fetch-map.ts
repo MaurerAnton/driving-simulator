@@ -45,9 +45,9 @@ rmSync(fresh, { recursive: true, force: true });
 mkdirSync(fresh);
 
 /** Download a file of the release to `to`; false if the release has no such file. */
-async function download(name: string, to: string): Promise<boolean> {
+async function download(name: string, to: string, from = tag): Promise<boolean> {
   // (-sS: no progress meter – it fills the log of a build –, but errors are shown; -f: an HTTP error is a failure)
-  const curl = spawn('curl', ['-fsSL', '--retry', '5', '--retry-all-errors', '--retry-delay', '3', '-A', 'map-fetch/0.1', '-o', to, `${repo}/releases/download/${tag}/${name}`], { stdio: ['ignore', 'inherit', 'pipe'] });
+  const curl = spawn('curl', ['-fsSL', '--retry', '5', '--retry-all-errors', '--retry-delay', '3', '-A', 'map-fetch/0.1', '-o', to, `${repo}/releases/download/${from}/${name}`], { stdio: ['ignore', 'inherit', 'pipe'] });
   let err = '';
   curl.stderr.on('data', (d: Buffer) => (err += d.toString()));
   const code = await new Promise<number>((r) => curl.on('close', (c) => r(c ?? 1)));
@@ -112,7 +112,10 @@ for (const name of EXTRA) {
 // tiles built again after the release of the map
 try {
   const patch = resolve(fresh, 'tiles-patch.tar');
-  if (await download('tiles-patch.tar', patch)) {
+  // (MAP_PATCH_RELEASE: the patch of another release – a work patch, for rendering it on GitHub without giving it to players)
+  const patchFrom = process.env.MAP_PATCH_RELEASE || tag;
+  if (patchFrom !== tag) console.log(`[map] tiles-patch.tar from release ${patchFrom}`);
+  if (await download('tiles-patch.tar', patch, patchFrom)) {
     const x = spawn('tar', ['-x', '-C', fresh, '-f', patch], { stdio: 'inherit' });
     if ((await new Promise<number>((r) => x.on('close', (c) => r(c ?? 1)))) !== 0) throw new Error('tar could not unpack it');
     rmSync(patch, { force: true });

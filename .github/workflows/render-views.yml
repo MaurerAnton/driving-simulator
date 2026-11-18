@@ -11,6 +11,9 @@ on:
       size:
         description: 'Picture size'
         default: '960x600'
+      patch:
+        description: 'Release whose tiles-patch.tar to use (empty: the one of map.release; map-work: the work patch, not given to players)'
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -30,6 +33,8 @@ jobs:
       - run: npm ci
       - name: Map (with the latest tiles patch of the map release)
         run: node tools/fetch-map.ts
+        env:
+          MAP_PATCH_RELEASE: ${{ inputs.patch }}
       - name: Build the game
         run: npx vite build
       - name: Chromium

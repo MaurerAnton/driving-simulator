@@ -57,7 +57,15 @@ while (todo().length > 0 && tries++ < Math.ceil(mine.length / group) * 3) {
     for (const v of batch) {
       for (const k of [0, 1]) {
         const hd = k === 0 ? v.heading : (v.heading + 180) % 360;
-        await page.evaluate(([x, y, z, h]) => window.__fs.game.devView(x, y, z, h, -10, 65, true), [v.x, v.y, v.z, hd]);
+        // (on the road where the photo's position is off it; never below the game's ground: then 2.5 m above it)
+        const [cx, cz] = v.road ?? [v.x, v.z];
+        const low = await page.evaluate(([x, y, z, h]) => {
+          const g = window.__fs.game.devView(x, y, z, h, -10, 65, true);
+          if (!(y < g + 1.5)) return false;
+          window.__fs.game.devView(x, 2.5, z, h, -10, 65, false);
+          return true;
+        }, [cx, v.y, cz, hd]);
+        if (low && k === 0) log(`view ${v.id}: below the ground – 2.5 m above it`);
         await page.waitForTimeout(k === 0 ? 25000 : 5000);
         await page.screenshot({ path: join(out, `game-${String(v.id).padStart(3, '0')}-${k}.jpg`), type: 'jpeg', quality: 88, timeout: 300000 });
       }
