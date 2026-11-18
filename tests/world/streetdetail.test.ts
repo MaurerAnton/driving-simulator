@@ -258,9 +258,12 @@ test('greenery seen on the aerial photographs: areas filled by density, rows, he
   for (const tile of all(ts)) {
     for (let i = 0; i < tile.trees.length; i += 5) {
       assert.ok(Math.abs(tile.trees[i + 2]) > 3, 'not on the road');
-      assert.ok(tile.trees[i + 3] >= 10 && tile.trees[i + 3] <= 25);
+      // (round 3: the undergrowth – shrub masses 2–4 m – between the trees of a dense stand)
+      if (tile.trees[i + 4] === 2) assert.ok(tile.trees[i + 3] >= 2 && tile.trees[i + 3] <= 4);
+      else assert.ok(tile.trees[i + 3] >= 10 && tile.trees[i + 3] <= 25);
     }
   }
+  assert.ok(st.shrubs > 200, `${st.shrubs} shrubs`);
   const crown = (h: number, r: number): number => treeWidth(0, h, r) * 0.6;
   assert.ok(crown(15, 0.5) > 10 && crown(15, 0.5) < 13);
   assert.ok(crown(25, 1) <= 14 * 1.1);
@@ -280,7 +283,8 @@ test('greenery from the aerial photographs is broadleaf unless the entry says co
     const ts = tiles();
     addGreenery(t.world, new CoverMap(-250, -250, 250, 250, 2), new TerrainGrid(-250, -250, 250, 250, 5), ts, () => false, { minX: -250, maxX: 250, minZ: -250, maxZ: 250 }, loadGreenery(file));
     const out: number[] = [];
-    for (const tile of all(ts)) for (let i = 0; i < tile.trees.length; i += 5) out.push(tile.trees[i + 4]);
+    // (the undergrowth's shrubs aside)
+    for (const tile of all(ts)) for (let i = 0; i < tile.trees.length; i += 5) if (tile.trees[i + 4] !== 2) out.push(tile.trees[i + 4]);
     return out;
   };
   const plain = kinds(undefined);

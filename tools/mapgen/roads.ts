@@ -313,14 +313,20 @@ export function roadAttrs(tags: Tags, urbanHint: boolean): Attrs | null {
     flags |= EF.MINOR_SERVICE;
   }
   if (tags.lit === 'yes' || (tags.lit === undefined && urban && tier >= 2)) flags |= EF.LIT;
+  // (an approach tagged with more lanes in one direction than one, or with turn lanes, has its lane lines
+  // painted, whatever its class – a street of a 30 zone aside)
+  const turnTagged = /\|/.test(`${tags['turn:lanes'] ?? ''}${tags['turn:lanes:forward'] ?? ''}${tags['turn:lanes:backward'] ?? ''}`);
+  const multiLane = !singleTrack && zone === 0 && (Math.max(lf, lb) >= 2 || turnTagged);
   const marked =
     tags.lane_markings === 'yes' ||
     (tags.lane_markings !== 'no' &&
       !singleTrack &&
       zone === 0 &&
-      (tier >= 3 || isLink || (lf + lb >= 2 && !Number.isNaN(lanesTag) && cls === CLS.UNCLASSIFIED && !urban)));
+      (tier >= 3 || isLink || multiLane || (lf + lb >= 2 && !Number.isNaN(lanesTag) && cls === CLS.UNCLASSIFIED && !urban)));
   if (marked) flags |= EF.MARKED;
-  if ((marked && !urban && tier >= 3) || cls <= CLS.TRUNK_LINK) flags |= EF.EDGE_LINES;
+  // (edge lines by class: on marked roads outside towns – not where the limit is 50 or less: there the
+  // carriageway ends at kerbs or verges without a line; lane_markings:edge says otherwise per side)
+  if ((marked && !urban && tier >= 3 && !(ms > 0 && ms <= 50)) || cls <= CLS.TRUNK_LINK) flags |= EF.EDGE_LINES;
   if (tags.overtaking === 'no' || tags['overtaking:forward'] === 'no') flags |= EF.SOLID_CENTER;
 
   // --- access ---
@@ -952,6 +958,11 @@ export function buildRoadGraph(osm: OsmData, area: MapArea): RoadGraph {
  * between kerb and footway where there is room – instead of a second one, or
  * none, beside it.
  */
+/** the narrowest gap (m) between a road's kerb and a separate footway that is drawn as a grass verge */
+export const SEPARATE_VERGE_MIN = 1.0;
+/** a separate footway lends the road's pavement its surface only when it starts within this of the kerb (m) */
+export const SEPARATE_LEND_MAX = 1.0;
+
 function separateWalks(graph: RoadGraph, attrs: Attrs[], sidewalks: FootwayIndex, bridges?: FootwayIndex): void {
   if (sidewalks.count === 0 && !bridges?.count) return;
   graph.edges.forEach((e, i) => {
@@ -972,11 +983,13 @@ function separateWalks(graph: RoadGraph, attrs: Attrs[], sidewalks: FootwayIndex
       if (onBridge) m = { ...m, verge: 0 };
       if (!(left ? a.vergeTaggedL : a.vergeTaggedR)) {
         const v = Math.round((m.verge - other) * 100) / 100;
-        if (v >= 0.5) side.v = v;
+        // (a gap of less than a metre between kerb and footway is paved: one pavement, not a hairline of grass)
+        if (v >= SEPARATE_VERGE_MIN) side.v = v;
         else delete side.v;
       }
-      // (the pavement drawn out to the separate way is made of what that way is, unless the road says)
-      if (side.wm === undefined && m.mat !== undefined && m.mat !== GM.SIDEWALK) side.wm = m.mat;
+      // (the pavement drawn out to the separate way is made of what that way is, unless the road says – only
+      // where that way is the street's pavement, right beside the kerb: one further out is a path of its own)
+      if (side.wm === undefined && m.mat !== undefined && m.mat !== GM.SIDEWALK && m.verge < SEPARATE_LEND_MAX) side.wm = m.mat;
       const beyond = Math.round(Math.max(m.beyond, sideOuter(side) + 1.0) * 100) / 100;
       if (left) {
         e.sl = beyond;

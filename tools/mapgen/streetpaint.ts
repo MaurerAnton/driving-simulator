@@ -37,6 +37,7 @@ import type { TileSet } from './meshacc.ts';
 import type { OsmData, Tags } from './osm.ts';
 import type { EdgeFeature } from './roads.ts';
 import { kerbedBox } from './roadside.ts';
+import { WALK_DEFAULT } from './xsection.ts';
 import { POST_CLEAR } from '../../src/sim/clearlanes.ts';
 
 const LIFT = 0.018;
@@ -236,20 +237,24 @@ function buildOuts(world: World, ts: TileSet, e: Edge, feats: readonly EdgeFeatu
       const c1 = onRoad(world, e, b - 0.5, side * (o0 + 0.3), 0);
       const c2 = onRoad(world, e, b - 0.5, side * (half - 0.2), 0);
       const c3 = onRoad(world, e, a + 0.5, side * (half - 0.2), 0);
-      box(ts, [c0, c1, c2, c3], KERB_H, KERB_H + 0.55, SHRUB);
+      box(ts, [c0, c1, c2, c3], KERB_H, KERB_H + 0.35, SHRUB);
     }
-    // a small tree in the bed (a shrub where its trunk would stand in a lane – mapgen clears trunks there)
+    // a young tree in the bed – slim, on a thin trunk (src/render/props.ts treeWidth); where its trunk would
+    // stand too near a lane (mapgen clears trunks there) only the low planting, not a ball of a shrub
     if (depth >= 0.9 && b - a >= 2.5 && planted && (nb.flags & BO.NO_TREE) === 0) {
       const off = half - Math.min(0.6, depth / 2);
       const [x, y, z] = onRoad(world, e, (a + b) / 2 + (b - a) * 0.15, side * off, 0);
       const r = mix(e.id, Math.round(at));
-      const tree = off - laneMiddle(e, side) >= POST_CLEAR + 0.1;
-      ts.at(x, z).trees.push(Math.round(x * 10) / 10, Math.round((y + KERB_H) * 10) / 10, Math.round(z * 10) / 10, Math.round((tree ? 4.5 + 2 * r : 2.2 + 0.6 * r) * 10) / 10, tree ? 3 : 2);
+      if (off - laneMiddle(e, side) >= POST_CLEAR + 0.1) {
+        ts.at(x, z).trees.push(Math.round(x * 10) / 10, Math.round((y + KERB_H) * 10) / 10, Math.round(z * 10) / 10, Math.round((4.2 + 1.3 * r) * 10) / 10, 0);
+      }
     }
-    // the beacon on the nose, towards the lanes
+    // the beacon (Leitbake) on the nose, towards the lanes, its face to the oncoming traffic
     if (nb.flags & BO.BEACON) {
-      const [x, y, z] = onRoad(world, e, (a + b) / 2, side * (o0 + 0.25), 0);
-      beacon(ts, x, y + KERB_H, z);
+      const sb = (a + b) / 2;
+      const [x, y, z] = onRoad(world, e, sb, side * (o0 + 0.25), 0);
+      samplePolyline(e.pl, sb, tmp);
+      beacon(ts, x, y + KERB_H, z, tmp.tx, tmp.tz);
     }
   }
   return n;
@@ -269,16 +274,39 @@ function box(ts: TileSet, c: Array<[number, number, number]>, y0: number, y1: nu
   }
 }
 
-/** A red-white beacon post, 1 m high, standing at (x, y, z). */
-function beacon(ts: TileSet, x: number, y: number, z: number): void {
-  const r = 0.06;
-  const foot: Array<[number, number, number]> = [
-    [x - r, y, z - r],
-    [x + r, y, z - r],
-    [x + r, y, z + r],
-    [x - r, y, z + r],
+/**
+ * A red-white beacon (Leitbake), standing at (x, y, z) across the road whose
+ * direction is (tx, tz): a board 0.25 m wide and 1 m high on a short post,
+ * in five slanted-looking bands – seen from both directions of travel.
+ */
+function beacon(ts: TileSet, x: number, y: number, z: number, tx: number, tz: number): void {
+  // across the road (the board's width) and along it (its thickness)
+  const ax = tz;
+  const az = -tx;
+  const w = 0.125;
+  const t = 0.03;
+  const corners = (y0: number, y1: number): Array<[number, number, number]> => [
+    [x - ax * w - tx * t, y + y0, z - az * w - tz * t],
+    [x + ax * w - tx * t, y + y0, z + az * w - tz * t],
+    [x + ax * w + tx * t, y + y0, z + az * w + tz * t],
+    [x - ax * w + tx * t, y + y0, z - az * w + tz * t],
   ];
-  for (let k = 0; k < 4; k++) box(ts, foot, k * 0.25, (k + 1) * 0.25, k % 2 === 0 ? RED : WHITE);
+  // the post below the board
+  const p = 0.03;
+  box(
+    ts,
+    [
+      [x - p, y, z - p],
+      [x + p, y, z - p],
+      [x + p, y, z + p],
+      [x - p, y, z + p],
+    ],
+    0,
+    0.25,
+    [70, 72, 72],
+  );
+  const foot = corners(0, 0);
+  for (let k = 0; k < 5; k++) box(ts, foot, 0.25 + k * 0.15, 0.25 + (k + 1) * 0.15, k % 2 === 0 ? RED : WHITE);
 }
 
 /** The pavement running on across the mouth of a road that meets a junction over a lowered kerb. */
@@ -298,7 +326,7 @@ function mouthBands(world: World, ts: TileSet, n: Node): number {
     if (room < d + 0.6) continue;
     // stations from the junction outwards
     const at = (dist: number): number => (arm.out ? e.cutA + dist : e.len - e.cutB - dist);
-    const wm = (prev.out ? prev.edge.xl : prev.edge.xr)?.wm ?? (next.out ? next.edge.xr : next.edge.xl)?.wm ?? GM.SIDEWALK;
+    const wm = (prev.out ? prev.edge.xl : prev.edge.xr)?.wm ?? (next.out ? next.edge.xr : next.edge.xl)?.wm ?? WALK_DEFAULT;
     const LOW = 0.03;
     const steps = Math.max(2, Math.ceil(half));
     const row = (dist: number, dy: number): number[] => {

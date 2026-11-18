@@ -109,29 +109,53 @@ export interface MedianStats {
   cars: number;
   trees: number;
   hedgeKm: number;
+  /** untagged narrow medians paved (the detail region) */
+  pavedKm: number;
 }
 
 const HEDGE: [number, number, number] = [58, 84, 44];
 
-/** Fill the medians of every carriageway that says what is in it. */
-export function addMedians(world: World, ts: TileSet): MedianStats {
-  const stats: MedianStats = { km: 0, cars: 0, trees: 0, hedgeKm: 0 };
+/** the widest median (kerb to kerb, m) that is paved where nothing is tagged (the detail region): a narrow strip between two carriageways is pavers, not lawn */
+export const NARROW_MEDIAN = 3.5;
+/** how far from the node where two branches meet a narrow median is left to the split island there (mapgen/islands.ts) */
+const ISLAND_REACH = 82;
+
+/**
+ * Fill the medians of every carriageway that says what is in it; and – for
+ * the roads `fresh` says yes to (the detail region) – where neither
+ * carriageway says anything, the stretches where they lie no more than
+ * NARROW_MEDIAN apart with kerbed pavers (away from where they meet: the
+ * split islands are there).
+ */
+export function addMedians(world: World, ts: TileSet, fresh?: (e: Edge) => boolean): MedianStats {
+  const stats: MedianStats = { km: 0, cars: 0, trees: 0, hedgeKm: 0, pavedKm: 0 };
   for (const e of world.edges) {
-    if (!e || !e.median || (e.lanesF > 0 && e.lanesB > 0)) continue;
+    if (!e || (e.lanesF > 0 && e.lanesB > 0)) continue;
+    const untagged = !e.median;
+    if (untagged && !fresh?.(e)) continue;
     const s0 = e.cutA + 1;
     const s1 = e.len - e.cutB - 1;
     if (s1 - s0 < 4) continue;
     const n = Math.max(1, Math.ceil((s1 - s0) / 4));
     const cuts: Array<MedianCut | null> = [];
-    for (let i = 0; i <= n; i++) cuts.push(lookAcross(world, e, s0 + ((s1 - s0) * i) / n));
+    for (let i = 0; i <= n; i++) {
+      let c = lookAcross(world, e, s0 + ((s1 - s0) * i) / n);
+      if (c && untagged && !narrowCut(e, c)) c = null;
+      cuts.push(c);
+    }
     // runs of stations with the other carriageway in sight
     let run: MedianCut[] = [];
     const flush = (): void => {
-      if (run.length >= 2) fillRun(world, ts, e, run, stats);
+      if (run.length >= 2) {
+        if (untagged) {
+          fillRun(world, ts, e, run, stats, MEDIAN.PAVED);
+          stats.pavedKm += (run[run.length - 1].s - run[0].s) / 1000;
+        } else fillRun(world, ts, e, run, stats, e.median);
+      }
       run = [];
     };
     for (const c of cuts) {
-      if (c && run.length && Math.abs(c.g1 - run[run.length - 1].g1) > 6) flush();
+      if (c && run.length && (Math.abs(c.g1 - run[run.length - 1].g1) > 6 || c.partner !== run[run.length - 1].partner)) flush();
       if (c) run.push(c);
       else flush();
     }
@@ -140,10 +164,23 @@ export function addMedians(world: World, ts: TileSet): MedianStats {
   return stats;
 }
 
-function fillRun(world: World, ts: TileSet, e: Edge, run: MedianCut[], stats: MedianStats): void {
-  const bits = e.median;
-  // half of the gap if the other carriageway fills its own half too
-  const shared = run.every((c) => c.partner.median !== 0);
+/** Is a look across from an untagged carriageway a narrow median it paves: neither says anything, it has the smaller id, not near where they meet? */
+function narrowCut(e: Edge, c: MedianCut): boolean {
+  const o = c.partner;
+  if (o.median || c.g1 - c.g0 > NARROW_MEDIAN) return false;
+  if (o.osm < e.osm || (o.osm === e.osm && o.id < e.id)) return false;
+  for (const [node, s] of [
+    [e.a, c.s],
+    [e.b, e.len - c.s],
+  ] as const) {
+    if (s < ISLAND_REACH && (o.a === node || o.b === node)) return false;
+  }
+  return true;
+}
+
+function fillRun(world: World, ts: TileSet, e: Edge, run: MedianCut[], stats: MedianStats, bits: number): void {
+  // half of the gap if the other carriageway fills its own half too (an untagged narrow median: this one fills all of it)
+  const shared = bits === e.median && run.every((c) => c.partner.median !== 0);
   const leads = !shared || run.every((c) => e.osm <= c.partner.osm);
   const at = (c: MedianCut, d: number, lift: number): [number, number, number] => {
     const g = (d - c.g0) / Math.max(0.01, c.g1 - c.g0);
@@ -161,6 +198,10 @@ function fillRun(world: World, ts: TileSet, e: Edge, run: MedianCut[], stats: Me
   const kerbLift = own > 0 ? 0 : KERB_H;
   if (own <= 0) {
     addBand(ts, 'ground', line((c) => c.g0, 0), line((c) => c.g0, KERB_H), [GM.KERB], 0, 0, 0);
+  }
+  // (an untagged narrow median: the other carriageway's kerb too, where it has no pavement there)
+  if (bits !== e.median && run.every((c) => (medianSide(c.partner) > 0 ? c.partner.swL : c.partner.swR) <= 0)) {
+    addBand(ts, 'ground', line((c) => c.g1, kerbLift - KERB_H), line((c) => c.g1, kerbLift), [GM.KERB], 0, 0, 0);
   }
   // (paving_stones: a paved strip – with young trees when trees are said too)
   const paved = (bits & MEDIAN.PAVED) !== 0 && (bits & MEDIAN.GRASS) === 0;
@@ -211,7 +252,7 @@ function fillRun(world: World, ts: TileSet, e: Edge, run: MedianCut[], stats: Me
       if (c.g1 - c.g0 < 1.6 + shift) continue;
       const p = at(c, mid(c) + shift, 0);
       const h = paved ? 5 + 2 * mix01(e.osm, Math.round(c.s), 23) : 9 + 5 * mix01(e.osm, Math.round(c.s), 23);
-      ts.at(p[0], p[2]).trees.push(p[0], p[1], p[2], h, paved ? 3 : 0);
+      ts.at(p[0], p[2]).trees.push(p[0], p[1], p[2], h, 0);
       stats.trees++;
       next = c.s + (paved ? 10 : 12);
     }

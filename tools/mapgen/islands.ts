@@ -16,8 +16,8 @@
  *   branches, up to 80 m from where they meet, unless an area of the map
  *   already lies there or the branches say what lies between them
  *   (median:contents, mapgen/median.ts); only where they part by at least
- *   ISLAND_MIN_GAP, and not where they leave a road merged from them
- *   (observed-roads.json "merge", mapgen/waysplit.ts).
+ *   ISLAND_MIN_GAP (MERGE_NOSE_GAP where they leave a road merged from
+ *   them: observed-roads.json "merge", mapgen/waysplit.ts – its nose).
  *
  *   island:surface   grass | plants | paving_stones | cobblestone | asphalt   (OUR OWN key; default
  *                    paving_stones; on the area, the node, or the branch with the smaller way id;
@@ -51,6 +51,8 @@ import type { TerrainGrid } from './terrain.ts';
 export const ISLAND_CLEAR = 1.1;
 /** how far apart (kerb to kerb, m) the branches of a split must get somewhere for an island between them */
 export const ISLAND_MIN_GAP = 2.0;
+/** … and where they leave a merged road (m) */
+export const MERGE_NOSE_GAP = 3.0;
 
 const tmp = newPolySample();
 
@@ -314,8 +316,30 @@ function place(c: Ctx, ring: number[], tags: Tags | null | undefined): boolean {
     c.stats.dropped++;
     return false;
   }
-  drawIsland(c, clear, islandMaterial(tags), islandPlanted(tags));
+  drawIsland(c, clear, narrowIslandMaterial(clear, tags), islandPlanted(tags));
   return true;
+}
+
+/** the widest island (its mean width, m) that is paved although OpenStreetMap's surface says grass */
+export const NARROW_ISLAND = 3.0;
+
+/**
+ * The material of an island as drawn: islandMaterial – but a narrow one
+ * (mean width under NARROW_ISLAND) that only OpenStreetMap's surface=* calls
+ * grass is paved: a strip that narrow beside the lanes is pavers nearly
+ * always (our own island:surface, seen on site, is taken as it is).
+ */
+export function narrowIslandMaterial(ring: number[], tags: Tags | null | undefined): number {
+  const m = islandMaterial(tags);
+  if (m !== GM.VERGE || tags?.['island:surface'] !== undefined) return m;
+  let per = 0;
+  const n = ring.length / 2;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    per += Math.hypot(ring[j * 2] - ring[i * 2], ring[j * 2 + 1] - ring[i * 2 + 1]);
+  }
+  const width = per > 0 ? (2 * Math.abs(ringArea(ring))) / per : 0;
+  return width < NARROW_ISLAND ? GM.PAVING : m;
 }
 
 /** An island in the middle of a two-way road at station `s`: `len` long, pointed at both ends. */
@@ -436,16 +460,22 @@ export function addIslands(
       if (run.length < 2 || long) continue;
       // (a real split: the branches part by at least ISLAND_MIN_GAP somewhere – not two lines drawn side by side –
       // and not where two carriageways merged into one by observed-roads.json leave it: they lie side by side there)
-      if (Math.max(...run.map((q) => q.g1 - q.g0)) < ISLAND_MIN_GAP) continue;
+      // (where carriageways leave a road merged from them (observed-roads.json "merge", mapgen/waysplit.ts) there is
+      // a nose too – as where any road splits –, but only where they part clearly: drawn side by side just apart
+      // they are one road with a line between them)
       const node = meet === 0 ? e.a : e.b;
-      if (node.arms.some((arm) => osm.wayById.get(arm.edge.osm)?.tags[MERGED_KEY] !== undefined)) continue;
+      const leavesMerge = node.arms.some((arm) => osm.wayById.get(arm.edge.osm)?.tags[MERGED_KEY] !== undefined);
+      if (Math.max(...run.map((q) => q.g1 - q.g0)) < (leavesMerge ? MERGE_NOSE_GAP : ISLAND_MIN_GAP)) continue;
       // nothing else lies between them
       const hit = newSurfaceHit();
       const between = run.some((q) => {
         const d = (q.g0 + q.g1) / 2;
         const x = q.x + q.nx * d;
         const z = q.z + q.nz * d;
-        return (world.surfaceAt(x, z, q.y0 + 2, hit) && hit.edge !== e && hit.edge !== o && !hit.node) || inMapped(x, z);
+        // (the merged road the branches leave reaches in between them at its end: not something else lying there)
+        if (inMapped(x, z)) return true;
+        if (!world.surfaceAt(x, z, q.y0 + 2, hit) || hit.node) return false;
+        return !(hit.edge === e || hit.edge === o || (leavesMerge && node.arms.some((a) => a.edge === hit.edge)));
       });
       if (between) continue;
       const ring = splitIslandRing(run);

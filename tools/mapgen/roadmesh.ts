@@ -19,6 +19,7 @@ import type { StripTree } from './parking.ts';
 import type { EdgeFeature } from './roads.ts';
 import { calmBreaks, calmLift } from '../../src/world/roadfeatures.ts';
 import { addStreetDetail } from './streetpaint.ts';
+import { WALK_DEFAULT } from './xsection.ts';
 import type { StreetDetailStats } from './streetpaint.ts';
 
 const PAINT_LIFT = 0.018;
@@ -251,12 +252,12 @@ export class RoadMesher {
         let at = half;
         const put = (r: [number, number] | null, m: number): void => {
           if (!r || r[1] <= at + 0.01) return;
-          if (r[0] > at + 0.01) strips.push([at, r[0], xs?.wm ?? GM.SIDEWALK]);
+          if (r[0] > at + 0.01) strips.push([at, r[0], xs?.wm ?? WALK_DEFAULT]);
           strips.push([Math.max(at, r[0]), r[1], m]);
           at = r[1];
         };
         // (the pavement in its own material where the side says so: sidewalk:<side>:surface / :colour)
-        const walkMat = xs?.wm ?? GM.SIDEWALK;
+        const walkMat = xs?.wm ?? WALK_DEFAULT;
         if (lay.park && lay.park[1] > half + 0.01) put([half, lay.park[1]], walkMat);
         put(lay.verge, xs?.vp ? GM.PAVING : GM.VERGE);
         put(lay.track, xs?.cr ? GM.CYCLE : xs?.cs ? GM.PAVING : GM.ASPHALT_OLD);
@@ -863,7 +864,7 @@ function cornerWalk(n: Node, i: number): number {
   const b = n.arms[(i + 1) % n.arms.length];
   const left = a ? (a.out ? a.edge.xl : a.edge.xr) : undefined;
   const right = b ? (b.out ? b.edge.xr : b.edge.xl) : undefined;
-  return left?.wm ?? right?.wm ?? GM.SIDEWALK;
+  return left?.wm ?? right?.wm ?? WALK_DEFAULT;
 }
 
 /** Like addBand, but each quad faces towards (or away from) a reference line. */

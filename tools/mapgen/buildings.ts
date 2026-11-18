@@ -35,6 +35,10 @@ interface Lod2Unit {
 type RGB = [number, number, number];
 const hex = (h: number): RGB => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
 const WALLS_HOUSE = [0xf1ede3, 0xe9e1cf, 0xe6d8b8, 0xdbd1c1, 0xf4f0e7, 0xd2cabb, 0xe8dcc6, 0xded5c5, 0xcdbb9f, 0xeee7d6, 0xd9c9a9, 0xc9bdac, 0xe3d2c0, 0xf0e2c8, 0xd6dbd3, 0xc98f6b].map(hex);
+/** the house colours without the brick tone (the last one): for tall houses of the detail region */
+const WALLS_RENDER = WALLS_HOUSE.slice(0, -1);
+/** a house this high (ground to ridge, m) or higher gets no brick tone from the palette (the detail region) */
+export const TALL_HOUSE_M = 10;
 const WALLS_COMMERCIAL = [0xd6d9db, 0xc3c7c9, 0xe0e0dc, 0xb9bdc1, 0xd0cdc4, 0xaeb4b8].map(hex);
 const WALLS_GARAGE = [0xddd8cc, 0xcbc6ba, 0xe8e4da, 0xc0bcb2, 0xd6d0c4].map(hex);
 const WALLS_PUBLIC = [0xe4ddcc, 0xd8cdb6, 0xcfc3ae, 0xbfa88c, 0xdcd6c8].map(hex);
@@ -226,7 +230,10 @@ export function addLod2Buildings(
           : style === BS.WALL_COMMERCIAL
             ? pick(WALLS_COMMERCIAL, seed)
             : pick(WALLS_PUBLIC, seed);
-    const wallCol = seen?.wall ?? guessed;
+    // (in the detail region a tall house – about three storeys and more – is not given the palette's brick tone:
+    // the blocks of flats of the town are rendered, white to beige; brick is what observed-buildings.json says)
+    const tallRender = fresh && style === BS.WALL_HOUSE && guessed === WALLS_HOUSE[WALLS_HOUSE.length - 1] && top - base >= TALL_HOUSE_M;
+    const wallCol = seen?.wall ?? (tallRender ? pick(WALLS_RENDER, seed + 3) : guessed);
     const flatRoof = u.roof === '1000' || (fresh && seen?.flat === true);
     const industrial = style === BS.WALL_COMMERCIAL;
     // (a roof of low pitch – under 15° – is not tiled: bitumen, metal or gravel, grey to dark, as on a flat roof)

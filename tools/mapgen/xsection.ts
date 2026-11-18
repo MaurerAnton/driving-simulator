@@ -53,6 +53,12 @@ import type { OsmData, Tags } from './osm.ts';
 
 export { MEDIAN };
 
+/**
+ * What a pavement is made of where nothing says (the roads of the detail region – the published map draws
+ * grey slabs, GM.SIDEWALK): small grey concrete pavers, as most of the town's pavements are.
+ */
+export const WALK_DEFAULT: number = GM.PAVING;
+
 function num(v: string | undefined): number {
   if (v === undefined) return NaN;
   const m = /^\s*(\d+(?:[.,]\d+)?)\s*(m|cm)?\s*$/.exec(v);

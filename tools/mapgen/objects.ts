@@ -7,7 +7,9 @@ import type { PlaceJson, SpawnJson } from '../../src/world/types.ts';
 import { newSurfaceHit } from '../../src/world/world.ts';
 import type { Edge, World } from '../../src/world/world.ts';
 import { CoverMap } from './cover.ts';
-import { addBand } from './meshacc.ts';
+import { addBand, addQuad } from './meshacc.ts';
+import { GM } from '../../src/world/tilefmt.ts';
+import { inDetail } from './detailregion.ts';
 import type { TileSet } from './meshacc.ts';
 import type { OsmData } from './osm.ts';
 import { isClosedWay } from './osm.ts';
@@ -16,6 +18,8 @@ import { loadObservedTrees } from './observed.ts';
 import { BARRIER_LOOK, loadObservedBarriers } from './facadedetail.ts';
 import { greenery } from './greenery.ts';
 import { barrierHeight, fenceColour, fenceDrawn } from './roadside.ts';
+import { BARRIER_STYLES, drawBarrier, fenceStyle, wallStyle } from './fences.ts';
+import type { BarrierStyle } from './fences.ts';
 
 const tmp = newPolySample();
 
@@ -43,6 +47,26 @@ export interface VegetationStats {
   rows: number;
   forest: number;
   garden: number;
+  /** kerbed pits of the trees on car parks (the detail region) */
+  pits: number;
+}
+
+/** A kerbed tree pit, 1.6 m square and a kerb's height, around (x, z) on ground at y. */
+export function treePit(ts: TileSet, x: number, y: number, z: number): void {
+  const r = 0.8;
+  const top = y + KERB_H;
+  const c = [
+    [x - r, z - r],
+    [x + r, z - r],
+    [x + r, z + r],
+    [x - r, z + r],
+  ];
+  addQuad(ts, 'ground', c.flatMap(([px, pz]) => [px, top, pz]), [GM.VERGE]);
+  for (let k = 0; k < 4; k++) {
+    const [ax, az] = c[k];
+    const [bx, bz] = c[(k + 1) % 4];
+    addQuad(ts, 'ground', [ax, y - 0.1, az, bx, y - 0.1, bz, bx, top, bz, ax, top, az], [GM.KERB], (ax + bx) / 2 - x, 0, (az + bz) / 2 - z);
+  }
 }
 
 /** Tree kinds: 0 broadleaf, 1 conifer, 2 bush, 3 small ornamental. */
@@ -57,7 +81,7 @@ export function addVegetation(
   /** mapped trees already placed (in the tree bulbs of parking strips – mapgen/roadside.ts) */
   placed: ReadonlySet<number> = new Set(),
 ): VegetationStats {
-  const stats: VegetationStats = { mapped: 0, rows: 0, forest: 0, garden: 0 };
+  const stats: VegetationStats = { mapped: 0, rows: 0, forest: 0, garden: 0, pits: 0 };
   const hit = newSurfaceHit();
   const occupied = (x: number, z: number): boolean => {
     const ix = Math.floor((x - cover.minX) / cover.cell);
@@ -83,7 +107,15 @@ export function addVegetation(
     }
     const conifer = n.tags.leaf_type === 'needleleaved';
     const h = Number.parseFloat(n.tags.height ?? '') || 7 + hash01(n.id) * 8;
-    if (put(n.x, n.z, Math.min(28, h), conifer ? 1 : 0, 0.6)) stats.mapped++;
+    if (put(n.x, n.z, Math.min(28, h), conifer ? 1 : 0, 0.6)) {
+      stats.mapped++;
+      // (in the detail region a tree on a car park or a paved square stands in a kerbed pit, not on the asphalt)
+      const c = cover.at(n.x, n.z);
+      if ((c === COVER.ASPHALT || c === COVER.PAVED) && inDetail(n.x, n.z)) {
+        treePit(ts, n.x, terrain.at(n.x, n.z), n.z);
+        stats.pits++;
+      }
+    }
     mappedTrees.push(n.x, n.z);
   }
   // trees seen on site where OpenStreetMap has none (tools/mapgen/observed-trees.json)
@@ -128,6 +160,14 @@ export function addVegetation(
         if (r < 0.82 && put(x, z, 14 + r2 * 11, kind, 3.2)) stats.forest++;
       } else if (c === COVER.SCRUB) {
         if (r < 0.6 && put(x, z, 2.2 + r2 * 3.5, r2 < 0.75 ? 2 : 0, 2.5)) stats.forest++;
+        // (in the detail region a thicket: shrub masses close together, not a few bushes on a lawn)
+        if (inDetail(x, z)) {
+          for (let k = 0; k < 3; k++) {
+            const sx = gx + G * ((0.3 + 0.37 * (k + 1) + 0.3 * hash01(seed + 11 + k)) % 1);
+            const sz = gz + G * ((0.6 + 0.29 * (k + 1) + 0.3 * hash01(seed + 21 + k)) % 1);
+            if (cover.at(sx, sz) === COVER.SCRUB && put(sx, sz, 1.8 + 2.2 * hash01(seed + 31 + k), 2, 1.5)) stats.forest++;
+          }
+        }
       } else if (c === COVER.ORCHARD) {
         if (r < 0.8 && put(x, z, 4 + r2 * 2, 3, 2.5)) stats.garden++;
       } else if (c === COVER.RESIDENTIAL || c === COVER.ALLOTMENT) {
@@ -294,12 +334,45 @@ export function addBarriersAndRails(
     return runs;
   };
 
+  /**
+   * A fence or garden wall of the detail region as what it is: a fence of its kind (fence_type, else one of
+   * the usual garden fences) at its usual height; a wall without a height in a garden (built-up land) low
+   * (0.4–0.8 m), elsewhere 1.5 m.  False: not drawn (a fence of wire round a field).
+   */
+  const styled = (id: number, t: Record<string, string>, coords: number[], hTag: number | undefined): boolean => {
+    let style: BarrierStyle;
+    let h: number;
+    if (t.barrier === 'fence') {
+      if (!fenceDrawn(t, (x, z) => cover.at(x, z), coords)) return false;
+      style = fenceStyle(t, id);
+      const [a, b] = BARRIER_STYLES[style].h;
+      h = hTag ?? a + (b - a) * hash01(id * 7 + 3);
+    } else {
+      style = wallStyle(t);
+      const garden = fenceDrawn({}, (x, z) => cover.at(x, z), coords);
+      const [a, b] = BARRIER_STYLES[style].h;
+      h = hTag ?? (garden ? a + (b - a) * hash01(id * 7 + 3) : 1.5);
+    }
+    for (const part of clip(densify(coords, 2.5))) {
+      for (const run of clear(part, ground)) {
+        const line: number[] = [];
+        for (let i = 0; i < run.length; i += 2) line.push(run[i], ground(run[i], run[i + 1]), run[i + 1]);
+        drawBarrier(ts, line, style, h);
+        for (let i = 3; i < line.length; i += 3) ts.at(line[i], line[i + 2]).collSeg.push(line[i - 3], line[i - 1], line[i], line[i + 2], line[i + 1]);
+      }
+    }
+    return true;
+  };
+
   for (const w of osm.ways) {
     const t = w.tags;
     // (at their mapped height: height=*, else what is usual – mapgen/roadside.ts; not outside the detail region)
     const now = !fresh || ((t.barrier || t.natural === 'hedge') && fresh(osm.wayCoords(w)));
     const hTag = now ? barrierHeight(t) : undefined;
-    if (t.barrier === 'wall' || t.barrier === 'retaining_wall' || t.barrier === 'city_wall') {
+    if (now && fresh && (t.barrier === 'fence' || t.barrier === 'wall') && styled(w.id, t, osm.wayCoords(w), hTag)) {
+      // (in the detail region: fences of their kind, garden walls low – mapgen/fences.ts)
+      barriers++;
+    } else if (t.barrier === 'wall' || t.barrier === 'retaining_wall' || t.barrier === 'city_wall') {
       for (const part of clip(densify(osm.wayCoords(w), 4))) for (const run of clear(part, ground)) strip(run, 0.14, -0.4, hTag ?? (t.barrier === 'retaining_wall' ? 1.2 : 1.5), [176, 170, 160], ground, true);
       barriers++;
     } else if (t.barrier === 'hedge' || t.natural === 'hedge') {

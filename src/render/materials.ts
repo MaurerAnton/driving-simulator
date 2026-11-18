@@ -47,8 +47,8 @@ vec3 fsGround(float m, vec3 wp, float dist) {
   } else if (m < 1.5) {                // concrete slabs
     c = vec3(0.60, 0.60, 0.58) * (1.0 + 0.10 * patch_ * mid) + grain * 0.05;
     c *= 1.0 - 0.35 * fsJoints(p, vec2(5.0, 3.6), 0.0, 0.03) * mid;
-  } else if (m < 2.5) {                // paving stones
-    c = vec3(0.56, 0.54, 0.52) * (1.0 + 0.12 * patch_ * mid) + grain * 0.05;
+  } else if (m < 2.5) {                // paving stones (small grey concrete pavers, a little darker than slabs)
+    c = vec3(0.50, 0.49, 0.47) * (1.0 + 0.12 * patch_ * mid) + grain * 0.05;
     c *= 1.0 - 0.30 * fsJoints(p, vec2(0.2, 0.1), 0.5, 0.012) * fine;
     c *= 0.94 + 0.12 * fsHash(floor(p / vec2(0.2, 0.1))) * fine;
   } else if (m < 3.5) {                // setts / cobbles

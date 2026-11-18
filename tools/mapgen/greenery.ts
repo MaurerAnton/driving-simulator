@@ -13,7 +13,9 @@
  *
  * World metres (x east, z south).  A wood or group is an area (its outline,
  * not closed) filled with trees on a jittered grid – every 6.5 m where it is
- * dense, 9 m medium, 13 m sparse; a row is a line of trees every 9 m.
+ * dense, 9 m medium, 13 m sparse, with a shrub mass 2–4 m high between
+ * them (the undergrowth: in a sparse stand on a third of the cells); a row
+ * is a line of trees every 9 m.
  * Broadleaf trees unless `leaf` says otherwise: "conifer" all conifers,
  * "mixed" about a quarter of them (the aerial photographs of the town show
  * broadleaf trees nearly everywhere; scattered conifers stood out as wrong).  Heights by class: small 6–10 m,
@@ -111,6 +113,8 @@ export function greenery(): Greenery {
 
 export interface GreeneryStats {
   trees: number;
+  /** shrub masses of the undergrowth (not in `trees`) */
+  shrubs: number;
 }
 
 /** Plant the trees of the areas and rows (build-tiles, after the trees of the ground cover). */
@@ -125,16 +129,18 @@ export function addGreenery(
   /** only the areas and rows this says yes to (by their points, flat x, z: the detail region – mapgen/detailregion.ts) */
   keep?: (pts: number[], row: boolean) => boolean,
 ): GreeneryStats {
-  const stats: GreeneryStats = { trees: 0 };
+  const stats: GreeneryStats = { trees: 0, shrubs: 0 };
   const hit = newSurfaceHit();
-  const put = (x: number, z: number, h: number, kind: number): void => {
-    if (x < bounds.minX + 1 || x > bounds.maxX - 1 || z < bounds.minZ + 1 || z > bounds.maxZ - 1) return;
-    if (occupied(x, z) || cover.at(x, z) === COVER.FOREST) return;
-    if (world.nearestRoad(x, z, 2.5, 0, hit) && hit.off < 1.5) return;
+  const put = (x: number, z: number, h: number, kind: number): boolean => {
+    if (x < bounds.minX + 1 || x > bounds.maxX - 1 || z < bounds.minZ + 1 || z > bounds.maxZ - 1) return false;
+    if (occupied(x, z) || cover.at(x, z) === COVER.FOREST) return false;
+    if (world.nearestRoad(x, z, 2.5, 0, hit) && hit.off < 1.5) return false;
     const y = terrain.at(x, z);
-    if (Number.isNaN(y)) return;
+    if (Number.isNaN(y)) return false;
     ts.at(x, z).trees.push(Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(z * 10) / 10, Math.round(h * 10) / 10, kind);
-    stats.trees++;
+    if (kind === 2) stats.shrubs++;
+    else stats.trees++;
+    return true;
   };
   list.trees.forEach((g, gi) => {
     const p = g.pts;
@@ -176,6 +182,13 @@ export function addGreenery(
         if (!pointInRing(x, z, p)) continue;
         const r = mix01(cx, cz, gi, 4);
         put(x, z, g.h0 + (g.h1 - g.h0) * mix01(cx, cz, gi, 3), r < g.conifers ? 1 : 0);
+        // the undergrowth of a dense or medium stand: a shrub mass between the trees (a thicket, not a lawn
+        // under a grid of trunks); in a sparse one now and then
+        if (G <= 9 || mix01(cx, cz, gi, 5) < 0.35) {
+          const bx = gx + G * ((0.65 + 0.7 * mix01(cx, cz, gi, 6)) % 1);
+          const bz = gz + G * ((0.65 + 0.7 * mix01(cx, cz, gi, 7)) % 1);
+          if (pointInRing(bx, bz, p)) put(bx, bz, 2.0 + 2.0 * mix01(cx, cz, gi, 8), 2);
+        }
       }
     }
   });

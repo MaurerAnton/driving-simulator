@@ -28,13 +28,13 @@ export const KERB = { RAISED: 0, LOWERED: 1, FLUSH: 2 } as const;
 export const MEDIAN = { GRASS: 1, PARKING: 2, HEDGE: 4, TREES: 8, PAVED: 16 } as const;
 /** what stands right behind the pavement (frontage:<side>=…) */
 export const FRONT = { NONE: 0, HEDGE: 1, FENCE: 2, WALL: 3, LAWN: 4 } as const;
-/** usual heights by FRONT (m): a garden hedge grows to about 1.8 m */
-export const FRONT_HEIGHTS = [0, 1.8, 1.2, 1.0, 0] as const;
+/** usual heights by FRONT (m): a garden hedge is mostly kept at about 1–1.2 m (the map build varies it plot by plot) */
+export const FRONT_HEIGHTS = [0, 1.2, 1.2, 1.0, 0] as const;
 /**
- * how far behind the pavement a hedge, fence or wall stands when nothing is tagged (m): a little behind a
- * pavement; where there is none, behind a strip of lawn or gravel – front gardens do not end at the asphalt
+ * how far behind the pavement a hedge, fence or wall stands when nothing is tagged (m): right behind a
+ * pavement; where there is none, behind the gutter or a narrow gravel strip
  */
-export const FRONT_OFFSETS = { behindWalk: 0.3, noWalk: 1.0 } as const;
+export const FRONT_OFFSETS = { behindWalk: 0.05, noWalk: 0.5 } as const;
 /** width of the paved gutter (Rinne) between asphalt and kerb in towns, when nothing is tagged (m) */
 export const GUTTER_DEFAULT = 0.4;
 

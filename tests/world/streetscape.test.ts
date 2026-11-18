@@ -357,8 +357,10 @@ test('frontage: a hedge behind the pavement, gaps at side streets; a lawn; young
   ]);
   const ts = tiles();
   const stats = addFrontage(t.world, ts, (x1, z1, x2, z2, y) => t.lanes.wallInLane(x1, z1, x2, z2, y, 1.3), () => false);
-  assert.ok(stats.hedgeKm > 0.12 && stats.hedgeKm < 0.15, `${stats.hedgeKm} km of hedge`);
-  assert.ok(stats.fenceKm > 0.25, `${stats.fenceKm} km of fence`);
+  // (round 3: an untagged hedge frontage is plot by plot – hedges, fences, walls, open lawn, driveways: mapgen/fences.ts)
+  assert.ok(stats.hedgeKm > 0.03 && stats.hedgeKm < 0.15, `${stats.hedgeKm} km of hedge`);
+  assert.ok(stats.hedgeKm + stats.fenceKm + stats.wallKm + stats.openKm > 0.35);
+  assert.ok(stats.fenceKm > 0.2, `${stats.fenceKm} km of fence`);
   assert.ok(stats.lawnKm > 0.12);
   assert.ok(stats.vergeTrees >= 10);
   const e = t.world.edges[t.edgeOf(1)];
@@ -374,7 +376,8 @@ test('frontage: a hedge behind the pavement, gaps at side streets; a lawn; young
     assert.ok(Math.abs(Math.abs(z1) - back - 0.45) < 0.5 || Math.abs(Math.abs(z1) - back - 0.08) < 0.5, `wall at z ${z1}`);
     if (z1 > 0) assert.ok(Math.abs(x1) > 3, `wall across the side street at x ${x1}`);
   }
-  const fenceTop = all(ts).flatMap((tile) => Array.from({ length: tile.struct.pos.length / 3 }, (_, i) => tile.struct.pos[i * 3 + 1]));
+  // (the fences of way 2, east of x = 0 – the hedges of way 1 vary in height)
+  const fenceTop = all(ts).flatMap((tile) => Array.from({ length: tile.struct.pos.length / 3 }, (_, i) => (tile.struct.pos[i * 3] > 3 ? tile.struct.pos[i * 3 + 1] : 0)));
   assert.ok(Math.max(...fenceTop) > 1.8 && Math.max(...fenceTop) < 2.0, 'the fence as high as tagged, on the pavement');
 });
 
@@ -397,5 +400,5 @@ test('median: paving stones with young trees', () => {
   const stats = addMedians(t.world, ts);
   assert.ok(withMat(ts, 'ground', GM.PAVING).length > 10);
   assert.ok(stats.trees >= 15, `${stats.trees} trees`);
-  for (const tile of all(ts)) for (let i = 0; i < tile.trees.length; i += 5) assert.ok(tile.trees[i + 3] <= 7 && tile.trees[i + 4] === 3, 'young trees');
+  for (const tile of all(ts)) for (let i = 0; i < tile.trees.length; i += 5) assert.ok(tile.trees[i + 3] <= 7 && tile.trees[i + 4] === 0, 'young trees (broadleaf, drawn slim at this height)');
 });

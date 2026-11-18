@@ -248,7 +248,7 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
     : { mapped: 0, points: 0, splits: 0, dropped: 0, signs: 0 };
   const bulbs = addTreeBulbs(world, tiles, info.edgeFeatures, stripTrees.byEdge);
   const parking = addParkedCars(world, tiles, info.edgeFeatures, stripTrees.byEdge);
-  const medians = addMedians(world, tiles);
+  const medians = addMedians(world, tiles, freshEdge);
   const yard = info.yardNear ? findYard(cover, terrain, world, osm, bmask, inWorld, info.yardNear) : null;
 
   // ---- the tiles of the block ----

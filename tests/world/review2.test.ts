@@ -108,10 +108,10 @@ test('a build-out narrows an unmarked residential street to one lane: kerbed bed
   });
   assert.ok(kerb.length > 0 && Math.max(...kerb) < 0, 'on the left side');
   assert.ok(Math.max(...kerb) > -2.5 + 1.5 - 0.05, `reaches in to z ${Math.max(...kerb)}`);
-  // a shrub (no trunk to hit in the lane) and the red-white beacon
+  // no tree where its trunk would stand in a lane (round 3: and no ball of a shrub either – the low planting only),
+  // and the red-white beacon
   const t1 = trees(ts);
-  assert.equal(t1.length, 1);
-  assert.equal(t1[0][4], 2, 'a shrub where a trunk would stand in a lane');
+  assert.equal(t1.length, 0);
   const reds = all(ts).reduce((n, t) => n + [...t.struct.a8].filter((v, i) => i % 3 === 0 && v === 196).length, 0);
   assert.ok(reds > 0, 'the beacon');
 
@@ -124,8 +124,8 @@ test('a build-out narrows an unmarked residential street to one lane: kerbed bed
   new RoadMesher(wide.world, ts2, { ground: () => 0, features: wide.features }).build();
   const t2 = trees(ts2);
   assert.equal(t2.length, 1);
-  assert.equal(t2[0][4], 3, 'a young tree');
-  assert.ok(t2[0][3] >= 4.5 && t2[0][3] <= 6.5);
+  assert.equal(t2[0][4], 0, 'a young broadleaf tree (drawn slim at this height)');
+  assert.ok(t2[0][3] >= 4 && t2[0][3] <= 5.5);
 
   // a road with painted lanes keeps the old rule (clear of the lane's middle)
   const marked = town(
@@ -169,7 +169,7 @@ test('a merged road is as wide as both carriageways were; the width beyond its l
   assert.ok(Math.abs(e.margin - (12.5 - 2 * e.laneW) / 2) < 1e-6, 'the rest beside the lanes');
 });
 
-test('no split island where merged carriageways part; a real split still gets one, a hairline one not', () => {
+test('split islands where merged carriageways part clearly, not in a long V; a real split gets one, a hairline one not', () => {
   // (the carriageways alone, their outer ends open: they meet only where the merged road begins and ends)
   const osm = osmOf([
     { id: 20, nodes: [[3, -120, 4.5], [4, 0, 4.5], [5, 120, 4.5]], tags: { highway: 'residential', oneway: 'yes', lanes: '1' } },
@@ -178,7 +178,16 @@ test('no split island where merged carriageways part; a real split still gets on
   mergePair(osm, { name: 'm', a: ['20'], b: ['21'], from: [-60, 0], to: [60, 0], tags: { lanes: '2' } });
   const t = townOf(osm);
   const st = addIslands(t.osm, t.world, tiles(), new TerrainGrid(-250, -250, 250, 250, 5), t.lanes, t.features, () => true);
+  // (they converge in a long V, under the junction area nearly all the way: no nose)
   assert.equal(st.splits, 0, JSON.stringify(st));
+  // round 3: carriageways that part clearly where they leave the merged road get a nose there too, as reality has
+  const wide = osmOf([
+    { id: 20, nodes: [[3, -120, 12], [4, 0, 12], [5, 120, 12]], tags: { highway: 'residential', oneway: 'yes', lanes: '1' } },
+    { id: 21, nodes: [[7, 120, -12], [8, 0, -12], [9, -120, -12]], tags: { highway: 'residential', oneway: 'yes', lanes: '1' } },
+  ]);
+  mergePair(wide, { name: 'm', a: ['20'], b: ['21'], from: [-60, 0], to: [60, 0], tags: { lanes: '2' } });
+  const wt = townOf(wide);
+  assert.ok(addIslands(wt.osm, wt.world, tiles(), new TerrainGrid(-250, -250, 250, 250, 5), wt.lanes, wt.features, () => true).splits >= 1);
   // a road that really splits into two branches 12 m apart for 50 m: an island
   const split = (d: number): OsmData =>
     osmOf([
@@ -205,23 +214,25 @@ test('an asphalt pavement is drawn as asphalt paths are; a separate pavement len
   const sides = taggedSides({ highway: 'residential', 'sidewalk:left:surface': 'asphalt' }, false, false);
   assert.equal(sides.left.side.wm, GM.ASPHALT_OLD, 'not the carriageway\'s asphalt');
   // a road whose pavement is mapped beside it as an asphalt footway=sidewalk 6 m from its middle
+  // (round 3: only a footway right beside the kerb – here 0.5 m beyond it – is the street's pavement and lends its surface)
   const t = town([
-    { id: 1, nodes: [[1, -100, 0], [2, 100, 0]], tags: { highway: 'residential' } },
-    { id: 50, nodes: [[50, -100, -6], [51, 100, -6]], tags: { highway: 'footway', footway: 'sidewalk', surface: 'asphalt' } },
+    { id: 1, nodes: [[1, -100, 0], [2, 100, 0]], tags: { highway: 'residential', width: '5.5' } },
+    { id: 50, nodes: [[50, -100, -4.25], [51, 100, -4.25]], tags: { highway: 'footway', footway: 'sidewalk', surface: 'asphalt' } },
     { id: 52, nodes: [[52, -100, 6], [53, 100, 6]], tags: { highway: 'footway', footway: 'sidewalk' } },
   ]);
   const e = t.world.edges[t.edgeOf(1)];
   assert.equal(e.xl?.wm, GM.ASPHALT_OLD, 'left: asphalt as the footway');
   assert.equal(e.xr?.wm, undefined, 'right: the footway says nothing – the usual slabs');
-  assert.ok(e.swL > 3);
+  assert.ok(e.swL > 2);
 });
 
 // ---------------------------------------------------------------------------
 // 4. hedges
 
-test('a frontage hedge is a garden hedge (1.8 m) and stands back from a kerb without pavement; not on paved ground', () => {
-  assert.equal(FRONT_HEIGHTS[1], 1.8);
-  const t = town([{ id: 1, nodes: [[1, -150, 0], [2, 150, 0]], tags: { highway: 'residential', width: '5', 'sidewalk:left': 'yes', 'sidewalk:right': 'no', 'frontage:right': 'hedge' } }]);
+test('a frontage hedge stands right behind the kerb where there is no pavement; not on paved ground; tagged height and offset', () => {
+  // (round 3: plot by plot – hedges, fences, walls, gaps – tests/world/review3.test.ts; here a tagged height: a hedge on every plot)
+  assert.equal(FRONT_HEIGHTS[1], 1.2);
+  const t = town([{ id: 1, nodes: [[1, -150, 0], [2, 150, 0]], tags: { highway: 'residential', width: '5', 'sidewalk:left': 'yes', 'sidewalk:right': 'no', 'frontage:right': 'hedge', 'frontage:right:height': '1.8' } }]);
   const e = t.world.edges[t.edgeOf(1)];
   const run = (paved: (x: number, z: number) => boolean): { ts: TileSet; km: number } => {
     const ts = tiles();
@@ -229,13 +240,13 @@ test('a frontage hedge is a garden hedge (1.8 m) and stands back from a kerb wit
     return { ts, km: st.hedgeKm };
   };
   const { ts, km } = run(() => false);
-  assert.ok(km > 0.25);
+  assert.ok(km > 0.2, `${km}`);
   const segs = all(ts).flatMap((tile) => {
     const out: number[][] = [];
     for (let i = 0; i < tile.collSeg.length; i += 5) out.push(tile.collSeg.slice(i, i + 5));
     return out;
   });
-  for (const [, z] of segs) assert.ok(Math.abs(z - (e.width / 2 + FRONT_OFFSETS.noWalk + 0.45)) < 0.05, `hedge at z ${z}`);
+  for (const [, z] of segs) assert.ok(Math.abs(z - (e.width / 2 + FRONT_OFFSETS.noWalk + 0.32 + 0.02)) < 0.05, `hedge at z ${z}`);
   const top = Math.max(...all(ts).flatMap((tile) => Array.from({ length: tile.struct.pos.length / 3 }, (_, i) => tile.struct.pos[i * 3 + 1])));
   assert.ok(Math.abs(top - 1.8) < 0.05, `top ${top}`);
   // a forecourt mapped as a paved area between x = 0 and 20: a gap there

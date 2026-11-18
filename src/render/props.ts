@@ -44,23 +44,26 @@ function merged(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
  */
 export function treeWidth(kind: number, h: number, r: number): number {
   if (kind !== 0) return h * (0.85 + 0.4 * r);
-  const crown = Math.min(14, 0.6 * h + 2.2) * (0.9 + 0.2 * r);
-  return Math.max(h * 0.85, crown / 0.6);
+  // (a young tree – a street tree, one in a build-out – is slim: about 3 m across at 5 m, 4.5 m at 7 m)
+  const young = Math.min(1, Math.max(0, (h - 3) / 9));
+  const crown = Math.min(14, 0.6 * h + 2.2 * young * young * (3 - 2 * young)) * (0.9 + 0.2 * r);
+  return Math.max(h * (0.6 + 0.25 * young), crown / 0.6);
 }
 
 /** Unit-height tree shapes (1 = full tree height), detailed and reduced. */
 function treeGeometries(): { hi: THREE.BufferGeometry[]; lo: THREE.BufferGeometry[] } {
-  const trunk = (h: number, r: number): THREE.BufferGeometry => colored(new THREE.CylinderGeometry(r * 0.7, r, h, 5, 1, true).translate(0, h / 2, 0), 0x4a3b2c);
+  // (bark is grey-brown, not black; trunks slim: a broadleaf's about 0.3 m across at 15 m)
+  const trunk = (h: number, r: number): THREE.BufferGeometry => colored(new THREE.CylinderGeometry(r * 0.7, r, h, 5, 1, true).translate(0, h / 2, 0), 0x6f665b);
   const blob = (y: number, rx: number, ry: number, detail: number, color: number): THREE.BufferGeometry =>
     colored(new THREE.IcosahedronGeometry(1, detail).scale(rx, ry, rx).translate(0, y, 0), color, 0.35);
   const cone = (y0: number, y1: number, r: number, color: number, sides: number): THREE.BufferGeometry =>
     colored(new THREE.ConeGeometry(r, y1 - y0, sides, 1, true).translate(0, (y0 + y1) / 2, 0), color, 0.3);
   const hi = [
     // (broadleaf: drawn wider than high – treeWidth – so its trunk is slim in the unit shape)
-    merged([trunk(0.42, 0.02), blob(0.66, 0.3, 0.34, 1, 0x4c7a36)]),
-    merged([trunk(0.2, 0.03), cone(0.14, 0.62, 0.23, 0x2f5a34, 7), cone(0.42, 1.0, 0.16, 0x356338, 7)]),
+    merged([trunk(0.42, 0.011), blob(0.66, 0.3, 0.34, 1, 0x4c7a36)]),
+    merged([trunk(0.2, 0.022), cone(0.14, 0.62, 0.23, 0x2f5a34, 7), cone(0.42, 1.0, 0.16, 0x356338, 7)]),
     merged([blob(0.5, 0.62, 0.5, 1, 0x4f7a3a)]),
-    merged([trunk(0.5, 0.04), blob(0.72, 0.36, 0.3, 1, 0x5d8c3d)]),
+    merged([trunk(0.5, 0.025), blob(0.72, 0.36, 0.3, 1, 0x5d8c3d)]),
   ];
   const lo = [
     merged([blob(0.6, 0.3, 0.4, 0, 0x4c7a36)]),

@@ -22,9 +22,10 @@ import { GM } from '../../src/world/tilefmt.ts';
 import { KERB_H } from '../../src/world/types.ts';
 import { newSurfaceHit } from '../../src/world/world.ts';
 import type { Edge, World } from '../../src/world/world.ts';
-import { FRONT, FRONT_HEIGHTS, FRONT_OFFSETS, PARK, sideLayout } from '../../src/world/xsection.ts';
+import { FRONT, FRONT_OFFSETS, PARK, sideLayout } from '../../src/world/xsection.ts';
 import type { RoadSideJson } from '../../src/world/xsection.ts';
 import { BARRIER_LOOK } from './facadedetail.ts';
+import { BARRIER_STYLES, drawBarrier, frontagePlan, isHedge, isWall } from './fences.ts';
 import { addBand, addQuad } from './meshacc.ts';
 import type { TileSet } from './meshacc.ts';
 import type { OsmData, Tags } from './osm.ts';
@@ -196,8 +197,21 @@ export function addTreeBulbs(
         const o1 = Math.min(p.outer, half);
         const len = Math.min(b.s1 - b.s0 - 0.3, 4.5);
         if (o1 - o0 > 0.6 && p.xs.p !== PARK.ON_KERB) kerbedBox(world, ts, e, side, sm - len / 2, sm + len / 2, o0, o1, kh, GM.VERGE);
+        else if (p.xs.p === PARK.ON_KERB) {
+          // (on the pavement: a tree pit of 1.6 m square, level with the pavers – the tree does not stand on them)
+          const mid = (p.inner + p.outer) / 2;
+          const half2 = Math.min(0.8, (p.outer - p.inner) / 2);
+          const ring = [
+            ...at(world, e, sm - 0.8, side * (mid - half2), kh + 0.015),
+            ...at(world, e, sm + 0.8, side * (mid - half2), kh + 0.015),
+            ...at(world, e, sm + 0.8, side * (mid + half2), kh + 0.015),
+            ...at(world, e, sm - 0.8, side * (mid + half2), kh + 0.015),
+          ];
+          addQuad(ts, 'ground', ring, [GM.VERGE]);
+        }
         const [x, y, z] = at(world, e, sm, side * ((p.inner + p.outer) / 2), kh);
-        const h = 8 + 5 * mix01(e.osm, side, Math.round(sm), 31);
+        // (street trees in bulbs are mostly young: 6–9 m – the renderer gives their crowns a street tree's width)
+        const h = 6 + 3 * mix01(e.osm, side, Math.round(sm), 31);
         ts.at(x, z).trees.push(Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(z * 10) / 10, Math.round(h * 10) / 10, 0);
         stats.bulbs++;
       }
@@ -214,16 +228,22 @@ export interface FrontageStats {
   fenceKm: number;
   wallKm: number;
   lawnKm: number;
+  /** plots left open (a lawn, no barrier) */
+  openKm: number;
   vergeTrees: number;
 }
 
-const HEDGE: RGB = [58, 92, 44];
-
 /**
- * A hedge, fence or wall along one side of a road behind its pavement
+ * What stands along one side of a road behind its pavement
  * (frontage:<side>; frontage:<side>:offset how far behind, else
- * FRONT_OFFSETS – behind a strip of lawn where there is no pavement), or a
- * lawn there; young trees in its verge (verge:<side>=…;trees).  Gaps where
+ * FRONT_OFFSETS – right behind the pavement, or behind the gutter where
+ * there is none): plot by plot (12–22 m, a driveway gap between most of
+ * them) a garden hedge of 0.7–1.2 m or 1.5–2.3 m, a fence, a low wall or
+ * open lawn – mostly hedges for frontage=hedge, fences for fence, walls for
+ * wall (mapgen/fences.ts; a tagged height: that kind at that height on
+ * every plot); or a lawn (frontage=lawn); young trees in its verge
+ * (verge:<side>=…;trees).  Only roads of the detail region carry these
+ * keys (mapgen/detailregion.ts).  Gaps where
  * another road or a junction lies, where a building stands (`occupied`), on
  * paved ground (`paved`: driveways and forecourts mapped as areas), and
  * wherever it would stand in a lane.
@@ -235,7 +255,7 @@ export function addFrontage(
   occupied: (x: number, z: number) => boolean,
   paved: (x: number, z: number) => boolean = () => false,
 ): FrontageStats {
-  const stats: FrontageStats = { hedgeKm: 0, fenceKm: 0, wallKm: 0, lawnKm: 0, vergeTrees: 0 };
+  const stats: FrontageStats = { hedgeKm: 0, fenceKm: 0, wallKm: 0, lawnKm: 0, openKm: 0, vergeTrees: 0 };
   const hit = newSurfaceHit();
   /** is the point free of other roads, junctions and buildings? */
   const free = (e: Edge, x: number, z: number, y: number): boolean => {
@@ -243,9 +263,30 @@ export function addFrontage(
     if (world.surfaceAt(x, z, y + 0.5, hit) && (hit.node || (hit.edge && hit.edge !== e))) return false;
     return true;
   };
+  let side: 1 | -1 = 1;
+  /** runs of stations every 2 m (s0…s1) at offset `off` where something may stand: free, and (`walls`) not in a lane */
+  const freeRuns = (e: Edge, s0: number, s1: number, off: number, lift: number, walls: boolean): number[][] => {
+    const n = Math.max(1, Math.ceil((s1 - s0) / 2));
+    const runs: number[][] = [];
+    let cur: number[] = [];
+    let prev: [number, number, number] | null = null;
+    for (let i = 0; i <= n; i++) {
+      const s = s0 + ((s1 - s0) * i) / n;
+      const p = at(world, e, s, side * off, lift);
+      const ok = free(e, p[0], p[2], p[1]) && (!prev || !walls || !inLane(prev[0], prev[2], p[0], p[2], Math.min(prev[1], p[1])));
+      if (ok) cur.push(s);
+      else {
+        if (cur.length >= 2) runs.push(cur);
+        cur = ok ? [s] : [];
+      }
+      prev = p;
+    }
+    if (cur.length >= 2) runs.push(cur);
+    return runs;
+  };
   for (const e of world.edges) {
     if (!e) continue;
-    for (const side of [1, -1] as const) {
+    for (side of [1, -1] as const) {
       const xs: RoadSideJson | undefined = side > 0 ? e.xl : e.xr;
       if (!xs || (!xs.ft && !xs.vt)) continue;
       const sw = side > 0 ? e.swL : e.swR;
@@ -263,71 +304,47 @@ export function addFrontage(
             const [x, y, z] = at(world, e, s, side * mid, lift);
             if (!free(e, x, z, y)) continue;
             const h = 5 + 2 * mix01(e.osm, side, Math.round(s), 41);
-            ts.at(x, z).trees.push(Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(z * 10) / 10, Math.round(h * 10) / 10, 3);
+            // (a young street tree: broadleaf, whose crown the renderer draws slim at this height)
+            ts.at(x, z).trees.push(Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(z * 10) / 10, Math.round(h * 10) / 10, 0);
             stats.vergeTrees++;
           }
         }
       }
       if (!xs.ft) continue;
       const kind = xs.ft;
-      const look = kind === FRONT.HEDGE ? { halfW: 0.4, y0: -0.3, rgb: HEDGE } : kind === FRONT.FENCE ? BARRIER_LOOK.fence : BARRIER_LOOK.wall;
-      const height = xs.fh ?? FRONT_HEIGHTS[kind] ?? 1.2;
-      const back = kind === FRONT.LAWN ? 0 : (xs.fo ?? (sw > 0 ? FRONT_OFFSETS.behindWalk : FRONT_OFFSETS.noWalk));
-      const off = half + Math.max(0, sw) + (kind === FRONT.LAWN ? 0 : back + look.halfW + 0.05);
-      // runs of stations every 2 m where it may stand
-      const n = Math.max(1, Math.ceil((s1 - s0) / 2));
-      const runs: number[][] = [];
-      let cur: number[] = [];
-      let prev: [number, number, number] | null = null;
-      for (let i = 0; i <= n; i++) {
-        const s = s0 + ((s1 - s0) * i) / n;
-        const p = at(world, e, s, side * off, lift);
-        const ok = free(e, p[0], p[2], p[1]) && (!prev || kind === FRONT.LAWN || !inLane(prev[0], prev[2], p[0], p[2], Math.min(prev[1], p[1])));
-        if (ok) cur.push(s);
-        else {
-          if (cur.length >= 2) runs.push(cur);
-          cur = ok ? [s] : [];
-        }
-        prev = p;
-      }
-      if (cur.length >= 2) runs.push(cur);
-      for (const run of runs) {
-        const km = (run[run.length - 1] - run[0]) / 1000;
-        if (kind === FRONT.LAWN) {
+      if (kind === FRONT.LAWN) {
+        const off = half + Math.max(0, sw);
+        for (const run of freeRuns(e, s0, s1, off, lift, false)) {
           // a strip of lawn 2.5 m deep at the pavement's height, then down to the ground
           const a = run.flatMap((s) => at(world, e, s, side * off, lift + 0.01));
           const b = run.flatMap((s) => at(world, e, s, side * (off + 2.5), lift + 0.01));
           const c = run.flatMap((s) => at(world, e, s, side * (off + 3.0), lift - 0.5));
           addBand(ts, 'ground', a, b, [GM.VERGE]);
           addBand(ts, 'ground', b, c, [GM.VERGE]);
-          stats.lawnKm += km;
+          stats.lawnKm += (run[run.length - 1] - run[0]) / 1000;
+        }
+        continue;
+      }
+      // plot by plot: a garden hedge, a fence, a low wall or open lawn, a driveway between most of them
+      // (mapgen/fences.ts) – right behind the pavement, or a little behind the kerb where there is none
+      const back = xs.fo ?? (sw > 0 ? FRONT_OFFSETS.behindWalk : FRONT_OFFSETS.noWalk);
+      for (const plot of frontagePlan(kind, s0, s1, e.osm, side, xs.fh)) {
+        if (!plot.style) {
+          stats.openKm += (plot.s1 - plot.s0) / 1000;
           continue;
         }
-        samplePolyline(e.pl, run[0], tmp);
-        const ox = tmp.tz * side;
-        const oz = -tmp.tx * side;
-        const foot = (o: number, y: number): number[] => run.flatMap((s) => at(world, e, s, side * o, lift + y));
-        const inA = foot(off - look.halfW, look.y0);
-        const inB = foot(off - look.halfW, height);
-        const outA = foot(off + look.halfW, look.y0);
-        const outB = foot(off + look.halfW, height);
-        addBand(ts, 'struct', inA, inB, look.rgb, -ox, 0, -oz);
-        addBand(ts, 'struct', outA, outB, look.rgb, ox, 0, oz);
-        addBand(ts, 'struct', inB, outB, look.rgb, 0, 1, 0);
-        for (const [s, dir] of [
-          [run[0], -1],
-          [run[run.length - 1], 1],
-        ] as const) {
-          const q = [...at(world, e, s, side * (off - look.halfW), lift + look.y0), ...at(world, e, s, side * (off + look.halfW), lift + look.y0), ...at(world, e, s, side * (off + look.halfW), lift + height), ...at(world, e, s, side * (off - look.halfW), lift + height)];
-          samplePolyline(e.pl, s, tmp);
-          addQuad(ts, 'struct', q, look.rgb, tmp.tx * dir, 0, tmp.tz * dir);
+        const look = BARRIER_STYLES[plot.style];
+        const off = half + Math.max(0, sw) + back + look.halfW + 0.02;
+        for (const run of freeRuns(e, plot.s0, plot.s1, off, lift, true)) {
+          const km = (run[run.length - 1] - run[0]) / 1000;
+          const line = run.flatMap((s) => at(world, e, s, side * off, lift));
+          drawBarrier(ts, line, plot.style, plot.h);
+          // (it stops whoever walks or drives into it)
+          for (let i = 3; i < line.length; i += 3) ts.at(line[i], line[i + 2]).collSeg.push(line[i - 3], line[i - 1], line[i], line[i + 2], Math.min(line[i - 2], line[i + 1]) - 0.2);
+          if (isHedge(plot.style)) stats.hedgeKm += km;
+          else if (isWall(plot.style)) stats.wallKm += km;
+          else stats.fenceKm += km;
         }
-        // (it stops whoever walks or drives into it)
-        const line = foot(off, 0);
-        for (let i = 3; i < line.length; i += 3) ts.at(line[i], line[i + 2]).collSeg.push(line[i - 3], line[i - 1], line[i], line[i + 2], Math.min(line[i - 2], line[i + 1]) - 0.2);
-        if (kind === FRONT.HEDGE) stats.hedgeKm += km;
-        else if (kind === FRONT.FENCE) stats.fenceKm += km;
-        else stats.wallKm += km;
       }
     }
   }
