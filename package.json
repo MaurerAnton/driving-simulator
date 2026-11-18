@@ -1,6 +1,6 @@
 {
   "name": "fahrsim-baunatal",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Freier 3D-Fahrschulsimulator für Nordhessen – deutsche Verkehrsregeln lernen, mit einem Fahrzeug jeder Führerscheinklasse (AGPL-3.0-only).",
   "license": "AGPL-3.0-only",
   "private": true,

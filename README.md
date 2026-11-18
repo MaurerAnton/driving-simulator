@@ -175,6 +175,11 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   Stimmen, Vollbild und Anzeige ausblenden (F2). **Gemeinsam spielen:** ein eigener Server (Konten mit Zugangscode,
   Fortschritt auf allen Geräten, Fotos und 360°-Panoramen, mehrere Spieler in einer Welt) – siehe `server/`.
   In „Neu“ auch die Entwicklungsversionen 0.1.0–0.9.0 (0.8.0 und 0.9.0 spielbar) und die Größe jeder Version.
+- **Neu in 1.7.1:** Die Knöpfe für Vollbild und Anzeige ausblenden liegen nicht mehr über der Suche der großen Karte
+  (auf Touchscreens im ⋯-Menü); Fahrzeuge sind fest – kein Hineinfahren in einen Bus mehr; einfacheres Fahren als
+  Voreinstellung (gleicher Grip überall, bei jedem Wetter); eine neue Grafikstufe **„Ohne Gnade“** mit Regen und
+  Schnee auf der Scheibe, Wasser auf den Straßen, Schmutz am Fahrzeug und den echten Jahreszeiten – nur nach einer
+  Warnung; alle anderen Stufen sind immer Sommer.
 - **Jedes Modell:** ein Testplatz auf dem Übungsplatz mit allen Fahrzeugen des Spiels nebeneinander (jede
   Führerscheinklasse, mit und ohne Anhänger), den Autos, Radfahrern und Leuten des Verkehrs, zwei Straßenbahnen
   und dem Flugzeug – zu Fuß oder mit dem eigenen Fahrzeug zwischen ihnen.
@@ -486,7 +491,7 @@ muss man zum Spielen und Entwickeln nicht.
 ### Tests
 
 ```bash
-npm test             # 926 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
+npm test             # 933 Tests, darunter (seit 1.4.0) Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen, Fußgänger,
                      # Tank und Waschanlage, Wetter, Jahreszeiten, Ampel-Uhren, Autopilot des Flugzeugs, Karten, Klänge; Fahrdynamik von Pkw (21), Lkw mit Anhänger (6) und den Fahrzeugen der anderen
                      # Klassen mit jeder Motorleistung (77), Flugphysik (25), Flugplätze (3), Straßenbahn fahren, ihr
                      # Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne im Verkehr (10), Fahrpläne
@@ -566,7 +571,7 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Stand und bekannte Grenzen
 
-- **Automatisch geprüft:** 926 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
+- **Automatisch geprüft:** 933 Tests (Fahrdynamik aller Fahrzeuge mit jeder Motorleistung, Flugphysik und Flugplätze,
   Straßenbahn mit Stromabnehmer, Doppeltraktion und Beiwagen, ihre Linien und Fahrpläne, Buslinien, die Wiederholung, Bus auf der Linie, zu Fuß an Fußgängerampel und Zebrastreifen, Fernsicht, Anhänger, Aufgaben der Klasse CE,
   Radfahrer, Ampeln, zu Fuß, Straßenbahnen, Sprachen, Rundfahrten, das Straßennetz in Stücken, das Kachelformat …), ein Dauerlauf des
   Umgebungsverkehrs (seit 1.4.0 auch Kräne, Theoriestunden, Einsatzfahrzeuge, Baustellen und Demonstrationen,
@@ -652,9 +657,10 @@ Regelwächter – was man sieht, worauf die Reifen stehen und wonach bewertet wi
 
 ## Vorgemerkt (fernere Zukunft)
 
-- **Grafikstufe „Ohne Gnade“ (geplant für Version 3.0.0, wann ist offen):** eine Stufe über „Sehr hoch“, die aus der Grafikkarte alles herausholt (höchste
-  Auflösung der Schatten und Spiegelungen, dichteste Vegetation, volle Sichtweite, aufwendigste Effekte); der Regen
-  auf der Scheibe mit Scheibenwischern wandert dorthin.
+- **Grafikstufe „Ohne Gnade“ ausbauen (geplant für Version 3.0.0, wann ist offen):** Seit 1.7.1 gibt es die Stufe – mit
+  Regen auf der Scheibe und Scheibenwischern, Wasser auf den Straßen, Schmutz am Fahrzeug und den echten Jahreszeiten.
+  Bis 3.0.0 soll sie aus der Grafikkarte alles herausholen (höchste Auflösung der Schatten und Spiegelungen, dichteste
+  Vegetation, volle Sichtweite, aufwendigste Effekte).
 - **Koppelnavigation zu Fuß:** feinere Schritte zwischen zwei GPS-Ortungen aus den Bewegungssensoren – erst in einer
   eigenen App verlässlich möglich.
 - **Freie Offline-Stimmen** für Sprachen ohne gute Stimme im Browser (z. B. Piper-Stimmen zum Nachladen).
@@ -791,6 +797,10 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   camera, "Teleport here", better voices, full screen and hiding the display (F2). Play together: an own server
   (accounts with access codes, progress on all devices, photos and 360° panoramas, several players in one world) –
   see `server/`. "What's new" lists the development versions 0.1.0–0.9.0 and every version's size.
+- **New in 1.7.1:** the buttons for full screen and hiding the display no longer cover the big map's search (and
+  on touch screens they sit in the ⋯ menu); vehicles are solid – no driving into a bus; simpler driving by default
+  (even grip everywhere, in any weather); a new graphics preset **"No mercy"** with rain and snow on the windscreen,
+  water on the roads, mud on the body and the real seasons – only after a warning; every other preset is always summer.
 - **Every model:** a test place on the practice yard with every vehicle of the game side by side, the cars,
   cyclists and people of the traffic, two trams and the aeroplane – walk or drive among them.
 - **Flying:** a light two-seat high-wing aeroplane (100 to 180 PS) takes off from the 21 airfields of
@@ -854,7 +864,7 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   (they stay on your device); plus the coordinates and links that open the place at KartaView, Mapillary,
   Panoramax, Google Street View, Google Maps, Google Earth and OpenStreetMap.
 
-Verified automatically by 926 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
+Verified automatically by 933 unit tests (since 1.4.0 also cranes, theory lessons, emergency vehicles, roadworks, pedestrians,
 fuel and car washes, weather and seasons, signal timers, the aeroplane's autopilot, maps and sounds; vehicle dynamics of every vehicle with every engine power, the tram with its pantograph and
 coupled units, the trailer, the class-CE tasks, cyclists, traffic lights, on foot and the pedestrian lights, trams with their lines and
 timetables, bus lines, replays, the bus line, flight physics, airfields, languages, tour planning, the road network in pieces, the tile format …), a traffic soak run,
@@ -883,8 +893,9 @@ instructor.
 
 ### Planned (far future)
 
-- A **"no mercy" graphics preset** (planned for version 3.0.0, no date yet) above "Very high" that pushes the graphics card to its limit (highest shadow and
-  reflection resolution, densest vegetation, full view distance, the costliest effects); rain on the windscreen with
-  the wipers moves there.
+- **Growing the "No mercy" graphics preset** (planned for version 3.0.0, no date yet): since 1.7.1 the preset exists,
+  with rain on the windscreen and the wipers, water on the roads, mud on the body and the real seasons. By 3.0.0 it
+  should push the graphics card to its limit (highest shadow and reflection resolution, densest vegetation, full view
+  distance, the costliest effects).
 - **Dead reckoning on foot** from the motion sensors between GPS fixes – reliable only in a native app.
 - **Free offline voices** for languages without a good browser voice (e.g. downloadable Piper voices).

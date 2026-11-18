@@ -41,6 +41,14 @@ export interface OutdoorsLanes {
 
 const HOUR = 3600_000;
 
+/**
+ * The season to show (1.7.1): a season chosen is shown; "by the date" only with the weather on the vehicle and the
+ * roads (the graphics' weatherFx – "No mercy") – otherwise it is always summer.
+ */
+export function seasonShown(settings: Readonly<{ season: SeasonSetting; graphics?: Readonly<{ weatherFx: boolean }> }>): SeasonSetting {
+  return settings.season === 'real' && settings.graphics && !settings.graphics.weatherFx ? 'summer' : settings.season;
+}
+
 export class Outdoors {
   readonly real: RealWeather;
   readonly view: WeatherRenderer;
@@ -89,7 +97,7 @@ export class Outdoors {
    * not known), the settings, the lanes for the wheel tracks (null: none)
    * and the game's clock.
    */
-  update(dt: number, camera: Readonly<{ x: number; y: number; z: number }>, place: Readonly<{ x: number; y: number; z: number }>, settings: Readonly<{ weather: WeatherSetting; season: SeasonSetting }>, lanes: OutdoorsLanes | null = null, clock: OutdoorsClock = gameClock): void {
+  update(dt: number, camera: Readonly<{ x: number; y: number; z: number }>, place: Readonly<{ x: number; y: number; z: number }>, settings: Readonly<{ weather: WeatherSetting; season: SeasonSetting; graphics?: Readonly<{ weatherFx: boolean }> }>, lanes: OutdoorsLanes | null = null, clock: OutdoorsClock = gameClock): void {
     const ms = clock.ms();
     const at = clock.real ? undefined : ms;
     // the real weather where the vehicle is (asked only when RealWeather allows – cheap to try every frame)
@@ -98,14 +106,15 @@ export class Outdoors {
       this.real.request(lat, lon, Number.isFinite(place.y) ? place.y : undefined, at);
     }
     const w = weatherFor(settings.weather, this.real, at);
+    const seasonSet = seasonShown(settings);
     const hour = Math.floor(ms / HOUR);
-    if (w !== this.weather || hour !== this.hour || settings.weather !== this.weatherSetting || settings.season !== this.seasonSetting) {
-      const switched = settings.weather !== this.weatherSetting || settings.season !== this.seasonSetting;
+    if (w !== this.weather || hour !== this.hour || settings.weather !== this.weatherSetting || seasonSet !== this.seasonSetting) {
+      const switched = settings.weather !== this.weatherSetting || seasonSet !== this.seasonSetting;
       this.weather = w;
       this.hour = hour;
       this.weatherSetting = settings.weather;
-      this.seasonSetting = settings.season;
-      this.season = seasonFor(settings.season, w, new Date(ms));
+      this.seasonSetting = seasonSet;
+      this.season = seasonFor(seasonSet, w, new Date(ms));
       this.look.set(this.season);
       this.grip = gripFactor(w, this.season.roadSnow);
       this.tracks.amount = this.season.roadSnow;

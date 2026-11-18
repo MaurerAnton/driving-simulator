@@ -958,7 +958,12 @@ export class Hud {
     select(this.t('startView'), s.view, [['chase', this.t('viewChase')], ['cockpit', this.t('viewCockpit')]], (v) => (s.view = v as Settings['view']));
     range(this.t('cabinOpacity'), (s.cabinOpacity - 0.2) / 0.8, (v) => (s.cabinOpacity = 0.2 + 0.8 * v));
     // Graphics: a preset – and, apart from it, the resolutions; the parts of the preset one by one below
-    select(this.t('quality'), s.quality, [['low', this.t('qLow')], ['medium', this.t('qMedium')], ['high', this.t('qHigh')], ['ultra', this.t('qUltra')], ['custom', this.t('qCustom')]], (v) => {
+    select(this.t('quality'), s.quality, [['low', this.t('qLow')], ['medium', this.t('qMedium')], ['high', this.t('qHigh')], ['ultra', this.t('qUltra')], ['nomercy', this.t('qNoMercy')], ['custom', this.t('qCustom')]], (v) => {
+      // ("No mercy" never comes by itself: only after a warning, and an OK – 1.7.1)
+      if (v === 'nomercy' && !confirm(this.t('noMercyAsk'))) {
+        queueMicrotask(() => this.showSettings(back));
+        return;
+      }
       s.quality = v as Settings['quality'];
       if (v !== 'custom') s.graphics = { ...GRAPHICS_PRESETS[v as Exclude<Settings['quality'], 'custom'>] };
       // (the low preset is for weak phones: the resolutions go down with it)
@@ -994,6 +999,15 @@ export class Hud {
       check(this.t('gfxVehicleDetail'), g.vehicleDetail, (v) => custom(() => (g.vehicleDetail = v))());
       // real water: ripples, the sky mirrored, the sun glinting (on "very high")
       check(this.t('gfxWater'), g.water, (v) => custom(() => (g.water = v))());
+      // the weather on the vehicle and the roads, and the seasons by the date (on "No mercy")
+      check(this.t('gfxWeatherFx'), g.weatherFx, (v) => {
+        // (what makes "No mercy": the same warning first)
+        if (v && !confirm(this.t('noMercyAsk'))) {
+          queueMicrotask(() => this.showSettings(back));
+          return;
+        }
+        custom(() => (g.weatherFx = v))();
+      });
       // (the rows were added to the panel: into the folded box with them)
       while (p.childElementCount > at) box.append(p.children[at]);
       p.append(box);
@@ -2317,6 +2331,19 @@ export class Hud {
     more.lastElementChild?.classList.add('road-only');
     item(this.t('tbAutopilot'), 'KeyT');
     more.lastElementChild?.classList.add('fly-only');
+    // full screen and hiding the display (ui/viewbuttons.ts): on a touch screen here, not over the ⋯ button
+    const viewItem = (label: string, run: () => void): HTMLButtonElement => {
+      const b = el('button', 'mb', label) as HTMLButtonElement;
+      b.type = 'button';
+      b.onclick = () => {
+        more.hidden = true;
+        run();
+      };
+      more.append(b);
+      return b;
+    };
+    viewItem(this.t('view.fullscreen'), () => this.view?.toggleFullscreen()).hidden = !document.documentElement.requestFullscreen;
+    viewItem(this.t('view.hudHide'), () => this.view?.toggleHud());
     const menu = el('button', 'mb', this.t('tbMenu'));
     menu.onclick = () => {
       more.hidden = true;

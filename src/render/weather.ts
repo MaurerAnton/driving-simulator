@@ -25,10 +25,10 @@ import * as THREE from 'three';
 import { windVector } from '../game/weather.ts';
 import type { WeatherKind, WeatherState } from '../game/weather.ts';
 
-export type WeatherQuality = 'low' | 'medium' | 'high' | 'ultra';
+export type WeatherQuality = 'low' | 'medium' | 'high' | 'ultra' | 'nomercy';
 
 /** the most raindrops in the air at once, by graphics quality (snow: 60 % of it – the flakes are bigger) */
-export const WEATHER_PARTICLES: Readonly<Record<WeatherQuality, number>> = Object.freeze({ low: 600, medium: 3000, high: 6000, ultra: 10000 });
+export const WEATHER_PARTICLES: Readonly<Record<WeatherQuality, number>> = Object.freeze({ low: 600, medium: 3000, high: 6000, ultra: 10000, nomercy: 10000 });
 const SNOW_SHARE = 0.6;
 
 /** What the weather does to the picture now (smoothed). */
@@ -467,6 +467,8 @@ const FADE = 2.5;
 const GROUND_WIND = 0.75;
 
 export class WeatherRenderer {
+  /** water standing on the roads in the wet (the graphics' weatherFx, 1.7.1: "No mercy"): without it they stay dry to the eye */
+  roadWater = true;
   /** add this to the scene */
   readonly group = new THREE.Group();
   readonly look: WeatherLook = {
@@ -718,7 +720,7 @@ export class WeatherRenderer {
     this.snow.advance(camera.x, camera.y, camera.z, step, wx, -1.1, wz, L.snow);
 
     this.applySky();
-    this.wetUniforms.uFsWet.value = L.wet;
+    this.wetUniforms.uFsWet.value = this.roadWater ? L.wet : 0;
     if (!this.sky) this.wetUniforms.uFsWetSky.value.copy(L.fogColor);
   }
 

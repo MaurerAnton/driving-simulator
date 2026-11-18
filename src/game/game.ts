@@ -595,6 +595,7 @@ export class Game {
     const world = app.world;
     // the weather and the season: the tiles', the trees' and the far hills' materials learn them before the first tile is drawn
     this.outdoors = new Outdoors(app.scene, app.sky, WEATHER_PARTICLES[this.settings.quality === 'custom' ? 'medium' : this.settings.quality]);
+    this.outdoors.view.roadWater = this.settings.graphics.weatherFx;
     const learn = (m: THREE.Material, k: Parameters<Outdoors['patch']>[1]): void => this.outdoors?.patch(m, k);
     app.tiles.setMaterialHook(learn);
     this.props.setSeason(learn);
@@ -638,6 +639,7 @@ export class Game {
     this.actors.highOf = (id) => this.beams.traffic.high(id);
     this.airfieldView = new AirfieldRenderer((x, z) => this.groundHeight(x, z), (x, z) => !Number.isNaN(this.app.tiles.heightAt(x, z)));
     this.services = new ServiceWorld({ scene: app.scene, collider: this.collider, ui: this.ui, map: app.map, ground: (x, z) => app.tiles.heightAt(x, z), onRoad: (x, z) => app.world.surfaceAt(x, z, app.tiles.heightAt(x, z) + 1, this.hit), blocked: (x, z, yaw) => this.collider.blocked(x, app.tiles.heightAt(x, z), z, yaw, 0.2), lang: () => this.settings.lang, message: (t, sub) => this.hud.message(t, sub), click: (k) => this.audio.click(k), hideOverlay: () => this.hud.hideOverlay(), rules: this.rules, shadows: () => this.settings.graphics.shadows !== 'off' });
+    this.services.dirtShown = this.settings.graphics.weatherFx;
     await this.services.load();
     this.spawnCars = this.makeSpawnCars();
     // (a tap on a vehicle: watch it, or get into a model of the test place – game/takeover.ts)
@@ -945,7 +947,7 @@ export class Game {
     this.hud.attachInput(this.input);
     // test overrides (not saved): ?quality=low|medium|high&mirrors=off|alternate|full&traffic=0..1
     const qq = q.get('quality');
-    if (qq === 'low' || qq === 'medium' || qq === 'high' || qq === 'ultra') {
+    if (qq === 'low' || qq === 'medium' || qq === 'high' || qq === 'ultra' || qq === 'nomercy') {
       this.settings.quality = qq;
       this.settings.graphics = { ...GRAPHICS_PRESETS[qq] };
       if (qq === 'low') this.settings.render3d = 0.7;
@@ -1214,6 +1216,9 @@ export class Game {
     // as many raindrops and snowflakes as the graphics allow
     if (this.outdoors) this.outdoors.view.quality = WEATHER_PARTICLES[s.quality === 'custom' ? 'medium' : s.quality];
     if (this.outdoors) this.outdoors.water.enabled = gx.water;
+    // the weather on the vehicle and the roads ("No mercy"): water on the roads, mud on the body (the windscreen: below)
+    if (this.outdoors) this.outdoors.view.roadWater = gx.weatherFx;
+    if (this.services) this.services.dirtShown = gx.weatherFx;
     // the trams' doors: drawn, opening and closing, from the medium graphics on (on the low preset the plain bodies of before)
     this.railActors.detail = this.showRail.detail = s.quality !== 'low';
     this.ui.style.setProperty('zoom', String(s.uiScale));
@@ -4092,15 +4097,12 @@ export class Game {
       }
     }
     for (const ev of this.traffic.events) {
-      if (ev.type === 'collision') {
-        // shove the cars apart and kill most of the closing speed
-        const dx = player.x - ev.car.x;
-        const dz = player.z - ev.car.z;
-        const l = Math.hypot(dx, dz) || 1;
-        v.translate((dx / l) * 0.25, 0, (dz / l) * 0.25);
-        const vn = v.vel[0] * (dx / l) + v.vel[2] * (dz / l);
-        if (vn < 0) v.applyImpulse(v.pos[0], v.pos[1], v.pos[2], -(dx / l) * vn * v.spec.mass * 1.2, 0, -(dz / l) * vn * v.spec.mass * 1.2);
-        this.audio.click('crash');
+      if (ev.type === 'collision') this.audio.click('crash');
+      else if (ev.type === 'contact') {
+        // out of the other vehicle by the shortest way, and no more speed into it (a little bounce): it is solid
+        v.translate(ev.nx * (ev.depth + 0.02), 0, ev.nz * (ev.depth + 0.02));
+        const vn = v.vel[0] * ev.nx + v.vel[2] * ev.nz;
+        if (vn < 0) v.applyImpulse(v.pos[0], v.pos[1], v.pos[2], -ev.nx * vn * v.spec.mass * 1.2, 0, -ev.nz * vn * v.spec.mass * 1.2);
       } else if (ev.type === 'cyclistEndangered' && ev.hit) this.audio.click('bump');
     }
     // on its side or roof: that is the end of this drive – count it as a crash and start again on the road
@@ -6406,11 +6408,11 @@ export class Game {
         }
       }
       app.render(this.watcher ? this.tmpV.set(this.watcher.at.x, this.watcher.at.y, this.watcher.at.z) : model.root.position);
-      // rain and snow on the windscreen, the wipers ("very high" graphics, from the driver's seat): after the picture, which it keeps for its blur
+      // rain and snow on the windscreen, the wipers ("No mercy" graphics – 1.7.0: "very high" –, from the driver's seat): after the picture, which it keeps for its blur
       const wn = weatherNow();
       const wind = windVector(wn, { x: 0, z: 0 });
       const ws = this.windscreen;
-      ws.frame({ renderer: app.renderer, model, detail: this.settings.graphics.vehicleDetail && !this.aircraft, cockpit: this.cameraMode === 'cockpit' && !this.walker && this.doorT < 0 && !this.watcher, dt: this.state === 'drive' ? dt : 0, rain: rainIntensity(wn), snow: snowIntensity(wn), temperature: wn.temperature, roadWet: wn.wet, windX: wind.x, windZ: wind.z, heater: this.vehicle.engineRunning, washer: this.input.washer, light: app.sky.hemi.intensity / 1.2 });
+      ws.frame({ renderer: app.renderer, model, detail: this.settings.graphics.vehicleDetail && this.settings.graphics.weatherFx && !this.aircraft, cockpit: this.cameraMode === 'cockpit' && !this.walker && this.doorT < 0 && !this.watcher, dt: this.state === 'drive' ? dt : 0, rain: rainIntensity(wn), snow: snowIntensity(wn), temperature: wn.temperature, roadWet: wn.wet, windX: wind.x, windZ: wind.z, heater: this.vehicle.engineRunning, washer: this.input.washer, light: app.sky.hemi.intensity / 1.2 });
       this.hud.setWipers(this.walker || this.aircraft ? null : ws.mode);
       if (ws.blindFor > 4 && this.state === 'drive') this.rules.note('noView', 'minor', {}, 60);
     } else {

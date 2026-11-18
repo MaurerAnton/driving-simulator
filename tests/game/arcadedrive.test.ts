@@ -16,7 +16,7 @@ import { DT, PlaneGround, input, makeCar } from '../vehicle/harness.ts';
 import { WorldGround } from '../../src/sim/ground.ts';
 import type { World } from '../../src/world/world.ts';
 import { COVER } from '../../src/world/cover.ts';
-import { DEFAULT_SETTINGS, loadSettings, resetSettings } from '../../src/game/settings.ts';
+import { DEFAULT_SETTINGS, SETTINGS_VERSION, loadSettings, resetSettings } from '../../src/game/settings.ts';
 
 test('the right pedal drives forwards, the left one brakes', () => {
   const a = new ArcadeDrive();
@@ -108,7 +108,7 @@ test('the road physics switched off: every surface, in any weather, grips as dry
   assert.deepEqual([out.grip, out.rolling], [1, 1]);
 });
 
-test('the arcade settings are off by default; "Reset settings" keeps the language and the keys', () => {
+test('arcade driving is off by default, the even grip on (1.7.1); "Reset settings" keeps the language and the keys', () => {
   const m = new Map<string, string>();
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -116,11 +116,11 @@ test('the arcade settings are off by default; "Reset settings" keeps the languag
     value: { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, String(v)), removeItem: (k: string) => void m.delete(k) },
   });
   assert.equal(DEFAULT_SETTINGS.arcadeDrive, false);
-  assert.equal(DEFAULT_SETTINGS.evenRoads, false);
-  m.set('fahrsim-baunatal.settings.v2', JSON.stringify({ arcadeDrive: 'yes', evenRoads: true }));
+  assert.equal(DEFAULT_SETTINGS.evenRoads, true);
+  m.set('fahrsim-baunatal.settings.v2', JSON.stringify({ version: SETTINGS_VERSION, arcadeDrive: 'yes', evenRoads: false }));
   const s = loadSettings();
   assert.equal(s.arcadeDrive, false, 'implausible: the default');
-  assert.equal(s.evenRoads, true);
+  assert.equal(s.evenRoads, false, 'chosen since 1.7.1: kept');
   s.lang = 'de';
   s.fuelKey = 'key';
   s.limiter = false;
@@ -131,7 +131,7 @@ test('the arcade settings are off by default; "Reset settings" keeps the languag
   assert.equal(r.fuelKey, 'key');
   assert.equal(r.limiter, DEFAULT_SETTINGS.limiter);
   assert.equal(r.traffic, DEFAULT_SETTINGS.traffic);
-  assert.equal(r.evenRoads, false);
+  assert.equal(r.evenRoads, DEFAULT_SETTINGS.evenRoads);
   assert.equal(r.graphics.water, DEFAULT_SETTINGS.graphics.water);
   // (the defaults themselves are not touched)
   r.graphics.water = !r.graphics.water;

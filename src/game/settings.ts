@@ -15,7 +15,7 @@ import { normaliseServerUrl } from '../net/client.ts';
 
 export type Transmission = 'assist' | 'manual' | 'automatic';
 /** a preset of the graphics – or 'custom': the advanced settings chosen one by one */
-export type Quality = 'low' | 'medium' | 'high' | 'ultra' | 'custom';
+export type Quality = 'low' | 'medium' | 'high' | 'ultra' | 'nomercy' | 'custom';
 
 /** What the graphics presets set – everything but the resolutions, which are settings of their own. */
 export interface Graphics {
@@ -35,14 +35,22 @@ export interface Graphics {
   vehicleDetail: boolean;
   /** real water: rivers, lakes and ponds with ripples, the sky mirrored and the sun glinting (render/water.ts) */
   water: boolean;
+  /**
+   * the weather on the vehicle and the roads (1.7.1: only "No mercy" by default) – rain and snow on the windscreen
+   * (render/windscreen.ts), water standing on the roads (render/weather.ts), mud on the body (render/dirt.ts) – and the
+   * seasons by the date: without it a season "by the date" is summer
+   */
+  weatherFx: boolean;
 }
 
 export const GRAPHICS_PRESETS: Record<Exclude<Quality, 'custom'>, Graphics> = {
   // (for weak phones: little to draw, few trees, a short view – the resolutions go down with it: lowResolutions)
-  low: { shadows: 'off', viewDistance: 500, propDensity: 0.2, facades: false, propShadows: false, farView: 0, vehicleDetail: false, water: false },
-  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false, farView: 8000, vehicleDetail: false, water: false },
-  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true, farView: 12000, vehicleDetail: false, water: false },
-  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true, farView: 20000, vehicleDetail: true, water: true },
+  low: { shadows: 'off', viewDistance: 500, propDensity: 0.2, facades: false, propShadows: false, farView: 0, vehicleDetail: false, water: false, weatherFx: false },
+  medium: { shadows: 'near', viewDistance: 1250, propDensity: 0.8, facades: true, propShadows: false, farView: 8000, vehicleDetail: false, water: false, weatherFx: false },
+  high: { shadows: 'far', viewDistance: 2000, propDensity: 1, facades: true, propShadows: true, farView: 12000, vehicleDetail: false, water: false, weatherFx: false },
+  ultra: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true, farView: 20000, vehicleDetail: true, water: true, weatherFx: false },
+  // (1.7.1: "very high" and the weather on the vehicle and the roads, and the seasons – planned to grow, see README)
+  nomercy: { shadows: 'far', viewDistance: 3000, propDensity: 1, facades: true, propShadows: true, farView: 20000, vehicleDetail: true, water: true, weatherFx: true },
 };
 export const VIEW_DISTANCES = [500, 700, 1000, 1250, 1600, 2000, 2500, 3000];
 
@@ -213,7 +221,7 @@ export interface Settings {
 }
 
 /** 2 (1.4.0): the map on the vehicle's screen became the default – before, a stored `false` was only the old default */
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export const DEFAULT_SETTINGS: Settings = {
   // the first of the browser's languages that the simulator speaks
@@ -225,7 +233,7 @@ export const DEFAULT_SETTINGS: Settings = {
   limiter: true,
   autopilotAssist: true,
   arcadeDrive: false,
-  evenRoads: false,
+  evenRoads: true,
   beamAssist: false,
   daylight: 'day',
   fuelKey: '',
@@ -317,7 +325,7 @@ function merge(parsed: Partial<Settings>): Settings {
   if (parsed.graphics && typeof (parsed.graphics as Partial<Graphics>).farView !== 'number') s.graphics.farView = GRAPHICS_PRESETS[s.quality === 'custom' || !GRAPHICS_PRESETS[s.quality as Exclude<Quality, 'custom'>] ? 'medium' : (s.quality as Exclude<Quality, 'custom'>)].farView;
   if (!FAR_VIEWS.includes(s.graphics.farView)) s.graphics.farView = FAR_VIEWS.reduce((a, b) => (Math.abs(b - s.graphics.farView) < Math.abs(a - s.graphics.farView) ? b : a));
   if (!['assist', 'manual', 'automatic'].includes(s.transmission)) s.transmission = d.transmission;
-  if (!['low', 'medium', 'high', 'ultra', 'custom'].includes(s.quality)) s.quality = d.quality;
+  if (!['low', 'medium', 'high', 'ultra', 'nomercy', 'custom'].includes(s.quality)) s.quality = d.quality;
   // (stored before there were advanced graphics settings: what the level gave then)
   if (!parsed.graphics) {
     s.graphics = { ...GRAPHICS_PRESETS[s.quality === 'custom' ? 'medium' : s.quality] };
@@ -335,6 +343,8 @@ function merge(parsed: Partial<Settings>): Settings {
   // (stored before there were finer vehicles: as the preset of then gives them – on "very high" only)
   if (typeof (parsed.graphics as Partial<Graphics> | undefined)?.vehicleDetail !== 'boolean') g.vehicleDetail = s.quality === 'ultra';
   if (typeof (parsed.graphics as Partial<Graphics> | undefined)?.water !== 'boolean') g.water = s.quality === 'ultra';
+  // (before 1.7.1 "very high" had the weather on the vehicle and the roads; now only "No mercy" – a custom choice of before keeps it)
+  if (typeof (parsed.graphics as Partial<Graphics> | undefined)?.weatherFx !== 'boolean') g.weatherFx = s.quality === 'nomercy' || (s.quality === 'custom' && g.vehicleDetail);
   if (!(s.uiScale >= 0.7 && s.uiScale <= 1.6)) s.uiScale = d.uiScale;
   if (![1, 1.5, 3].includes(s.pixelCap)) s.pixelCap = d.pixelCap;
   if (!(s.render3d >= 0.5 && s.render3d <= 1)) s.render3d = d.render3d;
@@ -366,6 +376,8 @@ function merge(parsed: Partial<Settings>): Settings {
   if (!(Number(parsed.version) >= 2)) s.reality.aerial = true;
   // (and for the main menu: the rows were 1.3.0's default – the stage is 1.4.0's; a list chosen stays a list)
   if (!(Number(parsed.version) >= 2) && s.menuStyle === 'carousel') s.menuStyle = 'stage';
+  // (1.7.1: simpler physics by default – the even grip of every road and field; settings of before stored the old default)
+  if (!(Number(parsed.version) >= 3)) s.evenRoads = true;
   s.version = SETTINGS_VERSION;
   if (typeof s.autopilotAssist !== 'boolean') s.autopilotAssist = d.autopilotAssist;
   if (typeof s.beamAssist !== 'boolean') s.beamAssist = d.beamAssist;

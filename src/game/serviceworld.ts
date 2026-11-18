@@ -136,6 +136,8 @@ export class ServiceWorld {
   tank: FuelTank | null = null;
   /** the dirt on it, 0 clean … 1 filthy */
   dirt = 0;
+  /** the dirt drawn on the body (the graphics' weatherFx, 1.7.1: "No mercy"); it gathers all the same, for the car wash */
+  dirtShown = true;
   private def: VehicleDef | null = null;
   private height = 1.45;
   private doing: Activity | null = null;
@@ -486,7 +488,7 @@ export class ServiceWorld {
       s.fuel = this.tank.share;
       this.dirtLook.apply(model as unknown as { root: THREE.Object3D; exterior?: { group: THREE.Object3D } });
     }
-    this.dirtLook.update(this.tank ? this.dirt : 0, model.root, this.height);
+    this.dirtLook.update(this.tank && this.dirtShown ? this.dirt : 0, model.root, this.height);
     const px = model.root.position.x;
     const pz = model.root.position.z;
     this.buildNext(px, pz);

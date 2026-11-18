@@ -221,6 +221,8 @@ export type TrafficEvent =
    */
   | { type: 'forcedBrake'; car: TrafficCar; decel: number; cutIn: boolean }
   | { type: 'collision'; car: TrafficCar; speed: number }
+  /** every picture while the player's vehicle overlaps one of the traffic: the way out (unit, from it to the player) and how deep */
+  | { type: 'contact'; car: TrafficCar; nx: number; nz: number; depth: number }
   | { type: 'pedestrianEndangered'; ped: Pedestrian }
   /** a cyclist had to brake hard because the player's vehicle came into their way – or was knocked over by it */
   | CycleEvent;
@@ -1842,11 +1844,17 @@ export class Traffic {
     car.yaw = yaw;
 
     // --- contact with the player ---
-    const dx = player.x - car.x;
-    const dz = player.z - car.z;
-    if (dx * dx + dz * dz < 9 && Math.abs(player.y - car.y) < 2.5) {
-      if (boxesOverlap(car.x, car.z, car.yaw, car.length / 2, car.width / 2, player.x, player.z, player.yaw, player.length / 2, player.width / 2)) {
+    // (where it is drawn, as long as it is: a bus is 12 m – not only within 3 m of its middle, as before 1.7.1;
+    // every picture of the contact pushes the player out of it, so that no one drives into a vehicle)
+    const at = car.drawn ?? car;
+    const dx = player.x - at.x;
+    const dz = player.z - at.z;
+    const reach = (car.length + player.length) / 2 + 1;
+    if (dx * dx + dz * dz < reach * reach && Math.abs(player.y - car.y) < 2.5) {
+      const push = boxPush(at.x, at.z, at.yaw, car.length / 2, car.width / 2, player.x, player.z, player.yaw, player.length / 2, player.width / 2);
+      if (push) {
         if (car.crashed <= 0) this.events.push({ type: 'collision', car, speed: Math.abs(player.speed) + car.v });
+        this.events.push({ type: 'contact', car, nx: push.nx, nz: push.nz, depth: push.depth });
         car.crashed = 6;
         car.v = 0;
       }
@@ -1968,6 +1976,28 @@ export class Traffic {
     for (const p of this.peds) if (p.crossing === c && p.state !== 'gone') return p;
     return null;
   }
+}
+
+/**
+ * How to push rectangle b out of rectangle a (oriented, on the ground plane): the unit direction (from a towards b)
+ * and the depth of the shortest way out – null when they do not overlap.  The separating-axis test, keeping the
+ * axis of least overlap.
+ */
+export function boxPush(ax: number, az: number, ayaw: number, ahl: number, ahw: number, bx: number, bz: number, byaw: number, bhl: number, bhw: number): { nx: number; nz: number; depth: number } | null {
+  const dx = bx - ax;
+  const dz = bz - az;
+  let best: { nx: number; nz: number; depth: number } | null = null;
+  for (const ang of [ayaw, ayaw + Math.PI / 2, byaw, byaw + Math.PI / 2]) {
+    const ux = -Math.sin(ang);
+    const uz = -Math.cos(ang);
+    const along = dx * ux + dz * uz;
+    const ra = ahl * Math.abs(Math.cos(ang - ayaw)) + ahw * Math.abs(Math.sin(ang - ayaw));
+    const rb = bhl * Math.abs(Math.cos(ang - byaw)) + bhw * Math.abs(Math.sin(ang - byaw));
+    const depth = ra + rb - Math.abs(along);
+    if (depth <= 0) return null;
+    if (!best || depth < best.depth) best = along >= 0 ? { nx: ux, nz: uz, depth } : { nx: -ux, nz: -uz, depth };
+  }
+  return best;
 }
 
 /** Separating-axis test for two oriented rectangles on the ground plane. */

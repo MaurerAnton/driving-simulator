@@ -124,7 +124,7 @@ export function rainOf(w: { kind: string; intensity: number } | null | undefined
  * phone on the low preset draws a few dozen, a fast computer up to CROWD_MAX.
  */
 export function crowdTarget(traffic: number, quality: string): number {
-  const base = quality === 'low' ? 24 : quality === 'medium' ? 80 : quality === 'ultra' ? 160 : 120;
+  const base = quality === 'low' ? 24 : quality === 'medium' ? 80 : quality === 'ultra' || quality === 'nomercy' ? 160 : 120;
   return Math.round(Math.min(CROWD_MAX, base * clamp(traffic / 0.6, 0, 1.4)));
 }
 

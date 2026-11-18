@@ -1096,6 +1096,11 @@ button.x-close.x-close.x-close:hover, .bm-tools .btn.ghost.bm-close:hover, butto
 .hud-off .view-btns .view-btn:first-child { display: none; }
 .hud-off .view-btns { opacity: 0.35; }
 .hud-off .view-btns:hover { opacity: 1; }
+/* (1.7.1) not over the big map's search, and on touch screens not over the ⋯ button: there both are in the ⋯ sheet,
+   and only the button that brings the hidden display back stays – in the ⋯ button's place, hidden with the rest) */
+body:has(.overlay.bigmap) .view-btns { display: none !important; }
+body:has(.hud.touchmode) .view-btns { display: none; }
+body:has(.hud.touchmode) .hud-off .view-btns { display: flex; }
 
 /* the server's panels and the viewer of its pictures (ui/netpanels.ts, ui/photoviewer.ts) */
 .net-panel h2 { font-size: 15px; margin: 18px 0 6px; }
