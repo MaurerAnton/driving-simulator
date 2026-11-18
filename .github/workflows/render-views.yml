@@ -1,0 +1,47 @@
+# Render the game at the comparison viewpoints of Baunatal centre (tools/dev/views-baunatal.json) in parallel jobs,
+# for comparing the world with street-level photos by eye (the photos stay with whoever compares – not here).
+# Started by hand: Actions → "Render comparison views" → Run workflow. The pictures come as artifacts.
+name: Render comparison views
+on:
+  workflow_dispatch:
+    inputs:
+      quality:
+        description: 'Graphics preset (low|medium|high|ultra)'
+        default: 'medium'
+      size:
+        description: 'Picture size'
+        default: '960x600'
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Map (with the latest tiles patch of the map release)
+        run: node tools/fetch-map.ts
+      - name: Build the game
+        run: npx vite build
+      - name: Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: Render
+        run: |
+          npx vite preview --port 4173 --strictPort > preview.log 2>&1 &
+          for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:4173/ && break; sleep 2; done
+          node tools/dev/render-views.mjs tools/dev/views-baunatal.json out --shard ${{ matrix.shard }}/8 --quality ${{ inputs.quality }} --size ${{ inputs.size }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: views-${{ matrix.shard }}
+          path: out/
+          retention-days: 14
