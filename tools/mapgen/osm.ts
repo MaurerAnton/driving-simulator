@@ -275,6 +275,31 @@ export class OsmData {
    * Assemble the rings of a multipolygon relation.  Returns outer and inner
    * rings as flat [x,z,…] arrays (closed implicitly, no repeated last point).
    */
+  /**
+   * Leave out what only the road network needed – the ways of `drop` (not those of a relation) and the nodes no way
+   * that stays uses and that have no tags – to make room once the network is built (tools/build-graph.ts).  Returns
+   * how many ways and nodes went.
+   */
+  prune(drop: (w: OWay) => boolean): { ways: number; nodes: number } {
+    const inRelation = new Set<number>();
+    for (const rel of this.relations) for (const m of rel.members) if (m.type === 'w') inRelation.add(m.ref);
+    const keep = this.ways.filter((w) => inRelation.has(w.id) || !drop(w));
+    const ways = this.ways.length - keep.length;
+    this.ways.length = 0;
+    for (const w of keep) this.ways.push(w);
+    this.wayById.clear();
+    for (const w of keep) this.wayById.set(w.id, w);
+    const used = new Set<number>();
+    for (const w of keep) for (const r of w.refs) used.add(r);
+    let nodes = 0;
+    for (const [id, n] of this.nodes) {
+      if (n.tags || used.has(id)) continue;
+      this.nodes.delete(id);
+      nodes++;
+    }
+    return { ways, nodes };
+  }
+
   multipolygonRings(rel: ORelation): { outer: number[][]; inner: number[][] } {
     const collect = (role: (r: string) => boolean): number[][] => {
       const segs: number[][] = [];

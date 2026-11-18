@@ -117,6 +117,13 @@ graph.edges.forEach((e, i) => {
 });
 const detail = spliceDetail(graph, control, osm, dgm, { inWorld, builtUp }, lap);
 if (detail) lap(detail.report);
+// (the roads are built: what comes after reads only place names, car parks, tracks and boundaries – the other ways
+// and their bare nodes go, which makes room for the world below on a machine with little memory)
+{
+  const gone = osm.prune((w) => !!w.tags.highway && !w.tags.railway && w.tags.amenity !== 'parking');
+  dgm.trim(64);
+  lap(`made room: ${gone.ways} road ways and ${gone.nodes} of their nodes let go`);
+}
 
 const bbox = coverage.bbox;
 const worldJson: WorldJson = {

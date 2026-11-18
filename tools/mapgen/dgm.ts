@@ -18,7 +18,7 @@ export class Dgm {
   private readonly dir: string;
   private readonly have = new Set<number>();
   private readonly cache = new Map<number, Uint16Array | null>();
-  private readonly limit: number;
+  private limit: number;
   /** cells per side of a tile, their size and the height step (from the first tile read) */
   private n = 500;
   private cellSize = 2;
@@ -41,6 +41,12 @@ export class Dgm {
     }
     this.count = this.have.size;
     if (this.count === 0) throw new Error(`no terrain tiles in ${dir} – fetch them with tools/fetch-geodata.py`);
+  }
+
+  /** Keep at most `limit` tiles from now on (the oldest go): the same heights, read again from disk when needed. */
+  trim(limit: number): void {
+    this.limit = limit;
+    while (this.cache.size > limit) this.cache.delete(this.cache.keys().next().value as number);
   }
 
   private load(eKm: number, nKm: number): Uint16Array | null {

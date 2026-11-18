@@ -28,6 +28,9 @@
  * lists (a patch of this tool, fetched or applied), or with --previous the
  * files of the earlier tiles-patch.tar.  They go into the patch as well.
  *
+ * DETAIL_GRAPH_HEAP / DETAIL_TILES_HEAP (MB, default 4096 / 3072): the heap of the two steps.  A machine with
+ * little free memory builds with less (e.g. 2600): the garbage is collected sooner, the data fits all the same.
+ *
  * --apply: copy the patch into public/map and set meta.patched in its
  * map.json (what tools/fetch-map.ts does with the release's patch).
  *
@@ -68,7 +71,7 @@ if (!existsSync(resolve(live, 'map.json'))) {
 if (!flag('--skip-graph') || !existsSync(resolve(work, 'plan.json'))) {
   mkdirSync(out, { recursive: true });
   lap('the road network of the whole region …');
-  const r = spawnSync('node', ['--max-old-space-size=4096', resolve(root, 'tools/build-graph.ts')], { stdio: 'inherit', cwd: root, env });
+  const r = spawnSync('node', ['--expose-gc', `--max-old-space-size=${process.env.DETAIL_GRAPH_HEAP ?? 4096}`, resolve(root, 'tools/build-graph.ts')], { stdio: 'inherit', cwd: root, env });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
@@ -85,7 +88,7 @@ for (const [bx, bz] of plan.blocks) {
 lap(`blocks the region reaches into: ${blocks.join(', ')}`);
 rmSync(resolve(out, 'tiles'), { recursive: true, force: true });
 for (const b of blocks) {
-  const r = spawnSync('node', ['--max-old-space-size=3072', resolve(root, 'tools/build-tiles.ts'), b], { stdio: 'inherit', cwd: root, env });
+  const r = spawnSync('node', [`--max-old-space-size=${process.env.DETAIL_TILES_HEAP ?? 3072}`, resolve(root, 'tools/build-tiles.ts'), b], { stdio: 'inherit', cwd: root, env });
   if (r.status !== 0) process.exit(r.status ?? 1);
   lap(`block ${b} built`);
 }
