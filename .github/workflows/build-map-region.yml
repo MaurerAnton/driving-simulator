@@ -56,9 +56,9 @@ jobs:
       - id: list
         run: |
           case "${{ inputs.region }}" in
-            suedwest) m='[{"id":"suedwest","label":"Südwest-Hessen"}]' ;;
-            suedost)  m='[{"id":"suedost","label":"Südost-Hessen"}]' ;;
-            *)        m='[{"id":"suedwest","label":"Südwest-Hessen"},{"id":"suedost","label":"Südost-Hessen"}]' ;;
+            suedwest) m='{"include":[{"id":"suedwest","label":"Südwest-Hessen"}]}' ;;
+            suedost)  m='{"include":[{"id":"suedost","label":"Südost-Hessen"}]}' ;;
+            *)        m='{"include":[{"id":"suedwest","label":"Südwest-Hessen"},{"id":"suedost","label":"Südost-Hessen"}]}' ;;
           esac
           echo "matrix=$m" >> "$GITHUB_OUTPUT"
 
