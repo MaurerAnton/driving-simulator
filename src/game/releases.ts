@@ -62,7 +62,7 @@ export const RELEASES: readonly Release[] = [
   {
     version: '1.7.2',
     date: '2026-11-19',
-    at: '',
+    at: '2026-11-19T12:23:10Z',
     items: ['news.1_7_2.limiter', 'news.1_7_2.drive', 'news.1_7_2.turn', 'news.1_7_2.bridge', 'news.1_7_2.signs'],
     size: { lines: 276212, code: 155912, tests: 27790, i18n: 68826, bytes: 20784083 },
   },
