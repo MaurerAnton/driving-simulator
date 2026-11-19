@@ -72,6 +72,13 @@ jobs:
       matrix: ${{ fromJson(needs.regions.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
+      # node as well: the building models are read by tools/lod2-extract.ts, which fetches
+      # nothing itself – the terrain script hands it each .gml – but wants node_modules (saxes)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
