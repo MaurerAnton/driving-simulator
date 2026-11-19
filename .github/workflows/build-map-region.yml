@@ -47,6 +47,7 @@ on:
 
 permissions:
   contents: write
+  actions: read   # artefacts of an earlier run (geodata_run)
 
 jobs:
   # which regions this run builds
@@ -93,6 +94,9 @@ jobs:
         with:
           name: geodata-${{ matrix.id }}
           run-id: ${{ inputs.geodata_run }}
+          # The upload of two paths keeps only what the two have not in common: inside the
+          # artefact the tiles are dgm2/… and lod2/… – so they belong in data/work again.
+          path: data/work
       # The two products spell some districts differently (Hochtaunus / Hochtaunuskreis,
       # Bergstrasse / Bergstraße); both spellings are in the list, and for the one a product
       # does not know the script prints "no district …" and goes on.
@@ -174,8 +178,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: geodata-${{ matrix.id }}
+          # dito: the artefact holds dgm2/… and lod2/…, without data/work
+          path: data/work
       - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
         run: |
+          ls data/work
+          du -sh data/work/dgm2 data/work/lod2
+          ls data/work/dgm2 | head -3
           df -h /
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
           df -h /
