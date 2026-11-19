@@ -1,0 +1,194 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Builds the map of one part of Hesse and puts it into a release as a map pack
+# (map.tar.00, map.tar.01, … – what the game loads in its settings, src/ui/mappacks.ts).
+#
+# Why it runs here: a build like this needs several gigabytes of disk and more memory than a
+# laptop has; a GitHub runner has 4 CPUs, 16 GB of memory and ~14 GB of disk, and its minutes
+# are free for a public repository.  The map never goes near GitHub Pages (1 GB limit):
+# releases have no size limit.
+#
+# Start it by hand: Actions → "Karte einer Region" → Run workflow.
+#
+# The order is the one of docs/MAP_DATA.md:
+#   1. terrain (DGM1) and building models (LoD2) of the districts of the region -> data/work/dgm2, data/work/lod2
+#   2. OpenStreetMap, cut to the region                                         -> npm run map:extract
+#   3. road network and tiles                                                   -> npm run map:build
+#   4. addresses, stops, tram and bus lines, signs, far view, timetables, services
+#   5. packed into parts of 100 MB, uploaded to a release
+#
+# Two jobs, so that a network error during the 20-30 GB of terrain does not lose the build,
+# and so that each part has six hours to itself.
+
+name: Karte einer Region
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: Welche Karte gebaut wird
+        type: choice
+        default: beide
+        options: [beide, suedwest, suedost]
+      tag:
+        description: 'Name des Releases (leer: karte-<region>-<Datum>-<Lauf>)'
+        type: string
+        default: ''
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        default: '^KVG\b|Kassel|RegioTram|^NVV\b|Nordhessischer|RMV'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: '^KVG M$|^NVV\b(?!.*\bAST\b)|Nordhessischer|RMV'
+
+permissions:
+  contents: write
+
+jobs:
+  # which regions this run builds
+  regions:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - id: list
+        run: |
+          case "${{ inputs.region }}" in
+            suedwest) m='[{"id":"suedwest","label":"Südwest-Hessen"}]' ;;
+            suedost)  m='[{"id":"suedost","label":"Südost-Hessen"}]' ;;
+            *)        m='[{"id":"suedwest","label":"Südwest-Hessen"},{"id":"suedost","label":"Südost-Hessen"}]' ;;
+          esac
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+
+  # 1: the open geodata – a long download (21 GB for the south-west, 32 GB for the south-east)
+  geodata:
+    needs: regions
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.regions.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # The two products spell some districts differently (Hochtaunus / Hochtaunuskreis,
+      # Bergstrasse / Bergstraße); both spellings are in the list, and for the one a product
+      # does not know the script prints "no district …" and goes on.
+      - name: Terrain (DGM1) und Gebäudemodelle (LoD2) holen
+        env:
+          Region: ${{ matrix.id }}
+        run: |
+          set -euo pipefail
+          case "$Region" in
+            suedwest)
+              districts=(
+                "Kreisfreie Stadt Wiesbaden" "Rheingau-Taunus-Kreis" "Main-Taunus-Kreis"
+                "Hochtaunuskreis" "Hochtaunus" "Kreisfreie Stadt Frankfurt am Main"
+                "Landkreis Limburg-Weilburg" "Landkreis Groß-Gerau" "Landkreis Gross-Gerau"
+                "Landkreis Bergstraße" "Landkreis Bergstrasse" "Kreisfreie Stadt Darmstadt"
+                "Landkreis Darmstadt-Dieburg" "Odenwaldkreis"
+              )
+              ;;
+            suedost)
+              districts=(
+                "Kreisfreie Stadt Offenbach am Main" "Landkreis Offenbach" "Kreisfreie Stadt Hanau"
+                "Main-Kinzig-Kreis" "Wetteraukreis" "Vogelsbergkreis" "Landkreis Fulda"
+                "Landkreis Gießen" "Lahn-Dill-Kreis" "Landkreis Marburg-Biedenkopf"
+              )
+              ;;
+            *) echo "no such region: $Region" >&2; exit 1 ;;
+          esac
+          args=()
+          for d in "${districts[@]}"; do args+=(--district "$d"); done
+          python3 -I tools/fetch-geodata.py "${args[@]}"
+          du -sh data/work/dgm2 data/work/lod2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: geodata-${{ matrix.id }}
+          path: |
+            data/work/dgm2
+            data/work/lod2
+          retention-days: 1
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, the build, and the release
+  build:
+    needs: [regions, geodata]
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.regions.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten der Region (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-${{ matrix.id }}
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, Hessen)
+        run: |
+          mkdir -p data/raw/osm
+          curl -fsSL --retry 5 --retry-delay 20 -o data/raw/osm/hessen-latest.osm.pbf \
+            https://download.geofabrik.de/europe/germany/hessen-latest.osm.pbf
+          ls -l data/raw/osm
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines
+          npm run map:buslines
+          npm run map:signs
+          npm run map:far
+          npm run map:timetable
+          npm run map:services
+      - name: Der Name der Karte (map.json)
+        env:
+          NAME: ${{ matrix.label }}
+        run: node -e 'const fs=require("fs"),p="public/map/map.json";const j=JSON.parse(fs.readFileSync(p,"utf8"));j.meta.name=process.env.NAME;fs.writeFileSync(p,JSON.stringify(j));console.log(j.meta.name,"-",j.nodes,"Knoten,",j.edges,"Kanten")'
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          REGION: ${{ matrix.id }}
+          LABEL: ${{ matrix.label }}
+        run: |
+          tag="${WANTED:-karte-$REGION-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL für den Fahrsimulator – im Spiel unter Einstellungen → Karte laden (Kartenpaket).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (ODbL 1.0) sowie Gelände- und Gebäudedaten der Hessischen
+          Verwaltung für Bodenmanagement und Geoinformation; die Quellen und Lizenzen stehen in docs/MAP_DATA.md.
+          Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel zusammengesetzt.
+
+          Nur ein Teil von Hessen: ganz Hessen passt nicht in den Speicher, und zwei Kartenpakete lassen sich
+          im Spiel nicht zusammenführen (es ist immer eines aktiv).
+          EOF
+          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+            --notes-file notes.md data/work/map.tar.*
+          echo "release $tag"
