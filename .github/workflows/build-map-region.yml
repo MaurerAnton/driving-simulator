@@ -90,13 +90,23 @@ jobs:
       # holt nur, was fehlt (die .done-Marken unter data/work/dgm2 und data/work/lod2).
       - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
         if: ${{ inputs.geodata_run != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: geodata-${{ matrix.id }}
-          run-id: ${{ inputs.geodata_run }}
-          # The upload of two paths keeps only what the two have not in common: inside the
-          # artefact the tiles are dgm2/… and lod2/… – so they belong in data/work again.
-          path: data/work
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+          REGION: ${{ matrix.id }}
+        run: |
+          set -euo pipefail
+          name="geodata-$REGION"
+          echo "Artefakte von Lauf $RUN:"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.total_count, .artifacts[].id'
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          ls -l /tmp/$name.zip
+          # Im Artefakt liegen die Kacheln als dgm2/… und lod2/… (beim Hochladen zweier
+          # Pfade bleibt nur deren gemeinsamer Vorfahr weg, data/work) – also nach data/work.
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2 data/work/lod2
       # The two products spell some districts differently (Hochtaunus / Hochtaunuskreis,
       # Bergstrasse / Bergstraße); both spellings are in the list, and for the one a product
       # does not know the script prints "no district …" and goes on.
