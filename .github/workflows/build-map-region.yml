@@ -42,6 +42,8 @@ on:
         description: Dieselben für die Buslinien
         type: string
         default: '^KVG M$|^NVV\b(?!.*\bAST\b)|Nordhessischer|RMV'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
 
 permissions:
   contents: write
@@ -83,6 +85,14 @@ jobs:
         with:
           python-version: '3.13'
       - run: pip install --quiet numpy pillow
+      # Was ein früherer Lauf schon geholt hat: das Skript lässt liegen, was da ist, und
+      # holt nur, was fehlt (die .done-Marken unter data/work/dgm2 und data/work/lod2).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-${{ matrix.id }}
+          run-id: ${{ inputs.geodata_run }}
       # The two products spell some districts differently (Hochtaunus / Hochtaunuskreis,
       # Bergstrasse / Bergstraße); both spellings are in the list, and for the one a product
       # does not know the script prints "no district …" and goes on.
@@ -112,15 +122,37 @@ jobs:
           esac
           args=()
           for d in "${districts[@]}"; do args+=(--district "$d"); done
-          python3 -I tools/fetch-geodata.py "${args[@]}"
+          # gds.hessen.de weist die Verbindung mitten im Holen ab (beim ersten Lauf nach
+          # 9 min im Südosten, nach 68 min im Südwesten; von hier aus ging sie immer).
+          # Das Skript versucht es fünfmal in 75 s – zu kurz.  Was da ist, wird übersprungen,
+          # ein neuer Versuch kostet also nur das Warten; danach wächst die Pause.
+          attempt=1
+          waits=(60 300 900 1800 1800)
+          while :; do
+            if python3 -I tools/fetch-geodata.py "${args[@]}"; then
+              break
+            fi
+            if [ "$attempt" -gt "${#waits[@]}" ]; then
+              echo "alle Versuche sind von gds.hessen.de abgewiesen worden" >&2
+              exit 1
+            fi
+            echo "Versuch $attempt gescheitert – Stand: $(du -sh data/work/dgm2 | cut -f1) Gelände, $(du -sh data/work/lod2 | cut -f1) Gebäude"
+            echo "warte $((waits[attempt - 1] / 60)) min"
+            sleep "${waits[attempt - 1]}"
+            attempt=$((attempt + 1))
+          done
           du -sh data/work/dgm2 data/work/lod2
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste
+      # Lauf kann mit geodata_run hier weiterfahren (.done-Marken müssen mit hoch)
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: geodata-${{ matrix.id }}
           path: |
             data/work/dgm2
             data/work/lod2
-          retention-days: 1
+          include-hidden-files: true
+          retention-days: 7
           if-no-files-found: error
 
   # 2-5: OpenStreetMap, the build, and the release
