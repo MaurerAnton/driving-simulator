@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Sakrij prikaz (F2)",
   "view.hudShow": "Vrati prikaz (F2)",
   "ctl.f2": "Sakrij ili prikaži cijeli prikaz – za čist pogled; blijedi gumb gore vraća ga.",
+  "ctl.f3": "Okreni vozilo – u traku suprotnog smjera ako je ima, inače na mjestu.",
   "settingsReset": "Vrati zadane postavke",
   "settingsResetAsk": "Vratiti sve postavke na zadane vrijednosti? Jezik, tvoje tipke i učitana karta ostaju kakvi jesu.",
   "noMercyAsk": "„Bez milosti“ prikazuje vrijeme kakvo jest: kiša i snijeg na vjetrobranu, voda na cestama, blato na karoseriji, pravo godišnje doba. Treba mu snažan uređaj, a po lošem vremenu vidjet ćeš mnogo manje. Uključiti?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Brzina kamere: {v} km/h",
   "teleportTap": "Dodir (ili klik) na mjesto na slici na nekoliko sekundi nudi „Teleportiraj ovamo“",
   "teleportHere": "Teleportiraj ovamo",
+  "tapDrive": "Vozi onamo",
   "teleportNoRoad": "Blizu tog mjesta nema ceste na koju bi se postavilo vozilo",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: let kamo gledaš · [[KeyE]] [[KeyQ]]: gore i dolje · Shift: brže · kotačić: brzina leta · drži tipku miša i pomiči miš za razgledavanje · desna tipka miša: iznad tla · dvostruki klik: natrag iza vozila, koje čeka zakočeno · [[KeyV]]: sljedeći prikaz",
   "freeCamTouch": "Palica lijevo leti · ▲ ▼: gore i dolje · jedan prst razgledava · dva prsta gore ili dolje: više ili niže · štipanje: brzina leta · vozilo čeka zakočeno",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Povuci za razgledavanje · kotačić ili dva prsta: bliže i dalje · oznake su napomene instruktora – dodirni oznaku da vidiš taj trenutak",
   "tbLookBack": "Pogled unatrag (drži)",
   "tbReset": "Natrag na cestu",
+  "turnAround": "Okreni se",
   "tbMenu": "Pauza · izbornik",
 
   // Key reminder at the bottom of the screen (one or two words each)

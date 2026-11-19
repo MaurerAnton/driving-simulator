@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Esconder a interface (F2)",
   "view.hudShow": "Mostrar a interface (F2)",
   "ctl.f2": "Esconder ou mostrar toda a interface – para uma vista limpa; o botão ténue em cima trá-la de volta.",
+  "ctl.f3": "Virar o veículo – para a faixa do sentido contrário se houver, senão no local.",
   "settingsReset": "Repor definições",
   "settingsResetAsk": "Repor todas as definições nos valores predefinidos? O idioma, as suas teclas e o mapa carregado ficam como estão.",
   "noMercyAsk": "«Sem piedade» mostra a meteorologia tal como é: chuva e neve no para-brisas, água parada nas estradas, lama na carroçaria, a estação real do ano. Precisa de um dispositivo potente, e com mau tempo verá muito menos. Ativar?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Velocidade da câmara: {v} km/h",
   "teleportTap": "Um toque (ou clique) num sítio da imagem oferece «Teletransportar para aqui» durante alguns segundos",
   "teleportHere": "Teletransportar para aqui",
+  "tapDrive": "Ir de carro",
   "teleportNoRoad": "Não há estrada perto desse sítio onde pôr o veículo",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: voar para onde olha · [[KeyE]] [[KeyQ]]: para cima e para baixo · Shift: mais depressa · roda: velocidade de voo · mantenha o botão do rato premido e mova o rato para olhar em volta · botão direito do rato: por cima do chão · duplo clique: de volta para trás do veículo, que espera travado · [[KeyV]]: vista seguinte",
   "freeCamTouch": "O joystick à esquerda voa · ▲ ▼: para cima e para baixo · um dedo olha em volta · dois dedos para cima ou para baixo: mais alto ou mais baixo · pinçar: velocidade de voo · o veículo espera, travado",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Arraste para olhar em volta · roda ou dois dedos: aproximar e afastar · as marcas são as notas do instrutor – toque numa para a ver",
   "tbLookBack": "Olhar para trás (manter)",
   "tbReset": "Voltar à estrada",
+  "turnAround": "Dar a volta",
   "tbMenu": "Pausa · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Masquer l’affichage (F2)",
   "view.hudShow": "Rétablir l’affichage (F2)",
   "ctl.f2": "Masquer ou afficher tout l’affichage – pour une vue dégagée ; le bouton discret en haut le fait revenir.",
+  "ctl.f3": "Faire demi-tour avec le véhicule – dans la voie de l’autre sens s’il y en a une, sinon sur place.",
   "settingsReset": "Rétablir les réglages",
   "settingsResetAsk": "Remettre tous les réglages à leurs valeurs par défaut ? La langue, vos touches et la carte chargée restent telles quelles.",
   "noMercyAsk": "« Sans pitié » montre la météo telle qu’elle est : pluie et neige sur le pare-brise, eau stagnante sur les routes, boue sur la carrosserie, la vraie saison. Il faut un appareil puissant, et par mauvais temps vous verrez beaucoup moins. L’activer ?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Vitesse de la caméra : {v} km/h",
   "teleportTap": "Une touche (ou un clic) sur un endroit de l’image propose « Se téléporter ici » pendant quelques secondes",
   "teleportHere": "Se téléporter ici",
+  "tapDrive": "Y aller en voiture",
   "teleportNoRoad": "Pas de route près de cet endroit où poser le véhicule",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]] : voler dans la direction du regard · [[KeyE]] [[KeyQ]] : monter et descendre · Maj : plus vite · molette : vitesse de vol · maintenez le bouton de la souris et bougez la souris pour regarder autour · bouton droit : au-dessus du sol · double clic : retour derrière le véhicule, qui attend freiné · [[KeyV]] : vue suivante",
   "freeCamTouch": "Le stick à gauche fait voler · ▲ ▼ : monter et descendre · un doigt pour regarder autour · deux doigts vers le haut ou le bas : plus haut ou plus bas · pincer : vitesse de vol · le véhicule attend, freiné",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Faites glisser pour regarder autour · molette ou deux doigts : plus près et plus loin · les marques sont les remarques du moniteur – touchez-en une pour la lire",
   "tbLookBack": "Regard arrière (maintenir)",
   "tbReset": "Retour sur la route",
+  "turnAround": "Faire demi-tour",
   "tbMenu": "Pause · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

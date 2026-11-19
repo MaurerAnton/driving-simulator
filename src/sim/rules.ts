@@ -80,6 +80,25 @@ export interface RuleContext {
 
 const SEVERITY_POINTS: Record<Severity, number> = { hint: 0, minor: 1, major: 3, fail: 10 };
 
+/**
+ * Where the road surface under the car cannot be found – a gap between the pieces of the
+ * map, the wide shoulder, a junction area without an edge – the nearest road within this
+ * many metres of its carriageway takes its place (world.locate).
+ */
+export const FALLBACK_MAX_DIST = 2.2;
+/**
+ * How far up or down that fallback may still match a road (m).  The map has some two
+ * hundred bridges with little headroom: the 50 km/h of a town road over the motorway
+ * must not become the limit of the motorway under it (tools/dev/limit-sweep.ts walks
+ * every motorway and slip road of the map to keep this true).
+ */
+export const FALLBACK_MAX_DY = 1.5;
+
+/** How far from where it stood solidly the last road keeps its limit (m). */
+const HOLD_DIST = 40;
+/** … and how far above or below (m). */
+const HOLD_DY = 1.5;
+
 export class RuleMonitor {
   readonly world: World;
   readonly graph: LaneGraph;
@@ -164,6 +183,15 @@ export class RuleMonitor {
   /** an oncoming car braked hard for us at this junction (judged once it is known which way we went) */
   private oncoming: { node: Node; time: number } | null = null;
   private lastEdge: Edge | null = null;
+  /**
+   * The road the car stood solidly on last, and the limit it set there: a weak
+   * match – a gap between the pieces of the map, a junction area, the nearest-road
+   * fallback – must not change the limit, or the 50 km/h of a town road on a bridge
+   * over the motorway (or of a road under it) becomes the limit of the motorway.
+   * Only a solid hit of a road changes it; the hold lasts while the car is still
+   * near that place and at its height (tools/dev/limit-sweep.ts).
+   */
+  private hold: { edge: Edge; s: number; dir: number; x: number; y: number; z: number; limit: number; when: string } | null = null;
   private readonly crossingState = new Map<object, number>();
 
   constructor(world: World, graph: LaneGraph, signals: SignalSystem, traffic: Traffic) {
@@ -181,6 +209,7 @@ export class RuleMonitor {
     this.redLine = null;
     this.oncoming = null;
     this.lastEdge = null;
+    this.hold = null;
     this.time = 0;
     this.speedOver = this.wrongSide = this.wrongWayT = this.sidewalkT = this.offRoadT = this.tailgateT = 0;
   }
@@ -196,7 +225,20 @@ export class RuleMonitor {
     this.redLine = null;
     this.oncoming = null;
     this.lastEdge = null;
+    this.hold = null;
     this.stoppedNearLine = false;
+  }
+
+  /**
+   * The limit of the road the car stood solidly on last, while it is still within
+   * `HOLD_DIST` metres and `HOLD_DY` metres in height of that place – null where the
+   * hold says nothing (nothing solid stood under the car yet, or it has moved away).
+   */
+  private holdNow(p: PlayerSnapshot): { edge: Edge; s: number; dir: number; limit: number; when: string } | null {
+    const h = this.hold;
+    if (!h) return null;
+    if (Math.hypot(p.x - h.x, p.z - h.z) > HOLD_DIST || Math.abs(p.y - h.y) > HOLD_DY) return null;
+    return h;
   }
 
   /** The lane the monitor has the car on (kept while it crosses a junction), or null off the road. */
@@ -294,12 +336,15 @@ export class RuleMonitor {
     const hit = this.hit;
     ctx.onRoad = onSurface && hit.zone === 0;
     ctx.wrongWay = false;
+    // a solid hit: the point stands on this road's carriageway – only such a hit may
+    // change the limit (the fallback below and a junction area may not)
+    const solid = onSurface && hit.zone === 0 && hit.edge !== null;
     let edge: Edge | null = onSurface ? hit.edge : null;
     // A wheel over the edge line or a clipped corner must not make us lose
     // track of the road we are on: fall back to the nearest carriageway.
     let near = false;
     if (!onSurface || (hit.zone !== 0 && !hit.edge)) {
-      if (world.locate(p.x, p.z, p.y, 2.2, this.frontHit) && this.frontHit.edge) {
+      if (world.locate(p.x, p.z, p.y, FALLBACK_MAX_DIST, this.frontHit, FALLBACK_MAX_DY) && this.frontHit.edge) {
         near = true;
         edge = this.frontHit.edge;
         hit.edge = edge;
@@ -324,17 +369,25 @@ export class RuleMonitor {
     }
 
     if (edge && (hit.zone === 0 || near)) {
+      // A weak match (a gap, a junction area, the nearest-road fallback) does not
+      // change what we know about the road: the last road the car stood solidly on
+      // keeps its limit – and its class for the caps – while the car is still near
+      // that place.  Only a solid hit of a road takes its limit over at once.
+      const held = solid ? null : this.holdNow(p);
+      const src = held ? held.edge : edge;
+      const srcS = held ? held.s : hit.s;
+      const srcDir = held ? held.dir : dir;
       // a sign with a time on it ("22–6 h") counts only then, in place of the road's own limit (world/extrasigns.ts)
-      const timed = this.timed?.limit(edge.id, dir, this.heavy) ?? null;
-      const limit = timed ? timed.v : dir > 0 ? edge.maxF : edge.maxB;
+      const timed = this.timed?.limit(src.id, srcDir, this.heavy) ?? null;
+      const limit = timed ? timed.v : srcDir > 0 ? src.maxF : src.maxB;
       // car parks, driveways and tracks have no signed limit: nothing to show
-      const unsigned = edge.cls >= CLS.SERVICE && edge.zone === 0 && !timed;
-      ctx.limit = edge.zone === 7 ? 7 : unsigned ? -1 : limit;
-      if (timed && edge.zone !== 7) ctx.limitWhen = timed.when;
+      const unsigned = src.cls >= CLS.SERVICE && src.zone === 0 && !timed;
+      ctx.limit = src.zone === 7 ? 7 : unsigned ? -1 : limit;
+      if (timed && src.zone !== 7) ctx.limitWhen = timed.when;
       // what the signs allow, but never more than this vehicle may drive there
       let capped = false;
-      if (this.caps && edge.zone !== 7 && !unsigned) {
-        const cap = edge.cls <= CLS.MOTORWAY_LINK ? this.caps.motorway : (edge.flags & EF.URBAN) !== 0 ? 0 : this.caps.rural;
+      if (this.caps && src.zone !== 7 && !unsigned) {
+        const cap = src.cls <= CLS.MOTORWAY_LINK ? this.caps.motorway : (src.flags & EF.URBAN) !== 0 ? 0 : this.caps.rural;
         if (cap > 0 && (ctx.limit === 0 || ctx.limit > cap)) {
           ctx.limit = cap;
           capped = true;
@@ -342,8 +395,8 @@ export class RuleMonitor {
       }
       // roadworks of the day (src/sim/roadevents.ts): their own limit, from its sign to the end of the zone
       const works = this.traffic.roadEvents;
-      if (works && !unsigned && edge.zone !== 7) {
-        const zl = works.limitAt(edge, hit.s, dir, ctx.limit);
+      if (works && !unsigned && src.zone !== 7) {
+        const zl = works.limitAt(src, srcS, srcDir, ctx.limit);
         if (zl !== ctx.limit) {
           ctx.limit = zl;
           capped = false;
@@ -351,9 +404,9 @@ export class RuleMonitor {
       }
       // a tractor on the motorway (or its slip road): not allowed at all
       if (this.noMotorway && edge.cls <= CLS.MOTORWAY_LINK && hit.zone === 0) this.report('motorwayBan', 'major', p, {}, 120);
-      ctx.zone = edge.zone;
-      ctx.urban = (edge.flags & EF.URBAN) !== 0;
-      ctx.roadName = edge.name || edge.ref;
+      ctx.zone = src.zone;
+      ctx.urban = (src.flags & EF.URBAN) !== 0;
+      ctx.roadName = src.name || src.ref;
       const lane = this.laneFor(edge, hit.s, hit.off, dir);
       const oneWayAgainst = (dir > 0 ? edge.lanesF : edge.lanesB) === 0;
 
@@ -387,13 +440,16 @@ export class RuleMonitor {
           this.speedOver += dt;
           if (this.speedOver > 1.6) {
             const sev: Severity = over > 25 ? 'fail' : over > 14 ? 'major' : 'minor';
-            this.report(edge.zone === 7 ? 'speedWalk' : capped ? this.capFault : 'speed', sev, p, { limit: lim, speed: Math.round(kmh) }, sev === 'minor' ? 18 : 10);
+            this.report(src.zone === 7 ? 'speedWalk' : capped ? this.capFault : 'speed', sev, p, { limit: lim, speed: Math.round(kmh) }, sev === 'minor' ? 18 : 10);
           }
         } else this.speedOver = Math.max(0, this.speedOver - dt * 2);
       }
 
       // (the time shows only while the limit of the timed sign is the one that holds)
       if (timed && ctx.limit !== timed.v) ctx.limitWhen = '';
+      // the limit is settled now: the road the car stands solidly on keeps it for the
+      // weak matches that follow (a gap, a junction area, the fallback)
+      if (solid) this.hold = { edge: src, s: srcS, dir: srcDir, x: p.x, y: p.y, z: p.z, limit: ctx.limit, when: ctx.limitWhen };
 
       // --- restricted roads ---
       if (edge !== this.lastEdge) {
@@ -418,7 +474,12 @@ export class RuleMonitor {
       // level crossings: the lights, the barriers, a train; not on the tracks, no overtaking before them (src/sim/levelcrossing.ts)
       this.traffic.levelCrossings?.judge(this, p, edge, hit.s, dir, dt);
     } else {
-      ctx.limit = -1;
+      // nothing solid under the car: the last road we stood on keeps its limit while
+      // we are still near it (a junction area, a gap, the pavement) – otherwise there
+      // is no limit to show
+      const held = this.holdNow(p);
+      ctx.limit = held ? held.limit : -1;
+      if (held) ctx.limitWhen = held.when;
       this.wrongWayT = 0;
       this.wrongSide = 0;
       // inside a junction area we keep the lane we came from; far from any road we forget it

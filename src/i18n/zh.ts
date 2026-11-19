@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "隐藏显示界面 (F2)",
   "view.hudShow": "恢复显示界面 (F2)",
   "ctl.f2": "隐藏或显示整个显示界面——获得干净的视野；顶部那个淡淡的按钮可以让它重新出现。",
+  "ctl.f3": "把车辆掉头——有反向车道就进那条车道，否则在原地掉头。",
   "settingsReset": "重置设置",
   "settingsResetAsk": "将所有设置恢复为默认值吗？语言、你的按键和已加载的地图保持不变。",
   "noMercyAsk": "“毫不留情”会如实呈现天气：挡风玻璃上的雨和雪、路面上的积水、车身上的泥巴、真实的季节。它需要性能强劲的设备，而且在恶劣天气下你能看到的会少得多。要开启吗？",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "视角速度：{v} km/h",
   "teleportTap": "在画面中的某个地方点按（或点击）一下，几秒钟内会出现“传送到这里”",
   "teleportHere": "传送到这里",
+  "tapDrive": "开车过去",
   "teleportNoRoad": "那个地方附近没有可以放置车辆的道路",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]：朝视线方向飞行 · [[KeyE]] [[KeyQ]]：上升和下降 · Shift：更快 · 滚轮：飞行速度 · 按住鼠标键并移动鼠标环顾四周 · 鼠标右键：贴地移动 · 双击：回到车辆后方，车辆会刹住等待 · [[KeyV]]：下一个视角",
   "freeCamTouch": "左侧摇杆飞行 · ▲ ▼：上升和下降 · 单指环顾四周 · 双指上下移动：升高或降低 · 捏合：飞行速度 · 车辆刹住等待",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "拖动：环顾四周 · 滚轮或双指：拉近或拉远 · 标记是教练的点评——点一下即可跳到该处",
   "tbLookBack": "向后看（按住）",
   "tbReset": "放回路上",
+  "turnAround": "掉头",
   "tbMenu": "暂停 · 菜单",
 
   // Key reminder at the bottom of the screen (one or two words each)

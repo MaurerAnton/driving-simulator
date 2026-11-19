@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Ocultar la interfaz (F2)",
   "view.hudShow": "Mostrar la interfaz (F2)",
   "ctl.f2": "Ocultar o mostrar toda la interfaz – para una vista despejada; el botón tenue de arriba la hace volver.",
+  "ctl.f3": "Gira el vehículo – al carril del sentido contrario si lo hay, si no, en el sitio.",
   "settingsReset": "Restablecer ajustes",
   "settingsResetAsk": "¿Devolver todos los ajustes a sus valores predeterminados? El idioma, tus teclas y el mapa cargado se quedan como están.",
   "noMercyAsk": "«Sin piedad» muestra el tiempo tal como es: lluvia y nieve en el parabrisas, agua estancada en las carreteras, barro en la carrocería, la estación real. Necesita un dispositivo potente, y con mal tiempo verás mucho menos. ¿Activarlo?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Velocidad de la cámara: {v} km/h",
   "teleportTap": "Un toque (o clic) en un sitio de la imagen ofrece «Teletransportarse aquí» durante unos segundos",
   "teleportHere": "Teletransportarse aquí",
+  "tapDrive": "Ir en coche",
   "teleportNoRoad": "No hay ninguna carretera cerca de ese sitio donde poner el vehículo",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: volar hacia donde miras · [[KeyE]] [[KeyQ]]: arriba y abajo · Mayús: más rápido · rueda: velocidad de vuelo · mantén pulsado el botón del ratón y mueve el ratón para mirar alrededor · botón derecho: sobre el suelo · doble clic: de vuelta detrás del vehículo, que espera frenado · [[KeyV]]: siguiente vista",
   "freeCamTouch": "El joystick de la izquierda vuela · ▲ ▼: arriba y abajo · un dedo mira alrededor · dos dedos arriba o abajo: más alto o más bajo · pellizcar: velocidad de vuelo · el vehículo espera, frenado",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Arrastra para mirar alrededor · rueda o dos dedos: más cerca y más lejos · las marcas son las notas del profesor – toca una para verla",
   "tbLookBack": "Mirar atrás (mantener)",
   "tbReset": "Volver a la calzada",
+  "turnAround": "Dar la vuelta",
   "tbMenu": "Pausa · menú",
 
   // Key reminder at the bottom of the screen (one or two words each)

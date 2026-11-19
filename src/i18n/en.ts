@@ -690,6 +690,7 @@ const dict: Dict = {
   "view.hudHide": "Hide the display (F2)",
   "view.hudShow": "Show the display (F2)",
   "ctl.f2": "Hide or show the whole display \u2013 for a clean view; the faint button at the top brings it back.",
+  "ctl.f3": "Turn the vehicle round – into the lane of the other direction where there is one, otherwise on the spot.",
   "settingsReset": "Reset settings",
   "settingsResetAsk": "Put all settings back to their defaults? The language, your keys and the map you loaded stay as they are.",
   "noMercyAsk": "“No mercy” shows the weather as it is: rain and snow on the windscreen, water standing on the roads, mud on the body, the real season. It needs a strong device, and in bad weather you will see much less. Turn it on?",
@@ -1053,6 +1054,7 @@ const dict: Dict = {
   "fly.speed": "Camera speed: {v} km/h",
   "teleportTap": "A tap (or click) on a place in the picture offers “Teleport here” for a few seconds",
   "teleportHere": "Teleport here",
+  "tapDrive": "Drive there",
   "teleportNoRoad": "No road near that place to put the vehicle on",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: fly the way you look · [[KeyE]] [[KeyQ]]: up and down · Shift: faster · wheel: flying speed · hold the mouse button and move the mouse to look around · right mouse button: over the ground · double click: back behind the vehicle, which waits braked · [[KeyV]]: next view",
   "freeCamTouch": "The stick on the left flies · ▲ ▼: up and down · one finger looks around · two fingers up or down: higher or lower · pinch: flying speed · the vehicle waits, braked",
@@ -1576,6 +1578,7 @@ const dict: Dict = {
   "replayHelp": "Drag to look round · wheel or two fingers: closer and further · the marks are the instructor's notes – tap one to see it",
   "tbLookBack": "Look back (hold)",
   "tbReset": "Back on the road",
+  "turnAround": "Turn around",
   "tbMenu": "Pause · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

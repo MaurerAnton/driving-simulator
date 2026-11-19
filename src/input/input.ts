@@ -43,7 +43,7 @@ const FLY_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Arrow
 
 /** mirror: look into the next mirror, large over the picture (ui/mirrorzoom.ts) */
 /** service: fill up at a pump, wash at a car wash, call for help with an empty tank, skip the loading of a truck (game/serviceworld.ts) */
-export type Action = 'view' | 'pause' | 'reset' | 'map' | 'help' | 'reality' | 'door' | 'panto' | 'mirror' | 'service' | 'wiper' | 'open' | 'hud';
+export type Action = 'view' | 'pause' | 'reset' | 'turn' | 'map' | 'help' | 'reality' | 'door' | 'panto' | 'mirror' | 'service' | 'wiper' | 'open' | 'hud';
 
 const TAU = Math.PI * 2;
 /** O held longer than this (ms) is the flasher, not a switch of the main beam */
@@ -510,6 +510,11 @@ export class Input {
       if (code === 'F2') {
         e.preventDefault();
         this.fire('hud');
+      }
+      // F3: turn the vehicle round (game.ts turnAround – into the lane of the other direction)
+      if (code === 'F3') {
+        e.preventDefault();
+        this.fire('turn');
       }
       // "Foto": what does this place really look like? (also from the pause menu)
       if (code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) this.fire('reality');

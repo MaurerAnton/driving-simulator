@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Fshih ekranin e informacionit (F2)",
   "view.hudShow": "Shfaq ekranin e informacionit (F2)",
   "ctl.f2": "Fshih ose shfaq gjithë ekranin e informacionit – për një pamje të pastër; butoni i zbehtë lart e kthen përsëri.",
+  "ctl.f3": "Kthe mjetin – në korsinë e kundërt nëse ka, përndryshe në vend.",
   "settingsReset": "Rivendos cilësimet",
   "settingsResetAsk": "T'i kthehen të gjitha cilësimet në parazgjedhje? Gjuha, tastet e tua dhe harta që ngarkove mbeten siç janë.",
   "noMercyAsk": "„Pa mëshirë“ e tregon motin ashtu siç është: shi dhe borë në xhamin e përparmë, ujë i ndenjur në rrugë, baltë në karroceri, stina e vërtetë. Kërkon një pajisje të fuqishme, dhe në mot të keq do të shohësh shumë më pak. Ta aktivizoj?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Shpejtësia e kamerës: {v} km/h",
   "teleportTap": "Një prekje (ose klikim) mbi një vend në pamje ofron për disa sekonda „Teleporto këtu“",
   "teleportHere": "Teleporto këtu",
+  "tapDrive": "Shko me makinë",
   "teleportNoRoad": "Asnjë rrugë pranë atij vendi ku të vendoset automjeti",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: fluturo nga shikon · [[KeyE]] [[KeyQ]]: lart e poshtë · Shift: më shpejt · rrotëza: shpejtësia e fluturimit · mbaj butonin e miut dhe lëviz miun për të parë përreth · butoni i djathtë i miut: mbi tokë · klikim i dyfishtë: prapa pas automjetit, që pret i frenuar · [[KeyV]]: pamja tjetër",
   "freeCamTouch": "Leva majtas fluturon · ▲ ▼: lart e poshtë · një gisht shikon përreth · dy gishta lart ose poshtë: më lart ose më poshtë · shtrëngim me dy gishta: shpejtësia e fluturimit · automjeti pret i frenuar",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Tërhiq për të parë përreth · rrota ose dy gishta: më afër dhe më larg · shenjat janë shënimet e instruktorit – prek njërën për ta parë",
   "tbLookBack": "Shiko mbrapa (mbaje)",
   "tbReset": "Kthehu në rrugë",
+  "turnAround": "Kthehu",
   "tbMenu": "Pauzë · menyja",
 
   // Key reminder at the bottom of the screen (one or two words each)

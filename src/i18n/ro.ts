@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Ascunde afișajul (F2)",
   "view.hudShow": "Arată afișajul (F2)",
   "ctl.f2": "Ascunde sau arată întregul afișaj – pentru o vedere curată; butonul estompat de sus îl aduce înapoi.",
+  "ctl.f3": "Întoarce vehiculul – pe banda sensului opus, dacă există, altfel pe loc.",
   "settingsReset": "Resetează setările",
   "settingsResetAsk": "Readuci toate setările la valorile implicite? Limba, tastele tale și harta încărcată rămân așa cum sunt.",
   "noMercyAsk": "„Fără milă” arată vremea așa cum este: ploaie și zăpadă pe parbriz, apă băltită pe drumuri, noroi pe caroserie, anotimpul real. Are nevoie de un dispozitiv puternic, iar pe vreme rea vei vedea mult mai puțin. Activezi?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Viteza camerei: {v} km/h",
   "teleportTap": "O atingere (sau un clic) pe un loc din imagine oferă câteva secunde „Teleportează-mă aici”",
   "teleportHere": "Teleportează-mă aici",
+  "tapDrive": "Mergi cu mașina",
   "teleportNoRoad": "Niciun drum în apropierea acelui loc pe care să fie pus vehiculul",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: zbori în direcția în care privești · [[KeyE]] [[KeyQ]]: sus și jos · Shift: mai repede · rotița: viteza de zbor · ține butonul mouse-ului și mișcă mouse-ul ca să privești în jur · butonul drept: deasupra solului · dublu clic: înapoi în spatele vehiculului, care așteaptă frânat · [[KeyV]]: vederea următoare",
   "freeCamTouch": "Joystickul din stânga zboară · ▲ ▼: sus și jos · un deget privește în jur · două degete în sus sau în jos: mai sus sau mai jos · ciupit: viteza de zbor · vehiculul așteaptă frânat",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Trage ca să te uiți în jur · rotița sau două degete: mai aproape și mai departe · marcajele sunt observațiile instructorului – atinge un marcaj ca să vezi observația",
   "tbLookBack": "Privire înapoi (ține)",
   "tbReset": "Înapoi pe drum",
+  "turnAround": "Întoarce-te",
   "tbMenu": "Pauză · meniu",
 
   // Key reminder at the bottom of the screen (one or two words each)

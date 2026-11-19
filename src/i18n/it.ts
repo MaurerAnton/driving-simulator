@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Nascondi il display (F2)",
   "view.hudShow": "Mostra il display (F2)",
   "ctl.f2": "Nascondi o mostra tutto il display – per una visuale pulita; il pulsante tenue in alto lo fa tornare.",
+  "ctl.f3": "Far fare inversione al veicolo – nella corsia del senso opposto se c’è, altrimenti sul posto.",
   "settingsReset": "Ripristina impostazioni",
   "settingsResetAsk": "Riportare tutte le impostazioni ai valori predefiniti? La lingua, i tuoi tasti e la mappa caricata restano come sono.",
   "noMercyAsk": "«Senza pietà» mostra il tempo com'è: pioggia e neve sul parabrezza, acqua ferma sulle strade, fango sulla carrozzeria, la stagione reale. Serve un dispositivo potente, e con il brutto tempo vedrai molto meno. Attivarlo?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Velocità della visuale: {v} km/h",
   "teleportTap": "Un tocco (o clic) su un punto dell'immagine offre «Teletrasportati qui» per qualche secondo",
   "teleportHere": "Teletrasportati qui",
+  "tapDrive": "Guida fin lì",
   "teleportNoRoad": "Nessuna strada vicino a quel punto su cui mettere il veicolo",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: vola dove guardi · [[KeyE]] [[KeyQ]]: su e giù · Maiusc: più veloce · rotellina: velocità di volo · tieni premuto il tasto del mouse e muovi il mouse per guardarti intorno · tasto destro: sopra il terreno · doppio clic: di nuovo dietro il veicolo, che aspetta frenato · [[KeyV]]: visuale successiva",
   "freeCamTouch": "Lo stick a sinistra fa volare · ▲ ▼: su e giù · un dito per guardarti intorno · due dita su o giù: più in alto o più in basso · pizzica: velocità di volo · il veicolo aspetta, frenato",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Trascina per guardarti intorno · rotellina o due dita: più vicino e più lontano · i segni sono le note dell'istruttore – toccane uno per leggerla",
   "tbLookBack": "Guarda indietro (tieni premuto)",
   "tbReset": "Di nuovo sulla strada",
+  "turnAround": "Fare inversione",
   "tbMenu": "Pausa · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

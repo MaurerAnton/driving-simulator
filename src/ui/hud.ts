@@ -1182,6 +1182,7 @@ export class Hud {
           [k('Escape'), 'ctl.pause'],
           [k('F1'), 'ctl.help'],
           [k('F2'), 'ctl.f2'],
+          [k('F3'), 'ctl.f3'],
         ],
       ],
       [
@@ -2329,6 +2330,9 @@ export class Hud {
     item(this.t('tbReset'), 'KeyT');
     // (in the aeroplane the same key is its autopilot: the button says so while flying)
     more.lastElementChild?.classList.add('road-only');
+    // turn the vehicle round – into the lane of the other direction (F3, game.ts turnAround)
+    item(this.t('turnAround'), 'F3');
+    more.lastElementChild?.classList.add('road-only');
     item(this.t('tbAutopilot'), 'KeyT');
     more.lastElementChild?.classList.add('fly-only');
     // full screen and hiding the display (ui/viewbuttons.ts): on a touch screen here, not over the ⋯ button
@@ -2412,7 +2416,7 @@ export class Hud {
       if (tr === 'manual') out.push(item('kr.clutch', ...k('ShiftLeft')));
       out.push(item('kr.gear', ...k('Digit1'), '–', ...k('Digit6')), item('kr.reverse', ...k('KeyR')), item('kr.neutral', ...k('KeyN')), item('kr.upDown', ...k('KeyE', 'KeyQ')));
     }
-    out.push(item('kr.handbrake', ...k('Space')), item('kr.startEngine', ...k('Enter')), item('kr.indicators', ...k('KeyZ', 'KeyC')), item('kr.shoulder', ...k('KeyJ', 'KeyK')), item('kr.mirror', ...k('KeyY')), item('kr.camera', ...k('KeyV')), item('kr.map', ...k('KeyM')), item('kr.allKeys', ...k('F1')));
+    out.push(item('kr.handbrake', ...k('Space')), item('kr.startEngine', ...k('Enter')), item('kr.indicators', ...k('KeyZ', 'KeyC')), item('kr.shoulder', ...k('KeyJ', 'KeyK')), item('kr.mirror', ...k('KeyY')), item('kr.camera', ...k('KeyV')), item('kr.map', ...k('KeyM')), item('turnAround', ...k('F3')), item('kr.allKeys', ...k('F1')));
     return out;
   }
 }

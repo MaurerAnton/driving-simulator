@@ -996,9 +996,15 @@ export class World {
 
   /**
    * Map-match a point to the road network: nearest edge by lateral distance
-   * within `maxDist` metres of its carriageway edge.  Returns false if none.
+   * within `maxDist` metres of its carriageway edge, and at most `maxDy`
+   * metres above or below `yRef`.  Returns false if none.
+   *
+   * `maxDy` defaults to 4.5 m – how far a road may lie above or below the
+   * point and still be taken for the one it stands on.  Callers that must
+   * not take a road on a bridge for the road under it (src/sim/rules.ts)
+   * pass a smaller one.
    */
-  locate(x: number, z: number, yRef: number, maxDist: number, out: SurfaceHit): boolean {
+  locate(x: number, z: number, yRef: number, maxDist: number, out: SurfaceHit, maxDy = 4.5): boolean {
     let best = Infinity;
     let found = false;
     const visit = (code: number): void => {
@@ -1009,7 +1015,7 @@ export class World {
       if (d > maxDist) return;
       samplePolyline(edge.pl, tmpProj.s, tmpSample, seg);
       const dy = Math.abs(tmpSample.y - yRef);
-      if (dy > 4.5) return;
+      if (dy > maxDy) return;
       const score = d + dy * 0.5;
       if (score < best) {
         best = score;

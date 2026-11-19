@@ -109,6 +109,7 @@ import type { SpawnJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { Edge, Node as Junction } from '../world/world.ts';
 import { App } from './app.ts';
+import { turnedSpot } from './turnaround.ts';
 import { LESSONS, Navigator, findTarget } from './nav.ts';
 import { planTourInSlices } from './tour.ts';
 import { ROUTE_PRESETS, RouteWatch, planPreset, presetOfMode, routeLine } from './routepresets.ts';
@@ -3715,6 +3716,9 @@ export class Game {
       // (in the aeroplane there is no road to be put back on: the key is its autopilot)
       if (this.aircraft) this.toggleFlightAuto();
       else this.resetToRoad();
+    } else if (a === 'turn') {
+      // F3, or "Turn around" in the ⋯ sheet: into the lane of the other direction, or on the spot
+      this.turnAround();
     } else if (a === 'wiper' && this.state === 'drive' && !this.walker && !this.aircraft) {
       // the wiper stalk one place on: off → intermittent → normal → fast
       const m = this.windscreen.cycle();
@@ -4952,9 +4956,11 @@ export class Game {
       ui: this.ui,
       heightAt: (x, z) => app.tiles.heightAt(x, z),
       allowed: () => this.canTeleport(),
+      canDrive: () => this.canDrive(),
       claimed: (cx, cy, down) => (down ? !!this.spawnCars?.picking : !!this.screenTap?.covers(cx, cy) || !!this.spawnCars?.claims(cx, cy)),
       tapped: (p) => this.tapToWalk(p.x, p.z),
       teleport: (p, yaw) => this.teleportHere(p.x, p.y, p.z, yaw),
+      drive: (p) => this.driveHere(p.x, p.z),
       t: (k) => tr(k, this.settings.lang),
     });
     const fly = this.flyFree();
@@ -5002,12 +5008,25 @@ export class Game {
     return this.flyParked;
   }
 
-  /** May the player be put at a place tapped on the picture (ui/worldtap.ts)?  In a drive of one's own, in a vehicle on the road or on foot. */
+  /** May the player be teleported now (ui/worldtap.ts)?  In a drive of one's own, in a vehicle on the road or on foot. */
   private canTeleport(): boolean {
     if (!this.settings.teleportTap || this.state !== 'drive' || this.lesson || this.task || this.demo?.active || this.watcher || this.showOn) return false;
     if (this.doorT >= 0 || this.opens.busy || this.riding || this.busRide || this.wrecked) return false;
     if (this.walker) return true;
     return !this.aircraft && !this.tram && !this.forklift && !this.crane?.operating;
+  }
+
+  /**
+   * May the vehicle be sent off to a place tapped on the picture (ui/worldtap.ts "Drive there")?
+   * The same as canTeleport, but for what can drive itself: the aeroplane flies there, a tram,
+   * a forklift and a crane never do.  On foot it is allowed too – startTrip puts the walker
+   * back into the seat first.
+   */
+  private canDrive(): boolean {
+    if (!this.settings.teleportTap || this.state !== 'drive' || this.lesson || this.task || this.demo?.active || this.watcher || this.showOn) return false;
+    if (this.doorT >= 0 || this.opens.busy || this.riding || this.busRide || this.wrecked) return false;
+    if (this.walker) return true;
+    return !this.tram && !this.forklift && !this.crane?.operating;
   }
 
   /** "Teleport here": somebody on foot to that very place; a vehicle into the lane of the road nearest it, facing along it (the way the camera looked, where it may). */
@@ -5038,6 +5057,51 @@ export class Game {
     this.putOnRoad(spot);
     this.path.breakLine();
     this.camSnap = true;
+  }
+
+  /**
+   * "Drive there" (ui/worldtap.ts): the vehicle drives to the place tapped on the picture by
+   * itself, the way the big map's "drive there" does (startTrip).  The aeroplane flies there
+   * and circles it; a car or a lorry goes to the nearest road there.  Takes over again at
+   * once as ever: a pedal or the wheel brings the player back.
+   */
+  private driveHere(x: number, z: number): void {
+    if (!this.canDrive()) return;
+    const lang = this.settings.lang;
+    if (this.aircraft) {
+      // (the aeroplane needs no road: startTrip flies it there and circles the place)
+      this.startTrip([{ name: '', x, z, yaw: 0, kind: 'street' }], false, null);
+      return;
+    }
+    const road = this.roadSpot(x, z, '', 150);
+    if (!road) {
+      this.tipText = tr('teleportNoRoad', lang);
+      this.tipUntil = this.time + 4;
+      return;
+    }
+    this.startTrip([{ name: '', x: road.x, z: road.z, yaw: road.yaw, kind: 'street' }], false, null);
+  }
+
+  /** Turn the vehicle round (input action 'turn'): into the lane of the other direction where there is one. */
+  private turnAround(): void {
+    if (!this.canTurnAround()) return;
+    const v = this.vehicle;
+    v.getModelPosition(this.mpos);
+    const here = { x: this.mpos[0], y: this.mpos[1], z: this.mpos[2], yaw: v.yaw };
+    // (the lane the other way round, where there is one – else the vehicle turns where it stands)
+    const spot = turnedSpot(here, this.freeSpot(here.x, here.z, here.yaw + Math.PI, 0));
+    this.putOnRoad(spot);
+    this.path.breakLine();
+    this.camSnap = true;
+    this.audio.click('tick');
+  }
+
+  /** May the vehicle be turned round now (input action 'turn', F3)?  A road vehicle while driving. */
+  private canTurnAround(): boolean {
+    if (this.state !== 'drive' || this.lesson || this.task || this.demo?.active || this.watcher || this.showOn) return false;
+    if (this.doorT >= 0 || this.opens.busy || this.riding || this.busRide) return false;
+    // not on foot, and not in what is driven by hand or by an operator: the aeroplane, the tram, the forklift, the crane
+    return !this.walker && !this.aircraft && !this.tram && !this.forklift && !this.crane;
   }
 
   /** Tap to walk (game/walkmodes.ts): off to the place tapped, along the pavements of the roads round there. */

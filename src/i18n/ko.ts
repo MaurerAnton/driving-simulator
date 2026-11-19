@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "화면 표시 숨기기 (F2)",
   "view.hudShow": "화면 표시 보이기 (F2)",
   "ctl.f2": "화면 표시 전체를 숨기거나 보이기 – 깔끔한 화면을 위해. 위쪽의 흐린 버튼으로 다시 불러올 수 있어요.",
+  "ctl.f3": "차량을 방향 반대로 – 반대 차선이 있으면 그쪽으로, 없으면 그 자리에서.",
   "settingsReset": "설정 초기화",
   "settingsResetAsk": "모든 설정을 기본값으로 되돌릴까요? 언어, 내 키 설정, 불러온 지도는 그대로 남아요.",
   "noMercyAsk": "“무자비”는 날씨를 있는 그대로 보여줘요: 앞유리의 비와 눈, 도로에 고인 물, 차체의 진흙, 실제 계절. 성능 좋은 기기가 필요하고, 날씨가 나쁘면 훨씬 덜 보여요. 켤까요?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "카메라 속도: {v} km/h",
   "teleportTap": "화면 속 장소를 탭(또는 클릭)하면 몇 초 동안 “여기로 순간 이동”이 나와요",
   "teleportHere": "여기로 순간 이동",
+  "tapDrive": "차로 이동",
   "teleportNoRoad": "그곳 근처에 차량을 놓을 도로가 없어요",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: 보는 방향으로 비행 · [[KeyE]] [[KeyQ]]: 위아래 · Shift: 더 빠르게 · 휠: 비행 속도 · 마우스 버튼을 누른 채 움직여 둘러보기 · 오른쪽 버튼: 땅 위로 이동 · 더블 클릭: 차량 뒤로 돌아가기(차량은 브레이크를 건 채 기다려요) · [[KeyV]]: 다음 시점",
   "freeCamTouch": "왼쪽 스틱으로 비행 · ▲ ▼: 위아래 · 한 손가락: 둘러보기 · 두 손가락 위아래로: 더 높이 / 더 낮게 · 핀치: 비행 속도 · 차량은 브레이크를 건 채 기다려요",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "드래그: 둘러보기 · 휠 또는 두 손가락: 가까이 / 멀리 · 표시는 강사의 지적 – 탭하면 그 장면으로 이동",
   "tbLookBack": "뒤 보기(길게 누르기)",
   "tbReset": "도로로 복귀",
+  "turnAround": "방향 바꾸기",
   "tbMenu": "일시 중지 · 메뉴",
 
   // Key reminder at the bottom of the screen (one or two words each)

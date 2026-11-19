@@ -11,7 +11,10 @@
  *    on rings of growing radius; the answers are kept for the corners of a
  *    2 m grid and blended between them, so the bed has no steps.  WorldGround
  *    (sim/ground.ts) puts the wheels on that bed: the vehicle sinks into the
- *    water as far as it is deep.
+ *    water as far as it is deep.  How deep a wheel really stands in is
+ *    worked out again from the height of the ground (wheelDepth): over a
+ *    bridge the wheels are metres above the river, and only the water they
+ *    reach into counts.
  *  - The car gets washed: its dirt goes down while it drives through water,
  *    faster with speed and with depth (washRate).
  *  - The brakes get wet: for a while after, until braking has dried them,
@@ -101,9 +104,34 @@ export function sprayRate(speed: number, depth: number): number {
   return Math.min(90, (6 + 7 * v) * Math.min(1, 0.4 + depth / 0.25));
 }
 
-/** what of the terrain is needed: the cover class at a place (render/tiles.ts's TileManager fits) */
+/**
+ * what of the terrain is needed: the cover class at a place (render/tiles.ts's
+ * TileManager fits) – and, if it can, the height of the ground there, so that
+ * water under a bridge is not taken for water the wheel stands in.
+ */
 export interface CoverSource {
   coverAt(x: number, z: number): number;
+  /**
+   * the height of the ground (over water: the water's surface, the bank's level)
+   * at a place, NaN where the tile is not loaded.  Sources without it (the tests)
+   * leave the depth as the cover map gives it.
+   */
+  heightAt?(x: number, z: number): number;
+}
+
+/**
+ * How deep the water a wheel stands in really is (m): `d0` is what the cover map
+ * says at that place, `ground` the height of the water's surface (the bank's
+ * level; NaN where it is not known) and `wheelBottom` the height of the wheel's
+ * lowest point.  The water reaches up to `ground` and no further: in the river
+ * the wheel stands on the bed `d0` down and the depth is the map's, on a bridge
+ * the wheel lies high above the river and the river below it counts for nothing,
+ * in between (a ramp, an embankment) it grows smoothly.
+ */
+export function wheelDepth(d0: number, ground: number, wheelBottom: number): number {
+  if (!(d0 > 0)) return 0;
+  if (!Number.isFinite(ground)) return d0;
+  return Math.max(0, Math.min(d0, ground - wheelBottom + 0.05));
 }
 
 /**
@@ -189,6 +217,7 @@ export type WadingTip = 'waterStalled' | 'wetBrakes' | null;
  */
 export class Wading {
   readonly depth: WaterDepth;
+  private readonly src: CoverSource;
   readonly spray = new WaterSpray(600);
   readonly group = new THREE.Group();
   /** the deepest water under a wheel now (m; 0: not in water) */
@@ -202,6 +231,7 @@ export class Wading {
   private readonly p: SprayParticle = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, life: 1, size0: 0.1, size1: 0.3, floor: 0, foam: false };
 
   constructor(src: CoverSource) {
+    this.src = src;
     this.depth = new WaterDepth(src);
     this.group.name = 'wading';
     this.group.add(this.spray.points);
@@ -242,7 +272,10 @@ export class Wading {
       const speed = v.speed;
       for (let i = 0; i < v.wheels.length && i < 4; i++) {
         const w = v.wheels[i];
-        const d = this.depth.at(w.hx, w.hz);
+        // The cover map says how deep the water is at that place, whatever stands
+        // over it: on a bridge the wheel is metres above the river, and only the
+        // water the wheel really reaches into counts (wheelDepth).
+        const d = wheelDepth(this.depth.at(w.hx, w.hz), this.src.heightAt?.(w.hx, w.hz) ?? Number.NaN, w.hy - v.spec.wheelRadius);
         if (d > deepest) deepest = d;
         if (d > 0 && wetsBrakes(d, speed)) wetting = true;
         if (effects && d > 0 && w.contact) this.splash(i, v, w, d, h);

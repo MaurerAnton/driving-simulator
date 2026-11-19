@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Ẩn màn hình hiển thị (F2)",
   "view.hudShow": "Hiện màn hình hiển thị (F2)",
   "ctl.f2": "Ẩn hoặc hiện toàn bộ màn hình hiển thị – để nhìn thoáng; nút mờ ở trên cùng sẽ đưa nó trở lại.",
+  "ctl.f3": "Quay đầu xe – vào làn chiều ngược lại nếu có, nếu không thì tại chỗ.",
   "settingsReset": "Đặt lại cài đặt",
   "settingsResetAsk": "Đưa mọi cài đặt về mặc định? Ngôn ngữ, các phím của bạn và bản đồ bạn đã tải vẫn giữ nguyên.",
   "noMercyAsk": "“Không khoan nhượng” hiển thị thời tiết đúng như thật: mưa và tuyết trên kính chắn gió, nước đọng trên đường, bùn trên thân xe, mùa thật trong năm. Cần một thiết bị mạnh, và khi thời tiết xấu bạn sẽ nhìn thấy ít hơn nhiều. Bật lên?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Tốc độ camera: {v} km/h",
   "teleportTap": "Một cú chạm (hoặc nhấp) vào một nơi trong hình sẽ hiện “Dịch chuyển đến đây” trong vài giây",
   "teleportHere": "Dịch chuyển đến đây",
+  "tapDrive": "Lái xe đến đó",
   "teleportNoRoad": "Không có con đường nào gần nơi đó để đặt xe lên",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: bay theo hướng nhìn · [[KeyE]] [[KeyQ]]: lên và xuống · Shift: nhanh hơn · con lăn: tốc độ bay · giữ nút chuột và di chuột để nhìn xung quanh · nút chuột phải: di chuyển trên mặt đất · nhấp đúp: quay về sau xe, xe chờ với phanh giữ · [[KeyV]]: góc nhìn tiếp theo",
   "freeCamTouch": "Cần điều khiển bên trái để bay · ▲ ▼: lên và xuống · một ngón: nhìn xung quanh · hai ngón lên hoặc xuống: cao hơn hoặc thấp hơn · chụm ngón: tốc độ bay · xe chờ với phanh giữ",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Kéo để nhìn xung quanh · con lăn hoặc hai ngón tay: lại gần và ra xa · các mốc là nhận xét của giáo viên – chạm vào một mốc để xem",
   "tbLookBack": "Nhìn ra sau (giữ)",
   "tbReset": "Trở lại đường",
+  "turnAround": "Quay đầu xe",
   "tbMenu": "Tạm dừng · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

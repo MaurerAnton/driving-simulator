@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Anzeige ausblenden (F2)",
   "view.hudShow": "Anzeige einblenden (F2)",
   "ctl.f2": "Die ganze Anzeige aus- oder einblenden – für einen freien Blick; der blasse Knopf oben holt sie zurück.",
+  "ctl.f3": "Fahrzeug wenden – in die Gegenrichtung, wo es eine gibt, sonst auf der Stelle.",
   "settingsReset": "Einstellungen zurücksetzen",
   "settingsResetAsk": "Alle Einstellungen auf ihre Standardwerte zurücksetzen? Die Sprache, deine Tasten und die geladene Karte bleiben, wie sie sind.",
   "noMercyAsk": "„Ohne Gnade“ zeigt das Wetter, wie es ist: Regen und Schnee auf der Windschutzscheibe, stehendes Wasser auf den Straßen, Schlamm an der Karosserie, die echte Jahreszeit. Das braucht ein starkes Gerät, und bei schlechtem Wetter siehst du viel weniger. Einschalten?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Kameratempo: {v} km/h",
   "teleportTap": "Ein Tipp (oder Klick) auf eine Stelle im Bild bietet ein paar Sekunden lang „Hierher teleportieren“ an",
   "teleportHere": "Hierher teleportieren",
+  "tapDrive": "Hinfahren",
   "teleportNoRoad": "Keine Straße in der Nähe dieser Stelle, auf die das Fahrzeug passt",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: in Blickrichtung fliegen · [[KeyE]] [[KeyQ]]: hoch und runter · Umschalt: schneller · Rad: Fluggeschwindigkeit · Maustaste halten und Maus bewegen zum Umsehen · rechte Maustaste: über den Boden · Doppelklick: zurück hinter das Fahrzeug, das gebremst wartet · [[KeyV]]: nächste Ansicht",
   "freeCamTouch": "Der Stick links fliegt · ▲ ▼: hoch und runter · ein Finger: umsehen · zwei Finger hoch oder runter: höher oder tiefer · Zusammenziehen: Fluggeschwindigkeit · das Fahrzeug wartet gebremst",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Ziehen: umsehen · Mausrad oder zwei Finger: näher und weiter weg · die Markierungen sind Anmerkungen des Fahrlehrers – zum Ansehen eine antippen",
   "tbLookBack": "Nach hinten sehen (halten)",
   "tbReset": "Zurück auf die Straße",
+  "turnAround": "Wenden",
   "tbMenu": "Pause · Menü",
 
   // Key reminder at the bottom of the screen (one or two words each)

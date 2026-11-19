@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Weergave verbergen (F2)",
   "view.hudShow": "Weergave tonen (F2)",
   "ctl.f2": "De hele weergave verbergen of tonen – voor een vrij zicht; de vage knop bovenaan brengt hem terug.",
+  "ctl.f3": "Het voertuig omkeren – in de rijstrook van de andere richting als die er is, anders ter plekke.",
   "settingsReset": "Instellingen terugzetten",
   "settingsResetAsk": "Alle instellingen terugzetten naar hun standaardwaarden? De taal, je toetsen en de geladen kaart blijven zoals ze zijn.",
   "noMercyAsk": "“Genadeloos” toont het weer zoals het is: regen en sneeuw op de voorruit, water dat op de wegen staat, modder op de carrosserie, het echte seizoen. Het vraagt een krachtig apparaat, en bij slecht weer zie je veel minder. Inschakelen?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Camerasnelheid: {v} km/h",
   "teleportTap": "Een tik (of klik) op een plek in het beeld biedt een paar seconden “Hierheen teleporteren” aan",
   "teleportHere": "Hierheen teleporteren",
+  "tapDrive": "Erheen rijden",
   "teleportNoRoad": "Geen weg in de buurt van die plek om het voertuig op te zetten",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: vliegen in de kijkrichting · [[KeyE]] [[KeyQ]]: omhoog en omlaag · Shift: sneller · scrollwiel: vliegsnelheid · houd de muisknop ingedrukt en beweeg de muis om rond te kijken · rechtermuisknop: over de grond · dubbelklik: terug achter het voertuig, dat geremd wacht · [[KeyV]]: volgende weergave",
   "freeCamTouch": "De stick links vliegt · ▲ ▼: omhoog en omlaag · één vinger kijkt rond · twee vingers omhoog of omlaag: hoger of lager · knijpen: vliegsnelheid · het voertuig wacht, geremd",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Slepen: rondkijken · scrollwiel of twee vingers: dichterbij en verder weg · de markeringen zijn opmerkingen van de instructeur – tik op een markering om de opmerking te zien",
   "tbLookBack": "Naar achteren kijken (houden)",
   "tbReset": "Terug op de weg",
+  "turnAround": "Omkeren",
   "tbMenu": "Pauze · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

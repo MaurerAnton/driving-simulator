@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Kijelző elrejtése (F2)",
   "view.hudShow": "Kijelző megjelenítése (F2)",
   "ctl.f2": "Az egész kijelző elrejtése vagy megjelenítése – a zavartalan kilátásért; a halvány gomb fent visszahozza.",
+  "ctl.f3": "A jármű megfordítása – a szemközti sávba, ha van ilyen, különben a helyén.",
   "settingsReset": "Beállítások visszaállítása",
   "settingsResetAsk": "Visszaállítod az összes beállítást az alapértékre? A nyelv, a billentyűid és a betöltött térkép változatlan marad.",
   "noMercyAsk": "A „Kíméletlen” olyannak mutatja az időjárást, amilyen: eső és hó a szélvédőn, víz áll az utakon, sár a karosszérián, a valódi évszak. Erős eszköz kell hozzá, és rossz időben sokkal kevesebbet fogsz látni. Bekapcsolod?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Kamerasebesség: {v} km/h",
   "teleportTap": "Egy koppintás (vagy kattintás) a kép egy pontjára néhány másodpercre felajánlja: „Teleportálás ide”",
   "teleportHere": "Teleportálás ide",
+  "tapDrive": "Odaautózás",
   "teleportNoRoad": "Nincs út a hely közelében, ahová a járművet le lehetne tenni",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: repülés a nézés irányába · [[KeyE]] [[KeyQ]]: fel és le · Shift: gyorsabban · görgő: repülési sebesség · tartsd lenyomva az egérgombot, és mozgasd az egeret a körülnézéshez · jobb egérgomb: a talaj felett · dupla kattintás: vissza a jármű mögé, amely befékezve vár · [[KeyV]]: következő nézet",
   "freeCamTouch": "A bal oldali joystick repül · ▲ ▼: fel és le · egy ujj: körülnézés · két ujj fel vagy le: magasabbra vagy alacsonyabbra · csippentés: repülési sebesség · a jármű befékezve vár",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Húzással körülnézel · görgő vagy két ujj: közelebb és távolabb · a jelölések az oktató megjegyzései – koppints egyre, hogy elolvasd",
   "tbLookBack": "Nézz hátra (tartsd)",
   "tbReset": "Vissza az útra",
+  "turnAround": "Fordulás",
   "tbMenu": "Szünet · menü",
 
   // Key reminder at the bottom of the screen (one or two words each)

@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Göstergeleri gizle (F2)",
   "view.hudShow": "Göstergeleri göster (F2)",
   "ctl.f2": "Tüm göstergeleri gizleyin ya da gösterin – temiz bir görünüm için; üstteki soluk düğme onları geri getirir.",
+  "ctl.f3": "Aracı döndür – karşı yöne ait şerit varsa oraya, yoksa bulunduğu yerde.",
   "settingsReset": "Ayarları sıfırla",
   "settingsResetAsk": "Tüm ayarlar varsayılan değerlerine döndürülsün mü? Dil, tuşlarınız ve yüklediğiniz harita olduğu gibi kalır.",
   "noMercyAsk": "“Acımasız” havayı olduğu gibi gösterir: ön camda yağmur ve kar, yollarda birikmiş su, kaportada çamur, gerçek mevsim. Güçlü bir cihaz gerektirir ve kötü havada çok daha az görürsünüz. Açılsın mı?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Kamera hızı: {v} km/h",
   "teleportTap": "Resimde bir yere dokunmak (ya da tıklamak) birkaç saniyeliğine “Buraya ışınlan” seçeneğini sunar",
   "teleportHere": "Buraya ışınlan",
+  "tapDrive": "Arabayla git",
   "teleportNoRoad": "O yerin yakınında aracın konabileceği bir yol yok",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: baktığınız yöne uçun · [[KeyE]] [[KeyQ]]: yukarı ve aşağı · Shift: daha hızlı · tekerlek: uçuş hızı · etrafa bakmak için fare düğmesini basılı tutup fareyi hareket ettirin · sağ fare düğmesi: zeminin üzerinde · çift tıklama: frenli bekleyen aracın arkasına geri · [[KeyV]]: sonraki görünüm",
   "freeCamTouch": "Soldaki çubukla uçun · ▲ ▼: yukarı ve aşağı · tek parmak etrafa bakar · iki parmak yukarı ya da aşağı: daha yüksek ya da daha alçak · sıkıştırma: uçuş hızı · araç frenli bekler",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Etrafa bakmak için sürükleyin · tekerlek veya iki parmak: yaklaştırma ve uzaklaştırma · işaretler direksiyon hocasının notlarıdır – görmek için birine dokunun",
   "tbLookBack": "Arkaya bakış (basılı tutun)",
   "tbReset": "Yola dönüş",
+  "turnAround": "Döndür",
   "tbMenu": "Duraklat · menü",
 
   // Key reminder at the bottom of the screen (one or two words each)

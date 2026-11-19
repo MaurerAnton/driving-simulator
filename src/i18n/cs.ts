@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Skrýt prvky obrazovky (F2)",
   "view.hudShow": "Zobrazit prvky obrazovky (F2)",
   "ctl.f2": "Skrýt nebo zobrazit všechny prvky obrazovky – pro čistý výhled; nevýrazné tlačítko nahoře je vrátí zpět.",
+  "ctl.f3": "Otočte vozidlo – do jízdního pruhu v protisměru, když je, jinak na místě.",
   "settingsReset": "Obnovit nastavení",
   "settingsResetAsk": "Vrátit všechna nastavení na výchozí hodnoty? Jazyk, tvoje klávesy a načtená mapa zůstanou, jak jsou.",
   "noMercyAsk": "„Nemilosrdná“ ukazuje počasí takové, jaké je: déšť a sníh na čelním skle, stojící vodu na silnicích, bláto na karoserii, skutečné roční období. Potřebuje výkonné zařízení a za špatného počasí uvidíš mnohem méně. Zapnout?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Rychlost kamery: {v} km/h",
   "teleportTap": "Klepnutí (nebo kliknutí) na místo v obraze nabídne na několik sekund „Teleportovat sem“",
   "teleportHere": "Teleportovat sem",
+  "tapDrive": "Jet tam",
   "teleportNoRoad": "Poblíž toho místa není silnice, na kterou by šlo vozidlo postavit",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: let ve směru pohledu · [[KeyE]] [[KeyQ]]: nahoru a dolů · Shift: rychleji · kolečko: rychlost letu · drž tlačítko myši a pohybem myši se rozhlížej · pravé tlačítko myši: nad zemí · dvojklik: zpět za vozidlo, které čeká zabrzděné · [[KeyV]]: další pohled",
   "freeCamTouch": "Joystick vlevo létá · ▲ ▼: nahoru a dolů · jeden prst se rozhlíží · dva prsty nahoru nebo dolů: výš nebo níž · sevření prstů: rychlost letu · vozidlo čeká zabrzděné",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Tažením se rozhlížíš · kolečko nebo dva prsty: blíž a dál · značky jsou poznámky učitele – klepnutím na značku zobrazíš poznámku",
   "tbLookBack": "Pohled dozadu (podržet)",
   "tbReset": "Zpět na silnici",
+  "turnAround": "Otočit se",
   "tbMenu": "Pauza · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

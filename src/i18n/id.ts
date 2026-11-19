@@ -684,6 +684,7 @@ const dict: Dict = {
   "view.hudHide": "Sembunyikan tampilan (F2)",
   "view.hudShow": "Munculkan tampilan (F2)",
   "ctl.f2": "Sembunyikan atau tampilkan seluruh tampilan – untuk pandangan yang bersih; tombol samar di atas memunculkannya kembali.",
+  "ctl.f3": "Putarbalik kendaraan – ke lajur arah berlawanan kalau ada, kalau tidak di tempatnya.",
   "settingsReset": "Atur ulang pengaturan",
   "settingsResetAsk": "Kembalikan semua pengaturan ke bawaan? Bahasa, tombol Anda, dan peta yang Anda muat tetap seperti semula.",
   "noMercyAsk": "“Tanpa ampun” menampilkan cuaca apa adanya: hujan dan salju di kaca depan, air menggenang di jalan, lumpur di bodi, musim yang sebenarnya. Ini butuh perangkat yang kuat, dan dalam cuaca buruk Anda akan melihat jauh lebih sedikit. Nyalakan?",
@@ -1047,6 +1048,7 @@ const dict: Dict = {
   "fly.speed": "Kecepatan kamera: {v} km/j",
   "teleportTap": "Ketukan (atau klik) pada sebuah tempat di gambar menawarkan “Teleportasi ke sini” selama beberapa detik",
   "teleportHere": "Teleportasi ke sini",
+  "tapDrive": "Mengemudi ke sana",
   "teleportNoRoad": "Tidak ada jalan di dekat tempat itu untuk meletakkan kendaraan",
   "freeCamKeys": "[[KeyW]] [[KeyA]] [[KeyS]] [[KeyD]]: terbang ke arah pandangan · [[KeyE]] [[KeyQ]]: naik dan turun · Shift: lebih cepat · roda: kecepatan terbang · tahan tombol mouse dan gerakkan mouse untuk melihat sekeliling · tombol kanan mouse: di atas tanah · klik ganda: kembali ke belakang kendaraan, yang menunggu dengan rem · [[KeyV]]: tampilan berikutnya",
   "freeCamTouch": "Stik di kiri untuk terbang · ▲ ▼: naik dan turun · satu jari untuk melihat sekeliling · dua jari ke atas atau ke bawah: lebih tinggi atau lebih rendah · cubit: kecepatan terbang · kendaraan menunggu dengan rem",
@@ -1570,6 +1572,7 @@ const dict: Dict = {
   "replayHelp": "Seret untuk melihat sekeliling · roda mouse atau dua jari: lebih dekat dan lebih jauh · tanda-tanda itu adalah catatan instruktur – ketuk salah satunya untuk melihatnya",
   "tbLookBack": "Menoleh ke belakang (tahan)",
   "tbReset": "Kembali ke jalan",
+  "turnAround": "Berbalik arah",
   "tbMenu": "Jeda · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

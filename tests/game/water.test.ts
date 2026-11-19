@@ -7,7 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEEP_WATER, Wading, WaterDepth, bedDepth, brakeFactor, dryRate, intakeHeight, sprayRate, washRate, wetsBrakes } from '../../src/game/wading.ts';
+import { DEEP_WATER, Wading, WaterDepth, bedDepth, brakeFactor, dryRate, intakeHeight, sprayRate, washRate, wetsBrakes, wheelDepth } from '../../src/game/wading.ts';
 import type { WadingVehicle } from '../../src/game/wading.ts';
 import { WATER_DROP } from '../../src/render/water.ts';
 import { COVER } from '../../src/world/cover.ts';
@@ -72,8 +72,21 @@ test('the spray: none standing still, more with speed', () => {
   assert.ok(sprayRate(10, 0.3) > sprayRate(2, 0.3));
 });
 
-/** a car standing (or moving) at z with its wheels 1.4 m apart across and 2.6 m along */
-function carAt(z: number, speed: number): WadingVehicle & { stalled: number } {
+test('wheelDepth: the water reaches up to the ground – on a bridge not at all', () => {
+  // in the river: the wheel stands on the bed, the map's depth is the depth
+  assert.equal(wheelDepth(DEEP_WATER, 0, -DEEP_WATER), DEEP_WATER);
+  // 5 m above the water: nothing of the river below counts
+  assert.equal(wheelDepth(DEEP_WATER, 0, 5), 0);
+  // at the bank's level: a hand's breadth at the surface
+  const atSurface = wheelDepth(DEEP_WATER, 0, 0);
+  assert.ok(atSurface > 0 && atSurface < 0.1, `${atSurface}`);
+  // no water there, or no height known (a tile not loaded, a source without heights): as the cover map says
+  assert.equal(wheelDepth(0, 0, -1), 0);
+  assert.equal(wheelDepth(0.4, Number.NaN, 5), 0.4);
+});
+
+/** a car standing (or moving) at z with its wheels 1.4 m apart across and 2.6 m along, `hy` the height of the wheel centres */
+function carAt(z: number, speed: number, hy = 0.3): WadingVehicle & { stalled: number } {
   const v = {
     pos: [5, 0, z],
     speed,
@@ -82,10 +95,10 @@ function carAt(z: number, speed: number): WadingVehicle & { stalled: number } {
     stalled: 0,
     spec: { wheelRadius: 0.3 },
     wheels: [
-      { hx: 4.3, hy: 0.3, hz: z - 1.3, contact: true },
-      { hx: 5.7, hy: 0.3, hz: z - 1.3, contact: true },
-      { hx: 4.3, hy: 0.3, hz: z + 1.3, contact: true },
-      { hx: 5.7, hy: 0.3, hz: z + 1.3, contact: true },
+      { hx: 4.3, hy, hz: z - 1.3, contact: true },
+      { hx: 5.7, hy, hz: z - 1.3, contact: true },
+      { hx: 4.3, hy, hz: z + 1.3, contact: true },
+      { hx: 5.7, hy, hz: z + 1.3, contact: true },
     ],
     resetDrivetrain(on: boolean) {
       v.engineRunning = on;
@@ -122,4 +135,31 @@ test('wading: washed in the shallows, the engine stalls in deep water, the brake
   w2.step(0.5, carAt(-0.8, 6), 'car', d2, 0, false);
   assert.equal(w2.spray.count, 0);
   assert.ok(d2.dirt < 1);
+});
+
+/** the same river, with the height of the ground: the water's surface at y 0 (the bank's level) */
+const riverAt = { ...river, heightAt: () => 0 };
+
+test('a bridge over the river: the engine keeps running, no wet brakes, no washing, no spray', () => {
+  const w = new Wading(riverAt);
+  const dirt = { dirt: 1 };
+  // in the middle of the river, but on the deck 5.7 m above the water
+  const bridge = carAt(15, 8, 6);
+  for (let i = 0; i < 30; i++) assert.equal(w.step(0.05, bridge, 'car', dirt, 0, true), null);
+  assert.equal(w.depthNow, 0);
+  assert.equal(bridge.engineRunning, true);
+  assert.equal(w.wet, 0);
+  assert.equal(w.brakeFactor, 1);
+  assert.equal(dirt.dirt, 1);
+  assert.equal(w.spray.count, 0);
+});
+
+test('the same car with its wheels on the bed of the river still stalls', () => {
+  const w = new Wading(riverAt);
+  const dirt = { dirt: 1 };
+  // standing on the bed, 1.8 m down under the surface
+  const ford = carAt(15, 2, -1.5);
+  assert.equal(w.step(0.05, ford, 'car', dirt, 0, true), 'waterStalled');
+  assert.equal(ford.engineRunning, false);
+  assert.equal(w.depthNow, DEEP_WATER);
 });
