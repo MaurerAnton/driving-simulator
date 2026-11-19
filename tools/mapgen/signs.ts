@@ -572,6 +572,13 @@ export class SignPlacer {
       const o = of.get(e);
       return !!o && o.list.some((t) => t.same === same && (t.along === 0 || t.along * o.wayDir === dir));
     };
+    // Is the same sign already standing on a road that leads INTO this junction?  At a plain
+    // 2-arm join that is the road before (no new post where two sections of a way join).  At a
+    // junction (3+ arms) a short arm (< 40 m) must not lose its conditional limit just for being
+    // short: only when an approach already carries the same sign does it stand there already.
+    // An approach arm runs into the node, so traffic on it travels along its edge's course (dir +1).
+    const approachHas = (node: Node, same: string): boolean =>
+      node.arms.some((a) => !a.out && has(a.edge, 1, same));
     for (const [e, { list, wayDir }] of of) {
       for (const t of list) {
         for (const dir of t.along !== 0 ? [t.along * wayDir] : [1, -1]) {
@@ -581,7 +588,7 @@ export class SignPlacer {
             // (the road before says the same: no new post where two sections of a way join)
             const prev = arm.node.arms.find((a) => a.edge !== e);
             if (prev && has(prev.edge, prev.out ? -1 : 1, t.same)) continue;
-          } else if (e.len < 40) continue;
+          } else if (e.len < 40 && approachHas(arm.node, t.same)) continue;
           const [s, d] = this.depart(arm, Math.min(e.len * 0.5, arm.cut + (e.flags & EF.URBAN ? 12 : 30)));
           this.post(e, s, d, t.codes);
         }

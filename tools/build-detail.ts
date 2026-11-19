@@ -40,7 +40,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { detailBoxes, rectInDetail } from './mapgen/detailregion.ts';
-import { BLOCK, HALO, gridRect, grow } from './mapgen/store.ts';
+import { BLOCK, GRID_OFFSET, HALO, TILE, gridRect, grow } from './mapgen/store.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -73,6 +73,20 @@ if (!flag('--skip-graph') || !existsSync(resolve(work, 'plan.json'))) {
 }
 
 // ---- 2. the tiles of the blocks the region reaches into ----
+// Besides the detail region, a block is rebuilt when it holds tiles whose signs are to be
+// those of the current sign placer rather than the frozen 1.3.0 ones (tools/mapgen/legacy/
+// patch-1.6.0-tiles.json): the conditional speed limits that drew no sign in 1.3.0.  Such a
+// block is outside the detail region, so it rebuilds on the legacy path (cover, roads, … to
+// the byte) and only the sign step switches – the patch is a sign change, nothing else.
+const signTiles = new Set((JSON.parse(readFileSync(resolve(root, 'tools/mapgen/legacy/patch-1.6.0-tiles.json'), 'utf8')) as { tiles: string[] }).tiles);
+const hasSignTile = (r: { minX: number; minZ: number; maxX: number; maxZ: number }): boolean => {
+  for (const t of signTiles) {
+    const [ix, iz] = t.split('_').map(Number);
+    const x0 = ix * TILE - GRID_OFFSET, z0 = iz * TILE - GRID_OFFSET;
+    if (x0 + TILE > r.minX && x0 < r.maxX && z0 + TILE > r.minZ && z0 < r.maxZ) return true;
+  }
+  return false;
+};
 const plan = JSON.parse(readFileSync(resolve(work, 'plan.json'), 'utf8')) as { blocks: Array<[number, number]> };
 const blocks: string[] = [];
 for (const [bx, bz] of plan.blocks) {
@@ -80,9 +94,9 @@ for (const [bx, bz] of plan.blocks) {
   const file = resolve(work, `b_${bx}_${bz}.json.gz`);
   let fresh = 0;
   if (existsSync(file)) fresh = ((JSON.parse(gunzipSync(readFileSync(file)).toString('utf8')) as { fresh?: number[] }).fresh ?? []).length;
-  if (fresh > 0 || rectInDetail(w.minX, w.minZ, w.maxX, w.maxZ)) blocks.push(`${bx}_${bz}`);
+  if (fresh > 0 || rectInDetail(w.minX, w.minZ, w.maxX, w.maxZ) || hasSignTile(w)) blocks.push(`${bx}_${bz}`);
 }
-lap(`blocks the region reaches into: ${blocks.join(', ')}`);
+lap(`blocks to build (region, fresh roads or sign tiles): ${blocks.join(', ')}`);
 rmSync(resolve(out, 'tiles'), { recursive: true, force: true });
 for (const b of blocks) {
   const r = spawnSync('node', ['--max-old-space-size=3072', resolve(root, 'tools/build-tiles.ts'), b], { stdio: 'inherit', cwd: root, env });
