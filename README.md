@@ -175,6 +175,12 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   Stimmen, Vollbild und Anzeige ausblenden (F2). **Gemeinsam spielen:** ein eigener Server (Konten mit Zugangscode,
   Fortschritt auf allen Geräten, Fotos und 360°-Panoramen, mehrere Spieler in einer Welt) – siehe `server/`.
   In „Neu“ auch die Entwicklungsversionen 0.1.0–0.9.0 (0.8.0 und 0.9.0 spielbar) und die Größe jeder Version.
+- **Neu in 1.7.2:** Der Tempomat hält das Fahrzeug nicht mehr an einem Limit fest, das die Straße nicht hat (auch
+  nicht die 50 der Stadtstraße auf einer Brücke über die Autobahn); ein Tippen auf einen Ort bietet jetzt auch
+  **„Hinfahren“** – das Fahrzeug fährt von selbst zur nächsten Straße; Fahrzeug **wenden** mit F3 (oder im
+  ⋯-Menü) in die Gegenrichtung; über eine Brücke zu fahren gilt nicht mehr als durchs Wasser fahren (erst das
+  Wasser, das ein Rad wirklich erreicht, nischt die Bremsen); und bedingte Tempolimits („80 bei Nässe“,
+  „100 ab 22 Uhr“) sind jetzt überall beschildert.
 - **Neu in 1.7.1:** Die Knöpfe für Vollbild und Anzeige ausblenden liegen nicht mehr über der Suche der großen Karte
   (auf Touchscreens im ⋯-Menü); Fahrzeuge sind fest – kein Hineinfahren in einen Bus mehr; einfacheres Fahren als
   Voreinstellung (gleicher Grip überall, bei jedem Wetter); eine neue Grafikstufe **„Ohne Gnade“** mit Regen und
@@ -797,6 +803,11 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   camera, "Teleport here", better voices, full screen and hiding the display (F2). Play together: an own server
   (accounts with access codes, progress on all devices, photos and 360° panoramas, several players in one world) –
   see `server/`. "What's new" lists the development versions 0.1.0–0.9.0 and every version's size.
+- **New in 1.7.2:** the speed limiter no longer holds the car at a limit the road does not have (nor the 50 of a town
+  road on a bridge over the motorway); a tap on a place now also offers **"Drive there"** – the vehicle drives off
+  by itself to the nearest road; **turn the vehicle round** with F3 (or in the ⋯ menu) into the other direction;
+  crossing a bridge no longer counts as driving through water (only the water a wheel really reaches wets the
+  brakes); and conditional speed limits ("80 when wet", "100 from 10 pm") are signed everywhere now.
 - **New in 1.7.1:** the buttons for full screen and hiding the display no longer cover the big map's search (and
   on touch screens they sit in the ⋯ menu); vehicles are solid – no driving into a bus; simpler driving by default
   (even grip everywhere, in any weather); a new graphics preset **"No mercy"** with rain and snow on the windscreen,
