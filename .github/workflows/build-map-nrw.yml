@@ -129,6 +129,19 @@ jobs:
           ls data/work/lod2
       # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste Lauf
       # kann mit geodata_run hier weiterfahren
+      # tools/lod2-extract.ts leert sein Ausgabeverzeichnis bei jedem Aufruf (rmSync).  Darum
+      # bekommt jede Gemeinde genau einen Lauf; hier wird nachgezählt, ob dabei nichts verloren
+      # geht: die Einheiten in data/work/lod2 müssen zu der Summe der Kachel-Zeilen passen
+      # (Niedersachsen hatte mit einem Lauf je Kachel nur 60 statt 37 000 Gebäude).
+      - name: 'Nachzählen: Einheiten im Verzeichnis gegen Gebäude je Kachel'
+        run: |
+          tiles=$(cat data/work/lod2/.done/nrw-*_* 2>/dev/null | sed 's/.*: \([0-9]*\) Gebäude.*/\1/;t;d' | awk '{s+=$1} END {print s+0}')
+          units=$(zcat data/work/lod2/*/*.ndjson.gz 2>/dev/null | wc -l)
+          dirs=$(find data/work/lod2 -mindepth 1 -maxdepth 1 -type d ! -name '.done' | wc -l)
+          echo "Kachel-Zeilen: $tiles Gebäude – $dirs Verzeichnisse mit $units Einheiten"
+          if [ "$tiles" -gt 0 ] && [ "$units" -lt $((tiles / 2)) ]; then
+            echo "zu wenig Einheiten: eine Gemeinde hat wohl mehrere Läufe bekommen"; exit 1
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -229,6 +242,15 @@ jobs:
         run: |
           npm run map:pack
           du -sh public/map
+      # Auch wenn das Release abgewiesen wird (HTTP 403 trotz contents: write, so bei NRW und
+      # Rheinland-Pfalz): das Paket liegt dann als Artefakt bereit und die Stunden des Bauens
+      # sind nicht verloren.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: karte-nrw-paket
+          path: data/work/map.tar.*
+          if-no-files-found: warn
+          retention-days: 7
       - name: Ins Release legen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -254,6 +276,17 @@ jobs:
           Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
           zusammengesetzt.
           EOF
-          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
-            --notes-file notes.md data/work/map.tar.*
+          # GitHub weist ein Release mitunter mit HTTP 403 ab, obwohl der Ablauf contents: write
+          # hat (so bei NRW und Rheinland-Pfalz); dann liegt das Paket schon als Artefakt bereit
+          # und der fertige Bau gilt nicht als gescheitert.
+          for try in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" \
+                 --title "Karte $LABEL" --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Versuch $try: Release $tag wurde nicht angelegt"
+            sleep 30
+          done
+          # Erst wenn alle drei Versuche scheitern, gilt der Lauf als gescheitert.
+          gh release view "$tag" --json tagName --jq .tagName
           echo "release $tag"
