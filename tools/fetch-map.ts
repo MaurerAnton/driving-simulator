@@ -99,18 +99,30 @@ let ok = false;
 try {
   // (the map as one file, or in parts: whatever the release names – and when the release names one
   // file it may still be the parts, as every release without a manifest has it)
-  const files = names.map.length > 1 ? names.map : [names.map[0], ...Array.from({ length: 100 }, (_, n) => `map.tar.${String(n).padStart(2, '0')}`)];
-  for (const name of files) {
-    if (!(await download(name, part))) {
-      if (names.map.length > 1) break; // (the manifest named them: a missing one stops)
-      continue; // (no manifest: the single file is not there – try the parts)
+  if (names.map.length > 1) {
+    // (the manifest names them: stop at the first one that is not there)
+    for (const name of names.map) {
+      if (!(await download(name, part))) break;
+      await feed(part);
+      process.stdout.write(`\r[map] ${name}  `);
+      ok = true;
     }
+    process.stdout.write('\n');
+  } else if (await download(names.map[0], part)) {
+    // (one file, as the manifest says – or the name every release without one has used)
     await feed(part);
-    process.stdout.write(`\r[map] ${name}  `);
     ok = true;
-    if (names.map.length === 1 && name === names.map[0]) break; // (one file, as the manifest says)
+  } else {
+    // (not that file: the parts, as every release without a manifest stores it – the first part
+    // that is not there ends the list, so a missing one costs one request, not a hundred)
+    for (let n = 0; n < 100; n++) {
+      if (!(await download(`map.tar.${String(n).padStart(2, '0')}`, part))) break;
+      await feed(part);
+      process.stdout.write(`\r[map] part ${n + 1}  `);
+      ok = true;
+    }
+    process.stdout.write('\n');
   }
-  process.stdout.write('\n');
 } catch (e) {
   console.error(`[map] ${(e as Error).message}`);
 }
