@@ -1,0 +1,271 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte eines Rechtecks in Baden-Württemberg und legt sie als Kartenpaket
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte laden liest,
+# src/ui/mappacks.ts) in ein Release.
+#
+# Warum das hier läuft: ein solcher Bau brauchte mehrere Gigabyte Platte und mehr Speicher,
+# als ein Laptop hat; ein GitHub-Läufer hat 4 CPUs, 16 GB Speicher und ~14 GB Platte, und
+# seine Minuten sind für ein öffentliches Repository frei.  Die Karte kommt nicht in die
+# GitHub-Seiten (1 GB Grenze): Releases haben keine Größengrenze.
+#
+# Starten von Hand: Actions → "Karte Baden-Württemberg" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (DGM1) und Gebäudemodelle (LoD2) des LGL             -> data/work/dgm2, data/work/lod2
+#   2. OpenStreetMap, auf das Rechteck geschnitten                  -> npm run map:extract
+#   3. Straßennetz und Kacheln                                      -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Zwei Aufträge, damit ein Netzfehler während des Holens nicht den ganzen Bau kostet
+# und damit jeder Teil seine eigenen Stunden hat.
+#
+# Rechteck: Kilometerkacheln in UTM32 (EPSG:25832) – 513_5402 ist die Kachel mit der
+# Stuttgarter Innenstadt.  Das Landesamt für Geoinformation und Landentwicklung (LGL)
+# hält die Daten in Archiven von 2 × 2 km (odd Ostwert, gerader Nordwert) auf
+# opengeodata.lgl-bw.de bereit, lizenziert unter der Datenlizenz Deutschland Namensnennung
+# 2.0 – kein Schlüssel, keine Anmeldung.  Welche Rechte das einräumt, sagt der
+# Metadatensatz der Produkte (gmd:otherConstraints): „Sie dürfen die Daten nach der
+# „Datenlizenz Deutschland Namensnennung 2.0" verwenden." mit dem Quellenvermerk
+# „Datengrundlage: LGL, www.lgl-bw.de".
+
+name: Karte Baden-Württemberg
+
+on:
+  workflow_dispatch:
+    inputs:
+      east:
+        description: 'Rechteck: Kilometer nach Osten (UTM32), 513 oder 502..523'
+        type: string
+        default: '513..514'
+      north:
+        description: 'Rechteck: Kilometer nach Norden (UTM32), 5402 oder 5393..5412'
+        type: string
+        default: '5402..5403'
+      label:
+        description: Name der Karte (steht in map.json und im Release)
+        type: string
+        default: 'Stuttgart'
+      osm:
+        description: OpenStreetMap-Ausschnitt von Geofabrik (Regierungsbezirk Stuttgart reicht für Stuttgart und Umgebung)
+        type: choice
+        default: stuttgart-regbez
+        options: [stuttgart-regbez, baden-wuerttemberg, karlsruhe-regbez, freiburg-regbez, tuebingen-regbez]
+      lod2_name:
+        description: 'Ordner unter data/work/lod2, in den die Gebäude kommen (ein Ordner je Karte)'
+        type: string
+        default: 'Baden-Wuerttemberg'
+      tag:
+        description: 'Name des Releases (leer: karte-bw-<Datum>-<Lauf>)'
+        type: string
+        default: ''
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        # gtfs.de liefert Baden-Württemberg nicht als „VVS", sondern in einzelnen Lieferungen –
+        # die Namen stehen in agency.txt von https://download.gtfs.de/germany/nv_free/latest.zip
+        # (Verkehrsverbund Stuttgart, S-Bahn Stuttgart, Albtal-Verkehrs-Gesellschaft, AVG,
+        # Arverio, Heilbronner Nahverkehr, Pforzheim-Enzkreis, Ostalbmobil, DING und htv,
+        # Freiburger Verkehrs AG, SWEG, RAB, Schwäbisch Hall, Karlsruhe, Rhein-Neckar, …).
+        default: 'Verkehrsverbund Stuttgart|S-Bahn Stuttgart|Albtal-Verkehrs-Gesellschaft|Arverio Baden-Württemberg|DB Regio AG Baden-Württemberg|Heilbronner Nahverkehr|Pforzheim-Enzkreis|Ostalbmobil|DING und htv|Freiburger Verkehrs AG|SWEG|Regionalbusverkehr Südwest|Regionalverkehr Alb-Bodensee|Schwäbisch Hall|Karlsruher Verkehrsverbund|Stadtbahn Karlsruhe|Rhein-Neckar|Schwarzwald-Baar|Hegau Bodensee|Bodensee-Oberschwaben|Tuttlingen'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: 'Verkehrsverbund Stuttgart|Regionalbusverkehr Südwest|Regionalverkehr Alb-Bodensee|SWEG|Freiburger Verkehrs AG|DING und htv|Ostalbmobil|Heilbronner Nahverkehr|Pforzheim-Enzkreis|Karlsruher Verkehrsverbund|Rhein-Neckar|Schwarzwald-Baar|Hegau Bodensee|Bodensee-Oberschwaben|Tuttlingen|Schwäbisch Hall'
+      jobs:
+        description: Wie viele Archive gleichzeitig geholt werden
+        type: string
+        default: '4'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: die offenen Geodaten – langes Holen (ein Archiv von 2 × 2 km: ~14 MB Gelände, ~18 MB Gebäude)
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # node auch hier: die Gebäudemodelle liest tools/lod2-extract.ts – es holt selbst nichts,
+      # das Geländeskript gibt ihm jede .gml –, aber es braucht node_modules (saxes)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # Zwei Karten dürfen keine Kachel von 500 m teilen: map-assets/index.json sagt, was eine
+      # andere Karte schon hat; das Skript lässt diese Kilometerraster weg (--on-overlap fail
+      # bricht stattdessen ab, damit es hier steht und nicht erst im Bau oder im Index).
+      - name: Veröffentlichte Kacheln (map-assets/index.json)
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 10 \
+            -o map-assets-index.json \
+            https://raw.githubusercontent.com/MaurerAnton/driving-simulator/main/map-assets/index.json
+          python3 -c 'import json; i=json.load(open("map-assets-index.json")); print(len({t for f in i["files"] for t in f["tiles"]}), "Kacheln anderer Karten")'
+      # Was ein früherer Lauf schon geholt hat: das Skript lässt liegen, was da ist, und holt nur,
+      # was fehlt (die Kacheln selbst und die Marken unter data/work/lod2/.done).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name=geodata-bw
+          echo "Artefakte von Lauf $RUN:"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          ls -l /tmp/$name.zip
+          # Im Artefakt liegen die Kacheln als dgm2/… und lod2/… (beim Hochladen zweier Pfade
+          # bleibt nur deren gemeinsamer Vorfahr weg, data/work) – also nach data/work.
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2 data/work/lod2
+      - name: Gelände (DGM1) und Gebäudemodelle (LoD2) holen
+        env:
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+          JOBS: ${{ inputs.jobs }}
+          LOD2_NAME: ${{ inputs.lod2_name }}
+        run: |
+          set -euo pipefail
+          python3 -I tools/fetch-bw.py --east "$EAST" --north "$NORTH" --jobs "$JOBS" \
+            --lod2-name "$LOD2_NAME" --published map-assets-index.json --on-overlap fail
+          du -sh data/work/dgm2 data/work/lod2
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste Lauf
+      # kann mit geodata_run hier weiterfahren (die Marken müssen mit hoch)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-bw
+          path: |
+            data/work/dgm2
+            data/work/lod2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    # Das Rechteck liegt außerhalb der Kästen von tools/mapgen/detail-region.json (die hessischen
+    # Karten); „all" baut die ganze Karte mit dem feineren Netz, das nach dem veröffentlichten
+    # Stand dazugekommen ist (Querschnitte, Parken, Gehwege, Markierungen, …).
+    env:
+      DETAIL_REGION: all
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-bw
+          # dito: das Artefakt hält dgm2/… und lod2/…, ohne data/work
+          path: data/work
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          ls data/work
+          du -sh data/work/dgm2 data/work/lod2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, Baden-Württemberg)
+        env:
+          OSM: ${{ inputs.osm }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/raw/osm
+          case "$OSM" in
+            baden-wuerttemberg) url=https://download.geofabrik.de/europe/germany/baden-wuerttemberg-latest.osm.pbf ;;
+            *) url="https://download.geofabrik.de/europe/germany/baden-wuerttemberg/$OSM/$OSM-latest.osm.pbf" ;;
+          esac
+          echo "$url"
+          curl -fsSL --retry 5 --retry-delay 20 -o "data/raw/osm/$OSM-latest.osm.pbf" "$url"
+          ls -l data/raw/osm
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        env:
+          OSM: ${{ inputs.osm }}
+        run: npm run map:extract -- "data/raw/osm/$OSM-latest.osm.pbf"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines
+          npm run map:buslines
+          npm run map:signs
+          npm run map:far
+          npm run map:timetable
+          npm run map:services
+      # build-graph.ts schreibt Namen und Quellen der hessischen Karte („Nordhessen", Hessische
+      # Verwaltung für Bodenmanagement und Geoinformation); hier stehen die von Baden-Württemberg.
+      - name: Der Name der Karte und ihre Quellen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+          ATTRIBUTION: 'Gelände (DGM1) und Gebäude (LoD2): Landesamt für Geoinformation und Landentwicklung Baden-Württemberg (LGL, www.lgl-bw.de), Datenlizenz Deutschland Namensnennung 2.0 (dl-de/by-2-0)'
+        run: |
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            const lines = (j.meta.attribution ?? []).filter((l) => !/Hessische|Hessen/i.test(l));
+            lines.push(process.env.ATTRIBUTION);
+            j.meta.attribution = lines;
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+            console.log(j.meta.attribution.join(" | "));
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+        run: |
+          tag="${WANTED:-karte-bw-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL (Baden-Württemberg) für den Fahrsimulator – im Spiel unter
+          Einstellungen → Karte laden (Kartenpaket).
+
+          Rechteck: $EAST km Ost, $NORTH km Nord (UTM32, EPSG:25832).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (© OpenStreetMap-Mitwirkende, ODbL 1.0) sowie dem
+          Geländemodell DGM1 und den Gebäudemodellen LoD2 des Landesamts für Geoinformation und
+          Landentwicklung Baden-Württemberg (https://opengeodata.lgl-bw.de).  Das LGL stellt diese
+          Daten unter der Datenlizenz Deutschland Namensnennung 2.0 (dl-de/by-2-0) bereit: „Sie dürfen
+          die Daten nach der Datenlizenz Deutschland Namensnennung 2.0 verwenden." Quellenvermerk:
+          „Datengrundlage: LGL, www.lgl-bw.de".  Die Quellen und Lizenzen stehen auch in map.json
+          (meta.attribution) und in docs/MAP_DATA.md.
+
+          Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
+          zusammengesetzt.
+          EOF
+          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+            --notes-file notes.md data/work/map.tar.*
+          echo "release $tag"
