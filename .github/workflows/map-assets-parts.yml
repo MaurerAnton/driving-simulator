@@ -462,6 +462,7 @@ jobs:
         if: ${{ inputs.commit }}
         env:
           TARGET: ${{ inputs.commit_path }}
+          START_AT: ${{ inputs.start_at }}
         run: |
           set -euo pipefail
           if [ "${GITHUB_REF_NAME}" != "main" ]; then
@@ -473,12 +474,18 @@ jobs:
           git fetch --quiet origin main
           git reset --quiet --hard origin/main
           mkdir -p "$TARGET"
-          # (nichts löschen, was schon im Repository liegt: sonst stünde in jedem Häppchen
-          # das Löschen aller übrigen Teile – nur die alten Teile, die es nicht mehr gibt)
+          # Weg damit ist nur, was dieser Lauf neu schreibt: die Teilnummern first…last.
+          # Alle übrigen Teile gehören zu Karten früherer Läufe und müssen bleiben – sonst
+          # verschwindet mit jedem Lauf die Karte der Länder von vorher.
           mapfile -t files < <(ls parts/*.tar | sort -V)
           n=${#files[@]}
+          first=${START_AT:-1}
+          num_last=$(( first + n - 1 ))
           for old in "$TARGET"/*.tar; do
             [ -e "$old" ] || continue
+            num=${old##*/}; num=${num%.tar}
+            case "$num" in ''|*[!0-9]*) continue ;; esac
+            [ "$num" -ge "$first" ] && [ "$num" -le "$num_last" ] || continue
             [ -f "parts/$(basename "$old")" ] || rm -f "$old"
           done
           batch=4
@@ -494,10 +501,25 @@ jobs:
             pushed=$(( pushed + 1 ))
             echo "Teile $(( i + 1 ))…$last sind im Repository"
           done
-          cp parts/index.json "$TARGET/"
+          # Der Index dieses Laufs kennt nur seine eigenen Teile; die Einträge der übrigen
+          # (die Karten früherer Läufe) nimmt er aus dem Index, der schon im Repository liegt.
+          python3 - "$TARGET" "$first" "$num_last" <<'PY'
+          import json, os, sys
+
+          target, first, last = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+          new = json.load(open('parts/index.json'))
+          path = os.path.join(target, 'index.json')
+          old = json.load(open(path)) if os.path.exists(path) else {'files': []}
+          kept = [f for f in old['files'] if not first <= f['n'] <= last]
+          files = sorted(kept + new['files'], key=lambda f: f['n'])
+          json.dump({'latest': files[-1]['n'], 'files': files}, open(path, 'w'), separators=(',', ':'))
+          print(f'index.json: {len(kept)} Teile von früher + {len(new["files"])} von diesem Lauf '
+                f'= {len(files)} insgesamt, höchste Nummer {files[-1]["n"]}')
+          PY
+          all=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["files"]))' "$TARGET/index.json")
           git add "$TARGET"
           if ! git diff --cached --quiet; then
-            git commit -q -m "map-assets: index of $n parts"
+            git commit -q -m "map-assets: index of $all parts"
             git push --quiet origin HEAD:main
             pushed=$(( pushed + 1 ))
           fi
