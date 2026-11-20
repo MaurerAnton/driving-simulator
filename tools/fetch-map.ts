@@ -97,21 +97,20 @@ const feed = (file: string): Promise<void> =>
   });
 let ok = false;
 try {
-  // (the map as one file, or in parts: whatever the release names)
-  if (names.map.length === 1) {
-    if (await download(names.map[0], part)) {
-      await feed(part);
-      ok = true;
+  // (the map as one file, or in parts: whatever the release names – and when the release names one
+  // file it may still be the parts, as every release without a manifest has it)
+  const files = names.map.length > 1 ? names.map : [names.map[0], ...Array.from({ length: 100 }, (_, n) => `map.tar.${String(n).padStart(2, '0')}`)];
+  for (const name of files) {
+    if (!(await download(name, part))) {
+      if (names.map.length > 1) break; // (the manifest named them: a missing one stops)
+      continue; // (no manifest: the single file is not there – try the parts)
     }
-  } else {
-    for (const name of names.map) {
-      if (!(await download(name, part))) break;
-      await feed(part);
-      process.stdout.write(`\r[map] ${name}  `);
-      ok = true;
-    }
-    process.stdout.write('\n');
+    await feed(part);
+    process.stdout.write(`\r[map] ${name}  `);
+    ok = true;
+    if (names.map.length === 1 && name === names.map[0]) break; // (one file, as the manifest says)
   }
+  process.stdout.write('\n');
 } catch (e) {
   console.error(`[map] ${(e as Error).message}`);
 }
