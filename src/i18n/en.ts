@@ -309,6 +309,7 @@ const dict: Dict = {
   "news.dev": "Development versions",
   "news.devIntro": "The steps on the way to 1.0.0, made on 15 and 16 November 2026. From 0.8.0 on they can be played on today's map; the earlier ones read a map of another form and are listed only.",
   "news.size": "{lines} lines (code {code} · tests {tests} · texts {texts}) · {bytes} of files in the repository",
+  "news.sizeMaps": "· {maps} of additional maps",
   "news.0_9_0.driver": "The automatic driver stops at a light or a stop sign at the very end of its way, and no longer cuts sharp bends into the lane of oncoming cars.",
   "news.0_9_0.plan": "The plan panel of the big map on low screens: the buttons that start a drive stay in view in one row at its foot.",
   "news.0_8_0.camera": "A free camera (V switches outside – cockpit – free): turn it by dragging or with a finger, move it with the right mouse button, two fingers or Alt + W A S D, come nearer with the wheel or a pinch. It stays where it is put while the car drives on.",

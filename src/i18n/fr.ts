@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Versions de développement",
   "news.devIntro": "Les étapes vers la 1.0.0, réalisées les 15 et 16 novembre 2026. À partir de la 0.8.0, elles se jouent sur la carte actuelle ; les précédentes lisent une carte d’une autre forme et ne sont que mentionnées.",
   "news.size": "{lines} lignes (code {code} · tests {tests} · textes {texts}) · {bytes} de fichiers dans le dépôt",
+  "news.sizeMaps": "· {maps} de cartes supplémentaires",
   "news.0_9_0.driver": "Le conducteur automatique s’arrête à un feu ou à un stop tout au bout de son trajet, et ne coupe plus les virages serrés sur la voie des véhicules venant en face.",
   "news.0_9_0.plan": "Le panneau de planification de la grande carte sur les écrans bas : les boutons qui lancent un trajet restent visibles, sur une rangée en bas.",
   "news.0_8_0.camera": "Une caméra libre (V passe de l’extérieur au cockpit puis à la vue libre) : faites-la tourner en la faisant glisser ou du doigt, déplacez-la avec le bouton droit de la souris, deux doigts ou Alt + W A S D, rapprochez-la avec la molette ou en écartant deux doigts. Elle reste là où on la place pendant que la voiture continue de rouler.",

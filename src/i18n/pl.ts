@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Wersje rozwojowe",
   "news.devIntro": "Kroki na drodze do 1.0.0, zrobione 15 i 16 listopada 2026. Od 0.8.0 można w nie grać na dzisiejszej mapie; wcześniejsze czytały mapę w innej postaci i są tylko wymienione.",
   "news.size": "{lines} wierszy (kod {code} · testy {tests} · teksty {texts}) · {bytes} plików w repozytorium",
+  "news.sizeMaps": "· {maps} dodatkowych map",
   "news.0_9_0.driver": "Automatyczny kierowca zatrzymuje się na światłach lub przy znaku stop na samym końcu swojej trasy i nie ścina już ostrych zakrętów na pas aut z naprzeciwka.",
   "news.0_9_0.plan": "Panel planowania dużej mapy na niskich ekranach: przyciski rozpoczynające jazdę pozostają widoczne w jednym rzędzie u jego dołu.",
   "news.0_8_0.camera": "Wolna kamera (V przełącza: z zewnątrz – kokpit – wolna): obracasz ją, przeciągając myszą lub palcem, przesuwasz prawym przyciskiem myszy, dwoma palcami albo Alt + W A S D, przybliżasz kółkiem lub szczypnięciem. Zostaje tam, gdzie ją ustawisz, gdy auto jedzie dalej.",

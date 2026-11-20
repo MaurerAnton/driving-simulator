@@ -71,8 +71,11 @@ test('every version says how big the game was – and it grew', () => {
     assert.ok(newer.lines <= older.lines * 3, `${what}: not more than three times as many lines at once`);
   }
   const w = sizeWords({ lines: 172000, code: 120400, tests: 17000, i18n: 36000, bytes: 11_600_000 }, 'en-GB');
-  assert.deepEqual(w, { lines: '172,000', code: '120k', tests: '17k', texts: '36k', bytes: '11.6 MB' });
+  assert.deepEqual(w, { lines: '172,000', code: '120k', tests: '17k', texts: '36k', bytes: '11.6 MB', maps: '' }, 'no additional maps: no word for them');
   assert.equal(sizeWords({ lines: 1, code: 1, tests: 1, i18n: 1, bytes: 1_450_000 }, 'de-DE').bytes, '1,5 MB');
+  // (the additional maps are counted apart from the game's own files)
+  assert.equal(sizeWords({ lines: 1, code: 1, tests: 1, i18n: 1, bytes: 20_000_000, maps: 2_532_710_569 }, 'en-GB').maps, '2.5 GB');
+  assert.equal(sizeWords({ lines: 1, code: 1, tests: 1, i18n: 1, bytes: 20_000_000, maps: 2_532_710_569 }, 'en-GB').bytes, '20.0 MB', 'the game is not inflated by the maps');
 });
 
 test('“What’s new” comes once after an update – not for whoever comes for the first time', () => {

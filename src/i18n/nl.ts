@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Ontwikkelversies",
   "news.devIntro": "De stappen op weg naar 1.0.0, gemaakt op 15 en 16 november 2026. Vanaf 0.8.0 zijn ze op de huidige kaart te spelen; de eerdere lezen een kaart van een andere vorm en worden alleen genoemd.",
   "news.size": "{lines} regels (code {code} · tests {tests} · teksten {texts}) · {bytes} aan bestanden in de repository",
+  "news.sizeMaps": "· {maps} aanvullende kaarten",
   "news.0_9_0.driver": "De automatische bestuurder stopt bij een verkeerslicht of stopbord helemaal aan het eind van zijn weg en snijdt scherpe bochten niet meer af over de rijstrook van tegenliggers.",
   "news.0_9_0.plan": "Het planpaneel van de grote kaart op lage schermen: de knoppen die een rit starten blijven in beeld, in één rij onderaan.",
   "news.0_8_0.camera": "Een vrije camera (V wisselt tussen buiten – cockpit – vrij): draai hem door te slepen of met een vinger, verplaats hem met de rechtermuisknop, twee vingers of Alt + W A S D, kom dichterbij met het scrollwiel of door te knijpen. Hij blijft staan waar je hem neerzet terwijl de auto doorrijdt.",

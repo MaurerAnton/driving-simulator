@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Entwicklungsversionen",
   "news.devIntro": "Die Schritte auf dem Weg zu 1.0.0, entstanden am 15. und 16. November 2026. Ab 0.8.0 lassen sie sich auf der heutigen Karte spielen; die früheren lesen eine Karte in anderer Form und sind nur aufgeführt.",
   "news.size": "{lines} Zeilen (Code {code} · Tests {tests} · Texte {texts}) · {bytes} an Dateien im Repository",
+  "news.sizeMaps": "· {maps} zusätzliche Karten",
   "news.0_9_0.driver": "Der automatische Fahrer hält an einer Ampel oder einem Stoppschild ganz am Ende seines Wegs und schneidet scharfe Kurven nicht mehr in die Spur des Gegenverkehrs.",
   "news.0_9_0.plan": "Das Planungsfeld der großen Karte auf niedrigen Bildschirmen: Die Knöpfe, die eine Fahrt starten, bleiben in einer Reihe an seinem Fuß im Blick.",
   "news.0_8_0.camera": "Eine freie Kamera (V wechselt außen – Cockpit – frei): Drehen durch Ziehen oder mit dem Finger, Verschieben mit der rechten Maustaste, zwei Fingern oder Alt + W A S D, näher heran mit dem Mausrad oder durch Aufziehen mit zwei Fingern. Sie bleibt, wo sie hingestellt wurde, während das Auto weiterfährt.",

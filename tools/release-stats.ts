@@ -55,9 +55,14 @@ export function linesOf(buf: Uint8Array): number | null {
 
 /** Add up files: (path, bytes, contents). */
 export function tally(files: Iterable<{ path: string; bytes: number; data: Uint8Array }>): ReleaseSize {
-  const s: ReleaseSize = { lines: 0, code: 0, tests: 0, i18n: 0, bytes: 0 };
+  const s: ReleaseSize = { lines: 0, code: 0, tests: 0, i18n: 0, bytes: 0, maps: 0 };
   for (const f of files) {
     if (f.path.startsWith('public/map/')) continue;
+    // (the additional maps are data like the map itself: counted apart, not as the game)
+    if (f.path.startsWith('map-assets/')) {
+      s.maps = (s.maps ?? 0) + f.bytes;
+      continue;
+    }
     s.bytes += f.bytes;
     const n = linesOf(f.data);
     if (n === null) continue;
@@ -121,7 +126,7 @@ export function fillInto(text: string, version: string, s: ReleaseSize): string 
   const end = next < 0 ? text.length : next;
   const m = /size: (null|\{[^}]*\}),/.exec(text.slice(start, end));
   if (!m) throw new Error(`src/game/releases.ts: the entry ${version} has no line "size: …,"`);
-  const lit = `size: { lines: ${s.lines}, code: ${s.code}, tests: ${s.tests}, i18n: ${s.i18n}, bytes: ${s.bytes} },`;
+  const lit = `size: { lines: ${s.lines}, code: ${s.code}, tests: ${s.tests}, i18n: ${s.i18n}, bytes: ${s.bytes}, maps: ${s.maps} },`;
   const at = start + m.index;
   return text.slice(0, at) + lit + text.slice(at + m[0].length);
 }

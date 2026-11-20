@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Versiuni de dezvoltare",
   "news.devIntro": "Pașii spre 1.0.0, făcuți pe 15 și 16 noiembrie 2026. De la 0.8.0 încoace se pot juca pe harta de azi; cele mai vechi citeau o hartă de altă formă și sunt doar enumerate.",
   "news.size": "{lines} de linii (cod {code} · teste {tests} · texte {texts}) · {bytes} de fișiere în depozitul de cod",
+  "news.sizeMaps": "· {maps} hărți suplimentare",
   "news.0_9_0.driver": "Șoferul automat oprește la un semafor sau la un indicator „Stop” chiar la capătul drumului său și nu mai taie curbele strânse pe banda mașinilor care vin din sens opus.",
   "news.0_9_0.plan": "Panoul de planificare al hărții mari pe ecrane joase: butoanele care pornesc o cursă rămân la vedere, pe un singur rând, la baza lui.",
   "news.0_8_0.camera": "O cameră liberă (V comută între exterior – cockpit – liberă): o rotești trăgând cu mouse-ul sau cu degetul, o muți cu butonul drept al mouse-ului, cu două degete sau cu Alt + W A S D, te apropii cu rotița sau ciupind ecranul. Rămâne unde ai pus-o în timp ce mașina merge mai departe.",

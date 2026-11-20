@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Razvojne verzije",
   "news.devIntro": "Koraci na putu do 1.0.0, nastali 15. i 16. studenoga 2026. Od 0.8.0 nadalje mogu se igrati na današnjoj karti; ranije čitaju kartu drugog oblika i samo su navedene.",
   "news.size": "{lines} redaka (kod {code} · testovi {tests} · tekstovi {texts}) · {bytes} datoteka u repozitoriju",
+  "news.sizeMaps": "· {maps} dodatnih karata",
   "news.0_9_0.driver": "Automatski vozač zaustavlja se na semaforu ili znaku stop na samom kraju svog puta i više ne siječe oštre zavoje kroz traku vozila iz suprotnog smjera.",
   "news.0_9_0.plan": "Ploča za planiranje na velikoj karti na niskim zaslonima: gumbi koji pokreću vožnju ostaju vidljivi u jednom redu pri njezinu dnu.",
   "news.0_8_0.camera": "Slobodna kamera (V prebacuje vanjski pogled – kokpit – slobodno): okreći je povlačenjem ili prstom, pomiči je desnom tipkom miša, s dva prsta ili s Alt + W A S D, približi je kotačićem ili štipanjem. Ostaje ondje gdje je postavljena dok automobil vozi dalje.",

@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Versões de desenvolvimento",
   "news.devIntro": "Os passos a caminho da 1.0.0, feitos a 15 e 16 de novembro de 2026. A partir da 0.8.0 podem ser jogadas no mapa atual; as anteriores leem um mapa de outra forma e são apenas listadas.",
   "news.size": "{lines} linhas (código {code} · testes {tests} · textos {texts}) · {bytes} de ficheiros no repositório",
+  "news.sizeMaps": "· {maps} de mapas adicionais",
   "news.0_9_0.driver": "O condutor automático para num semáforo ou num sinal de stop mesmo no fim do seu caminho, e já não corta curvas apertadas pela via de quem vem em sentido contrário.",
   "news.0_9_0.plan": "O painel de planeamento do mapa grande em ecrãs baixos: os botões que iniciam uma condução ficam à vista, numa fila em baixo.",
   "news.0_8_0.camera": "Uma câmara livre (V alterna entre exterior – cockpit – livre): rode-a arrastando ou com um dedo, desloque-a com o botão direito do rato, dois dedos ou Alt + W A S D, aproxime-se com a roda ou afastando dois dedos. Fica onde a pôs enquanto o carro continua.",

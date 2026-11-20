@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Versionet e zhvillimit",
   "news.devIntro": "Hapat në rrugën drejt 1.0.0, të bërë më 15 dhe 16 nëntor 2026. Që nga 0.8.0 e tutje mund të luhen mbi hartën e sotme; të mëparshmet lexojnë një hartë të një forme tjetër dhe vetëm renditen.",
   "news.size": "{lines} rreshta (kod {code} · teste {tests} · tekste {texts}) · {bytes} skedarë në depo",
+  "news.sizeMaps": "· {maps} harta shtesë",
   "news.0_9_0.driver": "Shoferi automatik ndalon te një semafor ose te një tabelë stop në fund fare të rrugës së vet dhe nuk i pret më kthesat e forta përmes korsisë së makinave që vijnë përballë.",
   "news.0_9_0.plan": "Paneli i planifikimit të hartës së madhe në ekranet e ulëta: butonat që nisin një ngarje mbeten të dukshëm në një rresht në fund të tij.",
   "news.0_8_0.camera": "Një kamerë e lirë (V kalon jashtë – kabinë – e lirë): rrotulloje duke tërhequr ose me gisht, lëvize me butonin e djathtë të miut, me dy gishta ose me Alt + W A S D, afroje me rrotëzën ose duke shtrënguar me dy gishta. Mbetet aty ku vendoset, ndërsa makina vazhdon.",

@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Versioni di sviluppo",
   "news.devIntro": "Le tappe verso la 1.0.0, realizzate il 15 e 16 novembre 2026. Dalla 0.8.0 in poi si possono giocare sulla mappa di oggi; le precedenti leggono una mappa di un'altra forma e sono solo elencate.",
   "news.size": "{lines} righe (codice {code} · test {tests} · testi {texts}) · {bytes} di file nel repository",
+  "news.sizeMaps": "· {maps} di mappe aggiuntive",
   "news.0_9_0.driver": "Il guidatore automatico si ferma a un semaforo o a uno stop proprio alla fine del suo percorso, e non taglia più le curve strette invadendo la corsia dei veicoli in senso opposto.",
   "news.0_9_0.plan": "Il pannello di pianificazione della mappa grande sugli schermi bassi: i pulsanti che avviano un percorso restano visibili, in una riga in fondo.",
   "news.0_8_0.camera": "Una visuale libera (V passa tra esterna – abitacolo – libera): ruotala trascinando o con un dito, spostala con il tasto destro del mouse, due dita o Alt + W A S D, avvicinati con la rotellina o allargando due dita. Resta dove la metti mentre l'auto prosegue.",

@@ -1525,7 +1525,10 @@ export class Hud {
       const card = devPart ?? p;
       const head = el('h2', '', `${this.t('newsVersion', { v: r.version })} · ${r.at ? dateTime.format(new Date(r.at)) : date.format(new Date(`${r.date}T12:00:00`))}`);
       // how big the game was then (tools/release-stats.ts)
-      if (r.size) head.append(el('span', 'news-size', this.t('news.size', sizeWords(r.size, localeOf(this.lang)))));
+      if (r.size) {
+        const w = sizeWords(r.size, localeOf(this.lang));
+        head.append(el('span', 'news-size', this.t('news.size', w) + (w.maps ? ` ${this.t('news.sizeMaps', w)}` : '')));
+      }
       card.append(head);
       // every version can be played again (ui/versionpicker.ts) – the button shows where the site has it
       const play = playVersionButton(r.version, (k, v) => this.t(k, v));

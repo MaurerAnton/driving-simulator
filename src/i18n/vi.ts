@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Các phiên bản phát triển",
   "news.devIntro": "Những bước trên đường đến 1.0.0, được làm vào ngày 15 và 16 tháng 11 năm 2026. Từ 0.8.0 trở đi có thể chơi chúng trên bản đồ hiện nay; các phiên bản sớm hơn đọc bản đồ theo định dạng khác nên chỉ được liệt kê.",
   "news.size": "{lines} dòng (mã {code} · kiểm thử {tests} · văn bản {texts}) · {bytes} tệp trong kho mã",
+  "news.sizeMaps": "· {maps} bản đồ bổ sung",
   "news.0_9_0.driver": "Tài xế tự động dừng ở đèn hoặc biển dừng ngay ở cuối lộ trình, và không còn cắt các khúc cua gắt sang làn xe ngược chiều.",
   "news.0_9_0.plan": "Bảng kế hoạch của bản đồ lớn trên màn hình thấp: các nút bắt đầu chuyến lái luôn hiện trong một hàng ở dưới cùng.",
   "news.0_8_0.camera": "Camera tự do (V chuyển bên ngoài – buồng lái – tự do): xoay bằng cách kéo hoặc bằng ngón tay, di chuyển bằng nút chuột phải, hai ngón tay hoặc Alt + W A S D, lại gần bằng con lăn hoặc chụm ngón tay. Camera đứng yên ở chỗ được đặt trong khi xe chạy tiếp.",

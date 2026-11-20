@@ -33,8 +33,13 @@ export interface ReleaseSize {
   tests: number;
   /** the translations (src/i18n) */
   i18n: number;
-  /** the bytes of all files in the repository */
+  /** the bytes of the game's own files in the repository (the map and the map parts not counted) */
   bytes: number;
+  /**
+   * the bytes of the additional maps in the repository (map-assets – the map itself is a file of a
+   * release).  Absent in the releases from before there were any: they count the whole repository.
+   */
+  maps?: number;
 }
 
 export interface Release {
@@ -64,7 +69,7 @@ export const RELEASES: readonly Release[] = [
     date: '2026-11-20',
     at: '',
     items: ['news.1_7_3.hesse', 'news.1_7_3.devmap', 'news.1_7_3.baunatal', 'news.1_7_3.parts'],
-    size: null,
+    size: { lines: 286563, code: 161141, tests: 28241, i18n: 69526, bytes: 21423781, maps: 2532710569 },
   },
   {
     version: '1.7.2',
@@ -244,14 +249,23 @@ export const RELEASES: readonly Release[] = [
 /**
  * The words of news.size for a version, in the number format of `locale`:
  * all lines in full ("203,374"), the parts short ("118K"), the bytes in MB
- * ("14.4 MB").
+ * ("14.4 MB") – and the additional maps of the repository, counted apart
+ * ("2.4 GB of map parts"), because they are data, not the game.
  */
 export function sizeWords(s: ReleaseSize, locale = 'en'): Record<string, string> {
   // (Western digits, like all the texts)
   const full = new Intl.NumberFormat(locale, { numberingSystem: 'latn' });
   const short = new Intl.NumberFormat(locale, { notation: 'compact', maximumSignificantDigits: 3, numberingSystem: 'latn' });
   const mb = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1, numberingSystem: 'latn' });
-  return { lines: full.format(s.lines), code: short.format(s.code), tests: short.format(s.tests), texts: short.format(s.i18n), bytes: `${mb.format(s.bytes / 1e6)} MB` };
+  const g = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1, numberingSystem: 'latn' });
+  return {
+    lines: full.format(s.lines),
+    code: short.format(s.code),
+    tests: short.format(s.tests),
+    texts: short.format(s.i18n),
+    bytes: `${mb.format(s.bytes / 1e6)} MB`,
+    maps: (s.maps ?? 0) > 0 ? `${g.format((s.maps ?? 0) / 1e9)} GB` : '',
+  };
 }
 
 /** the version running now */

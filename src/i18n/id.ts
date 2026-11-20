@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Versi pengembangan",
   "news.devIntro": "Langkah-langkah menuju 1.0.0, dibuat pada 15 dan 16 November 2026. Mulai 0.8.0, versi-versi ini bisa dimainkan di peta saat ini; versi yang lebih awal membaca peta dengan format lain dan hanya dicantumkan.",
   "news.size": "{lines} baris (kode {code} · tes {tests} · teks {texts}) · {bytes} file di repositori",
+  "news.sizeMaps": "· {maps} peta tambahan",
   "news.0_9_0.driver": "Pengemudi otomatis berhenti di lampu lalu lintas atau rambu stop di ujung paling akhir rutenya, dan tidak lagi memotong tikungan tajam ke lajur mobil dari arah berlawanan.",
   "news.0_9_0.plan": "Panel rencana di peta besar pada layar yang pendek: tombol-tombol untuk memulai perjalanan tetap terlihat dalam satu baris di bagian bawahnya.",
   "news.0_8_0.camera": "Kamera bebas (V berganti luar – kokpit – bebas): putar dengan menyeret atau dengan jari, geser dengan tombol kanan mouse, dua jari, atau Alt + W A S D, dekatkan dengan roda mouse atau cubitan. Kamera tetap di tempatnya selagi mobil terus melaju.",

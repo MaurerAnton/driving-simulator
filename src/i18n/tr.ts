@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Geliştirme sürümleri",
   "news.devIntro": "15 ve 16 Kasım 2026'da yapılan, 1.0.0'a giden yoldaki adımlar. 0.8.0'dan itibaren bugünkü haritada oynanabilirler; daha eskileri başka biçimde bir harita okur ve yalnızca listelenir.",
   "news.size": "{lines} satır (kod {code} · testler {tests} · metinler {texts}) · depoda {bytes} dosya",
+  "news.sizeMaps": "· {maps} ek harita",
   "news.0_9_0.driver": "Otomatik sürücü, yolunun en sonundaki bir ışıkta veya dur levhasında durur ve keskin virajları artık karşıdan gelen araçların şeridinden kesmez.",
   "news.0_9_0.plan": "Alçak ekranlarda büyük haritanın plan paneli: sürüşü başlatan düğmeler panelin altında tek bir satırda görünür kalır.",
   "news.0_8_0.camera": "Serbest bir kamera (V dışarıdan – kokpit – serbest arasında geçiş yapar): sürükleyerek veya parmakla döndürün, farenin sağ düğmesi, iki parmak ya da Alt + W A S D ile hareket ettirin, tekerlekle veya iki parmakla sıkıştırarak yaklaştırın. Araba yoluna devam ederken konduğu yerde kalır.",

@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Vývojové verze",
   "news.devIntro": "Kroky na cestě k 1.0.0, vytvořené 15. a 16. listopadu 2026. Od 0.8.0 je lze hrát na dnešní mapě; starší četly mapu v jiné podobě a jsou jen uvedené.",
   "news.size": "{lines} řádků (kód {code} · testy {tests} · texty {texts}) · {bytes} souborů v repozitáři",
+  "news.sizeMaps": "· {maps} dalších map",
   "news.0_9_0.driver": "Automatický řidič zastaví na semaforu nebo u značky Stop na samém konci své cesty a už neřeže ostré zatáčky do pruhu protijedoucích aut.",
   "news.0_9_0.plan": "Panel plánování velké mapy na nízkých obrazovkách: tlačítka, která spouštějí jízdu, zůstávají vidět v jedné řadě u jeho spodního okraje.",
   "news.0_8_0.camera": "Volná kamera (V přepíná zvenku – kokpit – volná): otáčíš jí tažením myší nebo prstem, posouváš ji pravým tlačítkem myši, dvěma prsty nebo Alt + W A S D, přiblížíš ji kolečkem nebo roztažením prstů. Zůstane tam, kam ji dáš, zatímco auto jede dál.",

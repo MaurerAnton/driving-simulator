@@ -303,6 +303,7 @@ const dict: Dict = {
   "news.dev": "Fejlesztői verziók",
   "news.devIntro": "Az 1.0.0 felé vezető lépések, 2026. november 15-én és 16-án készültek. A 0.8.0-tól kezdve a mai térképen játszhatók; a korábbiak más formájú térképet olvastak, ezért csak fel vannak sorolva.",
   "news.size": "{lines} sor (kód {code} · tesztek {tests} · szövegek {texts}) · {bytes} fájl a tárolóban",
+  "news.sizeMaps": "· {maps} további térkép",
   "news.0_9_0.driver": "Az automatikus sofőr megáll a lámpánál vagy a stoptáblánál az útja legvégén is, és már nem vágja be az éles kanyarokat a szembejövők sávjába.",
   "news.0_9_0.plan": "A nagy térkép tervezőpanelje alacsony képernyőkön: a vezetést indító gombok egy sorban, az alján láthatók maradnak.",
   "news.0_8_0.camera": "Szabad kamera (V vált: kívülről – pilótafülke – szabad): húzással vagy ujjal forgathatod, a jobb egérgombbal, két ujjal vagy Alt + W A S D-vel mozgathatod, a görgővel vagy csippentéssel közelíthetsz. Ott marad, ahová tetted, miközben az autó továbbhalad.",
