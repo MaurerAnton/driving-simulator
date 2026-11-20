@@ -186,23 +186,27 @@ jobs:
           ls -l data/raw/osm
       - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
         env:
-          OSM: ${{ inputs.osm }}
-        run: npm run map:extract -- "data/raw/osm/$OSM-latest.osm.pbf"
+          OSM: data/raw/osm/${{ inputs.osm }}-latest.osm.pbf
+        run: npm run map:extract -- "$OSM"
       - name: Kartenpaket 2/4 – Straßennetz und Kacheln
         run: npm run map:build -- --jobs 3
       - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
         env:
+          # build-lines.ts, build-buslines.ts, build-signs.ts und build-services.ts lesen die
+          # OpenStreetMap-Datei aus process.argv[2] und nehmen ohne Argument
+          # data/raw/osm/hessen-latest.osm.pbf – die hat nur der hessische Bau.
+          OSM: data/raw/osm/${{ inputs.osm }}-latest.osm.pbf
           GTFS_AGENCY: ${{ inputs.gtfs_agency }}
           GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
         run: |
           npm run map:addresses
           npm run map:stops
-          npm run map:lines
-          npm run map:buslines
-          npm run map:signs
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
           npm run map:far
           npm run map:timetable
-          npm run map:services
+          npm run map:services -- "$OSM"
       # build-graph.ts schreibt Namen und Quellen der hessischen Karte („Nordhessen", Hessische
       # Verwaltung für Bodenmanagement und Geoinformation); hier stehen die von NRW.
       - name: Der Name der Karte und ihre Quellen (map.json)
