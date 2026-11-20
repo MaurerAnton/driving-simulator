@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Probe SH-Portal
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set -euo pipefail
+          echo "== Index DGM1"
+          curl -fsSL -A map-fetch/0.1 -o /tmp/dgm1.geojson -w "%{http_code} %{size_download} %{time_total}s\n" \
+            "https://geodaten.schleswig-holstein.de/gaialight-sh/_apps/dladownload/single.php?file=DGM1_SH__Massendownload.geojson&id=4"
+          python3 -c "import json;d=json.load(open('/tmp/dgm1.geojson'));print('features',len(d['features']))"
+          echo "== Index LoD2"
+          curl -fsSL -A map-fetch/0.1 -o /tmp/lod2.geojson -w "%{http_code} %{size_download} %{time_total}s\n" \
+            "https://geodaten.schleswig-holstein.de/gaialight-sh/_apps/dladownload/single.php?file=LOD2_SH_Massendownload.geojson&id=4"
+          python3 -c "import json;d=json.load(open('/tmp/lod2.geojson'));print('features',len(d['features']))"
+          echo "== Nutzungsbedingungen"
+          curl -fsSL -A map-fetch/0.1 -o /tmp/lizenz.html -w "%{http_code} %{size_download}\n" \
+            "https://geodaten.schleswig-holstein.de/gaialight-sh/_apps/dladownload/lizenz.html"
+          grep -o "CC BY 4.0" /tmp/lizenz.html | head -1
+          echo "== eine Geländekachel (573_6020, Kiel)"
+          curl -fsSL -A map-fetch/0.1 --compressed -o /tmp/dgm.xyz -w "%{http_code} %{size_download} %{time_total}s\n" \
+            "https://geodaten.schleswig-holstein.de/gaialight-sh/_apps/dladownload/massen.php?file=dgm1_32_573_6020_1_sh_2023.xyz&id=2&live=2023&km=32570_6020"
+          head -1 /tmp/dgm.xyz
+          wc -l /tmp/dgm.xyz
+          echo "== eine Gebäudekachel"
+          curl -fsSL -A map-fetch/0.1 --compressed -o /tmp/lod2.xml -w "%{http_code} %{size_download} %{time_total}s\n" \
+            "https://geodaten.schleswig-holstein.de/gaialight-sh/_apps/dladownload/massen.php?file=LoD2_32_573_6020_1_SH.xml&id=4&live=2024&km=32570_6020"
+          head -c 200 /tmp/lod2.xml
+          echo "== Geofabrik Schleswig-Holstein"
+          curl -fsSL -r 0-1000 -o /dev/null -w "%{http_code}\n" \
+            "https://download.geofabrik.de/europe/germany/schleswig-holstein/schleswig-holstein-latest.osm.pbf"
