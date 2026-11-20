@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 name: probe-bayern
-on: workflow_dispatch:
+on:
+  workflow_dispatch:
+    inputs:
+      dummy:
+        description: ignore
+        type: string
+        default: ''
 jobs:
   probe:
     runs-on: ubuntu-latest
