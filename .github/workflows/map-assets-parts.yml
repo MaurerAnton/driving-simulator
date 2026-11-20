@@ -50,6 +50,14 @@ on:
         description: 'Leer: die Teile bleiben ein Artefakt dieses Laufs.  Sonst: ein Release dieses Namens, in das sie kommen.'
         type: string
         default: ''
+      commit:
+        description: 'Die Teile in das Repository legen (map-assets/) – dort liest das Spiel sie, raw.githubusercontent schickt den CORS-Kopf'
+        type: boolean
+        default: false
+      commit_path:
+        description: 'Wohin im Repository (map-assets: die Vorgabe des Spiels)'
+        type: string
+        default: 'map-assets'
 
 permissions:
   contents: write   # das Kartenpaket lesen, und ein Release schreiben, wenn to_release genannt ist
@@ -445,6 +453,56 @@ jobs:
           path: parts
           retention-days: 30
           if-no-files-found: error
+
+      # die Teile gleich dorthin legen, wo das Spiel sie liest: map-assets/ im Repository
+      # (raw.githubusercontent schickt den CORS-Kopf, ein Release nicht).  Ein Push darf
+      # höchstens 2 GiB sein – darum in Häppchen von vier Teilen, und der Index zuletzt,
+      # damit er nie auf eine Datei zeigt, die noch nicht da ist.
+      - name: In das Repository legen (map-assets/)
+        if: ${{ inputs.commit }}
+        env:
+          TARGET: ${{ inputs.commit_path }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "::error::In das Repository legen geht nur von main aus (dieser Lauf ist ${GITHUB_REF_NAME})"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --quiet origin main
+          git reset --quiet --hard origin/main
+          mkdir -p "$TARGET"
+          # (nichts löschen, was schon im Repository liegt: sonst stünde in jedem Häppchen
+          # das Löschen aller übrigen Teile – nur die alten Teile, die es nicht mehr gibt)
+          mapfile -t files < <(ls parts/*.tar | sort -V)
+          n=${#files[@]}
+          for old in "$TARGET"/*.tar; do
+            [ -e "$old" ] || continue
+            [ -f "parts/$(basename "$old")" ] || rm -f "$old"
+          done
+          batch=4
+          pushed=0
+          for (( i = 0; i < n; i += batch )); do
+            last=$(( i + batch ))
+            if [ "$last" -gt "$n" ]; then last=$n; fi
+            for (( j = i; j < last; j++ )); do cp "${files[j]}" "$TARGET/"; done
+            git add "$TARGET"
+            if git diff --cached --quiet; then continue; fi
+            git commit -q -m "map-assets: parts $(( i + 1 ))…$last of $n"
+            git push --quiet origin HEAD:main
+            pushed=$(( pushed + 1 ))
+            echo "Teile $(( i + 1 ))…$last sind im Repository"
+          done
+          cp parts/index.json "$TARGET/"
+          git add "$TARGET"
+          if ! git diff --cached --quiet; then
+            git commit -q -m "map-assets: index of $n parts"
+            git push --quiet origin HEAD:main
+            pushed=$(( pushed + 1 ))
+          fi
+          echo "$pushed Pushes, $(du -sh "$TARGET" | cut -f1) in $TARGET"
+          git log --oneline -n "$pushed"
 
       # nur wenn ein Name genannt ist: die Teile in ein Release legen – von dort holt man sie
       # herunter und legt sie unter map-assets/ im Repository ab (nur so kommen sie mit CORS
