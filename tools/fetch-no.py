@@ -128,13 +128,14 @@ def curl_to(url, dest, attempts=6):
     """Mit curl holen (und einen angefangenen Bruch wieder aufnehmen)."""
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     for attempt in range(attempts):
+        if os.path.exists(dest):
+            os.remove(dest)
         code = subprocess.call(
-            ['curl', '-fsSL', '-A', AGENT, '-C', '-', '--retry', '3', '--connect-timeout', '30', '-o', dest, url]
+            ['curl', '-fsSL', '-A', AGENT, '--retry', '3', '--connect-timeout', '30',
+             '-o', dest, url]
         )
         if code == 0 and os.path.exists(dest) and os.path.getsize(dest) > 0:
             return
-        if code == 33 and os.path.exists(dest):
-            os.remove(dest)
         say(f'[no] curl endete mit {code} für {os.path.basename(dest)}; noch einmal')
         time.sleep(10 * (attempt + 1))
     raise RuntimeError(f'nicht geholt: {url}')
@@ -152,23 +153,37 @@ def take_dgm(east, north, tmp):
     empty = os.path.join(GD.DGM_OUT, '.done', f'{east}_{north}')
     if os.path.exists(empty):  # gemerkt: hier gibt es nichts
         return -1
-    curl_to(coverage_url(east, north), tmp)
-    with open(tmp, 'rb') as f:
-        data = f.read()
-    if data[:2] not in (b'II', b'MM'):
-        # eine OGC-Meldung kommt als XML oder Text, nicht als GeoTIFF
+    # Kartverket bricht eine Anfrage mitten in der Datei ab, wenn mehrere zugleich kommen;
+    # ein solches Bruchstück wird noch dreimal neu geholt, ehe das Quadrat als Lücke gilt.
+    for attempt in range(4):
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        try:
+            curl_to(coverage_url(east, north), tmp)
+            with open(tmp, 'rb') as f:
+                data = f.read()
+        except RuntimeError:
+            continue
+        if data[:2] not in (b'II', b'MM'):
+            # eine OGC-Meldung kommt als XML oder Text, nicht als GeoTIFF
+            os.remove(tmp)
+            os.makedirs(os.path.dirname(empty), exist_ok=True)
+            with open(empty, 'w') as f:
+                f.write('kein GeoTIFF\n')
+            return -1
+        try:
+            blob = GD.reduce_tile(data)
+        except OSError as err:  # unvollständige Datei: die Größe stimmt nicht
+            say(f'[no] {east}_{north}: GeoTIFF unvollständig ({err}); noch einmal')
+            time.sleep(5)
+            continue
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        with open(out + '.tmp', 'wb') as f:
+            f.write(blob)
+        os.replace(out + '.tmp', out)
         os.remove(tmp)
-        os.makedirs(os.path.dirname(empty), exist_ok=True)
-        with open(empty, 'w') as f:
-            f.write('kein GeoTIFF\n')
-        return -1
-    blob = GD.reduce_tile(data)
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out + '.tmp', 'wb') as f:
-        f.write(blob)
-    os.replace(out + '.tmp', out)
-    os.remove(tmp)
-    return len(blob)
+        return len(blob)
+    raise RuntimeError(f'{east}_{north}: kein vollständiges GeoTIFF von Kartverket')
 
 
 def main():
@@ -230,11 +245,16 @@ def main():
     made = 0
     again = 0
     gaps = []
+    failed = []
     total = 0
 
     def one(item):
         e, n = item
-        return e, n, take_dgm(e, n, os.path.join(GD.TMP, f'no-{e}_{n}.tif'))
+        try:
+            return e, n, take_dgm(e, n, os.path.join(GD.TMP, f'no-{e}_{n}.tif'))
+        except Exception as err:  # ein Quadrat darf den Lauf nicht beenden
+            say(f'[no] {e}_{n}: {err}')
+            return e, n, -2
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         for count, (e, n, size) in enumerate(pool.map(one, work), start=1):
@@ -243,6 +263,8 @@ def main():
                 total += size
             elif size == 0:
                 again += 1
+            elif size == -2:
+                failed.append(f'{e}_{n}')
             else:
                 gaps.append(f'{e}_{n}')
             if count % 25 == 0 or count == len(work):
@@ -250,7 +272,14 @@ def main():
                     f'{again} waren schon da, {len(gaps)} ohne Daten '
                     f'– {(time.time() - started) / 60:.0f} min')
     say(f'[no] fertig: {made} Höhenkacheln ({total / 1e6:.0f} MB), {again} waren schon da, '
-        f'{len(gaps)} Quadrate ohne Daten, {(time.time() - started) / 60:.0f} min')
+        f'{len(gaps)} Quadrate ohne Daten, {len(failed)} fehlgeschlagen, '
+        f'{(time.time() - started) / 60:.0f} min')
+    if failed:
+        say(f'[no] nicht geholt (noch einmal mit demselben Rechteck, die fertigen bleiben liegen): '
+            + ', '.join(failed[:10]) + ('…' if len(failed) > 10 else ''))
+        if args.gaps:
+            with open(args.gaps, 'a') as f:
+                f.write('\n'.join(failed) + '\n')
     if gaps:
         say(f'[no] kein Gelände von Kartverket für {len(gaps)} Quadrate (die Karte bleibt dort weg)'
             + (f': {", ".join(gaps[:8])}' if len(gaps) <= 8 else ''))
