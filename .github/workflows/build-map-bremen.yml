@@ -177,9 +177,19 @@ jobs:
           df -h /
       - name: OpenStreetMap (Geofabrik, Bremen)
         run: |
+          set -euo pipefail
           mkdir -p data/raw/osm
-          curl -fsSL --retry 5 --retry-delay 20 -o data/raw/osm/bremen-latest.osm.pbf \
-            https://download.geofabrik.de/europe/germany/bremen/bremen-latest.osm.pbf
+          # der erste Versuch kann schon am Verbinden scheitern (Exit 7, gemessen im Lauf
+          # 44809592674 und bei Baden-Württemberg) – curl nimmt das nicht als Fehler zum
+          # Wiederholen, darum die Schleife
+          for try in 1 2 3 4 5; do
+            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors --connect-timeout 60 \
+              -o data/raw/osm/bremen-latest.osm.pbf \
+              https://download.geofabrik.de/europe/germany/bremen/bremen-latest.osm.pbf && break
+            echo "Versuch $try: OpenStreetMap nicht geholt"
+            sleep 30
+          done
+          test -s data/raw/osm/bremen-latest.osm.pbf
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
