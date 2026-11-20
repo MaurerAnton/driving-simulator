@@ -1,0 +1,340 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Makes map parts in the format of map-assets/ (index.json + 1.tar, 2.tar, …) out of
+# map packs that are already published in releases – what the game reads in its
+# developer mode (world/partcache.ts, world/patchpart.ts, world/tileversions.ts).
+#
+# Why it runs here: downloading, unpacking and packing several gigabytes needs the disk
+# of a runner (~14 GB); nothing of the map is built again – the tiles of a release are
+# only sorted into parts – so a run takes minutes, not hours, and no geodata is fetched.
+#
+# Start it by hand: Actions → "Kartenteile (map-assets)" → Run workflow.
+#
+# The parts of all the releases named in `releases` go into ONE map-assets/: the numbers
+# run through in the order of the input (1.tar … N.tar), and one index.json names them
+# all, so several maps share one folder.  `latest` is the highest number.
+#
+#   index.json   { latest, files: [{ n, file, type, codec, tiles }] }
+#   N.tar        one tar per part: every entry is one tile, stored as it is (gzip already),
+#                named by its key "412_398", plus a manifest.json with the type of the build
+#                and the codec of every entry.  The tiles go in row by row (z, then x), so a
+#                part is a band of the map and one download covers the neighbourhood.
+#
+# A release is only a place to put them down: the game reads the parts from the repository
+# (raw.githubusercontent.com, which sends the CORS header a release asset does not), so
+# they belong in map-assets/ – see docs, "map parts".
+
+name: Kartenteile (map-assets)
+
+on:
+  workflow_dispatch:
+    inputs:
+      releases:
+        description: 'Kartenpakete (Releases), in dieser Reihenfolge durchnumeriert (mit Leerzeichen getrennt)'
+        type: string
+        default: 'karte-suedwest-2026-11-20-r7 karte-suedost-2026-11-20-r7'
+      type:
+        description: 'Art der Teile: base – wie die Karte sie zum ersten Mal hatte; modified – ein Patch; unstable – ein Versuch'
+        type: choice
+        default: base
+        options: [base, modified, unstable]
+      part_mb:
+        description: 'Größenziel eines Teils in MiB ( mehr als 100 nimmt GitHub nicht an )'
+        type: string
+        default: '90'
+      to_release:
+        description: 'Leer: die Teile bleiben ein Artefakt dieses Laufs.  Sonst: ein Release dieses Namens, in das sie kommen.'
+        type: string
+        default: ''
+
+permissions:
+  contents: write   # das Kartenpaket lesen, und ein Release schreiben, wenn to_release genannt ist
+
+jobs:
+  parts:
+    timeout-minutes: 180
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # node braucht nur die Prüfung: sie liest die Teile mit dem eigenen Code des Spiels
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # ein Kartenpaket nach dem anderen: holen, auspacken, in Teile legen, prüfen, die Karte
+      # wieder wegwerfen – so bleibt der Platzbedarf bei einer Karte, nicht bei allen
+      - name: Kartenpakete holen und in Teile legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES: ${{ inputs.releases }}
+          TYPE: ${{ inputs.type }}
+          PART_MB: ${{ inputs.part_mb }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/mkparts2.py" <<'PY'
+          import io, json, math, os, sys, tarfile
+
+          mapdir, outdir, ptype, limit, first, fragment = sys.argv[1:7]
+          limit, first = int(limit), int(first)
+          BLOCK, RESERVE = 512, 1 << 20   # RESERVE: das manifest.json und das Ende des Archivs
+          TILES = os.path.join(mapdir, 'tiles')
+
+          def cost(size):
+              return BLOCK + math.ceil(size / BLOCK) * BLOCK
+
+          # zeilenweise (z, dann x): so ist ein Teil ein Streifen der Karte
+          tiles = []
+          for name in os.listdir(TILES):
+              if not name.endswith('.fsb'):
+                  continue
+              key = name[:-4]
+              try:
+                  six, siz = key.split('_')
+                  tiles.append((int(siz), int(six), key, os.path.getsize(os.path.join(TILES, name))))
+              except ValueError:
+                  continue
+          tiles.sort()
+
+          parts, cur, size = [], [], 0
+          for _, _, key, nbytes in tiles:
+              c = cost(nbytes)
+              if cur and size + c > limit - RESERVE:
+                  parts.append(cur)
+                  cur, size = [], 0
+              cur.append(key)
+              size += c
+          if cur:
+              parts.append(cur)
+
+          os.makedirs(outdir, exist_ok=True)
+          files = []
+          for n, keys in enumerate(parts, start=first):
+              # die Kacheln bleiben, wie sie sind – gzip sind sie schon; das manifest sagt es
+              manifest = json.dumps({'type': ptype, 'tiles': dict.fromkeys(keys, 'gzip')}, separators=(',', ':')).encode()
+              name = '%d.tar' % n
+              with tarfile.open(os.path.join(outdir, name), 'w', format=tarfile.USTAR_FORMAT) as tar:
+                  info = tarfile.TarInfo('manifest.json')
+                  info.size, info.mtime, info.mode = len(manifest), 0, 0o644
+                  tar.addfile(info, io.BytesIO(manifest))
+                  for key in keys:
+                      path = os.path.join(TILES, key + '.fsb')
+                      info = tarfile.TarInfo(key)
+                      info.size, info.mtime, info.mode = os.path.getsize(path), 0, 0o644
+                      with open(path, 'rb') as fh:
+                          tar.addfile(info, fh)
+              files.append({'n': n, 'file': name, 'type': ptype, 'codec': 'gzip', 'tiles': keys})
+
+          with open(fragment, 'w') as fh:
+              json.dump(files, fh, separators=(',', ':'))
+
+          sizes = [os.path.getsize(os.path.join(outdir, f['file'])) for f in files] or [0]
+          print(json.dumps({
+              'tiles': len(tiles), 'parts': len(files), 'first': first,
+              'last': first + len(files) - 1, 'bytes': sum(sizes),
+              'part_min': min(sizes), 'part_max': max(sizes),
+          }))
+          PY
+          cat > "$RUNNER_TEMP/checkparts.mjs" <<'JS'
+          import { readdirSync, readFileSync, statSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { gunzipSync } from 'node:zlib';
+
+          const [mapdir, partsdir, wantType, fragment] = process.argv.slice(2);
+          const base = process.env.SRC_BASE ?? `${process.cwd()}/src/world`;
+          const { PatchPart } = await import(`file://${base}/patchpart.ts`);
+
+          const fail = (msg) => { console.error('FAIL:', msg); process.exitCode = 1; };
+          const files = JSON.parse(readFileSync(fragment, 'utf8'));
+          const seen = new Map();
+          for (const f of files) {
+            if (f.type !== wantType) fail(`${f.file}: Art ${f.type}, erwartet ${wantType}`);
+            if (!f.tiles?.length) fail(`${f.file}: keine Kacheln`);
+            for (const t of f.tiles) seen.set(t, (seen.get(t) ?? 0) + 1);
+            const bytes = readFileSync(join(partsdir, f.file));
+            let part;
+            try { part = PatchPart.fromBytes(f.n, f.file, bytes); }
+            catch (err) { fail(`${f.file}: ${err.message}`); continue; }
+            if (part.manifest.type !== wantType) fail(`${f.file}: manifest-Art ${part.manifest.type}`);
+            if (part.tiles().length !== f.tiles.length) fail(`${f.file}: ${part.tiles().length} Einträge, das Verzeichnis nennt ${f.tiles.length}`);
+            // drei Kacheln von jedem Teil: herauskommen muss die Kachel, wie die Karte sie hat
+            for (const key of [f.tiles[0], f.tiles[f.tiles.length >> 1], f.tiles[f.tiles.length - 1]]) {
+              const got = await part.file(key);
+              if (!got) { fail(`${f.file}: ${key} ist nicht darin`); continue; }
+              const want = gunzipSync(readFileSync(join(mapdir, 'tiles', `${key}.fsb`)));
+              if (got.length !== want.length) fail(`${f.file}: ${key} ${got.length} Bytes, die Karte hat ${want.length}`);
+              else if (Buffer.compare(Buffer.from(got), want) !== 0) fail(`${f.file}: ${key} weicht von der Kachel der Karte ab`);
+              if (got[0] === 0x1f && got[1] === 0x8b) fail(`${f.file}: ${key} kommt noch gepackt heraus`);
+            }
+          }
+          const onDisk = readdirSync(join(mapdir, 'tiles')).filter((n) => n.endsWith('.fsb')).length;
+          if (seen.size !== onDisk) fail(`${seen.size} Kacheln in den Teilen, ${onDisk} in der Karte`);
+          const twice = [...seen].filter(([, n]) => n > 1).map(([t]) => t);
+          if (twice.length) fail(`${twice.length} Kacheln in mehr als einem Teil, z. B. ${twice.slice(0, 3)}`);
+          console.log(JSON.stringify({ parts: files.length, tiles: seen.size, type: wantType,
+            bytes: files.reduce((a, f) => a + statSync(join(partsdir, f.file)).size, 0) }));
+          console.log(process.exitCode ? 'Prüfung: nein' : 'Prüfung: ja');
+          JS
+
+          wanted=$(( PART_MB * 1048576 ))
+          echo "Teile von höchstens $wanted Bytes ($PART_MB MiB)"
+          mkdir -p parts
+          : > "$RUNNER_TEMP/tags"
+          first=1
+          i=0
+          for tag in $RELEASES; do
+            i=$(( i + 1 ))
+            work="work/$i"
+            mkdir -p "$work"
+            echo "== $tag =="
+            gh release download "$tag" --pattern 'map.tar.*' -D "$work"
+            # die Teile gehören zusammen: zusammengesetzt sind sie wieder ein tar (map/)
+            ( cd "$work" && cat map.tar.* > map.tar && rm -f map.tar.* && tar xf map.tar && rm -f map.tar )
+            echo "Karte: $(du -sh "$work/map" | cut -f1), $(find "$work/map/tiles" -name '*.fsb' | wc -l) Kacheln"
+            python3 "$RUNNER_TEMP/mkparts2.py" "$work/map" parts "$TYPE" "$wanted" "$first" "$RUNNER_TEMP/frag-$i.json" \
+              | tee "$RUNNER_TEMP/part-$i.json"
+            # geprüft, solange die Karte noch da ist: jede Kachel, die aus einem Teil kommt,
+            # muss die der Karte sein
+            SRC_BASE="$GITHUB_WORKSPACE/src/world" node "$RUNNER_TEMP/checkparts.mjs" \
+              "$work/map" parts "$TYPE" "$RUNNER_TEMP/frag-$i.json"
+            first=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[-1]['n']+1)" "$RUNNER_TEMP/frag-$i.json")
+            echo "$tag" >> "$RUNNER_TEMP/tags"
+            echo "$RUNNER_TEMP/frag-$i.json" >> "$RUNNER_TEMP/fragments"
+            rm -rf "$work"
+            df -h / | tail -1
+          done
+          echo "$i Karten, $(find parts -name '*.tar' | wc -l) Teile"
+
+      - name: index.json zusammensetzen
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/mergeindex.py" <<'PY'
+          import json, os, sys
+
+          outdir, fragments = sys.argv[1], sys.argv[2:]
+          files, seen_n, tiles, twice = [], set(), {}, []
+          for path in fragments:
+              for f in json.load(open(path)):
+                  if f['n'] in seen_n:
+                      sys.exit('Nummer %s kommt zweimal vor' % f['n'])
+                  seen_n.add(f['n'])
+                  files.append(f)
+                  for t in f['tiles']:
+                      if t in tiles:
+                          twice.append(t)
+                      tiles[t] = f['n']
+          files.sort(key=lambda f: f['n'])
+          index = {'latest': files[-1]['n'], 'files': files}
+          with open(os.path.join(outdir, 'index.json'), 'w') as fh:
+              json.dump(index, fh, separators=(',', ':'))
+
+          sizes = [os.path.getsize(os.path.join(outdir, f['file'])) for f in files]
+          print(json.dumps({
+              'parts': len(files), 'latest': index['latest'], 'tiles': len(tiles),
+              'bytes': sum(sizes), 'part_min': min(sizes), 'part_max': max(sizes),
+              'index_bytes': os.path.getsize(os.path.join(outdir, 'index.json')),
+              'tiles_in_two_parts': twice[:5], 'tiles_in_two_parts_count': len(twice),
+          }))
+          PY
+          python3 "$RUNNER_TEMP/mergeindex.py" parts $(cat "$RUNNER_TEMP/fragments") | tee "$RUNNER_TEMP/report.json"
+
+      # die Karten sind weg – jetzt zählt nur noch, was das Spiel aus dem einen map-assets/ liest
+      - name: Prüfen – das zusammengesetzte map-assets mit dem eigenen Code des Spiels lesen
+        env:
+          TYPE: ${{ inputs.type }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/checkmerged.mjs" <<'JS'
+          import { readFileSync, statSync } from 'node:fs';
+          import { join } from 'node:path';
+
+          const [partsdir, wantType, wantTiles] = process.argv.slice(2);
+          const base = process.env.SRC_BASE ?? `${process.cwd()}/src/world`;
+          const { parseIndex } = await import(`file://${base}/tileversions.ts`);
+          const { PatchPart } = await import(`file://${base}/patchpart.ts`);
+
+          const fail = (msg) => { console.error('FAIL:', msg); process.exitCode = 1; };
+          const index = parseIndex(JSON.parse(readFileSync(join(partsdir, 'index.json'), 'utf8')));
+          if (!index) fail('index.json ist nicht lesbar');
+          else {
+            const n = index.files.map((f) => f.n);
+            if (new Set(n).size !== n.length) fail('eine Nummer kommt zweimal vor');
+            if (index.latest !== Math.max(...n)) fail(`latest ${index.latest} ist nicht die höchste Nummer ${Math.max(...n)}`);
+            if ([...n].sort((a, b) => a - b).some((v, i) => v !== i + 1)) fail('die Nummern laufen nicht von 1 an durch');
+            let tiles = 0;
+            for (const f of index.files) {
+              if (f.type !== wantType) fail(`${f.file}: Art ${f.type}, erwartet ${wantType}`);
+              const part = PatchPart.fromBytes(f.n, f.file, readFileSync(join(partsdir, f.file)));
+              if (part.tiles().length !== f.tiles.length) fail(`${f.file}: ${part.tiles().length} Einträge, der Index nennt ${f.tiles.length}`);
+              tiles += f.tiles.length;
+              // eine Kachel je Teil: sie muss dekodiert herauskommen, nicht mehr gepackt
+              const got = await part.file(f.tiles[0]);
+              if (!got) fail(`${f.file}: ${f.tiles[0]} ist nicht darin`);
+              else if (got[0] === 0x1f && got[1] === 0x8b) fail(`${f.file}: ${f.tiles[0]} kommt noch gepackt heraus`);
+            }
+            if (wantTiles && tiles !== Number(wantTiles)) fail(`${tiles} Kacheln im Index, ${wantTiles} erwartet`);
+            console.log(JSON.stringify({ parts: index.files.length, latest: index.latest, tiles, type: wantType,
+              bytes: index.files.reduce((a, f) => a + statSync(join(partsdir, f.file)).size, 0),
+              index_bytes: statSync(join(partsdir, 'index.json')).size }));
+          }
+          console.log(process.exitCode ? 'Prüfung: nein' : 'Prüfung: ja');
+          JS
+          SRC_BASE="$GITHUB_WORKSPACE/src/world" node "$RUNNER_TEMP/checkmerged.mjs" parts "$TYPE" \
+            "$(python3 -c "import json; print(json.load(open('$RUNNER_TEMP/report.json'))['tiles'])")"
+
+      - name: Zusammenfassung
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP" <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, json, os, sys
+
+          temp = sys.argv[1]
+          report = json.load(open(os.path.join(temp, 'report.json')))
+          tags = [t.strip() for t in open(os.path.join(temp, 'tags')) if t.strip()]
+          parts = [json.load(open(p)) for p in sorted(glob.glob(os.path.join(temp, 'part-*.json')),
+                                                             key=lambda p: int(p.rsplit('-', 1)[1].split('.')[0]))]
+
+          print('## Kartenteile (map-assets)')
+          print('')
+          print('| Karte | Kacheln | Teile | MB |')
+          print('|---|---|---|---|')
+          for tag, p in zip(tags, parts):
+              print('| %s | %d | %d (%d…%d) | %.1f |' % (tag, p['tiles'], p['parts'], p['first'], p['last'], p['bytes'] / 1048576))
+          print('')
+          print('| | |')
+          print('|---|---|')
+          print('| Teile zusammen | %d |' % report['parts'])
+          print('| Kacheln | %d |' % report['tiles'])
+          print('| zusammen | %.1f MB |' % (report['bytes'] / 1048576))
+          print('| ein Teil | %.1f – %.1f MB |' % (report['part_min'] / 1048576, report['part_max'] / 1048576))
+          print('| index.json | %.1f KB |' % (report['index_bytes'] / 1024))
+          print('| latest | %d |' % report['latest'])
+          if report['tiles_in_two_parts_count']:
+              print('| Kacheln in zwei Teilen | %d, z. B. %s |' % (
+                  report['tiles_in_two_parts_count'], ', '.join(report['tiles_in_two_parts'])))
+          PY
+          du -sh parts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: map-assets
+          path: parts
+          retention-days: 30
+          if-no-files-found: error
+
+      # nur wenn ein Name genannt ist: die Teile in ein Release legen – von dort holt man sie
+      # herunter und legt sie unter map-assets/ im Repository ab (nur so kommen sie mit CORS
+      # zum Spiel)
+      - name: Ins Release legen
+        if: ${{ inputs.to_release != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.to_release }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --latest=false \
+            --target "$GITHUB_SHA" --title "$TAG" \
+            --notes "Kartenteile im Format map-assets: index.json und die Tar-Dateien – zum Ablegen unter map-assets/ im Repository."
+          gh release upload "$TAG" parts/index.json parts/*.tar --clobber
+          gh release view "$TAG" --json assets --jq '.assets[].name' | sort
