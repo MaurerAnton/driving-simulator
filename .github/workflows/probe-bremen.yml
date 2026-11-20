@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Probe Bremen
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import struct, urllib.request, zlib, io
+          UA = {'User-Agent': 'driving-simulator/0.1 map fetch'}
+          DGM = 'https://gdi2.geo.bremen.de/inspire/download/DGM/data/Gitternetz_DGM1_2017_HB_ASCII_XYZ.zip'
+          LOD = 'https://gdi2.geo.bremen.de/inspire/download/LoD/data/LOD2_CITYGML_HB.zip'
+
+          def get(url, start=None, end=None, tail=None):
+              h = dict(UA)
+              if tail is not None:
+                  h['Range'] = f'bytes=-{tail}'
+              elif start is not None:
+                  h['Range'] = f'bytes={start}-{end}'
+              return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=300).read()
+
+          def cd_at(d, i):
+              e = d[i:]
+              cs = struct.unpack('<I', e[12:16])[0]
+              p = i - cs
+              out = []
+              while p + 46 <= len(d) and d[p:p + 4] == b'PK\x01\x02':
+                  nlen = struct.unpack('<H', d[p + 28:p + 30])[0]
+                  elen = struct.unpack('<H', d[p + 30:p + 32])[0]
+                  clen = struct.unpack('<H', d[p + 32:p + 34])[0]
+                  out.append(dict(name=d[p + 46:p + 46 + nlen].decode('latin1'),
+                                  csize=struct.unpack('<I', d[p + 20:p + 24])[0],
+                                  off=struct.unpack('<I', d[p + 42:p + 46])[0],
+                                  method=struct.unpack('<H', d[p + 10:p + 12])[0]))
+                  p += 46 + nlen + elen + clen
+              return out
+
+          all_eocd = lambda d: [m for m in range(len(d)) if d.startswith(b'PK\x05\x06', m)]
+
+          # terrain
+          d = get(DGM, tail=3000000)
+          entries = cd_at(d, all_eocd(d)[-1])
+          print('dgm entries', len(entries))
+          t = [x for x in entries if x['name'].endswith('dgm1_32487_5881_1_hb.xyz')]
+          print('want', t)
+          if t:
+              t = t[0]
+              lh = get(DGM, t['off'], t['off'] + 200)
+              nlen = struct.unpack('<H', lh[26:28])[0]
+              elen = struct.unpack('<H', lh[28:30])[0]
+              start = t['off'] + 30 + nlen + elen
+              raw = get(DGM, start, start + t['csize'] - 1)
+              data = zlib.decompress(raw, -15)
+              print('dgm tile bytes', len(data), data[:60])
+
+          # buildings: the big zip holds one stored zip inside
+          out = get(LOD, tail=2000000)
+          outer = cd_at(out, all_eocd(out)[-1])
+          print('outer', outer)
+          lh = get(LOD, 0, 200)
+          base = 30 + struct.unpack('<H', lh[26:28])[0] + struct.unpack('<H', lh[28:30])[0]
+          tail = get(LOD, tail=9000000)
+          inner = None
+          for i in reversed(all_eocd(tail)):
+              try:
+                  e = cd_at(tail, i)
+              except Exception:
+                  continue
+              if len(e) > 5:
+                  inner = e
+                  break
+          print('inner entries', len(inner) if inner else None)
+          if inner:
+              t = [x for x in inner if x['name'].endswith('LoD2_32_486_5880_2_HB.gml')]
+              print('want', t)
+              if t:
+                  t = t[0]
+                  lh = get(LOD, base + t['off'], base + t['off'] + 200)
+                  nlen = struct.unpack('<H', lh[26:28])[0]
+                  elen = struct.unpack('<H', lh[28:30])[0]
+                  start = base + t['off'] + 30 + nlen + elen
+                  raw = get(LOD, start, start + t['csize'] - 1)
+                  data = zlib.decompress(raw, -15) if t['method'] == 8 else raw
+                  print('gml bytes', len(data), data[:80])
+          PY
