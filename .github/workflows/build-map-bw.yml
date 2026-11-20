@@ -160,6 +160,12 @@ jobs:
     needs: geodata
     timeout-minutes: 350
     runs-on: ubuntu-latest
+    # Die Rechte werden auch hier genannt: das Repository gibt dem Token der Läufe von sich aus
+    # nur Leserechte (actions/permissions/workflow: default_workflow_permissions "read"), und
+    # ohne contents: write antwortet das Release mit
+    # „HTTP 403: Resource not accessible by integration" (gemessen im Lauf 44792393161).
+    permissions:
+      contents: write
     # Das Rechteck liegt außerhalb der Kästen von tools/mapgen/detail-region.json (die hessischen
     # Karten); „all" baut die ganze Karte mit dem feineren Netz, das nach dem veröffentlichten
     # Stand dazugekommen ist (Querschnitte, Parken, Gehwege, Markierungen, …).
@@ -256,6 +262,14 @@ jobs:
         run: |
           npm run map:pack
           du -sh public/map
+      # auch als Artefakt: ein Stunden langer Bau ist damit nicht verloren, wenn das Release
+      # (oder der Platz beim Hochladen) doch einmal scheitert
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mappack-bw
+          path: data/work/map.tar.*
+          retention-days: 7
+          if-no-files-found: error
       - name: Ins Release legen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -282,6 +296,15 @@ jobs:
           Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
           zusammengesetzt.
           EOF
-          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
-            --notes-file notes.md data/work/map.tar.*
+          # auch hier darf der erste Versuch scheitern (403 im Lauf 44792393161): dreimal,
+          # und am Ende steht fest, dass das Release wirklich da ist
+          for try in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+              --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Versuch $try: Release $tag wurde nicht angelegt"
+            sleep 30
+          done
+          gh release view "$tag" --json tagName --jq .tagName
           echo "release $tag"
