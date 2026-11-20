@@ -251,6 +251,15 @@ jobs:
           Nur ein Rechteck Niedersachsens: das ganze Land paßt nicht in eine Karte; weitere Rechtecke
           kommen aus demselben Ablauf "Karte Niedersachsen" mit anderen Zahlen.
           EOF
-          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
-            --notes-file notes.md data/work/map.tar.*
+          # GitHub weist ein Release mitunter mit HTTP 403 ab, obwohl der Ablauf contents: write
+          # hat (so bei NRW und Rheinland-Pfalz); dann liegt das Paket schon als Artefakt bereit
+          # und der fertige Bau gilt nicht als gescheitert.
+          for try in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" \
+                 --title "Karte $LABEL" --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Versuch $try: Release abgewiesen, noch einmal"
+            sleep 30
+          done
           echo "release $tag"
