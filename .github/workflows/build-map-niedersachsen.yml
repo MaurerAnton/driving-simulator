@@ -224,7 +224,7 @@ jobs:
         run: |
           npm run map:pack
           du -sh public/map
-      - name: Ins Release legen
+      # Auch wenn das Release nicht klappt: das Paket liegt dann als Artefakt bereit und die\n      # Stunden des Bauens sind nicht verloren.\n      - uses: actions/upload-artifact@v4\n        with:\n          name: karte-niedersachsen-paket\n          path: data/work/map.tar.*\n          if-no-files-found: warn\n          retention-days: 7\n      - name: Ins Release legen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WANTED: ${{ inputs.tag }}
