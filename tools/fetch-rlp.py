@@ -43,9 +43,11 @@ after an interruption.
 """
 import argparse
 import concurrent.futures
+import gzip
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -214,7 +216,13 @@ def take_dgm(year, east, north, tmp):
 
 
 def take_lod2(east, north, name, tmp):
-    """One CityGML tile of 2 km → data/work/lod2/<name>/…, read by tools/lod2-extract.ts."""
+    """Eine CityGML-Kachel von 2 km → ein Zwischenverzeichnis für sich, von tools/lod2-extract.ts gelesen.
+
+    Der Name trägt die Kachel, weil tools/lod2-extract.ts sein Ausgabeverzeichnis vor dem
+    Schreiben leert (rmSync in Zeile 176): riefe man es je Kachel mit demselben Namen, bliebe
+    nur die letzte Kachel übrig.  Der Punkt davor verhindert, dass der Kartenbau das
+    Zwischenverzeichnis mitliest; merge_lod2() fügt die Kacheln danach zusammen.
+    """
     done = os.path.join(GD.LOD2_OUT, '.done', f'{name}-{east}_{north}')
     if os.path.exists(done):
         return 0
@@ -225,7 +233,7 @@ def take_lod2(east, north, name, tmp):
     say(f'[rlp] buildings {east}_{north}: {length / 1e6:.0f} MB')
     curl_to(url, tmp)
     node = subprocess.Popen(
-        ['node', os.path.join(ROOT, 'tools/lod2-extract.ts'), '--name', name, '-'],
+        ['node', os.path.join(ROOT, 'tools/lod2-extract.ts'), '--name', f'.{name}-{east}_{north}', '-'],
         stdin=subprocess.PIPE,
         cwd=ROOT,
     )
@@ -243,6 +251,31 @@ def take_lod2(east, north, name, tmp):
     with open(done, 'w') as f:
         f.write(f'{name} {east}_{north}\n')
     return 1
+
+
+def merge_lod2(name):
+    """Die Quadrate von 2 km aller Kacheln in data/work/lod2/<name> zusammenführen.
+
+    Jede Kachel hat in ihr eigenes Zwischenverzeichnis geschrieben; benachbarte Kacheln teilen
+    sich Quadrate, und ein Quadrat ist eine Datei voller Zeilen – mehr als das Aneinanderhängen
+    der Dateien braucht es nicht (eine gzip-Datei darf mehrere Member hintereinander haben).
+    """
+    final = os.path.join(GD.LOD2_OUT, name)
+    staging = sorted(d for d in os.listdir(GD.LOD2_OUT) if d.startswith(f'.{name}-'))
+    if not staging:
+        return
+    os.makedirs(final, exist_ok=True)
+    for part in staging:
+        src = os.path.join(GD.LOD2_OUT, part)
+        for square in os.listdir(src):
+            with open(os.path.join(src, square), 'rb') as a, open(os.path.join(final, square), 'ab') as b:
+                shutil.copyfileobj(a, b)
+        shutil.rmtree(src)
+    units = 0
+    for square in sorted(os.listdir(final)):
+        units += sum(1 for _ in gzip.open(os.path.join(final, square), 'rb'))
+    say(f'[rlp] Gebäude aus {len(staging)} Kacheln zusammengeführt: {len(os.listdir(final))} Quadrate '
+        f'von 2 km, {units} Einheiten in data/work/lod2/{name}')
 
 
 def main():
@@ -351,6 +384,8 @@ def main():
 
     say(f'[rlp] fertig: {counts["dgm"]} Geländekacheln ({again["dgm"]} waren schon da), '
         f'{counts["lod2"]} Gebäudekacheln ({again["lod2"]} waren schon da) in {(time.time() - started) / 60:.0f} min')
+    if args.only != 'dgm':
+        merge_lod2(args.lod2_name)
     if missing['lod2']:
         say(f'[rlp] keine Gebäudemodelle für {len(missing["lod2"])} Kacheln von 2 km: '
             + ', '.join(missing['lod2'][:8]))
