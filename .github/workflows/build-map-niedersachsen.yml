@@ -173,7 +173,7 @@ jobs:
         run: |
           mkdir -p data/raw/osm
           curl -fsSL --retry 5 --retry-delay 20 -o data/raw/osm/niedersachsen-latest.osm.pbf \
-            https://download.geofabrik.de/europe/germany/niedersachsen-latest.osm.pbf
+            https://download.geofabrik.de/europe/germany/niedersachsen/niedersachsen-latest.osm.pbf
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # Das Hessische im Rechteck bleibt eine Lücke (dort fehlt Niedersachsens Gelände);
