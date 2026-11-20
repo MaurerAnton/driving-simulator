@@ -1,0 +1,272 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte eines Stücks von Norwegen und legt sie als Kartenpaket in ein Release
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte lädt).
+#
+# Warum das hier läuft: ein Bau braucht mehrere Gigabyte Platte und mehr Speicher, als ein
+# Notebook hat; ein Läufer von GitHub hat 4 CPUs, 16 GB Speicher und ~14 GB Platte, und seine
+# Minuten sind für ein öffentliches Repository frei.  Die Karte geht nie über GitHub Pages
+# (dort sind es 1 GB): Releases haben keine Größenbeschränkung.
+#
+# Starten: Actions → "Karte Norwegen" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (DTM 1 m, Kartverket)                                   -> data/work/dgm2
+#   2. OpenStreetMap, auf das Rechteck geschnitten                     -> npm run map:extract
+#   3. Straßennetz und Kacheln                                         -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Das Rechteck ist aus UTM32-Kilometerquadraten (EPSG:25832); 598_6643 ist das Quadrat mit dem
+# Zentrum von Oslo.  Kartverket gibt die Höhen sonst in UTM33 heraus, der WCS rechnet sie aber
+# auf Anfrage in die Zone 32 um: tools/fetch-no.py fragt Quadrat für Quadrat 1000 × 1000 Werte
+# ab (≈ 4,2 MB und ≈ 3 s je Quadrat, gemessen November 2026).
+#
+# Gebäudemodelle fehlen: FKB-Bygning steht unter der Norge-digitalt-Lizenz und ist nur für
+# Vertragspartner.  Die Häuser dieser Karte sind also die aus OpenStreetMap extrudierten
+# Grundflächen – dadurch kann es innerhalb der Orte keine doppelten Gebäude geben.
+#
+# Zwei Aufträge, damit ein Netzfehler während des Holens nicht den ganzen Bau verdirbt und
+# damit jeder Teil seine sechs Stunden für sich hat.
+
+name: Karte Norwegen
+
+on:
+  workflow_dispatch:
+    inputs:
+      east_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Osten (UTM32, EPSG:25832)'
+        type: string
+        default: '591'
+      east_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Osten'
+        type: string
+        default: '605'
+      north_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Norden'
+        type: string
+        default: '6636'
+      north_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Norden'
+        type: string
+        default: '6650'
+      label:
+        description: Name der Karte (steht im Spiel und im map.json)
+        type: string
+        default: 'Oslo'
+      tag:
+        description: 'Name des Releases (leer: karte-norwegen-<Datum>-<Lauf>)'
+        type: string
+        default: ''
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        # Ruter ist der Verkehrsverbund von Oslo und Akershus; Vy und die Züge der Flytoget
+        # kommen dazu.  Eine norwegische Lieferung gibt es bei gtfs.de bislang nicht – ohne
+        # Treffer bleiben die Linien ohne Fahrplan.
+        default: 'Ruter|Sporveien|Oslo|Vy|Flytoget|Entur'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: 'Ruter|Sporveien|Oslo|Vy|Flytoget|Entur'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: die offenen Geodaten – Gelände ohne Anmeldung und ohne Schlüssel
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      # map-assets/ (inzwischen mehrere Gigabyte) braucht nur der zentrale Teile-Lauf; hier
+      # bleibt es beim Auschecken weg.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # Was ein früherer Lauf schon geholt hat: das Skript läßt liegen, was da ist, und holt
+      # nur, was fehlt.
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name="geodata-norwegen"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          echo "Artefakt von Lauf $RUN: $id"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2
+      # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche Kacheln
+      # von 500 m eine andere Karte hat; tools/fetch-no.py läßt sie aus.
+      - name: Index der schon veröffentlichten Karten
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 20 \
+            -o "$RUNNER_TEMP/published-index.json" \
+            https://raw.githubusercontent.com/${{ github.repository }}/main/map-assets/index.json
+          python3 -c "import json;d=json.load(open('$RUNNER_TEMP/published-index.json'));print('Kacheln in anderen Karten:',len({t for f in d['files'] for t in f['tiles']}))"
+      - name: Gelände (DTM 1 m, Kartverket) holen
+        env:
+          BOX_E: ${{ inputs.east_from }}..${{ inputs.east_to }}
+          BOX_N: ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          python3 -I tools/fetch-no.py --east "$BOX_E" --north "$BOX_N" \
+            --published "$RUNNER_TEMP/published-index.json" \
+            --on-overlap skip --jobs 6 --gaps data/work/gaps.txt
+          du -sh data/work/dgm2
+          wc -l data/work/gaps.txt || true
+      # auch nach einem Fehlschlag: die Stunden des Holens sind sonst verloren, und der
+      # nächste Lauf kann mit geodata_run hier weiterfahren
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-norwegen
+          path: data/work/dgm2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-norwegen
+          path: data/work
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      # Geofabrik kennt für Norwegen kein kleineres Gebiet als das ganze Land
+      # (download.geofabrik.de/europe/norway.html) – 1,38 GB (Content-Length, November 2026).
+      - name: OpenStreetMap (Geofabrik, Norwegen)
+        run: |
+          set -euo pipefail
+          mkdir -p data/raw/osm
+          for try in 1 2 3 4 5; do
+            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors --connect-timeout 60 \
+              -o data/raw/osm/norway-latest.osm.pbf \
+              https://download.geofabrik.de/europe/norway/norway-latest.osm.pbf && break
+            echo "Versuch $try: OpenStreetMap nicht geholt"
+            sleep 30
+          done
+          test -s data/raw/osm/norway-latest.osm.pbf
+          ls -l data/raw/osm
+      # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
+      # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
+      # Vorgängerkarte, deren Bytes stehen bleiben müßten.
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract -- data/raw/osm/norway-latest.osm.pbf
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        env:
+          DETAIL_REGION: all
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          # osm-extract, build-lines, build-buslines, build-signs und build-services lesen ohne
+          # Argument denselben hessischen Namen, der hier nie liegt – alle bekommen ihn.
+          OSM: data/raw/osm/norway-latest.osm.pbf
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
+          npm run map:far
+          npm run map:timetable
+          npm run map:services -- "$OSM"
+      # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
+      # die hessische Verwaltung; beides wird hier berichtigt.
+      - name: Der Name der Karte und ihre Quellenzeilen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            j.meta.attribution = [
+              "Straßennetz, Verkehrsregelung, Flächennutzung, Gebäude: © OpenStreetMap-Mitwirkende (ODbL 1.0)",
+              "Gelände (DTM 1 m): © Kartverket, Nasjonal høydemodell (hoydedata.no), CC BY 4.0",
+            ];
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      # Auch wenn das Release verweigert wird: das Paket liegt dann als Artefakt bereit und die
+      # Stunden des Bauens sind nicht verloren.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: karte-norwegen-paket
+          path: data/work/map.tar.*
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          BOX: ${{ inputs.east_from }}..${{ inputs.east_to }} / ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          tag="${WANTED:-karte-norwegen-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL (Norwegen) für den Fahrsimulator – im Spiel unter Einstellungen →
+          Karte laden (Kartenpaket).
+
+          Gebaut am $(date -u +%F) aus:
+
+          * Gelände: „Nasjonal høydemodell", Geländemodell von 1 m (DTM 1 m) von Kartverket,
+            geholt ohne Anmeldung und ohne Schlüssel über den WCS von Geonorge
+            (https://wcs.geonorge.no/skwms1/wcs.hoyde-dtm-nhm-25833; Kartkatalogen:
+            „Tilgangsrestriksjoner: Åpne data", „Lisens: Creative Commons BY 4.0 (CC BY 4.0)").
+            Quellenzeile: © Kartverket, Nasjonal høydemodell (hoydedata.no), CC BY 4.0.
+          * Straßennetz, Verkehrsregelung, Flächennutzung und **Gebäude**: OpenStreetMap
+            (ODbL 1.0).  Norwegen veröffentlicht keine offenen Gebäudemodelle (FKB-Bygning ist
+            auf Vertragspartner von Norge digitalt beschränkt), darum sind die Häuser dieser
+            Karte die aus OpenStreetMap-Grundflächen extrudierten Körper.
+
+          Rechteck aus Kilometerquadraten (UTM32, EPSG:25832): $BOX.
+          EOF
+          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+            --notes-file notes.md data/work/map.tar.* || echo "Release verweigert – Paket liegt als Artefakt"
+          echo "release $tag"
