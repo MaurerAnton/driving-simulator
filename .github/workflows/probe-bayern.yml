@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: probe-bayern
+on: workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: |
+          set -x
+          curl -sS -m 60 -o /dev/null -w 'portal json %{http_code} %{size_download}\n' \
+            https://geodaten.bayern.de/opengeodata/json/opengeodata_produkte.json
+          curl -sSI -m 60 -o /dev/null -w 'dgm1 head %{http_code} %{size_download}\n' \
+            https://download1.bayernwolke.de/a/dgm/dgm1/692_5334.tif
+          curl -sS -m 120 -r 0-200000 -o /tmp/d.tif -w 'dgm1 part %{http_code} %{size_download}\n' \
+            https://download1.bayernwolke.de/a/dgm/dgm1/692_5334.tif
+          curl -sSI -m 60 -o /dev/null -w 'lod2 head %{http_code} %{size_download}\n' \
+            https://download1.bayernwolke.de/a/lod2/citygml/692_5334.gml
+          curl -sS -m 180 -r 0-300000 -o /tmp/l.gml -w 'lod2 part %{http_code} %{size_download}\n' \
+            https://download1.bayernwolke.de/a/lod2/citygml/692_5334.gml
+          head -c 600 /tmp/l.gml
+          curl -sSI -m 60 -o /dev/null -w 'osm %{http_code} %{size_download}\n' \
+            https://download.geofabrik.de/europe/germany/bayern/oberbayern-latest.osm.pbf
