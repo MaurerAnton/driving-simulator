@@ -412,7 +412,8 @@ function buildBlock(bx: number, bz: number, coverage: Coverage, dgm: Dgm): Block
   return result;
 }
 
-const names = process.argv.slice(2).filter((a) => /^\d+_\d+$/.test(a));
+// (north and west of the world origin the block numbers are negative – those are real blocks)
+const names = process.argv.slice(2).filter((a) => /^-?\d+_-?\d+$/.test(a));
 if (names.length === 0) {
   console.error('usage: node tools/build-tiles.ts <bx>_<bz> [<bx>_<bz> …]   (the blocks are listed in data/work/graph/plan.json)');
   process.exit(2);
