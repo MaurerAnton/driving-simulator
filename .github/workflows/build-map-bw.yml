@@ -204,7 +204,15 @@ jobs:
             *) url="https://download.geofabrik.de/europe/germany/baden-wuerttemberg/$OSM/$OSM-latest.osm.pbf" ;;
           esac
           echo "$url"
-          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM_FILE" "$url"
+          # der erste Versuch kann schon am Verbinden scheitern (Exit 7, gemessen im Lauf
+          # 44786351824) – curl nimmt das nicht als Fehler zum Wiederholen, darum die Schleife
+          for try in 1 2 3 4 5; do
+            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors --connect-timeout 60 \
+              -o "$OSM_FILE" "$url" && break
+            echo "Versuch $try: $url nicht geholt"
+            sleep 30
+          done
+          test -s "$OSM_FILE"
           ls -l data/raw/osm
       - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
         run: |
