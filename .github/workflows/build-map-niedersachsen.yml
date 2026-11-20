@@ -187,17 +187,20 @@ jobs:
         run: npm run map:build -- --jobs 3
       - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
         env:
+          # osm-extract, build-lines, build-buslines, build-signs und build-services lesen ohne
+          # Argument denselben hessischen Namen, der hier nie liegt – alle vier bekommen ihn.
+          OSM: data/raw/osm/niedersachsen-latest.osm.pbf
           GTFS_AGENCY: ${{ inputs.gtfs_agency }}
           GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
         run: |
           npm run map:addresses
           npm run map:stops
-          npm run map:lines
-          npm run map:buslines
-          npm run map:signs
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
           npm run map:far
           npm run map:timetable
-          npm run map:services
+          npm run map:services -- "$OSM"
       # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
       # die hessische Verwaltung; beides wird hier berichtigt (CC BY 4.0, aus den
       # GetCapabilities des LGLN-WCS).
