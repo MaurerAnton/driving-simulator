@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-only
+#!/usr/bin/env python3
 """
 Fetch the official terrain model (DGM1) and the building models (LoD2) of the
 Free Hanseatic City of Bremen – the open geodata of the Landesamt GeoInformation
