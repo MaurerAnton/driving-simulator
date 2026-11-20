@@ -32,10 +32,36 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tag = readFileSync(resolve(root, 'map.release'), 'utf8').trim();
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { repository: { url: string } };
 const repo = pkg.repository.url.replace(/\.git$/, '');
-const url = `${repo}/releases/download/${tag}/map.tar`;
+const base = `${repo}/releases/download/${tag}/`;
 const target = resolve(root, 'public');
 /** files a release may have beside map.tar, put into the map folder */
 const EXTRA = ['timetable.json.gz', 'buslines.json.gz', 'signs.json.gz', 'services.json.gz'];
+
+/**
+ * The names of the release's files: its manifest (map-files.json) when it has
+ * one – so a file may be named as the release likes – else the names below,
+ * which every release so far has used.  The manifest is read from the release;
+ * a release without one is fetched all the same.
+ */
+interface Manifest {
+  files: Array<{ name: string }>;
+}
+let names: { map: string[]; patch: string; extra: string[] } = { map: ['map.tar'], patch: 'tiles-patch.tar', extra: EXTRA };
+try {
+  const res = await fetch(`${base}map-files.json`);
+  if (res.ok) {
+    const m = (await res.json()) as Manifest;
+    const list = (m.files ?? []).map((f) => f.name).filter(Boolean);
+    const map = list.filter((n) => n === 'map.tar' || /^map\.tar\.\d+$/.test(n));
+    const patch = list.find((n) => n === 'tiles-patch.tar');
+    const extra = list.filter((n) => EXTRA.includes(n));
+    if (map.length > 0) names = { map: map.sort(), patch: patch ?? 'tiles-patch.tar', extra: extra.length ? extra : EXTRA };
+    console.log(`[map] manifest: ${names.map.length} tar file(s), patch ${names.patch}, ${names.extra.length} small file(s)`);
+  }
+} catch {
+  // (no manifest: the names this tool knows)
+}
+const url = `${base}${names.map[0]}`;
 
 console.log(`[map] ${url}`);
 mkdirSync(target, { recursive: true });
@@ -71,18 +97,20 @@ const feed = (file: string): Promise<void> =>
   });
 let ok = false;
 try {
-  if (await download('map.tar', part)) {
-    await feed(part);
-    ok = true;
-  } else {
-    let n = 0;
-    for (; n < 100; n++) {
-      if (!(await download(`map.tar.${String(n).padStart(2, '0')}`, part))) break;
+  // (the map as one file, or in parts: whatever the release names)
+  if (names.map.length === 1) {
+    if (await download(names.map[0], part)) {
       await feed(part);
-      process.stdout.write(`\r[map] part ${n + 1}  `);
+      ok = true;
+    }
+  } else {
+    for (const name of names.map) {
+      if (!(await download(name, part))) break;
+      await feed(part);
+      process.stdout.write(`\r[map] ${name}  `);
+      ok = true;
     }
     process.stdout.write('\n');
-    ok = n > 0;
   }
 } catch (e) {
   console.error(`[map] ${(e as Error).message}`);
@@ -95,7 +123,7 @@ if (!ok || t !== 0 || !existsSync(resolve(fresh, 'map', 'map.json'))) {
   console.error(`[map] could not fetch the map (tar ${t}). Is there a release "${tag}" with a file map.tar or files map.tar.00 …?`);
   process.exit(1);
 }
-for (const name of EXTRA) {
+for (const name of names.extra) {
   try {
     const to = resolve(fresh, 'map', name);
     // (under another name first: a file that is not in this release leaves what map.tar had untouched)
@@ -111,8 +139,8 @@ for (const name of EXTRA) {
 }
 // tiles built again after the release of the map
 try {
-  const patch = resolve(fresh, 'tiles-patch.tar');
-  if (await download('tiles-patch.tar', patch)) {
+  const patch = resolve(fresh, names.patch);
+  if (await download(names.patch, patch)) {
     const x = spawn('tar', ['-x', '-C', fresh, '-f', patch], { stdio: 'inherit' });
     if ((await new Promise<number>((r) => x.on('close', (c) => r(c ?? 1)))) !== 0) throw new Error('tar could not unpack it');
     rmSync(patch, { force: true });
@@ -121,10 +149,10 @@ try {
     const json = JSON.parse(readFileSync(index, 'utf8')) as { meta: { patched?: string } };
     json.meta.patched = String(info.patched ?? '');
     writeFileSync(index, JSON.stringify(json));
-    console.log(`[map] tiles-patch.tar (${json.meta.patched})`);
+    console.log(`[map] ${names.patch} (${json.meta.patched})`);
   }
 } catch (e) {
-  console.error(`[map] tiles-patch.tar: ${(e as Error).message}`);
+  console.error(`[map] ${names.patch}: ${(e as Error).message}`);
   process.exit(1);
 }
 rmSync(resolve(target, 'map'), { recursive: true, force: true });

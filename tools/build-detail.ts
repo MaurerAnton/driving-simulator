@@ -135,17 +135,24 @@ lap(`${chunks} chunks and ${tiles} tiles compared with public/map: ${changed.len
 
 // the files of earlier patches (in public/map: written after its map.json, or listed in --previous)
 const earlier: string[] = [];
+const seen = new Set<string>();
+const add = (rel: string): void => {
+  if (rel && !rel.endsWith('/') && rel !== 'patch.json' && !seen.has(rel)) {
+    seen.add(rel);
+    earlier.push(rel);
+  }
+};
+// (the published patch's own list: the files of earlier patches that a release already carries.
+//  It is always taken, so a stale --previous cannot leave files out of the new patch – the patch
+//  a release ships is cumulative: it has every file of the patches before it.)
+if (existsSync(resolve(live, 'patch.json')) && Array.isArray((JSON.parse(readFileSync(resolve(live, 'patch.json'), 'utf8')) as { files?: unknown }).files)) {
+  for (const f of (JSON.parse(readFileSync(resolve(live, 'patch.json'), 'utf8')) as { files: string[] }).files) add(f);
+}
 const previous = value('--previous');
 if (previous) {
   const r = spawnSync('tar', ['-tf', resolve(previous)], { encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`tar -tf ${previous}: ${r.stderr}`);
-  for (const line of r.stdout.split('\n')) {
-    const rel = line.trim().replace(/^map\//, '');
-    if (rel && !rel.endsWith('/') && rel !== 'patch.json') earlier.push(rel);
-  }
-} else if (existsSync(resolve(live, 'patch.json')) && Array.isArray((JSON.parse(readFileSync(resolve(live, 'patch.json'), 'utf8')) as { files?: unknown }).files)) {
-  // (a patch of this tool, fetched or applied: it lists its files)
-  earlier.push(...((JSON.parse(readFileSync(resolve(live, 'patch.json'), 'utf8')) as { files: string[] }).files));
+  for (const line of r.stdout.split('\n')) add(line.trim().replace(/^map\//, ''));
 } else {
   const since = statSync(resolve(live, 'map.json')).mtimeMs;
   const walk = (sub: string): void => {
@@ -157,6 +164,26 @@ if (previous) {
   for (const sub of ['w', 'tiles']) if (existsSync(resolve(live, sub))) walk(sub);
 }
 const carried = earlier.filter((rel) => !changed.includes(rel) && existsSync(resolve(live, rel)));
+
+// The patch a release ships is cumulative: it must carry every file of the patches before it.
+// A --previous that is behind the published patch used to drop those files silently, so the
+// patch was short – and installing it fresh lost what it did not list.  Refuse to write one.
+{
+  const published = new Set<string>();
+  const pj = resolve(live, 'patch.json');
+  if (existsSync(pj)) {
+    const j = JSON.parse(readFileSync(pj, 'utf8')) as { files?: unknown };
+    if (Array.isArray(j.files)) for (const f of j.files) if (typeof f === 'string') published.add(f);
+  }
+  const out = new Set([...changed, ...carried]);
+  const missing = [...published].filter((f) => !out.has(f)).sort();
+  if (missing.length > 0) {
+    const shown = missing.slice(0, 8).join(', ') + (missing.length > 8 ? `, … (${missing.length} more)` : '');
+    console.error(`[detail] the patch would leave out ${missing.length} of the ${published.size} published files: ${shown}`);
+    console.error(`[detail] a release's patch is cumulative – it must carry them again.  Use the published patch as --previous (or none), not a stale one.`);
+    process.exit(1);
+  }
+}
 
 rmSync(patch, { recursive: true, force: true });
 mkdirSync(resolve(patch, 'map'), { recursive: true });
