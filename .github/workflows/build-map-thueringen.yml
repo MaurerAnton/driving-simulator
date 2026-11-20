@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: TH source probe (temporary diagnostic)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Reachability of the Thuringia portals
+        run: |
+          set -u
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
+          for u in \
+            "https://geoportal.thueringen.de/robots.txt" \
+            "https://geoportal.thueringen.de/gdi-th/download-offene-geodaten/download-hoehendaten" \
+            "https://geoportal.thueringen.de/gdi-th/download-offene-geodaten/download-3d-gebaeudedaten" \
+            "https://geoportal.thueringen.de/dienste/atom_th_hoehendaten_dgm" \
+            "https://geoportal.geoportal-th.de/dienste/atom_th_hoehendaten_dgm" \
+            "https://geoportal.geoportal-th.de/3dgebaeude/LoD2/LoD2_634_5616_2_TH.zip" \
+            "https://geoportal.geoportal-th.de/hoehendaten/LAS/las_2014-2019/las_623_5718_1_th_2014-2019.zip" \
+            "https://geomis.geoportal-th.de/geonetwork/srv/ger/csw?SERVICE=CSW&VERSION=2.0.2&REQUEST=GetRecordById&ElementSetName=full&CONSTRAINTLANGUAGE_VERSION=1.1.0&outputSchema=http://www.isotc211.org/2005/gmd&id=14418d25-fcd7-4a3f-99a9-e3059a2772af" \
+            "https://www.geoproxy.geoportal-th.de/inspire-dl/" \
+            "https://tlbg-onlineshop.thueringen.de/" \
+            ; do
+            echo "=== $u"
+            curl -sS -m 40 -A "$UA" -o /tmp/o -w "code=%{http_code} size=%{size_download} type=%{content_type}\n" "$u" || echo "curl failed"
+            head -c 300 /tmp/o | tr -d '\0'
+            echo
+          done
+      - name: Links on the height-data download page
+        run: |
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
+          for p in download-hoehendaten download-3d-gebaeudedaten; do
+            echo "########## $p"
+            curl -sS -m 40 -A "$UA" "https://geoportal.thueringen.de/gdi-th/download-offene-geodaten/$p" -o /tmp/h.html
+            echo "size: $(wc -c < /tmp/h.html)"
+            grep -oE 'href="[^"]*"' /tmp/h.html | sort -u | head -80
+            echo "--- text with atom|dienste|zip|tif|kachel|wcs|Download:"
+            sed 's/<[^>]*>/ /g' /tmp/h.html | tr -s ' \n' ' \n' | grep -iE 'atom|dienste|\.zip|\.tif|kachel|wcs|download' | head -40
+          done
+      - name: Follow the ATOM feed for height data
+        run: |
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
+          for base in "https://geoportal.thueringen.de" "https://geoportal.geoportal-th.de"; do
+            for q in "" "?type=dataset&id=14418d25-fcd7-4a3f-99a9-e3059a2772af"; do
+              u="$base/dienste/atom_th_hoehendaten_dgm$q"
+              echo "=== $u"
+              curl -sS -m 40 -A "$UA" -o /tmp/a.xml -w "code=%{http_code} size=%{size_download}\n" "$u"
+              grep -oE 'href="[^"]*"' /tmp/a.xml | head -12
+              head -c 300 /tmp/a.xml | tr -d '\0'
+              echo
+            done
+          done
+      - name: Federal fallbacks
+        run: |
+          set -u
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
+          for u in \
+            "https://daten.gdz.bkg.bund.de/produkte/" \
+            "https://daten.gdz.bkg.bund.de/produkte/sonstige/" \
+            "https://sg.geodatenzentrum.de/wcs_dgm1?SERVICE=WCS&VERSION=1.0.0&REQUEST=GetCapabilities" \
+            "https://download.geofabrik.de/europe/germany/thueringen/thueringen-latest.osm.pbf" \
+            ; do
+            echo "=== $u"
+            curl -sS -m 40 -A "$UA" -o /tmp/o -w "code=%{http_code} size=%{size_download} type=%{content_type}\n" "$u" || echo "curl failed"
+            head -c 300 /tmp/o | tr -d '\0'
+            echo
+          done
