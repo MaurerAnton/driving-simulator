@@ -1,0 +1,260 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte eines Rechtecks in Bayern und legt sie als Kartenpaket
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte laden liest,
+# src/ui/mappacks.ts) in ein Release.
+#
+# Warum das hier läuft: ein solcher Bau brauchte mehrere Gigabyte Platte und mehr Speicher,
+# als ein Laptop hat; ein GitHub-Läufer hat 4 CPUs, 16 GB Speicher und ~14 GB Platte, und
+# seine Minuten sind für ein öffentliches Repository frei.  Die Karte kommt nicht in die
+# GitHub-Seiten (1 GB Grenze): Releases haben keine Größengrenze.
+#
+# Starten von Hand: Actions → "Karte Bayern" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (DGM1) und Gebäudemodelle (LoD2) der Bayerischen Vermessungsverwaltung
+#                                                            -> data/work/dgm2, data/work/lod2
+#   2. OpenStreetMap, auf das Rechteck geschnitten           -> npm run map:extract
+#   3. Straßennetz und Kacheln                               -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Zwei Aufträge, damit ein Netzfehler während der vielen Gigabyte nicht den ganzen Bau kostet
+# und damit jeder Teil seine eigenen Stunden hat.
+#
+# Rechteck: Kilometerkacheln in UTM32 (EPSG:25832) – 691_5334 ist die Kachel mit dem
+# Marienplatz.  Bayern östlich von 12° Ost (das sind bei München rund 722 km Ost) liegt in
+# UTM-Zone 33, die Kacheln heißen dort anders: dieses Rechteck bleibt westlich davon.
+#
+# Quelle, ohne Anmeldung und ohne Schlüssel (https://geodaten.bayern.de/opengeodata/):
+#   DGM1  https://download1.bayernwolke.de/a/dgm/dgm1/<E>_<N>.tif       1 km-Kachel, GeoTIFF
+#   LoD2  https://download1.bayernwolke.de/a/lod2/citygml/<E>_<N>.gml   2 km-Kachel, CityGML
+# Die Bayerische Vermessungsverwaltung stellt diese Daten unter Creative Commons
+# Namensnennung 4.0 International (CC BY 4.0) zur Verfügung.
+
+name: Karte Bayern
+
+on:
+  workflow_dispatch:
+    inputs:
+      east:
+        description: 'Rechteck: Kilometer nach Osten (UTM32), 690 oder 690..694'
+        type: string
+        default: '690..694'
+      north:
+        description: 'Rechteck: Kilometer nach Norden (UTM32), 5334 oder 5334..5338'
+        type: string
+        default: '5334..5338'
+      label:
+        description: Name der Karte (steht in map.json und im Release)
+        type: string
+        default: 'München'
+      osm:
+        description: OpenStreetMap-Ausschnitt von Geofabrik (Oberbayern reicht für München)
+        type: choice
+        default: oberbayern
+        options: [oberbayern, mittelfranken, niederbayern, oberfranken, oberpfalz, schwaben, unterfranken]
+      lod2_name:
+        description: 'Alle Gebäude in einen Ordner dieses Namens (leer: ein Ordner je Gemeinde, wie in OpenStreetMap)'
+        type: string
+        default: ''
+      tag:
+        description: 'Name des Releases (leer: karte-bayern-<Datum>-<Lauf>)'
+        type: string
+        default: ''
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        default: 'Münchner Verkehrsgesellschaft|MVV|MVG|Regionalverkehr Oberbayern|Stadtwerke München|Deutsche Bahn|DB Regio'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: 'Münchner Verkehrsgesellschaft|MVV|MVG|Regionalverkehr Oberbayern|Stadtwerke München|Deutsche Bahn|DB Regio'
+      jobs:
+        description: Wie viele Kacheln gleichzeitig geholt werden
+        type: string
+        default: '3'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: die offenen Geodaten – München Innenstadt, 4 km × 4 km: 64 MB Gelände, 0,5 GB Gebäude
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # node auch hier: die Gebäudemodelle liest tools/lod2-extract.ts – es holt selbst nichts,
+      # das Geländeskript gibt ihm jede .gml –, aber es braucht node_modules (saxes)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # Was ein früherer Lauf schon geholt hat: das Skript lässt liegen, was da ist, und holt
+      # nur, was fehlt (die Marken unter data/work/lod2/.done und die Kacheln unter dgm2).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name=geodata-bayern
+          echo "Artefakte von Lauf $RUN:"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          ls -l /tmp/$name.zip
+          # Im Artefakt liegen die Kacheln als dgm2/… und lod2/… (beim Hochladen zweier Pfade
+          # bleibt nur deren gemeinsamer Vorfahr weg, data/work) – also nach data/work.
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2 data/work/lod2
+      - name: Gelände (DGM1) und Gebäudemodelle (LoD2) holen
+        env:
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+          JOBS: ${{ inputs.jobs }}
+          LOD2_NAME: ${{ inputs.lod2_name }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -n "$LOD2_NAME" ]; then args+=(--lod2-name "$LOD2_NAME"); fi
+          python3 -I tools/fetch-bayern.py --east "$EAST" --north "$NORTH" --jobs "$JOBS" "${args[@]}"
+          du -sh data/work/dgm2 data/work/lod2
+          ls data/work/lod2
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste Lauf
+      # kann mit geodata_run hier weiterfahren
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-bayern
+          path: |
+            data/work/dgm2
+            data/work/lod2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    # Das Rechteck liegt außerhalb der Kästen von tools/mapgen/detail-region.json (die hessischen
+    # Karten); „all" baut die ganze Karte mit dem feineren Netz, das nach dem veröffentlichten
+    # Stand dazugekommen ist (Querschnitte, Parken, Gehwege, Markierungen, …).
+    env:
+      DETAIL_REGION: all
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-bayern
+          # dito: das Artefakt hält dgm2/… und lod2/…, ohne data/work
+          path: data/work
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          ls data/work
+          du -sh data/work/dgm2 data/work/lod2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, Bayern)
+        env:
+          OSM: ${{ inputs.osm }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/raw/osm
+          url="https://download.geofabrik.de/europe/germany/bayern/$OSM/$OSM-latest.osm.pbf"
+          echo "$url"
+          curl -fsSL --retry 5 --retry-delay 20 -o "data/raw/osm/$OSM-latest.osm.pbf" "$url"
+          ls -l data/raw/osm
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        env:
+          OSM: data/raw/osm/${{ inputs.osm }}-latest.osm.pbf
+        run: npm run map:extract -- "$OSM"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          # build-lines.ts, build-buslines.ts, build-signs.ts und build-services.ts lesen die
+          # OpenStreetMap-Datei aus process.argv[2] und nehmen ohne Argument
+          # data/raw/osm/hessen-latest.osm.pbf – die hat nur der hessische Bau.
+          OSM: data/raw/osm/${{ inputs.osm }}-latest.osm.pbf
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
+          npm run map:far
+          npm run map:timetable
+          npm run map:services -- "$OSM"
+      # build-graph.ts schreibt Namen und Quellen der hessischen Karte („Nordhessen", Hessische
+      # Verwaltung für Bodenmanagement und Geoinformation); hier stehen die von Bayern.
+      - name: Der Name der Karte und ihre Quellen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+          ATTRIBUTION: 'Gelände (DGM1) und Gebäude (LoD2): Bayerische Vermessungsverwaltung, www.geodaten.bayern.de, Creative Commons Namensnennung 4.0 (CC BY 4.0)'
+        run: |
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            const lines = (j.meta.attribution ?? []).filter((l) => !/Hessische|Hessen/i.test(l));
+            lines.push(process.env.ATTRIBUTION);
+            j.meta.attribution = lines;
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+            console.log(j.meta.attribution.join(" | "));
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+        run: |
+          tag="${WANTED:-karte-bayern-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL (Bayern) für den Fahrsimulator – im Spiel unter
+          Einstellungen → Karte laden (Kartenpaket).
+
+          Rechteck: $EAST km Ost, $NORTH km Nord (UTM32, EPSG:25832).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (© OpenStreetMap-Mitwirkende, ODbL 1.0) sowie dem
+          Geländemodell DGM1 und den Gebäudemodellen LoD2 der Bayerischen Vermessungsverwaltung
+          (https://geodaten.bayern.de/opengeodata/, BayernWolke download1.bayernwolke.de).  Die
+          Vermessungsverwaltung stellt diese Daten unter Creative Commons Namensnennung 4.0
+          International (CC BY 4.0) zur Verfügung.  Die Quellen und Lizenzen stehen auch in
+          map.json (meta.attribution) und in docs/MAP_DATA.md.
+
+          Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
+          zusammengesetzt.
+          EOF
+          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+            --notes-file notes.md data/work/map.tar.*
+          echo "release $tag"
