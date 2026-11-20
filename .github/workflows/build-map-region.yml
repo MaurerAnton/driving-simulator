@@ -37,11 +37,17 @@ on:
       gtfs_agency:
         description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
         type: string
-        default: '^KVG\b|Kassel|RegioTram|^NVV\b|Nordhessischer|RMV'
+        # gtfs.de liefert den Rhein-Main-Raum nicht als „RMV", sondern in einzelnen Lieferungen
+        # (traffiQ = Frankfurt, HEAG = Darmstadt, VGO, ÜWAG direkt, ESWE direkt, DADINA, RTV Direkt,
+        # KVG MKK direkt, KVG OF, SW GI-direkt, Stadt Wetzlar direkt, LNG Fulda direkt).  Ohne sie
+        # blieb im ersten Lauf keine einzige Straßenbahnlinie mit Fahrplan; damit 35 von 42 im
+        # Südwesten und 5 von 10 im Südosten.  Die nordhessischen Betriebe bleiben für eine Karte,
+        # die bis Kassel reicht.
+        default: '^KVG\b|Kassel|RegioTram|^NVV\b|Nordhessischer|RMV|traffiQ|HEAG|ESWE|VGO|ÜWAG|DADINA|RTV|SW GI|Stadt Wetzlar|KVG OF|KVG MKK|LNG Fulda|Verkehrsverbund Rhein-Neckar|Mainzer Verkehrsgesellschaft|Hessische Landesbahn|VIAS'
       gtfs_bus_agency:
         description: Dieselben für die Buslinien
         type: string
-        default: '^KVG M$|^NVV\b(?!.*\bAST\b)|Nordhessischer|RMV'
+        default: '^KVG M$|^NVV\b(?!.*\bAST\b)|Nordhessischer|RMV|traffiQ|HEAG|ESWE|VGO|ÜWAG|DADINA|RTV|SW GI|Stadt Wetzlar|KVG OF|KVG MKK|LNG Fulda|Verkehrsverbund Rhein-Neckar|Mainzer Verkehrsgesellschaft|Hessische Landesbahn|VIAS'
       geodata_run:
         description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
 
