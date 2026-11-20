@@ -35,9 +35,11 @@ after an interruption.
 """
 import argparse
 import concurrent.futures
+import gzip
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -188,13 +190,19 @@ def take_dgm(product_url, east, north, tmp):
 
 
 def take_lod2(product_url, east, north, name, tmp):
-    """One CityGML file → data/work/lod2/<name>/…, read by tools/lod2-extract.ts (CityGML 1.0 AdV, as in Hesse)."""
+    """One CityGML file → a staging directory of its own, read by tools/lod2-extract.ts (CityGML 1.0 AdV, as in Hesse).
+
+    The name carries the tile, because tools/lod2-extract.ts empties the directory it writes
+    (rmSync in line 176): called once per tile with the same name, only the last tile would
+    stay.  The dot in front keeps the map build from reading the staging directory as well;
+    merge_lod2() puts the tiles together afterwards.
+    """
     done = os.path.join(GD.LOD2_OUT, '.done', f'{name}-{east}_{north}')
     if os.path.exists(done):
         return 0
     curl_to(product_url, tmp)
     node = subprocess.Popen(
-        ['node', os.path.join(ROOT, 'tools/lod2-extract.ts'), '--name', name, '-'],
+        ['node', os.path.join(ROOT, 'tools/lod2-extract.ts'), '--name', f'.{name}-{east}_{north}', '-'],
         stdin=subprocess.PIPE,
         cwd=ROOT,
     )
@@ -212,6 +220,32 @@ def take_lod2(product_url, east, north, name, tmp):
     with open(done, 'w') as f:
         f.write(f'{name} {east}_{north}\n')
     return 1
+
+
+def merge_lod2(name):
+    """Put the squares of 2 km of every kilometre tile together into data/work/lod2/<name>.
+
+    Every tile wrote into a staging directory of its own; neighbouring tiles share squares, and
+    one square is one file of lines – so joining the files is all there is to it (a gzip file
+    may hold several members one after the other).
+    """
+    final = os.path.join(GD.LOD2_OUT, name)
+    staging = sorted(d for d in os.listdir(GD.LOD2_OUT) if d.startswith(f'.{name}-'))
+    if not staging:
+        return None
+    units = 0
+    for part in staging:
+        src = os.path.join(GD.LOD2_OUT, part)
+        for square in os.listdir(src):
+            os.makedirs(final, exist_ok=True)
+            with open(os.path.join(src, square), 'rb') as a, open(os.path.join(final, square), 'ab') as b:
+                shutil.copyfileobj(a, b)
+        shutil.rmtree(src)
+    for square in sorted(os.listdir(final)):
+        units += sum(1 for _ in gzip.open(os.path.join(final, square), 'rb'))
+    say(f'[lgln] buildings joined from {len(staging)} tiles: {len(os.listdir(final))} squares of 2 km, '
+        f'{units} units in data/work/lod2/{name}')
+    return units
 
 
 def main():
@@ -307,6 +341,8 @@ def main():
 
     say(f'[lgln] done: {counts["dgm"]} tiles of terrain ({again["dgm"]} were there), '
         f'{counts["lod2"]} tiles of buildings ({again["lod2"]} were there) in {(time.time() - started) / 60:.0f} min')
+    if args.only != 'dgm':
+        merge_lod2(args.lod2_name)
     if 'gap' in report:
         gaps = report['gap']
         say(f'[lgln] no terrain of Lower Saxony for {len(gaps)} kilometre squares (the map stays out of them)'
