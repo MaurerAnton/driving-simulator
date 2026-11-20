@@ -163,8 +163,12 @@ jobs:
     # Das Rechteck liegt außerhalb der Kästen von tools/mapgen/detail-region.json (die hessischen
     # Karten); „all" baut die ganze Karte mit dem feineren Netz, das nach dem veröffentlichten
     # Stand dazugekommen ist (Querschnitte, Parken, Gehwege, Markierungen, …).
+    # OSM_FILE: osm-extract.ts, build-lines.ts, build-buslines.ts, build-signs.ts und
+    # build-services.ts lesen die OSM-Datei aus process.argv[2] und nehmen ohne Argument
+    # data/raw/osm/hessen-latest.osm.pbf – die es hier nicht gibt (ENOENT nach Stunden).
     env:
       DETAIL_REGION: all
+      OSM_FILE: data/raw/osm/${{ inputs.osm }}-latest.osm.pbf
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -192,17 +196,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/raw/osm
+          # Geofabrik hält das ganze Land und seine vier Regierungsbezirke: benannt ist jede Datei
+          # nach ihrem Gebiet (stuttgart-regbez-latest.osm.pbf), das Land selbst liegt im Ordner
+          # baden-wuerttemberg/ (nachgemessen: 206 auf einen Bereich von 1000 Byte).
           case "$OSM" in
-            baden-wuerttemberg) url=https://download.geofabrik.de/europe/germany/baden-wuerttemberg-latest.osm.pbf ;;
+            baden-wuerttemberg) url=https://download.geofabrik.de/europe/germany/baden-wuerttemberg/baden-wuerttemberg-latest.osm.pbf ;;
             *) url="https://download.geofabrik.de/europe/germany/baden-wuerttemberg/$OSM/$OSM-latest.osm.pbf" ;;
           esac
           echo "$url"
-          curl -fsSL --retry 5 --retry-delay 20 -o "data/raw/osm/$OSM-latest.osm.pbf" "$url"
+          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM_FILE" "$url"
           ls -l data/raw/osm
       - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
-        env:
-          OSM: ${{ inputs.osm }}
-        run: npm run map:extract -- "data/raw/osm/$OSM-latest.osm.pbf"
+        run: |
+          echo "OSM-Datei: $OSM_FILE"
+          npm run map:extract -- "$OSM_FILE"
       - name: Kartenpaket 2/4 – Straßennetz und Kacheln
         run: npm run map:build -- --jobs 3
       - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
@@ -212,12 +219,13 @@ jobs:
         run: |
           npm run map:addresses
           npm run map:stops
-          npm run map:lines
-          npm run map:buslines
-          npm run map:signs
+          # diese vier lesen die OSM-Datei selbst (argv[2]), die anderen beiden das Netz
+          npm run map:lines -- "$OSM_FILE"
+          npm run map:buslines -- "$OSM_FILE"
+          npm run map:signs -- "$OSM_FILE"
           npm run map:far
           npm run map:timetable
-          npm run map:services
+          npm run map:services -- "$OSM_FILE"
       # build-graph.ts schreibt Namen und Quellen der hessischen Karte („Nordhessen", Hessische
       # Verwaltung für Bodenmanagement und Geoinformation); hier stehen die von Baden-Württemberg.
       - name: Der Name der Karte und ihre Quellen (map.json)
