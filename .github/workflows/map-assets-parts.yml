@@ -136,6 +136,61 @@ jobs:
               'part_min': min(sizes), 'part_max': max(sizes),
           }))
           PY
+          cat > "$RUNNER_TEMP/checktiles.py" <<'PY'
+          import gzip, json, os, sys, tarfile
+
+          mapdir, partsdir, ptype, fragment = sys.argv[1:5]
+          files = json.load(open(fragment))
+          bad, tiles, seen = [], 0, {}
+
+          def fail(msg):
+              bad.append(msg)
+              if len(bad) <= 10:
+                  print('FAIL: ' + msg)
+
+          for f in files:
+              if f['type'] != ptype:
+                  fail('%s: Art %s, erwartet %s' % (f['file'], f['type'], ptype))
+              with tarfile.open(os.path.join(partsdir, f['file'])) as tar:
+                  names = tar.getnames()
+                  want_tiles = set(f['tiles'])
+                  if 'manifest.json' not in names:
+                      fail('%s: kein manifest.json' % f['file'])
+                  else:
+                      man = json.loads(tar.extractfile('manifest.json').read())
+                      if man.get('type') != ptype:
+                          fail('%s: manifest-Art %s' % (f['file'], man.get('type')))
+                      if set(man.get('tiles') or {}) != want_tiles:
+                          fail('%s: das manifest nennt %d Kacheln, der Index %d' % (
+                              f['file'], len(man.get('tiles') or {}), len(want_tiles)))
+                  entries = set(names) - {'manifest.json'}
+                  if entries != want_tiles:
+                      fail('%s: %d Einträge, der Index nennt %d' % (f['file'], len(entries), len(want_tiles)))
+                  for key in sorted(entries & want_tiles):
+                      tiles += 1
+                      seen[key] = seen.get(key, 0) + 1
+                      got = tar.extractfile(key).read()
+                      with open(os.path.join(mapdir, 'tiles', key + '.fsb'), 'rb') as fh:
+                          want = fh.read()
+                      if got != want:
+                          fail('%s: %s weicht von der Kachel der Karte ab' % (f['file'], key))
+                      try:
+                          gzip.decompress(got)
+                      except OSError as err:
+                          fail('%s: %s lässt sich nicht entpacken: %s' % (f['file'], key, err))
+
+          on_disk = len([n for n in os.listdir(os.path.join(mapdir, 'tiles')) if n.endswith('.fsb')])
+          if len(seen) != on_disk:
+              fail('%d Kacheln in den Teilen, %d in der Karte' % (len(seen), on_disk))
+          twice = [k for k, n in seen.items() if n > 1]
+          if twice:
+              fail('%d Kacheln in mehr als einem Teil, z. B. %s' % (len(twice), twice[:3]))
+          print(json.dumps({'parts': len(files), 'tiles': tiles, 'type': ptype}))
+          if bad:
+              print('%d Fehler' % len(bad))
+              sys.exit(1)
+          print('Prüfung: ja')
+          PY
           cat > "$RUNNER_TEMP/checkparts.mjs" <<'JS'
           import { readdirSync, readFileSync, statSync } from 'node:fs';
           import { join } from 'node:path';
@@ -195,9 +250,15 @@ jobs:
             python3 "$RUNNER_TEMP/mkparts2.py" "$work/map" parts "$TYPE" "$wanted" "$first" "$RUNNER_TEMP/frag-$i.json" \
               | tee "$RUNNER_TEMP/part-$i.json"
             # geprüft, solange die Karte noch da ist: jede Kachel, die aus einem Teil kommt,
-            # muss die der Karte sein
-            SRC_BASE="$GITHUB_WORKSPACE/src/world" node "$RUNNER_TEMP/checkparts.mjs" \
-              "$work/map" parts "$TYPE" "$RUNNER_TEMP/frag-$i.json"
+            # muss die der Karte sein – Byte für Byte
+            python3 "$RUNNER_TEMP/checktiles.py" "$work/map" parts "$TYPE" "$RUNNER_TEMP/frag-$i.json"
+            # und, wenn der Code des Spiels schon im Repository liegt, auch mit ihm
+            if [ -f src/world/patchpart.ts ]; then
+              SRC_BASE="$GITHUB_WORKSPACE/src/world" node "$RUNNER_TEMP/checkparts.mjs" \
+                "$work/map" parts "$TYPE" "$RUNNER_TEMP/frag-$i.json"
+            else
+              echo "::notice::src/world/patchpart.ts liegt nicht im Repository – die Prüfung mit dem Code des Spiels entfällt (jede Kachel wurde mit Python geprüft)"
+            fi
             first=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[-1]['n']+1)" "$RUNNER_TEMP/frag-$i.json")
             echo "$tag" >> "$RUNNER_TEMP/tags"
             echo "$RUNNER_TEMP/frag-$i.json" >> "$RUNNER_TEMP/fragments"
@@ -240,11 +301,54 @@ jobs:
           python3 "$RUNNER_TEMP/mergeindex.py" parts $(cat "$RUNNER_TEMP/fragments") | tee "$RUNNER_TEMP/report.json"
 
       # die Karten sind weg – jetzt zählt nur noch, was das Spiel aus dem einen map-assets/ liest
-      - name: Prüfen – das zusammengesetzte map-assets mit dem eigenen Code des Spiels lesen
+      - name: Prüfen – das zusammengesetzte map-assets lesen (Python, und der Code des Spiels, wenn er im Repository liegt)
         env:
           TYPE: ${{ inputs.type }}
         run: |
           set -euo pipefail
+          cat > "$RUNNER_TEMP/checkmerged.py" <<'PY'
+          import gzip, json, os, sys, tarfile
+
+          partsdir, ptype, want_tiles = sys.argv[1], sys.argv[2], int(sys.argv[3] or 0)
+          index = json.load(open(os.path.join(partsdir, 'index.json')))
+          files = index['files']
+          bad = []
+
+          def fail(msg):
+              bad.append(msg)
+              if len(bad) <= 10:
+                  print('FAIL: ' + msg)
+
+          nums = [f['n'] for f in files]
+          if len(set(nums)) != len(nums):
+              fail('eine Nummer kommt zweimal vor')
+          if index.get('latest') != max(nums):
+              fail('latest %s ist nicht die höchste Nummer %s' % (index.get('latest'), max(nums)))
+          if sorted(nums) != list(range(1, len(nums) + 1)):
+              fail('die Nummern laufen nicht von 1 an durch')
+          tiles = 0
+          for f in files:
+              if f['type'] != ptype:
+                  fail('%s: Art %s, erwartet %s' % (f['file'], f['type'], ptype))
+              with tarfile.open(os.path.join(partsdir, f['file'])) as tar:
+                  entries = set(tar.getnames()) - {'manifest.json'}
+                  if len(entries) != len(f['tiles']):
+                      fail('%s: %d Einträge, der Index nennt %d' % (f['file'], len(entries), len(f['tiles'])))
+                  try:
+                      gzip.decompress(tar.extractfile(f['tiles'][0]).read())
+                  except OSError as err:
+                      fail('%s: %s lässt sich nicht entpacken: %s' % (f['file'], f['tiles'][0], err))
+              tiles += len(f['tiles'])
+          if want_tiles and tiles != want_tiles:
+              fail('%d Kacheln im Index, %d erwartet' % (tiles, want_tiles))
+          print(json.dumps({'parts': len(files), 'latest': index.get('latest'), 'tiles': tiles, 'type': ptype}))
+          if bad:
+              print('%d Fehler' % len(bad))
+              sys.exit(1)
+          print('Prüfung: ja')
+          PY
+          python3 "$RUNNER_TEMP/checkmerged.py" parts "$TYPE" \
+            "$(python3 -c "import json; print(json.load(open('$RUNNER_TEMP/report.json'))['tiles'])")"
           cat > "$RUNNER_TEMP/checkmerged.mjs" <<'JS'
           import { readFileSync, statSync } from 'node:fs';
           import { join } from 'node:path';
@@ -280,8 +384,13 @@ jobs:
           }
           console.log(process.exitCode ? 'Prüfung: nein' : 'Prüfung: ja');
           JS
-          SRC_BASE="$GITHUB_WORKSPACE/src/world" node "$RUNNER_TEMP/checkmerged.mjs" parts "$TYPE" \
-            "$(python3 -c "import json; print(json.load(open('$RUNNER_TEMP/report.json'))['tiles'])")"
+          # dazu, wenn der Code des Spiels schon im Repository liegt, auch mit ihm
+          if [ -f src/world/patchpart.ts ]; then
+            SRC_BASE="$GITHUB_WORKSPACE/src/world" node "$RUNNER_TEMP/checkmerged.mjs" parts "$TYPE" \
+              "$(python3 -c "import json; print(json.load(open('$RUNNER_TEMP/report.json'))['tiles'])")"
+          else
+            echo "::notice::src/world/patchpart.ts liegt nicht im Repository – die Prüfung mit dem Code des Spiels entfällt"
+          fi
 
       - name: Zusammenfassung
         run: |
