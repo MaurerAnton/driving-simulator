@@ -39,7 +39,8 @@
     "map:pack": "rm -f data/work/map.tar.* && tar -cf - -C public map | split -b 100M -d -a 2 - data/work/map.tar."
   },
   "dependencies": {
-    "three": "^0.187.0"
+    "three": "^0.187.0",
+    "xz-decompress": "^0.2.3"
   },
   "devDependencies": {
     "@types/earcut": "^3.2.4",

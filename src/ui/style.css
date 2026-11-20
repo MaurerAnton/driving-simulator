@@ -344,6 +344,17 @@ kbd {
 .hud .map .expand svg { display: block; width: 100%; height: 100%; }
 .hud .map .expand:hover { background: rgba(255, 204, 0, 0.9); color: #111; }
 .hud .fps { position: absolute; right: 12px; top: 8px; padding: 2px 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.45); color: #d9f2c4; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+
+/* the bar of a map part being downloaded (developer mode, settings: devMap) – the corner, not the loading screen */
+.hud .asset-progress { position: absolute; right: 12px; bottom: 14px; width: 200px; padding: 8px 10px; border-radius: 8px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 12px; pointer-events: none; }
+.hud .asset-progress .progress { height: 5px; margin-top: 6px; }
+.hud .asset-progress .progress-pct { margin-top: 4px; font-size: 11px; }
+
+/* the corner label that the tile has several versions (developer mode), and its list */
+.hud .tile-versions { position: absolute; left: 12px; bottom: 14px; min-height: 32px; padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.4); background: rgba(16,24,34,0.86); color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; pointer-events: auto; touch-action: manipulation; }
+.hud .tile-versions:hover, .hud .tile-versions:focus-visible { border-color: var(--accent); outline: none; }
+.tile-versions-list { display: flex; flex-direction: column; gap: 8px; min-width: 260px; }
+.tile-versions-list .btn { text-align: left; }
 .hud .fps[hidden] { display: none; }
 .hud .tip { position: absolute; left: 50%; bottom: 82px; transform: translateX(-50%); background: rgba(0,0,0,.6); border-radius: 8px; padding: 6px 12px; font-size: 14px; white-space: nowrap; }
 /* bottom right: the bottom left corner is where the left door mirror is */

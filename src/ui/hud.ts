@@ -10,7 +10,7 @@ import { routeMode } from '../game/routepresets.ts';
 import type { VehicleKind } from '../game/vehicles.ts';
 import { RELEASES, VERSION, sizeWords } from '../game/releases.ts';
 import type { Settings } from '../game/settings.ts';
-import { FAR_VIEWS, GRAPHICS_PRESETS, LOW_RESOLUTIONS, RUN_SPEEDS, VIEW_DISTANCES, resetSettings, saveSettings } from '../game/settings.ts';
+import { DEFAULT_SETTINGS, FAR_VIEWS, GRAPHICS_PRESETS, LOW_RESOLUTIONS, RUN_SPEEDS, VIEW_DISTANCES, resetSettings, saveSettings } from '../game/settings.ts';
 import { closeX } from './closex.ts';
 import { setWasmMode, wasmSupported } from '../wasm/kernels.ts';
 import type { Input } from '../input/input.ts';
@@ -398,6 +398,137 @@ export class Hud {
   /** the largest share shown on the loading screen, and behind the menu, since each loading began */
   private loadShown = 0;
   private menuShown = 0;
+
+  /** the bar of a map part being downloaded (developer mode, settings: devMap) – a light one, not the loading screen's */
+  private assetBar: { box: HTMLElement; bar: HTMLElement; pct: HTMLElement } | null = null;
+
+  /**
+   * Begin showing the progress of a download of map assets (a part of
+   * map-assets): a small bar in the corner with the per cent and the bytes
+   * (the same words the loading screens use).  Off in the settings
+   * (devMapProgress), so this does nothing then.
+   */
+  showAssetProgress(title: string): void {
+    if (!this.settings.devMapProgress) return;
+    this.hideAssetProgress();
+    const box = el('div', 'asset-progress');
+    const bar = el('div', 'progress', '<i></i>');
+    const pct = el('small', 'progress-pct', '');
+    box.append(el('span', '', title), bar, pct);
+    this.hud.append(box);
+    this.assetBar = { box, bar, pct };
+  }
+
+  /** How far a download has got (0 … 1); the bytes come from netstats. */
+  setAssetProgress(share: number): void {
+    const a = this.assetBar;
+    if (!a) return;
+    const p = Math.round(Math.max(0, Math.min(1, share)) * 100);
+    a.bar.classList.add('known');
+    (a.bar.firstElementChild as HTMLElement).style.width = `${p}%`;
+    a.pct.textContent = `${p} % · ${formatBytes(downloaded(), localeOf(this.lang))}`;
+  }
+
+  /** The download finished (or failed): the bar goes. */
+  hideAssetProgress(): void {
+    this.assetBar?.box.remove();
+    this.assetBar = null;
+  }
+
+  /** the corner label that the tile the player stands on has several versions (developer mode) */
+  private tileLabel: { box: HTMLElement; text: HTMLElement } | null = null;
+  /** the tile the label is for now ('' = none) */
+  private tileLabelKey = '';
+  /** the versions of the tile the label is for, as the game worked them out (set by setTileVersions) */
+  private tileVersions: Array<{ label: string; loaded: boolean; n: number }> = [];
+  /** which tile's version list is open, and where to load it */
+  onTileVersion: (tile: string, part: number, when: 'now' | 'next') => void = () => {};
+
+  /**
+   * The tile the player stands on (`key`, or '' off a versioned tile): the
+   * label shows when it is a tile that ever had several versions (developer
+   * mode, settings: devMap) – and only then.
+   */
+  setTileVersions(key: string, versions: Array<{ label: string; loaded: boolean; n: number }>): void {
+    if (!this.settings.devMap || !key || versions.length < 2) {
+      this.hideTileLabel();
+      return;
+    }
+    if (!this.tileLabel) {
+      const box = el('button', 'tile-versions');
+      box.type = 'button';
+      box.onclick = () => this.openTileVersions();
+      const text = el('span', '', '');
+      box.append(text);
+      this.hud.append(box);
+      this.tileLabel = { box, text };
+    }
+    const label = this.tileLabel;
+    if (key !== this.tileLabelKey) {
+      this.tileLabelKey = key;
+      this.tileVersions = versions;
+      const t = this.t('devMap.label');
+      label.text.textContent = t;
+      label.box.title = t;
+      label.box.setAttribute('aria-label', t);
+    }
+    label.box.style.display = '';
+  }
+
+  private hideTileLabel(): void {
+    this.tileLabelKey = '';
+    this.tileVersions = [];
+    if (this.tileLabel) this.tileLabel.box.style.display = 'none';
+  }
+
+  /**
+   * The list of versions of the tile the label is for, the loaded one marked;
+   * choosing one asks when to load it (a part is fetched then or on the next
+   * drive into that region) – two buttons, as the developer asked.
+   */
+  private openTileVersions(): void {
+    const key = this.tileLabelKey;
+    if (!key) return;
+    const box = el('div', 'panel narrow tile-versions-list');
+    box.append(el('h2', '', this.t('devMap.listTitle')));
+    const pick = (v: { label: string; loaded: boolean; n: number }): void => {
+      this.confirmTileVersion(key, v);
+    };
+    for (const v of this.tileVersions) {
+      const b = el('button', 'btn' + (v.loaded ? ' ghost' : ''), `${v.label}${v.loaded ? ' · ' + this.t('devMap.loaded') : ''}`);
+      b.disabled = v.loaded;
+      b.onclick = () => pick(v);
+      box.append(b);
+    }
+    const back = el('button', 'btn ghost', this.t('back'));
+    back.onclick = () => this.hideOverlay();
+    box.append(back);
+    this.setOverlay(box);
+  }
+
+  /** The two choices of when a chosen version is loaded: now, or the next drive into that region. */
+  private confirmTileVersion(tile: string, v: { label: string; loaded: boolean; n: number }): void {
+    const box = el('div', 'panel narrow tile-versions-list');
+    box.append(el('h2', '', this.t('devMap.when', { what: v.label })), el('p', 'note', this.t('devMap.whenNote')));
+    const now = el('button', 'btn', this.t('devMap.now'));
+    now.onclick = () => {
+      this.hideOverlay();
+      this.onTileVersion(tile, v.n, 'now');
+    };
+    const next = el('button', 'btn ghost', this.t('devMap.next'));
+    next.onclick = () => {
+      this.hideOverlay();
+      this.onTileVersion(tile, v.n, 'next');
+    };
+    const back = el('button', 'btn ghost', this.t('back'));
+    back.onclick = () => this.hideTileVersionsList();
+    box.append(now, next, back);
+    this.setOverlay(box);
+  }
+
+  private hideTileVersionsList(): void {
+    this.hideOverlay();
+  }
 
   /** Behind the menu of rows: how far the surroundings of the start place are loaded (null: done). */
   setMenuLoading(share: number | null): void {
@@ -1059,6 +1190,35 @@ export class Hud {
     range(this.t('touchOpacity'), s.touchOpacity, (v) => (s.touchOpacity = Math.max(0.15, v)));
     check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
     check(this.t('showFps'), s.showFps, (v) => (s.showFps = v));
+    // developer mode: which map tiles have several versions, and where the parts come from (world/partcache.ts)
+    {
+      const head = el('h2', '', this.t('devMap.title'));
+      p.append(head);
+      check(this.t('devMap'), s.devMap, (v) => (s.devMap = v));
+      select(this.t('devMapFetch'), s.devMapFetch, (['repo', 'site', 'pack'] as const).map((k): [string, string] => [k, this.t(`devMapFetch.${k}`)]), (v) => (s.devMapFetch = v as Settings['devMapFetch']));
+      p.append(el('p', 'note', this.t('devMapFetch.note')));
+      {
+        const row = el('label', 'row');
+        const input = el('input');
+        input.type = 'text';
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+        input.value = s.devMapRepo;
+        input.onchange = () => {
+          s.devMapRepo = input.value.trim() || DEFAULT_SETTINGS.devMapRepo;
+          saveSettings(s);
+          this.onSettingsChanged();
+        };
+        const l = el('label', '', this.t('devMapRepo'));
+        l.style.minWidth = '0';
+        l.style.flex = '1';
+        row.append(input, l);
+        p.append(row);
+      }
+      select(this.t('devMapRam'), String(s.devMapRam), [['64', '64 MB'], ['128', '128 MB'], ['256', '256 MB'], ['512', '512 MB'], ['1024', '1024 MB']], (v) => (s.devMapRam = Number(v)));
+      check(this.t('devMapProgress'), s.devMapProgress, (v) => (s.devMapProgress = v));
+      p.append(el('p', 'note', this.t('devMap.note')));
+    }
     // the tiles and the quickest way in WebAssembly (wasm/kernels.ts) – or in JavaScript only
     select(this.t('wasm'), s.wasm, [['auto', this.t(wasmSupported() ? 'wasm.auto' : 'wasm.missing')], ['off', this.t('wasm.off')]], (v) => {
       s.wasm = v === 'off' ? 'off' : 'auto';

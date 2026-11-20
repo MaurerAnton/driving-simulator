@@ -126,6 +126,16 @@ export interface Settings {
   walkControls: 'auto' | 'classic' | 'tank' | 'tap';
   /** a tap (or click) on a place in the 3D picture offers "Teleport here" for a few seconds (ui/worldtap.ts) */
   teleportTap: boolean;
+  /** developer mode: show which map tiles have several versions, and let a tile be chosen from a part of map-assets (ui/mapversions.ts) */
+  devMap: boolean;
+  /** where the parts of map-assets come from: the site, the repository over raw.githubusercontent (CORS ok), or a stored map pack */
+  devMapFetch: 'site' | 'repo' | 'pack';
+  /** the repository that holds map-assets (owner/repo), for devMapFetch 'repo' */
+  devMapRepo: string;
+  /** how much of the parts to keep in memory, in megabytes */
+  devMapRam: number;
+  /** show the loading bar while a part of map-assets is downloaded (netstats + hud setLoadingProgress) */
+  devMapProgress: boolean;
   /** the tram the player drives: one unit, two coupled units, or one with a trailer car */
   tramSet: TramSet;
   /** the main menu: the vehicle large in the 3D picture with icons round it (the default since 1.4.0), rows of cards over the 3D scene, or the simple list of before */
@@ -246,6 +256,11 @@ export const DEFAULT_SETTINGS: Settings = {
   footView: 'eyes',
   walkControls: 'auto',
   teleportTap: true,
+  devMap: false,
+  devMapFetch: 'repo',
+  devMapRepo: 'MaurerAnton/driving-simulator',
+  devMapRam: 256,
+  devMapProgress: true,
   tramSet: 'single',
   // (new players get the stage; a list chosen before stays – the rows, 1.3.0's default, become the stage once)
   menuStyle: 'stage',
@@ -317,6 +332,11 @@ function merge(parsed: Partial<Settings>): Settings {
   if (s.footView !== 'eyes' && s.footView !== 'behind') s.footView = d.footView;
   if (!(['auto', 'classic', 'tank', 'tap'] as const).includes(s.walkControls)) s.walkControls = d.walkControls;
   if (typeof s.teleportTap !== 'boolean') s.teleportTap = d.teleportTap;
+  if (typeof s.devMap !== 'boolean') s.devMap = d.devMap;
+  if (s.devMapFetch !== 'site' && s.devMapFetch !== 'repo' && s.devMapFetch !== 'pack') s.devMapFetch = d.devMapFetch;
+  if (typeof s.devMapRepo !== 'string') s.devMapRepo = d.devMapRepo;
+  if (!(s.devMapRam >= 16 && s.devMapRam <= 4096)) s.devMapRam = d.devMapRam;
+  if (typeof s.devMapProgress !== 'boolean') s.devMapProgress = d.devMapProgress;
   if (s.tramSet !== 'single' && s.tramSet !== 'double' && s.tramSet !== 'trailer') s.tramSet = d.tramSet;
   if (s.menuStyle !== 'stage' && s.menuStyle !== 'carousel' && s.menuStyle !== 'classic') s.menuStyle = d.menuStyle;
   s.tourPrefs = { ...DEFAULT_TOUR_PREFS, ...(typeof parsed.tourPrefs === 'object' && parsed.tourPrefs ? parsed.tourPrefs : {}) };

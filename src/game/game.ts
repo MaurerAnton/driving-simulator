@@ -104,6 +104,11 @@ import { LaneGraph, TURN, lanePoint } from '../world/lanes.ts';
 import type { Lane } from '../world/lanes.ts';
 import { newPolySample, projectOnPolyline, samplePolyline } from '../core/geom.ts';
 import type { SignPost } from '../world/tilefmt.ts';
+import { tileKey } from '../world/tilefmt.ts';
+import { PartCache, sourceFor } from '../world/partcache.ts';
+import { useTileSource } from '../world/mappack.ts';
+import { versionedTiles, versionsOfTile, type PartIndex } from '../world/tileversions.ts';
+import { TILE, gridIndex } from '../world/grid.ts';
 import { CLS, CTRL, EF, RAIL, STOP_FLAG, SURF_ROLLING, XING } from '../world/types.ts';
 import type { SpawnJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
@@ -937,6 +942,7 @@ export class Game {
     // the driven path is written down now and then; make sure the last stretch is, too
     window.addEventListener('pagehide', () => this.path.save());
     this.hud.onSettingsChanged = () => this.applySettings();
+    this.hud.onTileVersion = (tile, part, when) => this.onTileVersion(tile, part, when);
     this.rules.onViolation = (v) => {
       this.hud.toast(v);
       this.faultLog.add({ t: Date.now(), id: v.id, severity: v.severity, data: v.data, street: this.rules.context.roadName, mode: this.lesson?.id ?? 'free', x: Math.round(v.x), z: Math.round(v.z) });
@@ -1246,6 +1252,81 @@ export class Game {
       this.rail.ringMax = Math.min(620, app.tiles.viewRadius * 0.8);
       this.rail.far = Math.min(900, app.tiles.viewRadius * 1.1);
     }
+    this.applyDevMap();
+  }
+
+  /**
+   * The developer mode's parts (settings: devMap): the cache of map-assets,
+   * built from the settings, and the index that says which tiles ever had a
+   * version – read once, so the corner label knows where it may show.
+   */
+  private applyDevMap(): void {
+    const s = this.settings;
+    if (!s.devMap) {
+      this.parts = null;
+      this.partIndex = null;
+      this.versioned = new Set();
+      this.labelTile = '';
+      this.pendingParts.clear();
+      useTileSource(null); // (the tiles come from the site again, as always)
+      this.hud.setTileVersions('', []);
+      return;
+    }
+    const opts = { fetch: s.devMapFetch, repo: s.devMapRepo, budgetMb: s.devMapRam, onProgress: (share: number) => this.hud.setAssetProgress(share) };
+    const cache = new PartCache(opts, sourceFor(s.devMapFetch, opts, this.app.baseUrl));
+    this.parts = cache;
+    // (a file of the map a part holds comes from it – a tile, the net, a network chunk –
+    // the site's file is the fallback; the path is the one in the map, the tile key for a tile)
+    useTileSource(async (path) => {
+      const prefer = this.pendingParts.get(path);
+      if (path.endsWith('.fsb') || /^\d+_\d+$/.test(path)) {
+        const got = await cache.tile(path.replace(/\.fsb$/, ''), prefer);
+        return got ? got.bytes : null;
+      }
+      const got = await cache.mapFile(path, prefer);
+      return got ? got.bytes : null;
+    }, this.app.baseUrl);
+    // the index says what exists: which tiles ever had a version, and the update check reads it too
+    void this.parts.getIndex(0).then((idx) => {
+      if (!idx || this.parts === null) return;
+      this.partIndex = idx;
+      this.versioned = versionedTiles(idx);
+      this.checkForNewerParts(idx);
+    });
+  }
+
+  /**
+   * The load-time check (first load, page reload): is there a newer part than
+   * the one the site ships?  The index's `latest` says so; a newer one means
+   * the developer has something to look at (the corner label, and the notice).
+   */
+  private async checkForNewerParts(idx: PartIndex): Promise<void> {
+    const newest = idx.latest;
+    const here = idx.files.find((f) => f.n === newest);
+    if (!here) return;
+    // (the site's own tiles are the "base"; a part newer than that is news)
+    if (here.type === 'base') return;
+    this.hud.message(tr('devMap.newer', this.settings.lang, { n: newest, type: here.type }));
+  }
+
+  /**
+   * A version of a tile chosen from the corner label (ui/hud.ts): `part` is a
+   * part number to load now, or 'next' to load it the next time the player
+   * drives into that region.
+   */
+  private onTileVersion(tile: string, part: number, when: 'now' | 'next'): void {
+    if (!this.parts) return;
+    if (when === 'next') {
+      // remembered: the next time the player drives into this tile's region,
+      // that part is preferred over the newest (the choice is one per tile)
+      this.pendingParts.set(tile, part);
+      this.hud.message(tr('devMap.next', this.settings.lang));
+      return;
+    }
+    void this.parts.tile(tile, part).then((got) => {
+      if (got) this.hud.message(tr('devMap.loadedNow', this.settings.lang, { n: got.part }));
+      else this.hud.message(tr('devMap.couldNot', this.settings.lang));
+    });
   }
 
   // ------------------------------------------------------------------- flow
@@ -4938,6 +5019,16 @@ export class Game {
   private readonly fly = new FlyCam();
   private touchStick: TouchStick | null = null;
   private worldTap: WorldTap | null = null;
+  /** the parts of map-assets in memory (developer mode, settings: devMap) – null while off */
+  private parts: PartCache | null = null;
+  /** which tiles ever had several versions (from the index) – where the corner label may show */
+  private versioned: Set<string> = new Set();
+  /** the index of map-assets, read once on load (the update check of Module H) */
+  private partIndex: PartIndex | null = null;
+  /** the tile the corner label is for now ('' = none) */
+  private labelTile = '';
+  /** the versions chosen for "next time": tile -> the part to prefer on the next drive into its region */
+  private pendingParts = new Map<string, number>();
   /** the vehicle stands still – its physics not stepped – while the flying camera is far from it, and till the world round it is loaded again */
   private flyParked = false;
 
@@ -4973,6 +5064,41 @@ export class Game {
     if (!w) this.walkCtl.cancel();
     this.touchStick.frame(touch ? (walking ? 'walk' : fly ? 'fly' : null) : null);
     this.worldTap.frame();
+    this.tileVersionsFrame();
+  }
+
+  /**
+   * Every picture: the corner label that the tile under the player has several
+   * versions (developer mode).  It shows only on a tile that ever had one, and
+   * only while the developer mode is on.
+   */
+  private tileVersionsFrame(): void {
+    if (!this.settings.devMap || !this.parts || !this.partIndex) {
+      this.hud.setTileVersions('', []);
+      this.labelTile = '';
+      return;
+    }
+    const key = tileKey(gridIndex(this.mpos[0], TILE), gridIndex(this.mpos[2], TILE));
+    if (key === this.labelTile) return;
+    this.labelTile = key;
+    if (!this.versioned.has(key)) {
+      this.hud.setTileVersions('', []);
+      return;
+    }
+    // the loaded part of this tile: whichever the cache would pick now
+    const loaded = this.loadedPartOf(key);
+    const versions = versionsOfTile(this.partIndex, key, loaded).map((v) => ({ label: v.label, loaded: v.loaded, n: v.n }));
+    this.hud.setTileVersions(key, versions);
+  }
+
+  /** The part of a tile that is loaded now, or null (nothing held). */
+  private loadedPartOf(key: string): number | null {
+    if (!this.parts || !this.partIndex) return null;
+    const holders = this.partIndex.files.filter((f) => (f.tiles ?? []).includes(key));
+    if (holders.length === 0) return null;
+    const held = this.parts.heldParts();
+    for (let i = holders.length - 1; i >= 0; i--) if (held.includes(holders[i].n)) return holders[i].n;
+    return null;
   }
 
   /** The flying camera (game/flycam.ts): from where the camera was – or from behind the vehicle – wherever it is flown. */

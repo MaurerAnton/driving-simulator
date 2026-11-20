@@ -5,8 +5,21 @@ import { Sky } from '../render/sky.ts';
 import { TileManager } from '../render/tiles.ts';
 import { lightsOutBy } from '../sim/signals.ts';
 import { MapLoader } from '../world/loader.ts';
-import { mapFetch, useMapPack } from '../world/mappack.ts';
+import { mapFetch, siteBytes, useMapPack } from '../world/mappack.ts';
+import { applyNetDiff, unpackNetDiff } from '../world/netdiff.ts';
+import { packNet, unpackNet } from '../world/netfile.ts';
 import { loadSettings } from './settings.ts';
+
+/** The bytes of a typed array as an ArrayBuffer (what the loader is handed). */
+function toArrayBuffer(b: Uint8Array): ArrayBuffer {
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+}
+
+/** gzip bytes to plain bytes (the map's files come gzipped). */
+async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
 import type { World } from '../world/world.ts';
 
 /** the share of the traffic lights that are out of order on any one day */
@@ -61,10 +74,32 @@ export class App {
         // (not there: a 404 – or, from a development server, the start page in its place)
         if (res.status === 404 || (res.headers.get('content-type') ?? '').includes('text/html')) return null;
         if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
-        const buf = await res.arrayBuffer();
-        const head = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));
+        let buf = await res.arrayBuffer();
+        let head = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));
         // gzip (unless the server already inflated it for us)
-        if (head[0] === 0x1f && head[1] === 0x8b) return await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+        if (head[0] === 0x1f && head[1] === 0x8b) {
+          buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+          head = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));
+        }
+        // the road network a part changed comes as a diff over the site's net (world/netdiff.ts):
+        // read the base (bypassing the parts) and apply it, so geometry and driving logic match
+        if (path === 'net.bin.gz') {
+          const diff = unpackNetDiff(new Uint8Array(buf));
+          if (diff) {
+            const baseBytes = await siteBytes(base, 'net.bin.gz');
+            if (baseBytes) {
+              try {
+                const inflated = await gunzip(baseBytes);
+                const baseNet = unpackNet(toArrayBuffer(inflated));
+                const net = packNet(applyNetDiff(baseNet, diff));
+                return toArrayBuffer(net);
+              } catch (e) {
+                // the diff was made against another network: keep the site's net
+                console.warn('[map] net diff not applied:', (e as Error).message);
+              }
+            }
+          }
+        }
         return buf;
       },
     }, { lightsOut: lightsOutBy(day, share) });

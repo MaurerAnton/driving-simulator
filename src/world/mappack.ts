@@ -176,6 +176,26 @@ export async function openMapPack(id: string): Promise<MapPack | null> {
 
 let active: { base: string; pack: MapPack } | null = null;
 
+/** A file of the map from a map part instead of the site (developer mode, settings: devMap). */
+export type MapFileFromPart = (path: string) => Promise<Uint8Array | null>;
+let fromPart: MapFileFromPart | null = null;
+/** the address of the site's map folder, so a path can be read out of a map URL */
+let base0: string | null = null;
+/** set while one read wants the site's file, not the part's (to get the base a diff applies over) */
+let bypassPart = false;
+
+/**
+ * Serve files of `map-assets` from the parts held in memory from now on
+ * (null: from the site, as always) – the developer mode's delivery of new
+ * tiles and of network changes (world/partcache.ts, world/netdiff.ts).
+ * `path` is the path in the map: a tile key ("412_398"), "net.bin.gz",
+ * "w/50_49.json.gz".
+ */
+export function useTileSource(src: MapFileFromPart | null, siteBase = ''): void {
+  fromPart = src;
+  base0 = src ? siteBase : null;
+}
+
 /** The stored map the game reads now, if it reads one. */
 export function activeMapPack(): MapPack | null {
   return active?.pack ?? null;
@@ -193,8 +213,41 @@ export async function useMapPack(id: string, base: string): Promise<boolean> {
   return !!pack;
 }
 
-/** fetch – but a file of the map comes from the stored map while one is in use. */
+/** fetch – but a tile may come from a map part, and a file of the map from the stored map while one is in use. */
+/**
+ * Read a file of the map from the site, ignoring the parts – to get the base a
+ * part's diff applies over (world/netdiff.ts).  The parts' own files are not
+ * the base, so this must not be intercepted.
+ */
+export async function siteBytes(base: string, path: string): Promise<Uint8Array | null> {
+  bypassPart = true;
+  try {
+    const res = await fetch(`${base}${path}`);
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return null;
+  } finally {
+    bypassPart = false;
+  }
+}
+
+/** The path of a map file inside its address: what comes after the map folder, before the query. */
+function mapPathOf(url: string, base: string): string | null {
+  if (!url.startsWith(base)) return null;
+  const rest = decodeURIComponent(url.slice(base.length).split(/[?#]/)[0]);
+  return rest || null;
+}
+
 export function mapFetch(url: string, init?: RequestInit): Promise<Response> {
+  // (a file the developer's part holds: tiles, the net, a network chunk – the part decides, the site does not)
+  if (fromPart && base0 !== null && !bypassPart) {
+    const path = mapPathOf(url, base0);
+    if (path) {
+      const key = path.startsWith('tiles/') && path.endsWith('.fsb') ? path.slice(6, -4) : path;
+      return fromPart(key).then((bytes) => (bytes ? new Response(new Blob([bytes as BlobPart]), { status: 200 }) : fetch(url, init)));
+    }
+  }
   if (active && url.startsWith(active.base)) {
     const path = decodeURIComponent(url.slice(active.base.length).split(/[?#]/)[0]);
     const blob = active.pack.file(path);
