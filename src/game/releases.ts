@@ -67,7 +67,7 @@ export const RELEASES: readonly Release[] = [
   {
     version: '1.7.3',
     date: '2026-11-20',
-    at: '',
+    at: '2026-11-20T22:43:21Z',
     items: ['news.1_7_3.hesse', 'news.1_7_3.devmap', 'news.1_7_3.baunatal', 'news.1_7_3.parts'],
     size: { lines: 286597, code: 161144, tests: 28244, i18n: 69554, bytes: 21425876, maps: 2835708591 },
   },
