@@ -42,6 +42,10 @@ on:
         description: 'Größenziel eines Teils in MiB ( mehr als 100 nimmt GitHub nicht an )'
         type: string
         default: '90'
+      start_at:
+        description: 'Nummer des ersten Teils (1: ein neues map-assets/; sonst die nächste freie Nummer, wenn die Teile zu einem bestehenden kommen)'
+        type: string
+        default: '1'
       to_release:
         description: 'Leer: die Teile bleiben ein Artefakt dieses Laufs.  Sonst: ein Release dieses Namens, in das sie kommen.'
         type: string
@@ -71,6 +75,7 @@ jobs:
           RELEASES: ${{ inputs.releases }}
           TYPE: ${{ inputs.type }}
           PART_MB: ${{ inputs.part_mb }}
+          START_AT: ${{ inputs.start_at }}
         run: |
           set -euo pipefail
           cat > "$RUNNER_TEMP/mkparts2.py" <<'PY'
@@ -236,7 +241,7 @@ jobs:
           echo "Teile von höchstens $wanted Bytes ($PART_MB MiB)"
           mkdir -p parts
           : > "$RUNNER_TEMP/tags"
-          first=1
+          first=$START_AT
           i=0
           for tag in $RELEASES; do
             i=$(( i + 1 ))
@@ -324,12 +329,14 @@ jobs:
               fail('eine Nummer kommt zweimal vor')
           if index.get('latest') != max(nums):
               fail('latest %s ist nicht die höchste Nummer %s' % (index.get('latest'), max(nums)))
-          if sorted(nums) != list(range(1, len(nums) + 1)):
-              fail('die Nummern laufen nicht von 1 an durch')
+          if sorted(nums) != list(range(min(nums), min(nums) + len(nums))):
+              fail('die Nummern laufen nicht ohne Lücke durch')
           tiles = 0
+          keys = set()
           for f in files:
               if f['type'] != ptype:
                   fail('%s: Art %s, erwartet %s' % (f['file'], f['type'], ptype))
+              keys.update(f['tiles'])
               with tarfile.open(os.path.join(partsdir, f['file'])) as tar:
                   entries = set(tar.getnames()) - {'manifest.json'}
                   if len(entries) != len(f['tiles']):
@@ -339,9 +346,12 @@ jobs:
                   except OSError as err:
                       fail('%s: %s lässt sich nicht entpacken: %s' % (f['file'], f['tiles'][0], err))
               tiles += len(f['tiles'])
-          if want_tiles and tiles != want_tiles:
-              fail('%d Kacheln im Index, %d erwartet' % (tiles, want_tiles))
-          print(json.dumps({'parts': len(files), 'latest': index.get('latest'), 'tiles': tiles, 'type': ptype}))
+          # eine Kachel, die in zwei Teilen liegt, liegt in zwei Karten (Grenzkacheln) – erlaubt,
+          # verglichen wird die Zahl der verschiedenen Kacheln
+          if want_tiles and len(keys) != want_tiles:
+              fail('%d verschiedene Kacheln im Index, %d erwartet' % (len(keys), want_tiles))
+          print(json.dumps({'parts': len(files), 'latest': index.get('latest'), 'tiles': len(keys),
+                            'entries': tiles, 'type': ptype}))
           if bad:
               print('%d Fehler' % len(bad))
               sys.exit(1)
@@ -365,20 +375,24 @@ jobs:
             const n = index.files.map((f) => f.n);
             if (new Set(n).size !== n.length) fail('eine Nummer kommt zweimal vor');
             if (index.latest !== Math.max(...n)) fail(`latest ${index.latest} ist nicht die höchste Nummer ${Math.max(...n)}`);
-            if ([...n].sort((a, b) => a - b).some((v, i) => v !== i + 1)) fail('die Nummern laufen nicht von 1 an durch');
+            if ([...n].sort((a, b) => a - b).some((v, i) => v !== Math.min(...n) + i)) fail('die Nummern laufen nicht ohne Lücke durch');
             let tiles = 0;
+            const keys = new Set();
             for (const f of index.files) {
               if (f.type !== wantType) fail(`${f.file}: Art ${f.type}, erwartet ${wantType}`);
               const part = PatchPart.fromBytes(f.n, f.file, readFileSync(join(partsdir, f.file)));
               if (part.tiles().length !== f.tiles.length) fail(`${f.file}: ${part.tiles().length} Einträge, der Index nennt ${f.tiles.length}`);
               tiles += f.tiles.length;
+              for (const t of f.tiles) keys.add(t);
               // eine Kachel je Teil: sie muss dekodiert herauskommen, nicht mehr gepackt
               const got = await part.file(f.tiles[0]);
               if (!got) fail(`${f.file}: ${f.tiles[0]} ist nicht darin`);
               else if (got[0] === 0x1f && got[1] === 0x8b) fail(`${f.file}: ${f.tiles[0]} kommt noch gepackt heraus`);
             }
-            if (wantTiles && tiles !== Number(wantTiles)) fail(`${tiles} Kacheln im Index, ${wantTiles} erwartet`);
-            console.log(JSON.stringify({ parts: index.files.length, latest: index.latest, tiles, type: wantType,
+            // Grenzkacheln liegen in zwei Karten und damit in zwei Teilen – verglichen wird die
+            // Zahl der verschiedenen Kacheln
+            if (wantTiles && keys.size !== Number(wantTiles)) fail(`${keys.size} verschiedene Kacheln im Index, ${wantTiles} erwartet`);
+            console.log(JSON.stringify({ parts: index.files.length, latest: index.latest, tiles: keys.size, entries: tiles, type: wantType,
               bytes: index.files.reduce((a, f) => a + statSync(join(partsdir, f.file)).size, 0),
               index_bytes: statSync(join(partsdir, 'index.json')).size }));
           }
