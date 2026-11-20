@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Kurze Netzprobe von einem Läufer: sind die drei Quellen der Hamburger Karte von GitHub aus
+# erreichbar, und antworten sie auf Range-Anfragen?  Wird nach der Probe wieder gelöscht.
+
+name: Netzprobe Hamburg
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  probe:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Erreichbarkeit und Range-Anfragen
+        run: |
+          set -euo pipefail
+          for url in \
+            https://archiv.transparenz.hamburg.de/hmbtgarchive/HMDK/dgm1_hh_2022-04-30_243830_snap_2.zip \
+            https://daten-hamburg.de/opendata/3d_stadtmodell_lod2/LoD2-DE_HH_2026-04-28.zip \
+            https://download.geofabrik.de/europe/germany/hamburg/hamburg-latest.osm.pbf ; do
+            echo "== $url"
+            curl -sSI --retry 3 --retry-delay 10 "$url" | grep -iE '^HTTP|^content-length|^accept-ranges' || true
+            # das Zentrale Verzeichnis eines ZIP liegt am Ende: nur so kommt die Karte an die
+            # Kacheln, ohne das ganze Archiv zu laden
+            if [[ "$url" == *.zip ]]; then
+              size=$(curl -sSI "$url" | awk 'tolower($1)=="content-length:"{print $2}' | tr -d '\r')
+              echo "-- letzte 22 Bytes von $size"
+              curl -sS --retry 3 -H "Range: bytes=$((size-22))-$((size-1))" "$url" | xxd | tail -2
+            fi
+            echo
+          done
