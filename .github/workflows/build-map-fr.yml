@@ -106,7 +106,10 @@ jobs:
           echo "Artefakt von Lauf $RUN: $id"
           curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
-          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('/tmp/fr-geodata')" "/tmp/$name.zip"
+          mkdir -p data/work/dgm2
+          find /tmp/fr-geodata -type f -name '*.dgm' -print0 | xargs -0 -r mv -t data/work/dgm2
+          rm -rf /tmp/fr-geodata
           du -sh data/work/dgm2
       # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
       # Kacheln von 500 m eine andere Karte hat; tools/fetch-fr.py läßt sie aus.
@@ -162,7 +165,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: geodata-fr
-          path: data/work
+          path: /tmp/geodata
+      # Das Paket kommt mit dem Wurzelverzeichnis desArtefakts; ein Weg sucht deshalb die
+      # Quadrate heraus und legt sie dorthin, wo der Bau sie erwartet.
+      - name: Gelände an seinen Platz legen
+        run: |
+          set -euo pipefail
+          mkdir -p data/work/dgm2
+          n=$(find /tmp/geodata -type f -name '*.dgm' | wc -l)
+          echo "$n Quadrate im Paket"
+          find /tmp/geodata -type f -name '*.dgm' -print0 | xargs -0 -r mv -t data/work/dgm2
+          rm -rf /tmp/geodata
+          ls data/work/dgm2 | wc -l
       - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
         run: |
           du -sh data/work/dgm2
