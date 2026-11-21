@@ -119,7 +119,7 @@ jobs:
           curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
           python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
-          du -sh data/work/dgm2 data/work/lod2
+          du -sh data/work/dgm2 data/work/lod2 2>/dev/null || du -sh data/work/dgm2
       # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
       # Kacheln von 500 m eine andere Karte hat; tools/fetch-he.py läßt sie aus.
       - name: Index der schon veröffentlichten Karten
@@ -146,7 +146,7 @@ jobs:
           python3 -I tools/fetch-he.py --east "$BOX_E" --north "$BOX_N" "${args[@]}" \
             --lod2-name "$NAME" --published "$RUNNER_TEMP/published-index.json" \
             --on-overlap skip --gaps data/work/gaps.txt
-          du -sh data/work/dgm2 data/work/lod2
+          du -sh data/work/dgm2 data/work/lod2 2>/dev/null || du -sh data/work/dgm2
           test -s data/work/dgm2   # ohne Gelände entsteht keine Karte
       # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste
       # Lauf kann mit geodata_run hier weiterfahren (.done-Marken müssen mit hoch)
@@ -202,7 +202,7 @@ jobs:
       - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
         run: |
           ls data/work
-          du -sh data/work/dgm2 data/work/lod2
+          du -sh data/work/dgm2 data/work/lod2 2>/dev/null || du -sh data/work/dgm2
           ls data/work/dgm2 | head -3
           df -h /
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
