@@ -1,0 +1,280 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut eine Karte Belgiens und legt sie als Kartenpaket in ein Release
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte lädt).
+#
+# Warum das hier läuft: das Gelände kommt als Antworten eines WCS oder als Gradkachel aus einem
+# S3-Eimer, und ein Bau braucht mehrere Gigabyte Platte; ein Läufer von GitHub hat 4 CPUs, 16 GB
+# Speicher und ~14 GB Platte, und seine Minuten sind für ein öffentliches Repository frei.
+# Die Karte geht nie über GitHub Pages (dort sind es 1 GB): Releases haben keine
+# Größenbeschränkung.
+#
+# Starten: Actions → "Karte Belgien" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (DHMV II DTM 1 m für Flandern und Brüssel, sonst Copernicus DEM GLO-30)
+#                                                                     -> data/work/dgm2
+#      Gebäudemodelle gibt es in Belgien nicht offen: weder Flandern noch Wallonien veröffentlichen
+#      CityGML in LoD2, deshalb bleibt jede belgische Karte eine Karte ohne Gebäudemodelle (wie das
+#      Spiel es verträgt – data/work/lod2 bleibt leer).
+#   2. OpenStreetMap, auf die Region geschnitten                      -> npm run map:extract
+#   3. Straßennetz und Kacheln                                        -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Kein Fahrplan: tools/build-timetable.ts kennt nur die deutschen Aufgabenträger von gtfs.de.
+# Die Haltestellen und Linien der Karte kommen aus OpenStreetMap, Abfahrtszeiten hat sie nicht
+# (SNCB/NMBS, De Lijn, TEC und STIB/MIVB stünden in einem eigenen belgischen Feed).
+#
+# Die Region ist ein Rechteck aus UTM32-Kilometerquadraten (EPSG:25832), dasselbe Gitter, nach
+# dem die Kacheln des Landes benannt sind: 243_5649 ist das Quadrat, in dem der Grote Markt von
+# Hasselt liegt.  Zwei Abläufe dürfen kein Kilometerquadrat gemeinsam haben.
+
+name: Karte Belgien
+
+on:
+  workflow_dispatch:
+    inputs:
+      east_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Osten (UTM32, EPSG:25832)'
+        type: string
+        default: '236'
+      east_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Osten'
+        type: string
+        default: '250'
+      north_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Norden'
+        type: string
+        default: '5642'
+      north_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Norden'
+        type: string
+        default: '5656'
+      source:
+        description: 'Geländemodell: dhmv (DHMV II 1 m, Flandern), copernicus (GLO-30), auto'
+        type: choice
+        options: [auto, dhmv, copernicus]
+        default: 'auto'
+      label:
+        description: Name der Karte (steht im Spiel und im map.json)
+        type: string
+        default: 'Hasselt und Umgebung'
+      tag:
+        description: 'Name des Releases (leer: karte-be-<Lauf>)'
+        type: string
+        default: 'karte-be-hasselt-2026-11-21'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: die offenen Geodaten – das Holen
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    outputs:
+      terrain: ${{ steps.quelle.outputs.line }}
+      quelle: ${{ steps.quelle.outputs.kurz }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      # numpy (Umrechnen und Entzerren) und Pillow (GeoTIFF lesen)
+      - run: pip install --quiet numpy pillow
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      # Was ein früherer Lauf schon geholt hat: das Skript läßt liegen, was da ist, und holt
+      # nur, was fehlt (die Quadrate unter data/work/dgm2).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name="geodata-belgien"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          echo "Artefakt von Lauf $RUN: $id"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2
+      # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
+      # Kacheln von 500 m eine andere Karte hat; tools/fetch-be.py läßt sie aus.
+      - name: Index der schon veröffentlichten Karten
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 20 \
+            -o "$RUNNER_TEMP/published-index.json" \
+            https://raw.githubusercontent.com/${{ github.repository }}/main/map-assets/index.json
+          python3 -c "import json;d=json.load(open('$RUNNER_TEMP/published-index.json'));print('Kacheln in anderen Karten:',len({t for f in d['files'] for t in f['tiles']}))"
+      - name: Gelände holen
+        env:
+          BOX_E: ${{ inputs.east_from }}..${{ inputs.east_to }}
+          BOX_N: ${{ inputs.north_from }}..${{ inputs.north_to }}
+          SRC: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          python3 -I tools/fetch-be.py --east "$BOX_E" --north "$BOX_N" --source "$SRC" \
+            --published "$RUNNER_TEMP/published-index.json" \
+            --on-overlap skip --gaps data/work/gaps.txt
+          du -sh data/work/dgm2 data/work/belgien
+      # Woher die Höhen kamen, sagt das Skript selber: auto nimmt das 1-m-Modell Flanderns nur,
+      # wo dessen Rahmen das ganze Rechteck deckt, sonst Copernicus.  Die Quellenzeile der Karte
+      # muß dazu passen.
+      - name: Welches Geländemodell es war (Quellenzeile)
+        id: quelle
+        env:
+          BOX_E: ${{ inputs.east_from }}..${{ inputs.east_to }}
+          BOX_N: ${{ inputs.north_from }}..${{ inputs.north_to }}
+          SRC: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          python3 -I tools/fetch-be.py --dry --source "$SRC" --east "$BOX_E" --north "$BOX_N" | tee quelle.txt
+          if grep -q Copernicus quelle.txt; then
+            echo 'line=Gelände (Copernicus DEM GLO-30, 30 m): Produced using Copernicus DEM © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved' >> "$GITHUB_OUTPUT"
+            echo 'kurz=dem Geländemodell „Copernicus DEM GLO-30" (30 m) der Europäischen Union (Copernicus-Programm, ESA, DLR e. V., Airbus Defence and Space GmbH)' >> "$GITHUB_OUTPUT"
+          else
+            echo 'line=Gelände (DHMV II DTM, 1 m): agentschap Digitaal Vlaanderen, Modellicentie voor gratis hergebruik (einzige Bedingung: Quellenangabe)' >> "$GITHUB_OUTPUT"
+            echo 'kurz=dem digitalen Höhenmodell „DHMV II DTM" (1 m) von agentschap Digitaal Vlaanderen, veröffentlicht unter der Modellicentie voor gratis hergebruik (einzige Bedingung: Quellenangabe)' >> "$GITHUB_OUTPUT"
+          fi
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste
+      # Lauf kann mit geodata_run hier weiterfahren
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-belgien
+          path: |
+            data/work/dgm2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    env:
+      # Die Werkzeuge lesen sonst eine deutsche Datei – jedes von ihnen bekommt die Datei
+      # dieses Landes ausdrücklich.
+      OSM: data/raw/osm/belgium-261119.osm.pbf
+      TERRAIN: ${{ needs.geodata.outputs.terrain }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Das Paket hält nur die Quadrate (ein Pfad beim Hochheben), also genau dorthin ablegen
+      - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-belgien
+          path: data/work/dgm2
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, Belgien)
+        run: |
+          mkdir -p data/raw/osm
+          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
+            https://download.geofabrik.de/europe/belgium/belgium-261119.osm.pbf
+          ls -l data/raw/osm
+      # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
+      # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
+      # Vorgängerkarte, deren Bytes stehen bleiben müßten.
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract -- "$OSM"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        env:
+          DETAIL_REGION: all
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Tankstellen
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
+          npm run map:far
+          npm run map:services -- "$OSM"
+      # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
+      # die hessische Verwaltung; beides wird hier berichtigt.
+      - name: Der Name der Karte und ihre Quellenzeilen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            j.meta.attribution = [
+              "Straßennetz, Verkehrsregelung, Flächennutzung: © OpenStreetMap-Mitwirkende (ODbL 1.0)",
+              process.env.TERRAIN,
+            ];
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      - name: Kartenpaket hochheben (ehe das Release es will)
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-belgien
+          path: data/work/map.tar.*
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          QUELLE: ${{ needs.geodata.outputs.quelle }}
+          BOX: ${{ inputs.east_from }}..${{ inputs.east_to }} / ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          tag="${WANTED:-karte-be-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL für den Fahrsimulator – im Spiel unter Einstellungen → Karte laden
+          (Kartenpaket).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (ODbL 1.0) sowie $QUELLE.
+          Rechteck aus Kilometerquadraten (UTM32): $BOX.
+
+          Gebäudemodelle enthält diese Karte nicht: weder Flandern noch Wallonien veröffentlichen
+          für Belgien CityGML in LoD2 unter einer offenen Lizenz.
+
+          Fahrpläne enthält diese Karte nicht: tools/build-timetable.ts lädt die deutschen
+          Aufgabenträger von gtfs.de; SNCB/NMBS, De Lijn, TEC und STIB/MIVB stehen darin nicht.
+          Haltestellen und Linien kommen aus OpenStreetMap, Abfahrtszeiten hat diese Karte nicht.
+          EOF
+          # (ein verwehrtes gh release create darf Stunden von Bau nicht wegwerfen: das Paket
+          #  liegt schon als Artefakt oben; hier ein zweiter Versuch nach einer Weile)
+          for versuch in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+                 --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Release $tag ging schief (Versuch $versuch); noch einmal in 60 s"
+            sleep 60
+          done
+          echo "release $tag"
