@@ -65,7 +65,7 @@ on:
       region:
         description: 'Geofabrik-Region unter europe/france, aus der OpenStreetMap kommt'
         type: choice
-        options: [alsace, lorraine, franche-comte]
+        options: [alsace, lorraine, franche-comte, champagne-ardenne, bourgogne]
         default: 'alsace'
       dept:
         description: 'Départements, aus denen das Gelände kommt (leer: das Skript fragt geo.api.gouv.fr)'
