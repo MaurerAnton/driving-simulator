@@ -289,18 +289,22 @@ jobs:
         env:
           NAME: ${{ inputs.label }}
           NORTH: ${{ inputs.north }}
+          DEM: ${{ inputs.dem }}
           # wie der Herausgeber es verlangt (dati.trentino.it: „Creative Commons Attribution 4.0";
           # natur-raum.provinz.bz.it: „… werden die Daten mit der Lizenz ‚Creative Commons Zero'
-          # (kurz CC0) ausgegeben.")
+          # (kurz CC0) ausgegeben.")  Die Zahl im Text ist das Modell, das wirklich geholt wurde.
           ATT_TN: 'Gelände: Provincia autonoma di Trento – Servizio Geologico, LiDAR DTM PAT 2014/2018 (0,5 m), CC BY 4.0 (heruntergerechnet auf 2 m je Zelle)'
-          ATT_BZ: 'Gelände: Autonome Provinz Bozen - Südtirol, Digitales Geländemodell 0,5 m (LiDAR), CC0 1.0 (heruntergerechnet auf 2 m je Zelle)'
+          ATT_BZ: 'Gelände: Autonome Provinz Bozen - Südtirol, Digitales Geländemodell 0,5 m, wo der Dienst keines hat das von 2,5 m (LiDAR), CC0 1.0 (heruntergerechnet auf 2 m je Zelle)'
+          ATT_BZ25: 'Gelände: Autonome Provinz Bozen - Südtirol, Digitales Geländemodell 2,5 m (LiDAR), CC0 1.0 (heruntergerechnet auf 2 m je Zelle)'
         run: |
           set -euo pipefail
           north0="${NORTH%%..*}"
           north1="${NORTH##*..}"
           {
-            [ "$north0" -lt 5120 ] && printf '%s\n' "$ATT_TN"
-            [ "$north1" -ge 5120 ] && printf '%s\n' "$ATT_BZ"
+            if [ "$north0" -lt 5120 ]; then printf '%s\n' "$ATT_TN"; fi
+            if [ "$north1" -ge 5120 ]; then
+              if [ "$DEM" = "25m" ]; then printf '%s\n' "$ATT_BZ25"; else printf '%s\n' "$ATT_BZ"; fi
+            fi
           } > attribution.txt
           cat attribution.txt
           node -e '
@@ -334,6 +338,7 @@ jobs:
           EAST: ${{ inputs.east }}
           NORTH: ${{ inputs.north }}
           OSM: ${{ inputs.osm }}
+          DEM: ${{ inputs.dem }}
         run: |
           tag="${WANTED:-karte-it-tn-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
           cat > notes.md <<EOF
@@ -373,6 +378,9 @@ jobs:
           Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
           zusammengesetzt.
           EOF
+          if [ "$DEM" = "25m" ]; then
+            printf '\nBozen wurde mit dem Modell von **2,5 m** gebaut: für die 225 Kacheln von 0,5 m\n(16 777 748 B je Kachel, 3,6 GB) brauchte der Läufer über 90 min und wurde nicht fertig,\ndas Modell von 2,5 m war in 1 min da.  Hier auf dem Rechner antwortet der Dienst auf eine\nKachel von 0,5 m in 6 s – die Langsamkeit lag also am Weg zum Läufer, nicht am Dienst.\nBeide Modelle sind CC0; bei 2 m je Zelle in der Karte ist der Unterschied klein\n(gemessen an 682_5152: im Mittel 0,86 m, an Felswänden bis 17 m).\n' >> notes.md
+          fi
           # auch hier darf der erste Versuch scheitern: dreimal, und am Ende steht fest, dass das
           # Release wirklich da ist
           for try in 1 2 3; do
@@ -381,6 +389,11 @@ jobs:
               break
             fi
             echo "Versuch $try: Release $tag wurde nicht angelegt"
+            # steht da schon eines unter diesem Namen (noch einmal gebaut): die Dateien ersetzen
+            if gh release view "$tag" > /dev/null 2>&1 &&
+               gh release upload "$tag" data/work/map.tar.* --clobber; then
+              break
+            fi
             sleep 30
           done
           gh release view "$tag" --json tagName --jq .tagName
