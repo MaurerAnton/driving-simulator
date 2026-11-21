@@ -1,0 +1,261 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte eines Teils der Niederlande und legt sie als Kartenpaket in ein Release
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte lädt).
+#
+# Warum das hier läuft: ein Bau braucht mehrere Gigabyte Platte und mehr Speicher, als ein
+# Notebook hat; ein Läufer von GitHub hat 4 CPUs, 16 GB Speicher und ~14 GB Platte, und seine
+# Minuten sind für ein öffentliches Repository frei.  Die Karte geht nie über GitHub Pages
+# (dort sind es 1 GB): Releases haben keine Größenbeschränkung.
+#
+# Starten: Actions → "Karte Niederlande" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (AHN) und Gebäudemodelle (3DBAG)                 -> data/work/dgm2, data/work/lod2
+#   2. OpenStreetMap, auf die Region geschnitten                 -> npm run map:extract
+#   3. Straßennetz und Kacheln                                   -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Die Region ist ein Rechteck aus UTM32-Kilometerquadraten (EPSG:25832), dasselbe Gitter, nach
+# dem die Kacheln der Karte benannt sind: 221_5810 ist das Quadrat, in dem die Amsterdamer
+# Innenstadt liegt.  Die ganzen Niederlande paßt nicht in eine Karte; darum nimmt dieser Lauf
+# ein Rechteck, und die weiteren Rechtecke folgen mit demselben Ablauf und anderen Zahlen.
+# Zwei Abläufe dürfen kein Kilometerquadrat gemeinsam haben.
+#
+# Kein Fahrplan: tools/build-timetable.ts kennt nur die deutschen Aufgabenträger (gtfs.de).
+# Die Haltestellen und Linien der Karte kommen aus OpenStreetMap, Abfahrtszeiten hat sie nicht.
+#
+# Zwei Aufträge, damit ein Netzfehler während des Holens nicht den ganzen Bau verdirbt und
+# damit jeder Teil seine sechs Stunden für sich hat.
+
+name: Karte Niederlande
+
+on:
+  workflow_dispatch:
+    inputs:
+      east_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Osten (UTM32, EPSG:25832)'
+        type: string
+        default: '214'
+      east_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Osten'
+        type: string
+        default: '228'
+      north_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Norden'
+        type: string
+        default: '5803'
+      north_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Norden'
+        type: string
+        default: '5817'
+      label:
+        description: Name der Karte (steht im Spiel und im map.json)
+        type: string
+        default: 'Amsterdam und Umgebung'
+      tag:
+        description: 'Name des Releases (leer: karte-nl-<Datum>)'
+        type: string
+        default: ''
+      province:
+        description: 'Provinz für OpenStreetMap (Geofabrik: kleinster Ausschnitt, der die Region enthält)'
+        type: choice
+        options:
+          - noord-holland
+          - zuid-holland
+          - utrecht
+          - noord-brabant
+          - limburg
+          - overijssel
+          - groningen
+        default: 'noord-holland'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: die offenen Geodaten – AHN (WCS) und 3DBAG (CityJSON); ein langes Holen
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # node ebenfalls: die Gebäudemodelle liest tools/lod2-extract.ts, dem das Skript jede
+      # Kachel als CityGML gibt; node_modules braucht es dafür (saxes)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # Was ein früherer Lauf schon geholt hat: das Skript läßt liegen, was da ist, und holt
+      # nur, was fehlt (die .done-Marken unter data/work/dgm2 und data/work/lod2).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name="geodata-nl"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          echo "Artefakt von Lauf $RUN: $id"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2 data/work/lod2
+      # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
+      # Kacheln von 500 m eine andere Karte hat; tools/fetch-nl.py läßt sie aus.
+      - name: Index der schon veröffentlichten Karten
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 20 \
+            -o "$RUNNER_TEMP/published-index.json" \
+            https://raw.githubusercontent.com/${{ github.repository }}/main/map-assets/index.json
+          python3 -c "import json;d=json.load(open('$RUNNER_TEMP/published-index.json'));print('Kacheln in anderen Karten:',len({t for f in d['files'] for t in f['tiles']}))"
+      - name: Gelände (AHN) und Gebäudemodelle (3DBAG) holen
+        env:
+          BOX_E: ${{ inputs.east_from }}..${{ inputs.east_to }}
+          BOX_N: ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          python3 -I tools/fetch-nl.py --east "$BOX_E" --north "$BOX_N" \
+            --published "$RUNNER_TEMP/published-index.json" \
+            --on-overlap skip --jobs 4 --gaps data/work/gaps.txt
+          du -sh data/work/dgm2 data/work/lod2
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste
+      # Lauf kann mit geodata_run hier weiterfahren (.done-Marken müssen mit hoch)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-nl
+          path: |
+            data/work/dgm2
+            data/work/lod2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    env:
+      # Die Werkzeuge lesen sonst data/raw/osm/hessen-latest.osm.pbf – jedes von ihnen
+      # bekommt die Datei dieser Provinz ausdrücklich.
+      OSM: data/raw/osm/${{ inputs.province }}-latest.osm.pbf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-nl
+          path: data/work
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          du -sh data/work/dgm2 data/work/lod2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, Provinz)
+        run: |
+          mkdir -p data/raw/osm
+          p=${{ inputs.province }}
+          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
+            "https://download.geofabrik.de/europe/netherlands/$p/$p-latest.osm.pbf"
+          ls -l data/raw/osm
+      # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
+      # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
+      # Vorgängerkarte, deren Bytes stehen bleiben müßten.
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract -- "$OSM"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        env:
+          DETAIL_REGION: all
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Tankstellen
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
+          npm run map:far
+          npm run map:services -- "$OSM"
+      # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
+      # die hessische Verwaltung; beides wird hier berichtigt.  Der Wortlaut der
+      # Namensnennung von AHN ist der der Fähigkeiten des Dienstes selbst ("Geen
+      # beperkingen", CC0 1.0), der von 3DBAG der der Sammlung (CC BY 4.0).
+      - name: Der Name der Karte und ihre Quellenzeilen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            j.meta.attribution = [
+              "Straßennetz, Verkehrsregelung, Flächennutzung: © OpenStreetMap-Mitwirkende (ODbL 1.0)",
+              "Gelände (AHN, 0,5 m): Rijkswaterstaat / PDOK, CC0 1.0 (Geen beperkingen) [Daten bearbeitet]",
+              "Gebäudemodelle (LoD2, 3DBAG): Kadaster, CC BY 4.0 [Daten bearbeitet]",
+            ];
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          BOX: ${{ inputs.east_from }}..${{ inputs.east_to }} / ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          tag="${WANTED:-karte-nl-$(date -u +%F)}"
+          cat > notes.md <<EOF
+          Karte von $LABEL für den Fahrsimulator – im Spiel unter Einstellungen → Karte laden
+          (Kartenpaket).
+
+          Gebaut am $(date -u +%F) aus
+
+          * OpenStreetMap (ODbL 1.0), Provinzausschnitt von Geofabrik,
+          * dem Aktueel Hoogtebestand Nederland (AHN, Raster von 0,5 m) von Rijkswaterstaat und
+            PDOK, CC0 1.0 – „Geen beperkingen",
+          * den Gebäudemodellen LoD2 von 3DBAG (Kadaster), CC BY 4.0.
+
+          Rechteck aus Kilometerquadraten (UTM32): $BOX.
+
+          **Zur Höhe:** das Höhenmodell der Karte kann keine Höhe unter 0 halten (0 bedeutet
+          „keine Höhe" darin), und ein großer Teil der Niederlande liegt unter NAP.  Darum sind
+          alle Höhen – Gelände und Gebäudemodelle gleichermaßen – um 10 m angehoben; das Gelände
+          behält seine Form, nur der Nullpunkt verschiebt sich.  Wo AHN keine Höhe hat (unter
+          Gebäuden, auf Wasser), ist der Mittelwert der Nachbarschaft eingesetzt.  Quadrate, die
+          fast nur Lücke sind (offenes Wasser), bleiben ohne Gelände, und die Karte bleibt dort
+          aus.  Keine Fahrpläne: die Karten kennen nur deutsche Verkehrsbetriebe.
+
+          Nur ein Rechteck der Niederlande: das ganze Land paßt nicht in eine Karte; weitere
+          Rechtecke kommen aus demselben Ablauf „Karte Niederlande" mit anderen Zahlen.
+          EOF
+          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+            --notes-file notes.md data/work/map.tar.*
+          echo "release $tag"
