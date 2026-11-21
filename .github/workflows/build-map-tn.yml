@@ -1,0 +1,387 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte eines Rechtecks in Trentino-Südtirol und legt sie als Kartenpaket
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte laden liest,
+# src/ui/mappacks.ts) in ein Release.
+#
+# Der Aufbau ist der von .github/workflows/build-map-it.yml: zwei Aufträge, damit ein Netzfehler
+# beim Holen des Geländes nicht den ganzen Bau kostet und jeder Teil seine eigenen Stunden hat.
+# Starten von Hand: Actions → "Karte Trentino-Südtirol" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (DTM aus dem Laserflug, 0,5 m)                     -> data/work/dgm2
+#   2. OpenStreetMap, auf das Rechteck geschnitten                -> npm run map:extract
+#   3. Straßennetz und Kacheln                                    -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Rechteck: Kilometerkacheln in UTM32 (EPSG:25832) – 664_5105 ist die Kachel, in der Trient
+# liegt, 681_5152 die mit Bozen.
+#
+# Gelände: beide Provinzen geben ihre Höhen offen heraus, jede für ihr eigenes Gebiet, ohne
+# Schlüssel und ohne Anmeldung:
+#   * Trient: eine ESRI-ASCII-Datei je Blatt von 500 m im Ordner
+#     siatservices.provincia.tn.it/stemdata/2014_lidar_dtm_asc/ (7,0 MB, ~6 s je Blatt,
+#     nachgemessen am 21.11.2026).  Das Portal dati.trentino.it nennt als Lizenz
+#     „Creative Commons Attribution 4.0" (CC BY 4.0) – Nutzung also gegen Namensnennung.
+#   * Bozen: WCS 2.0.1 des GeoServer geoservices9.civis.bz.it, „DigitalTerrainModel-0.5m"
+#     (2000 × 2000 Zellen je Kilometerkachel, 16,8 MB, 11 s, nachgemessen am 21.11.2026).
+#     Das Landesportal sagt: „Falls nicht anders angegeben, werden die Daten mit der Lizenz
+#     ‚Creative Commons Zero‘ (kurz CC0) ausgegeben." (natur-raum.provinz.bz.it/de/
+#     geodienste-nutzen).
+#     Wo die 0,5 m nichts hergeben, nimmt das Skript das Modell von 2,5 m derselben Provinz.
+# Beide Modelle erreichen Höhen über 1310 m (bis 3276 m hält eine Kachel bei 5 cm je Stufe),
+# darum schreibt tools/fetch-tn.py eigene Kacheln mit 5 cm Stufe – der Kopf jeder Kachel sagt
+# es, tools/mapgen/dgm.ts liest ihn.
+#
+# Gebäudemodelle: keine Provinz veröffentlicht offenes LoD2 ohne Schlüssel (November 2026);
+# die Dächer kommen aus den OpenStreetMap-Umrissen.  Die Stufen dafür sind in
+# tools/fetch-tn.py schon angelegt (--lod2-source, --lod2-name).
+#
+# Fahrpläne: tools/build-timetable.ts holt nur deutsche Lieferungen (download.gtfs.de); die
+# Betriebe Trentino Trasporti, SASA, STA und Trenitalia stehen darin nicht.  Die Haltestellen
+# sind da, die Abfahrten fehlen.
+
+name: Karte Trentino-Südtirol
+
+on:
+  workflow_dispatch:
+    inputs:
+      east:
+        description: 'Rechteck: Kilometer nach Osten (UTM32), 664 oder 657..671'
+        type: string
+        default: '657..671'
+      north:
+        description: 'Rechteck: Kilometer nach Norden (UTM32), 5105 oder 5098..5112 (ab 5120: Bozen)'
+        type: string
+        default: '5098..5112'
+      label:
+        description: Name der Karte (steht in map.json und im Release)
+        type: string
+        default: 'Trient'
+      osm:
+        description: OpenStreetMap-Ausschnitt von openstreetmap.fr (Region, zu der das Rechteck gehört)
+        type: choice
+        default: trentino_alto_adige
+        options: [trentino_alto_adige, veneto, lombardia]
+      dem:
+        description: 'Bozen: nur das Gelände von 0,5 m (05m) oder nur das von 2,5 m (25m)'
+        type: choice
+        default: auto
+        options: [auto, '05m', '25m']
+      tag:
+        description: 'Name des Releases (leer: karte-it-<Kennung>-<Datum>-<Lauf>)'
+        type: string
+        default: ''
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        # build-timetable.ts holt nur deutsche Fahrpläne (download.gtfs.de); diese Betriebe
+        # findet es darin nicht – ohne Fund bleiben die Fahrpläne leer.
+        default: 'Trentino Trasporti|SASA|STA|Trenitalia'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: 'Trentino Trasporti|SASA|STA|Trenitalia'
+      jobs:
+        description: Wie viele Höhenkacheln gleichzeitig geholt werden
+        type: string
+        default: '4'
+      lod2_name:
+        description: 'Verzeichnis unter data/work/lod2 für Gebäudemodelle (ohne offene LoD2-Quelle ohne Wirkung)'
+        type: string
+        default: ''
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: das Gelände – Blätter von 500 m (Trient) oder WCS-Antworten (Bozen), ~5,5 GB je Rechteck
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      # map-assets/ liegt im Repository (2,7 GB) und wird hier nicht gebraucht: index.json wird
+      # aus dem Web geholt (unten), und kein Schritt des Baus liest die fertigen Karten.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      # node as well: should a set of building models be handed in, tools/lod2-extract.ts reads
+      # it – it fetches nothing itself but wants node_modules (saxes)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # Zwei Karten dürfen keine Kachel von 500 m teilen: map-assets/index.json sagt, was eine
+      # andere Karte schon hat; das Skript lässt diese Kilometerraster weg (--on-overlap fail
+      # bricht stattdessen ab, damit es hier steht und nicht erst im Bau oder im Index).
+      - name: Veröffentlichte Kacheln (map-assets/index.json)
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 10 \
+            -o map-assets-index.json \
+            https://raw.githubusercontent.com/MaurerAnton/driving-simulator/main/map-assets/index.json
+          python3 -c 'import json; i=json.load(open("map-assets-index.json")); print(len({t for f in i["files"] for t in f["tiles"]}), "Kacheln anderer Karten")'
+      # Was ein früherer Lauf schon geholt hat: das Skript lässt liegen, was da ist, und holt nur,
+      # was fehlt.
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name=geodata-tn
+          echo "Artefakte von Lauf $RUN:"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          ls -l /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work/dgm2')" "/tmp/$name.zip"
+          du -sh data/work/dgm2
+      - name: Gelände der Provinz holen
+        env:
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+          JOBS: ${{ inputs.jobs }}
+          DEM: ${{ inputs.dem }}
+          LOD2_NAME: ${{ inputs.lod2_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/work/dgm2
+          args=(--east "$EAST" --north "$NORTH" --jobs "$JOBS" --dem "$DEM" \
+            --published map-assets-index.json --on-overlap fail --gaps data/work/gaps.txt)
+          if [ -n "$LOD2_NAME" ]; then args+=(--lod2-name "$LOD2_NAME"); fi
+          # siatservices.provincia.tn.it weist schon beim Verbinden ab, wenn zu viele Blätter
+          # gleichzeitig gefragt werden; was da ist, wird übersprungen, ein neuer Versuch kostet
+          # also nur das Warten.
+          attempt=1
+          waits=(60 300 900)
+          while :; do
+            if python3 -I tools/fetch-tn.py "${args[@]}"; then
+              break
+            fi
+            if [ "$attempt" -gt "${#waits[@]}" ]; then
+              echo "alle Versuche sind abgewiesen worden" >&2
+              exit 1
+            fi
+            echo "Versuch $attempt gescheitert – Stand: $(du -sh data/work/dgm2 | cut -f1) Gelände"
+            echo "warte $((waits[attempt - 1] / 60)) min"
+            sleep "${waits[attempt - 1]}"
+            attempt=$((attempt + 1))
+          done
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | wc -l
+          test -f data/work/gaps.txt && cat data/work/gaps.txt || echo "keine Lücke"
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste Lauf
+      # kann mit geodata_run hier weiterfahren
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-tn
+          path: data/work/dgm2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    # Die Rechte werden auch hier genannt: das Repository gibt dem Token der Läufe von sich aus
+    # nur Leserechte (actions/permissions/workflow: default_workflow_permissions "read"), und
+    # ohne contents: write antwortet das Release mit
+    # „HTTP 403: Resource not accessible by integration".
+    permissions:
+      contents: write
+    # Das Rechteck liegt außerhalb der Kästen von tools/mapgen/detail-region.json (die hessischen
+    # Karten); „all" baut die ganze Karte mit dem feineren Netz, das nach dem veröffentlichten
+    # Stand dazugekommen ist (Querschnitte, Parken, Gehwege, Markierungen, …).
+    # OSM_FILE: osm-extract.ts, build-lines.ts, build-buslines.ts, build-signs.ts und
+    # build-services.ts lesen die OSM-Datei aus process.argv[2] und nehmen ohne Argument
+    # data/raw/osm/hessen-latest.osm.pbf – die es hier nicht gibt (ENOENT nach Stunden).
+    env:
+      DETAIL_REGION: all
+      OSM_FILE: data/raw/osm/${{ inputs.osm }}-latest.osm.pbf
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Gelände (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-tn
+          path: data/work/dgm2
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          ls data/work
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (openstreetmap.fr, Trentino-Südtirol)
+        env:
+          OSM: ${{ inputs.osm }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/raw/osm
+          # Geofabrik hält Trentino-Südtirol nicht als eigene Datei (nur ganz Italien, 627 MB);
+          # der regionale Ausschnitt liegt bei openstreetmap.fr, benannt nach seiner Region
+          # (trentino_alto_adige-latest.osm.pbf, nachgemessen am 21.11.2026: 136,7 MB, Stand
+          # 19.11.2026), ODbL 1.0, kein Schlüssel.
+          url="https://download.openstreetmap.fr/extracts/europe/italy/$OSM-latest.osm.pbf"
+          echo "$url"
+          # der erste Versuch kann schon am Verbinden scheitern – curl nimmt das nicht als Fehler
+          # zum Wiederholen, darum die Schleife
+          for try in 1 2 3 4 5; do
+            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors --connect-timeout 60 \
+              -o "$OSM_FILE" "$url" && break
+            echo "Versuch $try: $url nicht geholt"
+            sleep 30
+          done
+          test -s "$OSM_FILE"
+          ls -l data/raw/osm
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: |
+          echo "OSM-Datei: $OSM_FILE"
+          npm run map:extract -- "$OSM_FILE"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          # diese vier lesen die OSM-Datei selbst (argv[2]), die anderen beiden das Netz
+          npm run map:lines -- "$OSM_FILE"
+          npm run map:buslines -- "$OSM_FILE"
+          npm run map:signs -- "$OSM_FILE"
+          npm run map:far
+          npm run map:timetable
+          npm run map:services -- "$OSM_FILE"
+      # build-graph.ts schreibt Namen und Quellen der hessischen Karte („Nordhessen", Hessische
+      # Verwaltung für Bodenmanagement und Geoinformation); hier stehen die der Provinz, aus der
+      # das Rechteck kommt (südlich von 5120 km ist das Trient, nördlich davon Bozen).
+      - name: Der Name der Karte und ihre Quellen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+          NORTH: ${{ inputs.north }}
+          # wie der Herausgeber es verlangt (dati.trentino.it: „Creative Commons Attribution 4.0";
+          # natur-raum.provinz.bz.it: „… werden die Daten mit der Lizenz ‚Creative Commons Zero'
+          # (kurz CC0) ausgegeben.")
+          ATT_TN: 'Gelände: Provincia autonoma di Trento – Servizio Geologico, LiDAR DTM PAT 2014/2018 (0,5 m), CC BY 4.0 (heruntergerechnet auf 2 m je Zelle)'
+          ATT_BZ: 'Gelände: Autonome Provinz Bozen - Südtirol, Digitales Geländemodell 0,5 m (LiDAR), CC0 1.0 (heruntergerechnet auf 2 m je Zelle)'
+        run: |
+          set -euo pipefail
+          north0="${NORTH%%..*}"
+          north1="${NORTH##*..}"
+          {
+            [ "$north0" -lt 5120 ] && printf '%s\n' "$ATT_TN"
+            [ "$north1" -ge 5120 ] && printf '%s\n' "$ATT_BZ"
+          } > attribution.txt
+          cat attribution.txt
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            const lines = (j.meta.attribution ?? []).filter((l) => !/Hessische|Hessen|DGM1|LoD2/i.test(l));
+            lines.push(...fs.readFileSync("attribution.txt", "utf8").trim().split("\n"));
+            j.meta.attribution = lines;
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+            console.log(j.meta.attribution.join(" | "));
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      # auch als Artefakt: ein Stunden langer Bau ist damit nicht verloren, wenn das Release
+      # (oder der Platz beim Hochladen) doch einmal scheitert
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mappack-tn
+          path: data/work/map.tar.*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+          OSM: ${{ inputs.osm }}
+        run: |
+          tag="${WANTED:-karte-it-tn-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL (Trentino-Südtirol) für den Fahrsimulator – im Spiel unter
+          Einstellungen → Karte laden (Kartenpaket).
+
+          Rechteck: $EAST km Ost, $NORTH km Nord (UTM32, EPSG:25832).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (© OpenStreetMap-Mitwirkende, ODbL 1.0,
+          Regionalausschnitt $OSM von https://download.openstreetmap.fr/extracts/europe/italy/)
+          und dem Geländemodell der Provinz:
+
+          $(cat attribution.txt)
+
+          Trient: die Provinz gibt je Blatt von 500 m eine ESRI-ASCII-Datei heraus
+          (https://siatservices.provincia.tn.it/stemdata/2014_lidar_dtm_asc/5hEEEENNNNN_DTM.asc,
+          7,0 MB, ohne Schlüssel).  Ihr Portal dati.trentino.it nennt als Lizenz „Creative
+          Commons Attribution 4.0" (CC BY 4.0).  Lücken: Campolongo und Teile der Dolomiten
+          sind nicht beflogen; dort bleibt die Karte weg.
+
+          Bozen: WCS 2.0.1 des GeoServer der Provinz
+          (https://geoservices9.civis.bz.it/geoserver/wcs, „DigitalTerrainModel-0.5m",
+          2000 × 2000 Zellen je Kilometerkachel, ohne Schlüssel).  Ihr Landesportal sagt:
+          „Falls nicht anders angegeben, werden die Daten mit der Lizenz ‚Creative Commons Zero'
+          (kurz CC0) ausgegeben." (https://natur-raum.provinz.bz.it/de/geodienste-nutzen).
+
+          Beide Modelle sind Höhen über 1310 m gewachsen, darum schreiben diese Kacheln 5 cm je
+          Stufe (bis 3276 m); der Kopf jeder Kachel sagt es, tools/mapgen/dgm.ts liest ihn.
+
+          Keine Gebäudemodelle: keine der beiden Provinzen veröffentlicht offenes LoD2 ohne
+          Schlüssel (November 2026).  Die Dächer kommen aus den OpenStreetMap-Umrissen.
+
+          Keine Fahrpläne: tools/build-timetable.ts holt nur deutsche Lieferungen
+          (https://download.gtfs.de); die Betriebe Trentino Trasporti, SASA, STA und Trenitalia
+          stehen darin nicht.  Die Haltestellen sind da, die Abfahrten fehlen.
+
+          Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
+          zusammengesetzt.
+          EOF
+          # auch hier darf der erste Versuch scheitern: dreimal, und am Ende steht fest, dass das
+          # Release wirklich da ist
+          for try in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+              --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Versuch $try: Release $tag wurde nicht angelegt"
+            sleep 30
+          done
+          gh release view "$tag" --json tagName --jq .tagName
+          echo "release $tag"
