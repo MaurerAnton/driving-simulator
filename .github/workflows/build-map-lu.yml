@@ -1,0 +1,260 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte des Großherzogtums Luxemburg und legt sie als Kartenpaket in ein Release
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte lädt).
+#
+# Warum das hier läuft: das Geländemodell des Landes ist eine einzige Rasterdatei von 1,3 GB,
+# und ein Bau braucht mehrere Gigabyte Platte; ein Läufer von GitHub hat 4 CPUs, 16 GB
+# Speicher und ~14 GB Platte, und seine Minuten sind für ein öffentliches Repository frei.
+# Die Karte geht nie über GitHub Pages (dort sind es 1 GB): Releases haben keine
+# Größenbeschränkung.
+#
+# Starten: Actions → "Karte Luxemburg" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (BD-L-MNT-1m, 1 m)                                     -> data/work/dgm2
+#      Gebäudemodelle gibt es in Luxemburg nicht offen: das Katasteramt veröffentlicht kein
+#      CityGML in LoD2, deshalb bleibt diese Karte eine Karte ohne Gebäudemodelle (wie das
+#      Spiel es verträgt – data/work/lod2 bleibt leer).
+#   2. OpenStreetMap, auf die Region geschnitten                      -> npm run map:extract
+#   3. Straßennetz und Kacheln                                        -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Die Region ist ein Rechteck aus UTM32-Kilometerquadraten (EPSG:25832), dasselbe Gitter, nach
+# dem die Kacheln des Landes benannt sind: 293_5499 ist das Quadrat, in dem die Stadt
+# Luxemburg liegt.  Zwei Abläufe dürfen kein Kilometerquadrat gemeinsam haben.
+
+name: Karte Luxemburg
+
+on:
+  workflow_dispatch:
+    inputs:
+      east_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Osten (UTM32, EPSG:25832)'
+        type: string
+        default: '286'
+      east_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Osten'
+        type: string
+        default: '300'
+      north_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Norden'
+        type: string
+        default: '5492'
+      north_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Norden'
+        type: string
+        default: '5506'
+      label:
+        description: Name der Karte (steht im Spiel und im map.json)
+        type: string
+        default: 'Stadt Luxemburg und Umland'
+      tag:
+        description: 'Name des Releases (leer: karte-lu-luxemburg-<Datum>-<Lauf>)'
+        type: string
+        default: 'karte-lu-luxemburg-2026-11-21'
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        # gtfs.de verteilt nv_free (GTFS für Deutschland); aus Luxemburg stehen darin nur die
+        # Fahrten der CFL, die über die Grenze fahren – mehr ist offen nicht zu haben.
+        default: 'CFL'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: 'CFL'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: die offenen Geodaten des Landes – das Holen
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      # numpy (Umrechnen und Entzerren) und Pillow (libtiff entpackt die Zeilen des Rasters)
+      - run: pip install --quiet numpy pillow
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      # Was ein früherer Lauf schon geholt hat: das Skript läßt liegen, was da ist, und holt
+      # nur, was fehlt (die Quadrate unter data/work/dgm2).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name="geodata-luxemburg"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          echo "Artefakt von Lauf $RUN: $id"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2
+      # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
+      # Kacheln von 500 m eine andere Karte hat; tools/fetch-lu.py läßt sie aus.
+      - name: Index der schon veröffentlichten Karten
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 20 \
+            -o "$RUNNER_TEMP/published-index.json" \
+            https://raw.githubusercontent.com/${{ github.repository }}/main/map-assets/index.json
+          python3 -c "import json;d=json.load(open('$RUNNER_TEMP/published-index.json'));print('Kacheln in anderen Karten:',len({t for f in d['files'] for t in f['tiles']}))"
+      - name: Gelände (BD-L-MNT-1m, 1 m) holen
+        env:
+          BOX_E: ${{ inputs.east_from }}..${{ inputs.east_to }}
+          BOX_N: ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          python3 -I tools/fetch-lu.py --east "$BOX_E" --north "$BOX_N" \
+            --published "$RUNNER_TEMP/published-index.json" \
+            --on-overlap skip --gaps data/work/gaps.txt
+          du -sh data/work/dgm2 data/work/luxembourg
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste
+      # Lauf kann mit geodata_run hier weiterfahren
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-luxemburg
+          path: |
+            data/work/dgm2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    env:
+      # Die Werkzeuge lesen sonst eine deutsche Datei – jedes von ihnen bekommt die Datei
+      # dieses Landes ausdrücklich.
+      OSM: data/raw/osm/luxembourg-261119.osm.pbf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-luxemburg
+          path: data/work
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, Luxemburg)
+        run: |
+          mkdir -p data/raw/osm
+          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
+            https://download.geofabrik.de/europe/luxembourg/luxembourg-261119.osm.pbf
+          ls -l data/raw/osm
+      # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
+      # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
+      # Vorgängerkarte, deren Bytes stehen bleiben müßten.
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract -- "$OSM"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        env:
+          DETAIL_REGION: all
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
+          npm run map:far
+          npm run map:timetable
+          npm run map:services -- "$OSM"
+      # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
+      # die hessische Verwaltung; beides wird hier berichtigt.  Das Portal data.public.lu
+      # veröffentlicht den Geländedatensatz unter cc-zero (CC0 1.0), deshalb ist die
+      # Namensnennung eine Quellenangabe und keine Lizenzpflicht.
+      - name: Der Name der Karte und ihre Quellenzeilen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            j.meta.attribution = [
+              "Straßennetz, Verkehrsregelung, Flächennutzung: © OpenStreetMap-Mitwirkende (ODbL 1.0)",
+              "Gelände (MNT 2017, 1 m): Administration du cadastre et de la topographie, cc-zero (CC0 1.0), data.public.lu",
+            ];
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      - name: Kartenpaket hochheben (ehe das Release es will)
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-luxemburg
+          path: data/work/map.tar.*
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          BOX: ${{ inputs.east_from }}..${{ inputs.east_to }} / ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          tag="${WANTED:-karte-lu-luxemburg-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL für den Fahrsimulator – im Spiel unter Einstellungen → Karte laden (Kartenpaket).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (ODbL 1.0) sowie dem Geländemodell
+          „BD-L-MNT-1m" (MNT 2017, 1 m) der Administration du cadastre et de la topographie,
+          veröffentlicht auf data.public.lu unter cc-zero (CC0 1.0).  Rechteck aus
+          Kilometerquadraten (UTM32): $BOX.
+
+          Gebäudemodelle enthält diese Karte nicht: das Katasteramt veröffentlicht für
+          Luxemburg kein CityGML in LoD2 unter einer offenen Lizenz.
+
+          Fahrpläne: gtfs.de – GTFS für Deutschland (DELFI e. V.), Lizenz CC BY 4.0.  Aus
+          Luxemburg stehen darin nur die grenzüberschreitenden Fahrten der CFL.
+          EOF
+          # (ein verwehrtes gh release create darf Stunden von Bau nicht wegwerfen: das Paket
+          #  liegt schon als Artefakt oben; hier ein zweiter Versuch nach einer Weile)
+          for versuch in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+                 --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Release $tag ging schief (Versuch $versuch); noch einmal in 60 s"
+            sleep 60
+          done
+          echo "release $tag"
