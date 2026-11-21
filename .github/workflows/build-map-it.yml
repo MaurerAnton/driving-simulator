@@ -1,0 +1,322 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte eines Rechtecks im Nordwesten Italiens und legt sie als Kartenpaket
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte laden liest,
+# src/ui/mappacks.ts) in ein Release.
+#
+# Der Aufbau ist der von .github/workflows/build-map-bw.yml: zwei Aufträge, damit ein
+# Netzfehler beim Holen des Geländes nicht den ganzen Bau kostet und jeder Teil seine
+# eigenen Stunden hat.  Starten von Hand: Actions → "Karte Italien-Nordwest" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (Copernicus DEM GLO-30)                            -> data/work/dgm2
+#   2. OpenStreetMap, auf das Rechteck geschnitten                -> npm run map:extract
+#   3. Straßennetz und Kacheln                                    -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Rechteck: Kilometerkacheln in UTM32 (EPSG:25832) – 397_4992 ist die Kachel mit der
+# Turiner Innenstadt.
+#
+# Gelände: die italienischen Regionalportale geben ihre Höhendaten nicht offen heraus
+# (Ligurien antwortet auf /download/ mit 403 Forbidden, die Lombardei öffnet ein
+# Anmeldefenster, Piemonte und Aostatal nennen im Metadatensatz keine Adresse zum Holen).
+# Darum das offene Geländemodell der EU: Copernicus DEM GLO-30 liegt im frei lesbaren
+# Behälter copernicus-dem-30m (ein Kasten von 1° × 1°, ~42 MB, 30 m Raster) und ist nach
+# seiner Nutzungsvereinbarung INFO/eula_F.pdf „Global 30m Full, Free & Open … full, open
+# and free-of-charge" – kein Schlüssel, keine Anmeldung.
+#
+# Gebäudemodelle sind keine da: Italien hat kein offenes LoD2 (siehe tools/fetch-it.py);
+# die Dächer kommen wie in Frankreich aus den OpenStreetMap-Umrissen.
+
+name: Karte Italien-Nordwest
+
+on:
+  workflow_dispatch:
+    inputs:
+      east:
+        description: 'Rechteck: Kilometer nach Osten (UTM32), 397 oder 390..404'
+        type: string
+        default: '390..404'
+      north:
+        description: 'Rechteck: Kilometer nach Norden (UTM32), 4992 oder 4985..4999'
+        type: string
+        default: '4985..4999'
+      label:
+        description: Name der Karte (steht in map.json und im Release)
+        type: string
+        default: 'Turin'
+      osm:
+        description: OpenStreetMap-Ausschnitt von openstreetmap.fr (Region, zu der das Rechteck gehört)
+        type: choice
+        default: piemonte
+        options: [piemonte, lombardia, liguria, valle_aosta, italy]
+      tag:
+        description: 'Name des Releases (leer: karte-it-<Datum>-<Lauf>)'
+        type: string
+        default: ''
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        # build-timetable.ts holt nur deutsche Fahrpläne (download.gtfs.de); italienische
+        # Betriebe findet es darin nicht.  Wer einen passenden italienischen Feed hat, kann ihn
+        # hier eintragen – ohne Fund bleiben die Fahrpläne leer.
+        default: 'Trenitalia|Trenord|ATM|GTT|AMT'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: 'Trenitalia|Trenord|ATM|GTT|AMT'
+      jobs:
+        description: Wie viele Höhenkacheln gleichzeitig gerechnet werden
+        type: string
+        default: '4'
+      lod2_name:
+        description: 'Ohne Wirkung: offene italienische Gebäudemodelle gibt es nicht'
+        type: string
+        default: ''
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: das Gelände – Höhen aus dem Copernicus-Behälter rechnen (ein Kasten von 1° × 1°: ~42 MB)
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      # map-assets/ liegt im Repository (2,7 GB) und wird hier nicht gebraucht: index.json wird
+      # aus dem Web geholt (unten), und kein Schritt des Baus liest die fertigen Karten.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # Zwei Karten dürfen keine Kachel von 500 m teilen: map-assets/index.json sagt, was eine
+      # andere Karte schon hat; das Skript lässt diese Kilometerraster weg (--on-overlap fail
+      # bricht stattdessen ab, damit es hier steht und nicht erst im Bau oder im Index).
+      - name: Veröffentlichte Kacheln (map-assets/index.json)
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 10 \
+            -o map-assets-index.json \
+            https://raw.githubusercontent.com/MaurerAnton/driving-simulator/main/map-assets/index.json
+          python3 -c 'import json; i=json.load(open("map-assets-index.json")); print(len({t for f in i["files"] for t in f["tiles"]}), "Kacheln anderer Karten")'
+      # Was ein früherer Lauf schon geholt hat: das Skript lässt liegen, was da ist, und holt nur,
+      # was fehlt.
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name=geodata-it
+          echo "Artefakte von Lauf $RUN:"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          ls -l /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work/dgm2')" "/tmp/$name.zip"
+          du -sh data/work/dgm2
+      - name: Gelände aus dem Copernicus DEM holen
+        env:
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+          JOBS: ${{ inputs.jobs }}
+          LOD2_NAME: ${{ inputs.lod2_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/work/dgm2
+          args=(--east "$EAST" --north "$NORTH" --jobs "$JOBS" \
+            --published map-assets-index.json --on-overlap fail --gaps data/work/gaps.txt)
+          if [ -n "$LOD2_NAME" ]; then args+=(--lod2-name "$LOD2_NAME"); fi
+          python3 -I tools/fetch-it.py "${args[@]}"
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | wc -l
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste Lauf
+      # kann mit geodata_run hier weiterfahren
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-it
+          path: data/work/dgm2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    # Die Rechte werden auch hier genannt: das Repository gibt dem Token der Läufe von sich aus
+    # nur Leserechte (actions/permissions/workflow: default_workflow_permissions "read"), und
+    # ohne contents: write antwortet das Release mit
+    # „HTTP 403: Resource not accessible by integration" (gemessen im Lauf 44792393161).
+    permissions:
+      contents: write
+    # Das Rechteck liegt außerhalb der Kästen von tools/mapgen/detail-region.json (die hessischen
+    # Karten); „all" baut die ganze Karte mit dem feineren Netz, das nach dem veröffentlichten
+    # Stand dazugekommen ist (Querschnitte, Parken, Gehwege, Markierungen, …).
+    # OSM_FILE: osm-extract.ts, build-lines.ts, build-buslines.ts, build-signs.ts und
+    # build-services.ts lesen die OSM-Datei aus process.argv[2] und nehmen ohne Argument
+    # data/raw/osm/hessen-latest.osm.pbf – die es hier nicht gibt (ENOENT nach Stunden).
+    env:
+      DETAIL_REGION: all
+      OSM_FILE: data/raw/osm/${{ inputs.osm }}-latest.osm.pbf
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Gelände (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-it
+          path: data/work/dgm2
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          ls data/work
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (openstreetmap.fr, Italien)
+        env:
+          OSM: ${{ inputs.osm }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/raw/osm
+          # Geofabrik hält Nordwestitalien nicht als eigene Datei (nur ganz Italien); die regionalen
+          # Ausschnitte liegen bei openstreetmap.fr benannt nach ihrer Region
+          # (piemonte-latest.osm.pbf, nachgemessen am 19.11.2026: valle_aosta 21 MB, liguria
+          # 87 MB, piemonte 240 MB, lombardia 357 MB), ODbL 1.0, kein Schlüssel.
+          url="https://download.openstreetmap.fr/extracts/europe/italy/$OSM-latest.osm.pbf"
+          echo "$url"
+          # der erste Versuch kann schon am Verbinden scheitern (im bw-Lauf 44786351824 Exit 7) –
+          # curl nimmt das nicht als Fehler zum Wiederholen, darum die Schleife
+          for try in 1 2 3 4 5; do
+            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors --connect-timeout 60 \
+              -o "$OSM_FILE" "$url" && break
+            echo "Versuch $try: $url nicht geholt"
+            sleep 30
+          done
+          test -s "$OSM_FILE"
+          ls -l data/raw/osm
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: |
+          echo "OSM-Datei: $OSM_FILE"
+          npm run map:extract -- "$OSM_FILE"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          # diese vier lesen die OSM-Datei selbst (argv[2]), die anderen beiden das Netz
+          npm run map:lines -- "$OSM_FILE"
+          npm run map:buslines -- "$OSM_FILE"
+          npm run map:signs -- "$OSM_FILE"
+          npm run map:far
+          npm run map:timetable
+          npm run map:services -- "$OSM_FILE"
+      # build-graph.ts schreibt Namen und Quellen der hessischen Karte („Nordhessen", Hessische
+      # Verwaltung für Bodenmanagement und Geoinformation); hier stehen die von Italien.
+      - name: Der Name der Karte und ihre Quellen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+          ATTRIBUTION: 'Gelände (Copernicus DEM GLO-30): Produced using Copernicus DEM © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved'
+        run: |
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            const lines = (j.meta.attribution ?? []).filter((l) => !/Hessische|Hessen|DGM1|LoD2/i.test(l));
+            lines.push(process.env.ATTRIBUTION);
+            j.meta.attribution = lines;
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+            console.log(j.meta.attribution.join(" | "));
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      # auch als Artefakt: ein Stunden langer Bau ist damit nicht verloren, wenn das Release
+      # (oder der Platz beim Hochladen) doch einmal scheitert
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mappack-it
+          path: data/work/map.tar.*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+          OSM: ${{ inputs.osm }}
+        run: |
+          tag="${WANTED:-karte-it-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL (Nordwestitalien) für den Fahrsimulator – im Spiel unter
+          Einstellungen → Karte laden (Kartenpaket).
+
+          Rechteck: $EAST km Ost, $NORTH km Nord (UTM32, EPSG:25832).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (© OpenStreetMap-Mitwirkende, ODbL 1.0,
+          Regionalausschnitt $OSM von https://download.openstreetmap.fr/extracts/europe/italy/)
+          und dem Geländemodell Copernicus DEM GLO-30 der Europäischen Union.  Dessen
+          Nutzungsvereinbarung sagt: „Licence for Copernicus DEM instance COP-DEM-GLO-30-F
+          Global 30m Full, Free & Open … full, open and free-of-charge basis" (WorldDEM-10 ist
+          ausgenommen).  Quellenvermerk: „Produced using Copernicus DEM © DLR e.V. 2010-2014
+          and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the
+          European Union and ESA; all rights reserved".  Die Quellen und Lizenzen stehen auch in
+          map.json (meta.attribution) und in docs/MAP_DATA.md.
+
+          Keine Gebäudemodelle: Italien hat kein offenes LoD2 – die Regionalportale verlangen
+          eine Anmeldung (Lombardei), antworten mit 403 Forbidden (Ligurien) oder nennen im
+          Metadatensatz keine Adresse zum Holen (Piemonte, Aostatal).  Die Dächer kommen darum
+          aus den OpenStreetMap-Umrissen.
+
+          Keine Fahrpläne: tools/build-timetable.ts holt nur deutsche Lieferungen
+          (https://download.gtfs.de); offene italienische GTFS-Feeds der Betriebe Trenitalia,
+          Trenord, ATM, GTT und AMT waren unter keinen erreichbaren, schlüsselfreien Adressen zu
+          finden.  Die Haltestellen sind da, die Abfahrten fehlen.
+
+          Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
+          zusammengesetzt.
+          EOF
+          # auch hier darf der erste Versuch scheitern (403 im Lauf 44792393161): dreimal,
+          # und am Ende steht fest, dass das Release wirklich da ist
+          for try in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+              --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Versuch $try: Release $tag wurde nicht angelegt"
+            sleep 30
+          done
+          gh release view "$tag" --json tagName --jq .tagName
+          echo "release $tag"
