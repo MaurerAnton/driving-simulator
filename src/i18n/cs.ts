@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Tento prohlížeč neumí předčítat texty.",
   "voice.onlineNote": "Hlasy označené „online“ obvykle zní nejlépe. Potřebují připojení a posílají čtený text – jen pokyny hry – řečové službě výrobce prohlížeče; bez připojení převezme hlas v zařízení.",
   "volume": "Hlasitost",
+  "steerSensitivity": "Citlivost řízení: jak prudce A/D zatáčejí",
   "traffic": "Hustota provozu",
   "touchControls": "Ovládání na obrazovce",
   "tcAuto": "automaticky (při dotyku zapnuto, s klávesnicí vypnuto)",

@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Ta przeglądarka nie potrafi czytać tekstów na głos.",
   "voice.onlineNote": "Głosy oznaczone „online” brzmią zwykle najlepiej. Potrzebują połączenia i wysyłają czytany tekst – tylko komunikaty gry – do usługi mowy producenta przeglądarki; bez połączenia przejmuje głos z urządzenia.",
   "volume": "Głośność",
+  "steerSensitivity": "Czułość kierowania: jak ostro skręcają A/D",
   "traffic": "Natężenie ruchu",
   "touchControls": "Sterowanie na ekranie",
   "tcAuto": "automatycznie (włączone po dotknięciu, wyłączone przy klawiaturze)",

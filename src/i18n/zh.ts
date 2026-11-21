@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "此浏览器无法朗读文字。",
   "voice.onlineNote": "标有“在线”的语音通常听起来最好。它们需要网络连接，并会把正在朗读的文字——仅限游戏的指示——发送到浏览器厂商的语音服务；没有连接时，由设备上的语音接替。",
   "volume": "音量",
+  "steerSensitivity": "转向灵敏度：A/D 转向有多急",
   "traffic": "交通密度",
   "touchControls": "屏幕操作按钮",
   "tcAuto": "自动（触摸时显示，使用键盘时隐藏）",

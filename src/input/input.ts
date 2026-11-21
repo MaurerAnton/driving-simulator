@@ -713,6 +713,8 @@ export class Input {
       // with a comfortable lateral acceleration at this speed – full lock at walking pace, a fraction
       // of a degree on the motorway – and wind it on within about half a second.
       // (hands off: the wheel centres itself when the car rolls, and stays put when it stands)
+      // the sensitivity is read here so a slider change takes effect at once
+      this.feel.sens = this.settings.steerSensitivity;
       c.steer = keySteer(this.feel, c.steer, (right ? 1 : 0) - (left ? 1 : 0), absSpeed, selfAlign, dt);
       const gas = !fly && this.key('KeyW', 'ArrowUp');
       const brake = !fly && this.key('KeyS', 'ArrowDown');

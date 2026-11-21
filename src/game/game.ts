@@ -467,6 +467,13 @@ export class Game {
   private screenTap: ScreenTap | null = null;
   private spawn: SpawnJson | null = null;
   private lesson: LessonDef | null = null;
+  /**
+   * free drive: the car was spawned in gear (D1) with the handbrake off, held
+   * still until the driver gives gas or the brake (settings: none – the spawn
+   * is ready to go but does not creep off on its own).  Off for lessons/exams,
+   * which start the full programme (handbrake on, released by the driver).
+   */
+  private spawnHold = false;
   private targetIdx = 0;
   /** the road a lesson began on (its number in the map: the road itself may be dropped and loaded again on the way), or -1 */
   private homeEdge = -1;
@@ -2122,7 +2129,13 @@ export class Game {
     this.passengerView.show(null);
     this.vehicle.vel.fill(0);
     this.vehicle.angVel.fill(0);
-    this.input.c.handbrake = this.def.kind === 'tram' ? 0 : 1;
+    // a teleport in a free drive lands ready to go: in gear (D1 on an automatic),
+    // no handbrake, held still until the driver gives gas.  A lesson keeps its
+    // programme (handbrake on), and a tram has none of that.
+    const tpFree = !this.lesson && this.def.kind !== 'tram';
+    this.spawnHold = tpFree;
+    this.input.c.handbrake = tpFree ? 0 : this.def.kind === 'tram' ? 0 : 1;
+    if (tpFree && arcadeTransmission(this.settings.arcadeDrive, this.settings.transmission) === 'automatic') this.input.c.gear = 1; // (D1)
     this.path.breakLine();
     this.keepClock = true;
     this.state = 'placing';
@@ -2843,7 +2856,13 @@ export class Game {
     this.input.setSteering(spec.wheelbase, spec.maxWheelAngle, spec);
     this.input.setAutomatic(spec.transmission === 'automatic');
     const c = this.input.c;
-    c.handbrake = 1;
+    // a free drive starts ready to go: in gear (D1), no handbrake, held still
+    // until the driver gives gas or the brake.  Lessons and exams keep the full
+    // programme – the handbrake on, released by the driver (the lesson says so).
+    const freeGo = !this.lesson && mode === 'free';
+    this.spawnHold = freeGo;
+    c.handbrake = freeGo ? 0 : 1;
+    if (freeGo && spec.transmission === 'automatic') c.gear = 1; // (D1: the selector in drive)
     c.ignition = true;
     c.indicator = 0;
     c.hazard = false;
@@ -4023,6 +4042,15 @@ export class Game {
     d.gear = c.gear;
     d.ignition = c.ignition;
     d.starter = c.starter;
+    // the free-drive spawn: in gear, no handbrake, held still until the driver
+    // gives gas or the brake – the brake holds it (the converter would creep)
+    if (this.spawnHold) {
+      if (c.throttle > 0.05 || c.brake > 0.05) this.spawnHold = false;
+      else {
+        d.brake = 1;
+        d.throttle = 0;
+      }
+    }
     // a look back over the left shoulder: that is what is asked for before the door is opened
     if (c.lookYaw > 0.9) this.lookedBackAt = this.time;
     this.stepDoor(dt);

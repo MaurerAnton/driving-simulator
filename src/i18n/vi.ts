@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Trình duyệt này không thể đọc văn bản thành tiếng.",
   "voice.onlineNote": "Các giọng được đánh dấu “trực tuyến” thường nghe hay nhất. Chúng cần kết nối mạng và gửi văn bản đang đọc – chỉ là các hướng dẫn của trò chơi – đến dịch vụ giọng nói của nhà sản xuất trình duyệt; khi không có kết nối, một giọng trên thiết bị sẽ thay thế.",
   "volume": "Âm lượng",
+  "steerSensitivity": "Độ nhạy lái: A/D rẽ sắc đến mức nào",
   "traffic": "Mật độ giao thông",
   "touchControls": "Nút điều khiển trên màn hình",
   "tcAuto": "tự động (bật khi chạm, tắt khi dùng bàn phím)",

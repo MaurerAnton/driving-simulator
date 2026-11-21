@@ -111,3 +111,18 @@ test('the articulated lorry turns at a lorry’s rate, not a car’s', () => {
   assert.ok(slow.toLock > 1.2 && slow.toLock < 2.2, `lock to lock is hand over hand: ${slow.toLock}`);
   console.log(rows.join('\n'));
 });
+
+test('the steering sensitivity: a sharper feel asks for more lock, never past full lock', () => {
+  const speed = 8; // m/s – a town turn, where the keys wind on meaningful lock
+  const gentle = keySteer(steerFeel(COMPACT_CAR_AUTOMATIC, undefined, undefined, 0.5), 0, 1, speed, 0, 0.5);
+  const asBuilt = keySteer(steerFeel(COMPACT_CAR_AUTOMATIC, undefined, undefined, 1), 0, 1, speed, 0, 0.5);
+  const sharp = keySteer(steerFeel(COMPACT_CAR_AUTOMATIC, undefined, undefined, 2), 0, 1, speed, 0, 0.5);
+  // more sensitivity -> more lock for the same input at the same speed
+  assert.ok(gentle < asBuilt, `${gentle} < ${asBuilt}`);
+  assert.ok(asBuilt < sharp, `${asBuilt} < ${sharp}`);
+  // but never more than full lock, however sharp
+  const full = keySteer(steerFeel(COMPACT_CAR_AUTOMATIC, undefined, undefined, 8), 0, 1, speed, 0, 0.5);
+  assert.ok(full <= 1, `never past full lock: ${full}`);
+  // the default feel (sens 1) is unchanged by building one without a sens
+  assert.equal(steerFeel(COMPACT_CAR_AUTOMATIC).sens, 1);
+});

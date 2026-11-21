@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Ez a böngésző nem tud szöveget felolvasni.",
   "voice.onlineNote": "Az „online” jelölésű hangok általában a legjobbak. Kapcsolatra van szükségük, és a felolvasott szöveget – csak a játék utasításait – elküldik a böngésző gyártójának beszédszolgáltatásához; kapcsolat nélkül egy eszközön lévő hang veszi át.",
   "volume": "Hangerő",
+  "steerSensitivity": "Kormányérzékenység: milyen élesen fordul A/D",
   "traffic": "Forgalomsűrűség",
   "touchControls": "Képernyős kezelőszervek",
   "tcAuto": "automatikus (érintésre be, billentyűzettel ki)",

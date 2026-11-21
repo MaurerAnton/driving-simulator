@@ -1146,6 +1146,8 @@ export class Hud {
     }
     select(this.t('mirrors'), s.mirrors, [['off', this.t('mOff')], ['alternate', this.t('mAlt')], ['full', this.t('mFull')]], (v) => (s.mirrors = v as Settings['mirrors']));
     range(this.t('traffic'), s.traffic, (v) => (s.traffic = v));
+    // steering sensitivity: how sharply A/D turn (0.5 gentle … 1 as built … 2 sharp)
+    range(this.t('steerSensitivity'), (s.steerSensitivity - 0.5) / 1.5, (v) => (s.steerSensitivity = Math.round((0.5 + v * 1.5) * 100) / 100));
     range(this.t('volume'), s.volume, (v) => (s.volume = v));
     // music made as it plays: off unless asked for
     select(this.t('music'), s.music, [['off', this.t('musicOff')], ['quiet', this.t('musicQuiet')], ['on', this.t('musicOn')]], (v) => (s.music = v as Settings['music']));

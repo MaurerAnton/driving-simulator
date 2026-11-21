@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Browser ini tidak bisa membacakan teks.",
   "voice.onlineNote": "Suara bertanda “daring” biasanya terdengar paling bagus. Suara itu memerlukan koneksi dan mengirim teks yang dibacakan – hanya instruksi game – ke layanan ucapan milik pembuat browser; tanpa koneksi, suara di perangkat yang mengambil alih.",
   "volume": "Volume",
+  "steerSensitivity": "Sensivitas setir: seberapa tajam A/D berbelok",
   "traffic": "Kepadatan lalu lintas",
   "touchControls": "Kontrol di layar",
   "tcAuto": "otomatis (aktif saat layar disentuh, mati jika memakai keyboard)",

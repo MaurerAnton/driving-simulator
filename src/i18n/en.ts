@@ -1180,6 +1180,7 @@ const dict: Dict = {
   "voice.onlineNote": "Voices marked “online” usually sound best. They need a connection and send the text being read – only the game’s instructions – to the speech service of the browser’s maker; without a connection a voice on the device takes over.",
   "volume": "Volume",
   "traffic": "Traffic density",
+  "steerSensitivity": "Steering sensitivity: how sharply A/D turn",
   "touchControls": "On-screen controls",
   "tcAuto": "automatic (on when touched, off with a keyboard)",
   "tcOn": "always show",

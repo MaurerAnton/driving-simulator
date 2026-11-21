@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Ky shfletues nuk mund t'i lexojë tekstet me zë.",
   "voice.onlineNote": "Zërat e shënuar „online“ zakonisht tingëllojnë më mirë. Ata kanë nevojë për lidhje dhe e dërgojnë tekstin që lexohet – vetëm udhëzimet e lojës – te shërbimi i të folurit i prodhuesit të shfletuesit; pa lidhje e merr përsipër një zë në pajisje.",
   "volume": "Volumi",
+  "steerSensitivity": "Sensiviteti i drejtimit: sa më qëlloreshëm kthejnë A/D",
   "traffic": "Dendësia e trafikut",
   "touchControls": "Komandat në ekran",
   "tcAuto": "automatike (aktive me prekje, joaktive me tastierë)",

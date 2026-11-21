@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Bu tarayıcı metinleri sesli okuyamıyor.",
   "voice.onlineNote": "“Çevrimiçi” işaretli sesler genellikle en iyi duyulanlardır. Bağlantı gerektirirler ve okunan metni – yalnızca oyunun komutlarını – tarayıcı üreticisinin konuşma hizmetine gönderirler; bağlantı yoksa cihazdaki bir ses devralır.",
   "volume": "Ses düzeyi",
+  "steerSensitivity": "Direksiyon hassasiyeti: A/D ne kadar keskin döner",
   "traffic": "Trafik yoğunluğu",
   "touchControls": "Ekran kontrolleri",
   "tcAuto": "otomatik (dokunulunca açık, klavyeyle kapalı)",

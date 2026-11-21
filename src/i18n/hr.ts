@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Ovaj preglednik ne može čitati tekstove naglas.",
   "voice.onlineNote": "Glasovi označeni s „online“ obično zvuče najbolje. Trebaju vezu i šalju tekst koji se čita – samo upute igre – govornoj usluzi proizvođača preglednika; bez veze preuzima glas na uređaju.",
   "volume": "Glasnoća",
+  "steerSensitivity": "Osjetljivost upravljanja: koliko oštro skreću A/D",
   "traffic": "Gustoća prometa",
   "touchControls": "Upravljanje na zaslonu",
   "tcAuto": "automatski (uključeno na dodir, isključeno uz tipkovnicu)",

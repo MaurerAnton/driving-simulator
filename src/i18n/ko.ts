@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "이 브라우저는 글을 소리 내어 읽을 수 없어요.",
   "voice.onlineNote": "“온라인”으로 표시된 음성이 대개 가장 듣기 좋아요. 인터넷 연결이 필요하고, 읽는 글 – 게임의 안내만 – 을 브라우저 제작사의 음성 서비스로 보내요. 연결이 없으면 기기의 음성이 대신 읽어 줘요.",
   "volume": "음량",
+  "steerSensitivity": "조향 감도: A/D가 얼마나 날카롭게 도는지",
   "traffic": "교통량",
   "touchControls": "화면 조작 버튼",
   "tcAuto": "자동(터치하면 켜짐, 키보드를 쓰면 꺼짐)",

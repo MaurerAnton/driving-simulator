@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Dieser Browser kann keine Texte vorlesen.",
   "voice.onlineNote": "Mit „online“ markierte Stimmen klingen meist am besten. Sie brauchen eine Verbindung und senden den gelesenen Text – nur die Ansagen des Spiels – an den Sprachdienst des Browserherstellers; ohne Verbindung übernimmt eine Stimme auf dem Gerät.",
   "volume": "Lautstärke",
+  "steerSensitivity": "Lenk-Empfindlichkeit: wie scharf A/D einlenken",
   "traffic": "Verkehrsdichte",
   "touchControls": "Bedienung auf dem Bildschirm",
   "tcAuto": "automatisch (bei Berührung an, bei Tastatur aus)",

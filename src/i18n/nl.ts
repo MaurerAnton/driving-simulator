@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Deze browser kan geen teksten voorlezen.",
   "voice.onlineNote": "Stemmen gemarkeerd met “via internet” klinken meestal het best. Ze hebben een verbinding nodig en sturen de voorgelezen tekst – alleen de aanwijzingen van het spel – naar de spraakdienst van de maker van de browser; zonder verbinding neemt een stem op het apparaat het over.",
   "volume": "Volume",
+  "steerSensitivity": "Stuurgevoeligheid: hoe scherp A/D sturen",
   "traffic": "Verkeersdrukte",
   "touchControls": "Bediening op het scherm",
   "tcAuto": "automatisch (aan bij aanraken, uit bij toetsenbord)",

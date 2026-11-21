@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Acest browser nu poate citi texte cu voce tare.",
   "voice.onlineNote": "Vocile marcate „online” sună de obicei cel mai bine. Au nevoie de conexiune și trimit textul citit – doar indicațiile jocului – către serviciul de vorbire al producătorului browserului; fără conexiune preia o voce de pe dispozitiv.",
   "volume": "Volum",
+  "steerSensitivity": "Sensibilitatea direcției: cât de ascuțit viraj A/D",
   "traffic": "Densitatea traficului",
   "touchControls": "Comenzi pe ecran",
   "tcAuto": "automat (activ la atingere, inactiv cu tastatura)",

@@ -41,6 +41,13 @@ export interface SteerFeel {
   lateral: number;
   /** the fastest the steering input may move (share of the lock per second; Infinity: no limit) */
   rate: number;
+  /**
+   * how sharply the keys turn for a given speed (settings: steerSensitivity):
+   * 1 the feel as built, 2 twice the lock at the same speed (sharper), 0.5 half
+   * (gentler).  Scales the lock the keys ask for; the vehicle's own limits and
+   * the lateral shaping still hold.
+   */
+  sens: number;
 }
 
 /** below this mass (kg) a vehicle steers like a car … */
@@ -69,8 +76,8 @@ export function heaviness(mass: number): number {
 }
 
 /** The shaping for a vehicle (without one: the compact car's geometry, a car's feel). */
-export function steerFeel(spec?: SteerSpec | null, wheelbase = 2.63, maxWheelAngle = 0.576): SteerFeel {
-  if (!spec) return { wheelbase, maxWheelAngle, lateral: 1, rate: Infinity };
+export function steerFeel(spec?: SteerSpec | null, wheelbase = 2.63, maxWheelAngle = 0.576, sens = 1): SteerFeel {
+  if (!spec) return { wheelbase, maxWheelAngle, lateral: 1, rate: Infinity, sens };
   const h = heaviness(spec.mass);
   if (h <= 0)
     return {
@@ -78,6 +85,7 @@ export function steerFeel(spec?: SteerSpec | null, wheelbase = 2.63, maxWheelAng
       maxWheelAngle: spec.maxWheelAngle,
       lateral: 1,
       rate: Infinity,
+      sens,
     };
   // the steering wheel's angle from the middle to the stop (rad)
   const lock = Math.max(0.1, spec.maxWheelAngle * spec.steeringRatio);
@@ -87,6 +95,7 @@ export function steerFeel(spec?: SteerSpec | null, wheelbase = 2.63, maxWheelAng
     maxWheelAngle: spec.maxWheelAngle,
     lateral: 1 + (LORRY_LATERAL - 1) * h,
     rate: wheelSpeed / lock,
+    sens,
   };
 }
 
@@ -115,7 +124,9 @@ export function analogSteer(f: SteerFeel, cur: number, want: number, speed: numb
  */
 export function keySteer(f: SteerFeel, cur: number, target: number, speed: number, selfAlign: number, dt: number): number {
   const absSpeed = Math.abs(speed);
-  const limit = lockFor(f, keyLateral(absSpeed), absSpeed);
+  // (the sensitivity scales how much lock the keys ask for at this speed; the
+  //  lock itself is still capped at 1 – a sharper feel never asks past full lock)
+  const limit = clamp(lockFor(f, keyLateral(absSpeed), absSpeed) * f.sens, 0.003, 1);
   if (target !== 0) {
     const rate = Math.min(limit * (1.2 + 1.3 * (1 - limit)), f.rate);
     // counter-steering is quicker than winding on more lock

@@ -96,7 +96,11 @@ export interface Settings {
    * it); one of its VehicleDef.powers – a kind not listed has the power it comes with
    */
   powers: Partial<Record<VehicleKind, number>>;
-  /** with keys or pedals on the screen the throttle eases off at the current speed limit */
+  /**
+   * with keys or pedals on the screen the throttle eases off at the current speed limit.
+   * Off by default since 1.7.5: no speed is held back unless the player asks for it – one
+   * who wants 150 km/h in a town can have it; the limit roundel still shows when it is passed.
+   */
   limiter: boolean;
   /** the autopilot lets the player take over for a moment and drives on to its places when let go (else taking over ends it) */
   autopilotAssist: boolean;
@@ -120,6 +124,12 @@ export interface Settings {
   musicVolume: number;
   /** how fast one runs on foot (km/h), one of RUN_SPEEDS */
   runSpeed: number;
+  /**
+   * how sharply A/D turn for a given speed (settings: a slider):
+   * 1 the feel as built, above 1 sharper, below 1 gentler (input/steerfeel.ts).
+   * A key-steering feel only – a real wheel keeps its own shape.
+   */
+  steerSensitivity: number;
   /** on foot: through one's own eyes, or seen from behind (the camera key switches) */
   footView: 'eyes' | 'behind';
   /** how one walks (game/walkmodes.ts): 'auto' – the classic way on a touch screen, as before with keys –, the classic way (stick or W A S D, look by dragging), as before 1.7.0 (pedals and bar, A D turn), or tap to walk */
@@ -242,7 +252,7 @@ export const DEFAULT_SETTINGS: Settings = {
   vehicle: 'car',
   transmission: 'automatic',
   powers: {},
-  limiter: true,
+  limiter: false,
   autopilotAssist: true,
   arcadeDrive: false,
   evenRoads: true,
@@ -255,6 +265,7 @@ export const DEFAULT_SETTINGS: Settings = {
   music: 'off',
   musicVolume: 1,
   runSpeed: 12,
+  steerSensitivity: 1,
   footView: 'eyes',
   walkControls: 'auto',
   teleportTap: true,
@@ -332,6 +343,8 @@ function merge(parsed: Partial<Settings>): Settings {
   if (s.view !== 'chase' && s.view !== 'cockpit') s.view = d.view;
   if (!vehicleKind(s.vehicle)) s.vehicle = d.vehicle;
   if (!RUN_SPEEDS.includes(s.runSpeed)) s.runSpeed = d.runSpeed;
+  if (typeof s.steerSensitivity !== 'number' || !Number.isFinite(s.steerSensitivity)) s.steerSensitivity = d.steerSensitivity;
+  else s.steerSensitivity = Math.min(2, Math.max(0.5, s.steerSensitivity));
   if (s.footView !== 'eyes' && s.footView !== 'behind') s.footView = d.footView;
   if (!(['auto', 'classic', 'tank', 'tap'] as const).includes(s.walkControls)) s.walkControls = d.walkControls;
   if (typeof s.teleportTap !== 'boolean') s.teleportTap = d.teleportTap;

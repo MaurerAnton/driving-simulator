@@ -1173,6 +1173,7 @@ const dict: Dict = {
   "voice.unsupported": "Este navegador no puede leer textos en voz alta.",
   "voice.onlineNote": "Las voces marcadas «en línea» suelen sonar mejor. Necesitan conexión y envían el texto leído – solo las indicaciones del juego – al servicio de voz del fabricante del navegador; sin conexión, toma el relevo una voz del dispositivo.",
   "volume": "Volumen",
+  "steerSensitivity": "Sensibilidad de la dirección: qué de agudo giran A/D",
   "traffic": "Densidad del tráfico",
   "touchControls": "Controles en pantalla",
   "tcAuto": "automático (se activan al tocar la pantalla y se ocultan con teclado)",
