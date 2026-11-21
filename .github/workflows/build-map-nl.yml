@@ -309,7 +309,7 @@ jobs:
           # wenn kurz zuvor viele Releases entstanden sind; darum mehrere Versuche mit Pause,
           # und wenn das Release schon da ist, nur die Teile hochladen.
           ok=0
-          for try in 1 2 3 4 5 6; do
+          for try in $(seq 1 15); do
             if gh release view "$tag" >/dev/null 2>&1; then
               gh release upload "$tag" data/work/map.tar.* --clobber
               ok=1
@@ -320,8 +320,8 @@ jobs:
               ok=1
               break
             fi
-            echo "Release nicht angelegt (Versuch $try) – 60 s Pause"
-            sleep 60
+            echo "Release nicht angelegt (Versuch $try) – 120 s Pause"
+            sleep 120
           done
           [ "$ok" = 1 ] || { echo "kein Release"; exit 1; }
           echo "release $tag"
