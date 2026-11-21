@@ -92,7 +92,7 @@ jobs:
           echo "Artefakt von Lauf $RUN: $id"
           curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
-          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work/dgm2')" "/tmp/$name.zip"
           du -sh data/work/dgm2
       # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
       # Kacheln von 500 m eine andere Karte hat; tools/fetch-ch.py läßt sie aus.
@@ -141,11 +141,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Nur ein Pfad wird hochgehoben, darum liegen die Kacheln selbst (nicht data/work/dgm2/…)
+      # im Artefakt – hier genau dorthin zurück.
       - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
         uses: actions/download-artifact@v4
         with:
           name: geodata-ch
-          path: data/work
+          path: data/work/dgm2
       - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
         run: |
           du -sh data/work/dgm2
