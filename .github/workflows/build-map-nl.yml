@@ -181,27 +181,27 @@ jobs:
           base="https://download.geofabrik.de/europe/netherlands/$p"
           # Der kleine Ausschnitt ist …/<Provinz>/<Provinz>-latest.osm.pbf (die flache Adresse
           # ohne die zweite Ebene ist 404).  "-latest" führt auf eine Tagesdatei, die es
-          # mitunter noch nicht gibt – die 404 liefert, obwohl sie im Verzeichnis steht.
-          # Darum wird die jüngste Tagesdatei gesucht, die wirklich antwortet: heute,
-          # gestern, … bis zehn Tage zurück.
+          # mitunter noch nicht gibt und die 404 liefert, obwohl sie im Verzeichnis steht –
+          # darum die jüngste Tagesdatei, die wirklich antwortet (heute, gestern, … 12 Tage
+          # zurück).  Und wenn der Dienst gerade gar nicht erreichbar ist (messen: curl (7),
+          # wenn mehrere Läufe zugleich holen), Pause und von vorn.
+          hole() {
+            curl -fsSIL --retry 2 --retry-delay 5 --retry-all-errors --max-time 60 \
+                 -o /dev/null "$base/$1" || return 1
+            curl -fsSL --retry 5 --retry-delay 20 --retry-all-errors -o "$OSM" "$base/$1" || return 1
+            echo "genommen: $1"
+          }
           ok=0
-          for n in $(seq 0 10); do
-            cand=$p-$(date -u -d "-$n day" +%y%m%d).osm.pbf
-            if curl -fsSIL --retry 2 --retry-delay 5 --retry-all-errors --max-time 60 \
-                 -o /dev/null "$base/$cand"; then
-              curl -fsSL --retry 5 --retry-delay 20 --retry-all-errors -o "$OSM" "$base/$cand"
-              echo "genommen: $cand"
-              ok=1
-              break
-            fi
-            echo "$cand nicht da"
+          for try in 1 2 3 4 5; do
+            for n in $(seq 0 12); do
+              if hole "$p-$(date -u -d "-$n day" +%y%m%d).osm.pbf"; then ok=1; break; fi
+            done
+            [ "$ok" = 1 ] && break
+            hole "$p-latest.osm.pbf" && { ok=1; break; }
+            echo "kein Ausschnitt erreichbar (Versuch $try) – 120 s Pause"
+            sleep 120
           done
-          # und wenn auch das nichts wird, der Weg über "-latest" (er führt auf die Datei,
-          # die der Dienst selbst für die neueste hält)
-          if [ "$ok" = 0 ]; then
-            curl -fsSL --retry 5 --retry-delay 20 --retry-all-errors -o "$OSM" "$base/$p-latest.osm.pbf"
-            echo "genommen: $p-latest.osm.pbf"
-          fi
+          [ "$ok" = 1 ] || { echo "Geofabrik nicht erreichbar"; exit 1; }
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
@@ -297,6 +297,23 @@ jobs:
           Nur ein Rechteck der Niederlande: das ganze Land paßt nicht in eine Karte; weitere
           Rechtecke kommen aus demselben Ablauf „Karte Niederlande" mit anderen Zahlen.
           EOF
-          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
-            --notes-file notes.md data/work/map.tar.*
+          # Manchmal antwortet die API mit 403 ("Resource not accessible by integration"),
+          # wenn kurz zuvor viele Releases entstanden sind; darum mehrere Versuche mit Pause,
+          # und wenn das Release schon da ist, nur die Teile hochladen.
+          ok=0
+          for try in 1 2 3 4 5 6; do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release upload "$tag" data/work/map.tar.* --clobber
+              ok=1
+              break
+            fi
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+                 --notes-file notes.md data/work/map.tar.*; then
+              ok=1
+              break
+            fi
+            echo "Release nicht angelegt (Versuch $try) – 60 s Pause"
+            sleep 60
+          done
+          [ "$ok" = 1 ] || { echo "kein Release"; exit 1; }
           echo "release $tag"
