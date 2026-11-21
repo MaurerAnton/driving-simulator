@@ -94,16 +94,18 @@ def tile_keys(east, north):
 
 
 def ask(url, range_header):
-    """One ranged GET; None if the server does not serve it."""
+    """One ranged GET; None if the server does not serve it (it also refuses single ones of many)."""
     request = urllib.request.Request(url, headers={'User-Agent': AGENT, 'Range': range_header})
-    try:
-        with urllib.request.urlopen(request, timeout=180) as r:
-            if r.status != 206:
-                return None
-            return r.read()
-    except Exception as e:  # noqa: BLE001 - every trouble here only means "unknown, fetch it"
-        say(f'{type(e).__name__} {e}: no ranged read of {os.path.basename(url)}')
-        return None
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(request, timeout=180) as r:
+                if r.status != 206:
+                    return None
+                return r.read()
+        except Exception as e:  # noqa: BLE001 - every trouble here only means "unknown, fetch it"
+            say(f'{type(e).__name__} {e}: no ranged read of {os.path.basename(url)}')
+            time.sleep(5 * (attempt + 1))
+    return None
 
 
 def archive_tiles(url):
@@ -117,7 +119,7 @@ def archive_tiles(url):
     entries = struct.unpack('<H', tail[at + 10:at + 12])[0]
     cd_size, cd_offset = struct.unpack('<II', tail[at + 12:at + 20])
     directory = ask(url, f'bytes={cd_offset}-{cd_offset + cd_size - 1}') if cd_size else b''
-    if len(directory) < cd_size:
+    if directory is None or len(directory) < cd_size:
         return None
     tiles = set()
     at = 0
