@@ -177,21 +177,27 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/raw/osm
-          # 'norway-latest' zeigt auf die Ausgabe des heutigen Laufs, die manchmal erst Stunden
-          # später dasteht; dann ist sie 404 und die datierte Datei von gestern wird genommen
-          # (die Bezeichnung ist norway-<JJMMTT>.osm.pbf).
-          cands="norway-latest.osm.pbf norway-$(date -u -d 'yesterday' +%y%m%d).osm.pbf norway-$(date -u -d '2 days ago' +%y%m%d).osm.pbf"
-          for name in $cands; do
-            echo "versuche $name"
+          # norway-latest zeigt auf die Ausgabe des heutigen Laufs, die manchmal erst Stunden
+          # später dasteht (dann 404); darum die datierten Dateien der letzten Tage, und wenn
+          # Geofabrik gar nicht antwortet, der Auszug von OpenStreetMap Frankreich
+          # (dasselbe Material, ebenso ODbL).  Die Bezeichnung bei Geofabrik ist
+          # norway-<JJMMTT>.osm.pbf.
+          base=https://download.geofabrik.de/europe/norway
+          urls="$base/norway-latest.osm.pbf \
+                $base/norway-$(date -u -d 'yesterday' +%y%m%d).osm.pbf \
+                $base/norway-$(date -u -d '2 days ago' +%y%m%d).osm.pbf \
+                https://download.openstreetmap.fr/extracts/europe/norway.osm.pbf"
+          for url in $urls; do
+            echo "versuche $url"
             for try in 1 2 3 4 5; do
               if curl -fL --connect-timeout 60 --retry 3 --retry-delay 30 --retry-all-errors \
-                   -o data/raw/osm/tmp.pbf "https://download.geofabrik.de/europe/norway/$name" \
+                   -o data/raw/osm/tmp.pbf "$url" \
                  && test "$(stat -c %s data/raw/osm/tmp.pbf)" -gt 100000000; then
                 mv data/raw/osm/tmp.pbf data/raw/osm/norway-latest.osm.pbf
-                echo "$name genommen"
+                echo "$url genommen"
                 break 2
               fi
-              echo "Versuch $try: $name nicht geholt"
+              echo "Versuch $try: $url nicht geholt"
               sleep 30
             done
           done
