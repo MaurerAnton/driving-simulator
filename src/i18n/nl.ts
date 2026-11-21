@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "Naar achteren kijken (houden)",
   "tbReset": "Terug op de weg",
   "turnAround": "Omkeren",
+  "tbClose": "Sluiten",
   "tbMenu": "Pauze · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "Ματιά πίσω (κράτα)",
   "tbReset": "Πίσω στον δρόμο",
   "turnAround": "Γύρισμα",
+  "tbClose": "Κλείσιμο",
   "tbMenu": "Παύση · μενού",
 
   // Key reminder at the bottom of the screen (one or two words each)

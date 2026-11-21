@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "Nhìn ra sau (giữ)",
   "tbReset": "Trở lại đường",
   "turnAround": "Quay đầu xe",
+  "tbClose": "Đóng",
   "tbMenu": "Tạm dừng · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

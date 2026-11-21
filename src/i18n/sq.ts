@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "Shiko mbrapa (mbaje)",
   "tbReset": "Kthehu në rrugë",
   "turnAround": "Kthehu",
+  "tbClose": "Mbyll",
   "tbMenu": "Pauzë · menyja",
 
   // Key reminder at the bottom of the screen (one or two words each)

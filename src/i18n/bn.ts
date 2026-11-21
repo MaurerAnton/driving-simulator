@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "পেছনে দেখুন (চেপে ধরুন)",
   "tbReset": "আবার রাস্তায়",
   "turnAround": "গাড়ি ঘোরান",
+  "tbClose": "বন্ধ করুন",
   "tbMenu": "বিরতি · মেনু",
 
   // Key reminder at the bottom of the screen (one or two words each)

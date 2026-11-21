@@ -410,6 +410,7 @@ kbd {
 .touch .more[hidden] { display: none; }
 .touch .mb { padding: 11px 8px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.07); color: var(--text); font: inherit; font-size: 14px; }
 .touch .mb.on { background: var(--accent); color: #111; border-color: var(--accent); }
+.touch .mb.mb-close { background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 18px; }
 /* with the fingers on the screen: the map moves to the top row, left of the signs (the pedals, gears and
    handbrake have the right-hand side), a compact speed strip, no fault counter */
 .hud.touchmode .map { right: 214px; top: 8px; bottom: auto; width: 96px; height: 96px; }

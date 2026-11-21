@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "後ろを見る（長押し）",
   "tbReset": "道路に戻す",
   "turnAround": "向きを変える",
+  "tbClose": "閉じる",
   "tbMenu": "ポーズ · メニュー",
 
   // Key reminder at the bottom of the screen (one or two words each)

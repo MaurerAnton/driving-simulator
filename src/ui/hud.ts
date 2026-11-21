@@ -2551,6 +2551,15 @@ export class Hud {
       this.onPause();
     };
     more.append(menu);
+    // (a way out of the sheet without choosing anything: close it)
+    const close = el('button', 'mb mb-close', '✕');
+    close.type = 'button';
+    close.title = this.t('tbClose');
+    close.setAttribute('aria-label', this.t('tbClose'));
+    close.onclick = () => {
+      more.hidden = true;
+    };
+    more.append(close);
     this.moreBox = more;
     const dots = el('button', 'tb more-btn', '⋯');
     dots.title = this.t('tbMore');

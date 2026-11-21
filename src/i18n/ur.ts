@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "پیچھے دیکھیں (دبائے رکھیں)",
   "tbReset": "واپس سڑک پر",
   "turnAround": "گاڑی موڑیں",
+  "tbClose": "بند کریں",
   "tbMenu": "وقفہ · مینو",
 
   // Key reminder at the bottom of the screen (one or two words each)

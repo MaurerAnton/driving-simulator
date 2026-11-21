@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "뒤 보기(길게 누르기)",
   "tbReset": "도로로 복귀",
   "turnAround": "방향 바꾸기",
+  "tbClose": "닫기",
   "tbMenu": "일시 중지 · 메뉴",
 
   // Key reminder at the bottom of the screen (one or two words each)

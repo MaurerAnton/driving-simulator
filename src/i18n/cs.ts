@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "Pohled dozadu (podržet)",
   "tbReset": "Zpět na silnici",
   "turnAround": "Otočit se",
+  "tbClose": "Zavřít",
   "tbMenu": "Pauza · menu",
 
   // Key reminder at the bottom of the screen (one or two words each)

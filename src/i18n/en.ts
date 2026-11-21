@@ -1623,6 +1623,7 @@ const dict: Dict = {
   "tbReset": "Back on the road",
   "turnAround": "Turn around",
   "tbMenu": "Pause · menu",
+  "tbClose": "Close",
 
   // Key reminder at the bottom of the screen (one or two words each)
   "kr.gear": "gear",

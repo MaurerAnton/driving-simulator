@@ -1616,6 +1616,7 @@ const dict: Dict = {
   "tbLookBack": "Nézz hátra (tartsd)",
   "tbReset": "Vissza az útra",
   "turnAround": "Fordulás",
+  "tbClose": "Bezárás",
   "tbMenu": "Szünet · menü",
 
   // Key reminder at the bottom of the screen (one or two words each)
