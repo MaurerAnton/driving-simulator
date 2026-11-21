@@ -1561,6 +1561,7 @@ const dict: Dict = {
 
   // On-screen controls (short labels)
   "tbGas": "ΓΚΑΖΙ",
+  "tbClutch": "ΣΥΜΠΛΟΚΗ",
   "tbBrake": "ΦΡΕΝΟ",
   "tbIndLeft": "Φλας αριστερά",
   "tbIndRight": "Φλας δεξιά",

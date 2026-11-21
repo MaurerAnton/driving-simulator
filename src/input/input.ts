@@ -88,7 +88,7 @@ export class Input {
   private gearMax = 6;
   /** touch state, written by the on-screen controls */
   /** the controls on the screen: the steering bar (and, flying, its height: the stick pulled or pushed, + pulled), the pedals */
-  touch = { active: false, steer: 0, pitch: 0, throttle: 0, brake: 0 };
+  touch = { active: false, steer: 0, pitch: 0, throttle: 0, brake: 0, clutch: 0 };
   /**
    * What the driver is using right now: fingers on the screen or keys.
    * It follows the last real input, so a tablet with a keyboard works both ways.
@@ -710,7 +710,7 @@ export class Input {
       c.steer = analogSteer(this.feel, c.steer, this.touch.steer, absSpeed, dt, 4);
       c.throttle = this.touch.throttle;
       c.brake = this.touch.brake;
-      c.clutch = 0;
+      c.clutch = this.touch.clutch;
     } else {
       c.device = 'keyboard';
       const left = !fly && this.key('KeyA', 'ArrowLeft');

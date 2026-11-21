@@ -1561,6 +1561,7 @@ const dict: Dict = {
 
   // On-screen controls (short labels)
   "tbGas": "GAS",
+  "tbClutch": "SPOJKA",
   "tbBrake": "KOČNICA",
   "tbIndLeft": "Pokazivač smjera lijevo",
   "tbIndRight": "Pokazivač smjera desno",

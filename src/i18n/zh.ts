@@ -1561,6 +1561,7 @@ const dict: Dict = {
 
   // On-screen controls (short labels)
   "tbGas": "油门",
+  "tbClutch": "离合器",
   "tbBrake": "刹车",
   "tbIndLeft": "左转向灯",
   "tbIndRight": "右转向灯",

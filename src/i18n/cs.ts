@@ -1561,6 +1561,7 @@ const dict: Dict = {
 
   // On-screen controls (short labels)
   "tbGas": "PLYN",
+  "tbClutch": "SPUSTKA",
   "tbBrake": "BRZDA",
   "tbIndLeft": "Blinkr vlevo",
   "tbIndRight": "Blinkr vpravo",

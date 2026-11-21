@@ -263,9 +263,19 @@ export class Hud {
   /**
    * The gearbox of the vehicle that is being driven, where it is not the one
    * of the settings: the truck's is automatic, and so is the car's on a
-   * demonstration drive.  (The key reminder goes by it.)
+   * demonstration drive.  (The key reminder goes by it, and the touch clutch
+   * shows only where there is one to press.)
    */
-  gearbox: Settings['transmission'] | null = null;
+  private _gearbox: Settings['transmission'] | null = null;
+  private clutchPedal: HTMLElement | null = null;
+  get gearbox(): Settings['transmission'] | null {
+    return this._gearbox;
+  }
+  set gearbox(v: Settings['transmission'] | null) {
+    this._gearbox = v;
+    // (a clutch pedal where there is a manual gearbox to use it on)
+    if (this.clutchPedal) this.clutchPedal.hidden = (this._gearbox ?? this.settings.transmission) !== 'manual';
+  }
   onMap: () => void = () => {};
   /** plan a demonstration drive (opens the map with its panel for that) */
   onDemo: () => void = () => {};
@@ -2549,6 +2559,9 @@ export class Hud {
       steer,
       pedal('gas', this.t('tbGas'), (v) => (input.touch.throttle = v)),
       pedal('brk', this.t('tbBrake'), (v) => (input.touch.brake = v)),
+      // (the clutch of a manual gearbox: held to change gear with the ▲▼ keys –
+      //  shown where there is a manual gearbox, hidden for an automatic)
+      (this.clutchPedal = pedal('clutch', this.t('tbClutch'), (v) => (input.touch.clutch = v))),
       key('tb ind-l', '◀', 'KeyZ', this.t('tbIndLeft')),
       key('tb ind-r', '▶', 'KeyC', this.t('tbIndRight')),
       key('tb gear-up', '▲', 'KeyE', this.t('tbGearUp')),
@@ -2560,6 +2573,8 @@ export class Hud {
       more,
     );
     this.hud.append(t);
+    // (the clutch pedal's first state: shown where there is a manual gearbox)
+    this.gearbox = this._gearbox;
     // the tip line doubles as a button: "fasten your seat belt – tap here"
     let tipHeld = '';
     const tipUp = (): void => {

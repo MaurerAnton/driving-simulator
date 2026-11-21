@@ -397,6 +397,7 @@ kbd {
 .touch .pedal { bottom: 5vh; width: 13vw; height: 36vh; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.4); display: flex; align-items: flex-end; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; padding-bottom: 8px; }
 .touch .gas { right: 3vw; background: rgba(40, 170, 90, 0.6); }
 .touch .brk { right: 18vw; background: rgba(210, 60, 60, 0.6); }
+.touch .clutch { right: 33vw; background: rgba(60, 120, 210, 0.6); }
 .touch .tb { width: 52px; height: 52px; border-radius: 50%; background: rgba(20, 28, 38, 0.75); border: 1px solid rgba(255, 255, 255, 0.45); color: #fff; font-size: 20px; font-weight: 700; padding: 0; }
 .touch .tb.on { background: var(--accent); color: #111; border-color: var(--accent); }
 .touch .ind-l { left: 3vw; bottom: calc(27vh + 8px); }
@@ -638,6 +639,7 @@ kbd { direction: ltr; unicode-bidi: isolate; }
   .hud.touchmode .touch .steer { width: min(34vw, 250px); height: min(20vh, 72px); }
   .hud.touchmode .touch .pedal { width: min(13vw, 84px); height: min(36vh, 138px); font-size: 12px; padding-bottom: 6px; }
   .hud.touchmode .touch .brk { right: calc(3vw + min(13vw, 84px) + 12px); }
+  .hud.touchmode .touch .clutch { right: calc(3vw + 2 * (min(13vw, 84px) + 12px)); }
   .hud.touchmode .touch .tb { width: 44px; height: 44px; font-size: 17px; }
   .hud.touchmode .touch .ind-l { bottom: calc(5vh + min(20vh, 72px) + 10px); }
   .hud.touchmode .touch .ind-r { left: calc(3vw + 52px); bottom: calc(5vh + min(20vh, 72px) + 10px); }

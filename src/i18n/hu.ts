@@ -1561,6 +1561,7 @@ const dict: Dict = {
 
   // On-screen controls (short labels)
   "tbGas": "GÁZ",
+  "tbClutch": "KUPPLUNG",
   "tbBrake": "FÉK",
   "tbIndLeft": "Irányjelző balra",
   "tbIndRight": "Irányjelző jobbra",
