@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automaticky (při dotyku zapnuto, s klávesnicí vypnuto)",
   "tcOn": "vždy zobrazit",
   "tcOff": "nikdy nezobrazovat",
+  "tiltSteer": "Řízení nakláněním telefonu (nakloňte ho doleva nebo doprava k zatáčení)",
   "touchOpacity": "Krytí ovládacích prvků",
   "keyHints": "Při rozjezdu zobrazit přehled kláves",
   "showFps": "Zobrazit snímky za sekundu (FPS)",

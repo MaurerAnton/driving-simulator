@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automatike (aktive me prekje, joaktive me tastierë)",
   "tcOn": "shfaq gjithmonë",
   "tcOff": "mos shfaq kurrë",
+  "tiltSteer": "Drejto duke pjerrëzuar telefonin (pjerrëzoje majtas ose djathtas për të kthyer)",
   "touchOpacity": "Opaciteti i komandave",
   "keyHints": "Shfaq kujtesën e tasteve gjatë nisjes",
   "showFps": "Shfaq kuadrot për sekondë (FPS)",

@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "otomatis (aktif saat layar disentuh, mati jika memakai keyboard)",
   "tcOn": "selalu tampilkan",
   "tcOff": "jangan pernah tampilkan",
+  "tiltSteer": "Belok dengan memiringkan ponsel (miringkan ke kiri atau kanan untuk belok)",
   "touchOpacity": "Opasitas kontrol",
   "keyHints": "Tampilkan pengingat tombol saat mulai berjalan",
   "showFps": "Tampilkan laju bingkai per detik (FPS)",

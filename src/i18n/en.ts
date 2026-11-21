@@ -1186,6 +1186,7 @@ const dict: Dict = {
   "tcOn": "always show",
   "tcOff": "never show",
   "touchOpacity": "Opacity of the controls",
+  "tiltSteer": "Steer by tilting the phone (turn it left or right to steer)",
   "keyHints": "Show the key reminder when pulling away",
   "showFps": "Show frames per second (FPS)",
   "wasm": "Faster computing (WebAssembly)",

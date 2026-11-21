@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "otomatik (dokunulunca açık, klavyeyle kapalı)",
   "tcOn": "her zaman göster",
   "tcOff": "hiç gösterme",
+  "tiltSteer": "Telefonu eğerek yönlendirme (dönmek için sola veya sağa eğ)",
   "touchOpacity": "Kontrollerin opaklığı",
   "keyHints": "Kalkışta tuş hatırlatıcısını göster",
   "showFps": "Saniyedeki kare sayısını göster (FPS)",

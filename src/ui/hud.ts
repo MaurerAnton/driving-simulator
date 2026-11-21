@@ -278,6 +278,8 @@ export class Hud {
   /** where the vehicle is (for the search for addresses: what lies near comes first) */
   where: () => { x: number; z: number } | null = () => null;
   onSettingsChanged: () => void = () => {};
+  /** the tilt steering was switched (ui/tiltsteer.ts): asked for from the toggle's gesture (iOS asks permission there) */
+  onTiltSteer: (on: boolean) => Promise<void> = async () => {};
   /** "Account / server" in the settings and "Play together" in the pause menu (net/online.ts; null: not offered) */
   onAccount: ((back: () => void) => void) | null = null;
   onTogether: (() => void) | null = null;
@@ -1195,6 +1197,21 @@ export class Hud {
     }
     select(this.t('touchControls'), s.touchControls, [['auto', this.t('tcAuto')], ['on', this.t('tcOn')], ['off', this.t('tcOff')]], (v) => (s.touchControls = v as Settings['touchControls']));
     range(this.t('touchOpacity'), s.touchOpacity, (v) => (s.touchOpacity = Math.max(0.15, v)));
+    // steer by tilting the phone: the toggle's change is the gesture iOS asks its permission on
+    {
+      const row = el('div', 'row');
+      const c = el('input');
+      c.type = 'checkbox';
+      c.checked = s.tiltSteer;
+      c.onchange = () => {
+        void this.onTiltSteer(c.checked).then(() => {
+          saveSettings(s);
+          this.onSettingsChanged();
+        });
+      };
+      row.append(c, el('label', '', this.t('tiltSteer')));
+      p.append(row);
+    }
     check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
     check(this.t('showFps'), s.showFps, (v) => (s.showFps = v));
     // developer mode: which map tiles have several versions, and where the parts come from (world/partcache.ts)

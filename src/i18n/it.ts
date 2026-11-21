@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automatico (attivi al tocco, disattivati con la tastiera)",
   "tcOn": "mostra sempre",
   "tcOff": "non mostrare mai",
+  "tiltSteer": "Sterzare inclinando il telefono (inclinalo a sinistra o destra per sterzare)",
   "touchOpacity": "Opacità dei comandi",
   "keyHints": "Mostra il promemoria dei tasti alla partenza",
   "showFps": "Mostra i fotogrammi al secondo (FPS)",

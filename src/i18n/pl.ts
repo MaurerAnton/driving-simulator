@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automatycznie (włączone po dotknięciu, wyłączone przy klawiaturze)",
   "tcOn": "zawsze pokazuj",
   "tcOff": "nigdy nie pokazuj",
+  "tiltSteer": "Skręcanie przez przechylenie telefonu (przechyl w lewo lub w prawo, aby skręcić)",
   "touchOpacity": "Krycie przycisków sterowania",
   "keyHints": "Pokazuj ściągę klawiszy przy ruszaniu",
   "showFps": "Pokazuj liczbę klatek na sekundę (FPS)",

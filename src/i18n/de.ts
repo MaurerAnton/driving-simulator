@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automatisch (bei Berührung an, bei Tastatur aus)",
   "tcOn": "immer anzeigen",
   "tcOff": "nie anzeigen",
+  "tiltSteer": "Lenken durch Neigen des Telefons (nach links oder rechts neigen zum Lenken)",
   "touchOpacity": "Deckkraft der Bedienelemente",
   "keyHints": "Tastenhilfe beim Anfahren einblenden",
   "showFps": "Bilder pro Sekunde (FPS) anzeigen",

@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automatski (uključeno na dodir, isključeno uz tipkovnicu)",
   "tcOn": "uvijek prikaži",
   "tcOff": "nikad ne prikazuj",
+  "tiltSteer": "Upravljanje naginjanjem telefona (nagni ga lijevo ili desno za skretanje)",
   "touchOpacity": "Neprozirnost kontrola",
   "keyHints": "Prikaži podsjetnik za tipke pri polasku",
   "showFps": "Prikaži broj sličica u sekundi (FPS)",

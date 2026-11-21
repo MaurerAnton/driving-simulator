@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automat (activ la atingere, inactiv cu tastatura)",
   "tcOn": "afișează mereu",
   "tcOff": "nu afișa niciodată",
+  "tiltSteer": "Conducere înclinând telefonul (înclinați-l la stânga sau la dreapta ca să virați)",
   "touchOpacity": "Opacitatea comenzilor",
   "keyHints": "Afișează tastele utile la plecarea de pe loc",
   "showFps": "Afișează cadrele pe secundă (FPS)",

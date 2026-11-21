@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automatique (activées au toucher, désactivées avec un clavier)",
   "tcOn": "toujours afficher",
   "tcOff": "ne jamais afficher",
+  "tiltSteer": "Diriger en inclinant le téléphone (inclinez-le à gauche ou à droite pour diriger)",
   "touchOpacity": "Opacité des commandes",
   "keyHints": "Afficher le rappel des touches au démarrage",
   "showFps": "Afficher le nombre d’images par seconde (FPS)",

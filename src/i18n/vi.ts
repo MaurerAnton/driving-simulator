@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "tự động (bật khi chạm, tắt khi dùng bàn phím)",
   "tcOn": "luôn hiện",
   "tcOff": "không bao giờ hiện",
+  "tiltSteer": "Lái bằng cách nghiêng điện thoại (nghiêng trái hoặc phải để lái)",
   "touchOpacity": "Độ đậm của nút điều khiển",
   "keyHints": "Hiện nhắc phím khi bắt đầu chạy",
   "showFps": "Hiện số khung hình mỗi giây (FPS)",

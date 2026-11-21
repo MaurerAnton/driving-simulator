@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "自动（触摸时显示，使用键盘时隐藏）",
   "tcOn": "始终显示",
   "tcOff": "从不显示",
+  "tiltSteer": "倾斜手机转向（向左或向右倾斜即可转向）",
   "touchOpacity": "按钮不透明度",
   "keyHints": "起步时显示按键提示",
   "showFps": "显示帧率（FPS）",

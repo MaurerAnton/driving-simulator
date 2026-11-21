@@ -457,6 +457,12 @@ export class Input {
     this.touch.active = true;
   }
 
+  /** Let go of the on-screen controls (the tilt steering was switched off): the keys take over again. */
+  untouched(): void {
+    this.touch.active = false;
+    this.touch.steer = 0;
+  }
+
   /** A button on the screen stands in for a key (down / up). */
   press(code: string, down: boolean): void {
     this.mode = 'touch';

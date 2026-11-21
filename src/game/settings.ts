@@ -198,6 +198,12 @@ export interface Settings {
   touchControls: 'auto' | 'on' | 'off';
   /** how solid the on-screen controls are drawn, 0.15 … 1 */
   touchOpacity: number;
+  /**
+   * steer by tilting the phone (DeviceOrientation; ui/tiltsteer.ts): turned left/right
+   * turns the vehicle instead of the on-screen steering bar.  Off unless the player asks
+   * for it – a phone without the sensors, or in a pocket, must not steer.
+   */
+  tiltSteer: boolean;
   /** short reminder of the keys while standing or crawling (keyboard only) */
   keyHints: boolean;
   /** show how many pictures a second are drawn (FPS) in a corner of the screen */
@@ -299,6 +305,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reality: { panoramax: false, kartaview: false, mapillary: false, mapillaryToken: '', aerial: true },
   touchControls: 'auto',
   touchOpacity: 0.55,
+  tiltSteer: false,
   keyHints: true,
   showFps: false,
   startOutside: false,
@@ -343,6 +350,7 @@ function merge(parsed: Partial<Settings>): Settings {
   if (!RUN_SPEEDS.includes(s.runSpeed)) s.runSpeed = d.runSpeed;
   if (typeof s.steerSensitivity !== 'number' || !Number.isFinite(s.steerSensitivity)) s.steerSensitivity = d.steerSensitivity;
   else s.steerSensitivity = Math.min(2, Math.max(0.5, s.steerSensitivity));
+  if (typeof s.tiltSteer !== 'boolean') s.tiltSteer = d.tiltSteer;
   if (s.footView !== 'eyes' && s.footView !== 'behind') s.footView = d.footView;
   if (!(['auto', 'classic', 'tank', 'tap'] as const).includes(s.walkControls)) s.walkControls = d.walkControls;
   if (typeof s.teleportTap !== 'boolean') s.teleportTap = d.teleportTap;

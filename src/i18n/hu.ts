@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automatikus (érintésre be, billentyűzettel ki)",
   "tcOn": "mindig látszik",
   "tcOff": "soha nem látszik",
+  "tiltSteer": "Kormányzás a telefon döntésével (döntsd balra vagy jobbra a kormányzáshoz)",
   "touchOpacity": "A kezelőszervek átlátszatlansága",
   "keyHints": "Billentyűsúgó megjelenítése elinduláskor",
   "showFps": "Képkockasebesség (FPS) megjelenítése",

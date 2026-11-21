@@ -62,6 +62,7 @@ import type { CarVisualState } from '../render/car.ts';
 import { PropRenderer } from '../render/props.ts';
 import { SignRenderer } from '../render/signs.ts';
 import { SignalTimers } from '../ui/signaltimers.ts';
+import { TiltSteer } from '../ui/tiltsteer.ts';
 import { QueueLabels } from '../ui/queuelabels.ts';
 import { TimedRules, loadExtraSigns } from '../world/extrasigns.ts';
 import type { ExtraSigns } from '../world/extrasigns.ts';
@@ -474,6 +475,8 @@ export class Game {
    * which start the full programme (handbrake on, released by the driver).
    */
   private spawnHold = false;
+  /** steering by tilting the phone (settings: tiltSteer, ui/tiltsteer.ts) – null while off */
+  private tilt: TiltSteer | null = null;
   private targetIdx = 0;
   /** the road a lesson began on (its number in the map: the road itself may be dropped and loaded again on the way), or -1 */
   private homeEdge = -1;
@@ -955,6 +958,7 @@ export class Game {
     // the driven path is written down now and then; make sure the last stretch is, too
     window.addEventListener('pagehide', () => this.path.save());
     this.hud.onSettingsChanged = () => this.applySettings();
+    this.hud.onTiltSteer = (on) => this.setTiltSteer(on);
     this.hud.onTileVersion = (tile, part, when) => this.onTileVersion(tile, part, when);
     this.rules.onViolation = (v) => {
       this.hud.toast(v);
@@ -1293,6 +1297,35 @@ export class Game {
     const opts = { fetch: 'repo' as const, repo: this.settings.devMapRepo, budgetMb: this.settings.devMapRam };
     this.regionParts = new PartCache(opts, sourceFor('repo', opts, this.app.baseUrl));
     return { id: region.id, source };
+  }
+
+  /**
+   * Steering by tilting the phone (settings: tiltSteer): on, the phone's left/right
+   * tilt drives input.touch.steer instead of the on-screen bar; off, it stops and
+   * centres the steer.  `on` is asked for from a gesture (the settings toggle), where
+   * iOS asks its permission (ui/tiltsteer.ts).
+   */
+  private async setTiltSteer(on: boolean): Promise<void> {
+    if (!on) {
+      this.tilt?.stop();
+      this.tilt = null;
+      // (the tilt was the control: let go of it – the screen or the keys take over again)
+      this.input.untouched();
+      this.settings.tiltSteer = false;
+      return;
+    }
+    if (this.tilt) return;
+    const tilt = new TiltSteer((steer) => (this.input.touch.steer = steer));
+    const ok = await tilt.start();
+    if (!ok) {
+      // (no sensors, or the permission refused: the setting goes back off)
+      this.settings.tiltSteer = false;
+      return;
+    }
+    this.tilt = tilt;
+    // (the tilt is the control now: the input reads touch.steer while it is on, without a touch)
+    this.input.touched();
+    this.settings.tiltSteer = true;
   }
 
   /**

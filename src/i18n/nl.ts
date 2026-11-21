@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automatisch (aan bij aanraken, uit bij toetsenbord)",
   "tcOn": "altijd tonen",
   "tcOff": "nooit tonen",
+  "tiltSteer": "Sturen door de telefoon te kantelen (kantel hem links of rechts om te sturen)",
   "touchOpacity": "Dekking van de bedieningselementen",
   "keyHints": "Toetsenhulp tonen bij het wegrijden",
   "showFps": "Beelden per seconde (FPS) tonen",

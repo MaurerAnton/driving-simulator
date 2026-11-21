@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "automático (ligados ao tocar, desligados com teclado)",
   "tcOn": "mostrar sempre",
   "tcOff": "nunca mostrar",
+  "tiltSteer": "Dirigir inclinando o teófono (inclina-o à esquerda ou à direita para virar)",
   "touchOpacity": "Opacidade dos comandos",
   "keyHints": "Mostrar a ajuda das teclas ao arrancar",
   "showFps": "Mostrar imagens por segundo (FPS)",

@@ -1179,6 +1179,7 @@ const dict: Dict = {
   "tcAuto": "자동(터치하면 켜짐, 키보드를 쓰면 꺼짐)",
   "tcOn": "항상 표시",
   "tcOff": "표시 안 함",
+  "tiltSteer": "폰을 기울여 조향하기 (왼쪽이나 오른쪽으로 기울여 조향)",
   "touchOpacity": "조작 버튼 불투명도",
   "keyHints": "출발할 때 키 안내 표시",
   "showFps": "초당 프레임 수(FPS) 표시",
