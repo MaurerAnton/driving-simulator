@@ -325,5 +325,13 @@ jobs:
             echo "Versuch $try: Release $tag wurde nicht angelegt"
             sleep 30
           done
-          gh release view "$tag" --json tagName --jq .tagName
-          echo "release $tag"
+          # In diesem Repository ist gh release create gelegentlich verwehrt (HTTP 403
+          # „Resource not accessible by integration", bei anderen Bögen gemessen).  Ein
+          # verwehrtes Release darf Stunden von Bau nicht wegwerfen: das Paket liegt als
+          # Artefakt mappack-at oben und kann von Hand mit gh release create nachgelegt
+          # werden.  Darum hier kein harter Fehlschlag, sondern ein Vermerk.
+          if gh release view "$tag" --json tagName --jq .tagName; then
+            echo "release $tag"
+          else
+            echo "::warning::Release $tag wurde nicht angelegt – Paket liegt im Artefakt mappack-at"
+          fi
