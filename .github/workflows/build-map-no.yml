@@ -177,12 +177,23 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/raw/osm
-          for try in 1 2 3 4 5; do
-            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors --connect-timeout 60 \
-              -o data/raw/osm/norway-latest.osm.pbf \
-              https://download.geofabrik.de/europe/norway/norway-latest.osm.pbf && break
-            echo "Versuch $try: OpenStreetMap nicht geholt"
-            sleep 30
+          # 'norway-latest' zeigt auf die Ausgabe des heutigen Laufs, die manchmal erst Stunden
+          # später dasteht; dann ist sie 404 und die datierte Datei von gestern wird genommen
+          # (die Bezeichnung ist norway-<JJMMTT>.osm.pbf).
+          cands="norway-latest.osm.pbf norway-$(date -u -d 'yesterday' +%y%m%d).osm.pbf norway-$(date -u -d '2 days ago' +%y%m%d).osm.pbf"
+          for name in $cands; do
+            echo "versuche $name"
+            for try in 1 2 3 4 5; do
+              if curl -fL --connect-timeout 60 --retry 3 --retry-delay 30 --retry-all-errors \
+                   -o data/raw/osm/tmp.pbf "https://download.geofabrik.de/europe/norway/$name" \
+                 && test "$(stat -c %s data/raw/osm/tmp.pbf)" -gt 100000000; then
+                mv data/raw/osm/tmp.pbf data/raw/osm/norway-latest.osm.pbf
+                echo "$name genommen"
+                break 2
+              fi
+              echo "Versuch $try: $name nicht geholt"
+              sleep 30
+            done
           done
           test -s data/raw/osm/norway-latest.osm.pbf
           ls -l data/raw/osm
