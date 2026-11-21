@@ -50,7 +50,7 @@ on:
         description: OpenStreetMap-Ausschnitt von openstreetmap.fr (Region, zu der das Rechteck gehört)
         type: choice
         default: piemonte
-        options: [piemonte, lombardia, liguria, valle_aosta, italy]
+        options: [piemonte, lombardia, liguria, valle_aosta, toscana, emilia_romagna, veneto, trentino_alto_adige, italy]
       tag:
         description: 'Name des Releases (leer: karte-it-<Datum>-<Lauf>)'
         type: string
@@ -204,9 +204,11 @@ jobs:
           set -euo pipefail
           mkdir -p data/raw/osm
           # Geofabrik hält Nordwestitalien nicht als eigene Datei (nur ganz Italien); die regionalen
-          # Ausschnitte liegen bei openstreetmap.fr benannt nach ihrer Region
-          # (piemonte-latest.osm.pbf, nachgemessen am 19.11.2026: valle_aosta 21 MB, liguria
-          # 87 MB, piemonte 240 MB, lombardia 357 MB), ODbL 1.0, kein Schlüssel.
+          # Ausschnitte liegen bei openstreetmap.fr benannt nach ihrer Region (toskana:
+          # toscana-latest.osm.pbf, Emilia-Romagna und Trentino-Südtirol mit Unterstrich:
+          # emilia_romagna-latest.osm.pbf), ODbL 1.0, kein Schlüssel.  Nachgemessen am 19.11.2026:
+          # valle_aosta 21 MB, liguria 87 MB, piemonte 240 MB, lombardia 357 MB,
+          # emilia_romagna 215 MB, toscana 215 MB, veneto 282 MB.
           url="https://download.openstreetmap.fr/extracts/europe/italy/$OSM-latest.osm.pbf"
           echo "$url"
           # der erste Versuch kann schon am Verbinden scheitern (im bw-Lauf 44786351824 Exit 7) –
