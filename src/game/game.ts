@@ -1269,6 +1269,7 @@ export class Game {
    */
   private async chosenRegion(): Promise<LoadedRegion | null> {
     const id = this.settings.region;
+    this.regionParts = null; // (no region until one is found)
     if (!id) return null;
     const index = await loadRegionIndex(true, 'map-assets/');
     const region: Region | null = index ? index.regions.find((r) => r.id === id) ?? null : null;
@@ -1280,6 +1281,10 @@ export class Game {
       { repo: this.settings.devMapRepo, ref: 'main', dir: 'map-assets' },
       'map-assets/',
     );
+    // the region's tiles are in map-assets as parts: a cache of them, so the
+    // renderer can fetch them whatever devMap says (the region's own tiles)
+    const opts = { fetch: 'repo' as const, repo: this.settings.devMapRepo, budgetMb: this.settings.devMapRam };
+    this.regionParts = new PartCache(opts, sourceFor('repo', opts, this.app.baseUrl));
     return { id: region.id, source };
   }
 
@@ -1296,8 +1301,21 @@ export class Game {
       this.versioned = new Set();
       this.labelTile = '';
       this.pendingParts.clear();
-      useTileSource(null); // (the tiles come from the site again, as always)
       this.hud.setTileVersions('', []);
+      // a chosen region's tiles come from its parts (independent of devMap):
+      // the site's files are the fallback for anything the parts do not hold
+      if (this.regionParts) {
+        const cache = this.regionParts;
+        useTileSource(async (path) => {
+          if (path.endsWith('.fsb') || /^\d+_\d+$/.test(path)) {
+            const got = await cache.tile(path.replace(/\.fsb$/, ''));
+            return got ? got.bytes : null;
+          }
+          return null; // (the region's map.json/net/w come from regionFiles, not here)
+        }, this.app.baseUrl);
+        return;
+      }
+      useTileSource(null); // (the tiles come from the site again, as always)
       return;
     }
     const opts = { fetch: s.devMapFetch, repo: s.devMapRepo, budgetMb: s.devMapRam, onProgress: (share: number) => this.hud.setAssetProgress(share) };
@@ -5049,6 +5067,8 @@ export class Game {
   private worldTap: WorldTap | null = null;
   /** the parts of map-assets in memory (developer mode, settings: devMap) – null while off */
   private parts: PartCache | null = null;
+  /** the parts holding the chosen region's tiles (a region loads them regardless of devMap) – null while none */
+  private regionParts: PartCache | null = null;
   /** which tiles ever had several versions (from the index) – where the corner label may show */
   private versioned: Set<string> = new Set();
   /** the index of map-assets, read once on load (the update check of Module H) */
