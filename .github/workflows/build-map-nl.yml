@@ -175,10 +175,20 @@ jobs:
           df -h /
       - name: OpenStreetMap (Geofabrik, Provinz)
         run: |
+          set -euo pipefail
           mkdir -p data/raw/osm
           p=${{ inputs.province }}
-          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
-            "https://download.geofabrik.de/europe/netherlands/$p/$p-latest.osm.pbf"
+          base="https://download.geofabrik.de/europe/netherlands/$p"
+          # Der kleine Ausschnitt ist …/<Provinz>/<Provinz>-latest.osm.pbf (die flache Adresse
+          # ohne die zweite Ebene ist 404).  "-latest" führt auf eine Tagesdatei, die es
+          # mitunter noch nicht gibt (dann 404) – darum als zweiter Weg die neueste
+          # Tagesdatei, die das Verzeichnis ausweist.
+          if ! curl -fsSL --retry 5 --retry-delay 20 --retry-all-errors -o "$OSM" \
+              "$base/$p-latest.osm.pbf"; then
+            newest=$(curl -fsSL "$base/" | grep -oE "$p-[0-9]{6}\.osm\.pbf" | sort -u | tail -1)
+            echo "-latest fehlt, weiche auf $newest aus"
+            curl -fsSL --retry 5 --retry-delay 20 --retry-all-errors -o "$OSM" "$base/$newest"
+          fi
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
