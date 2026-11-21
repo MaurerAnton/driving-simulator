@@ -1,0 +1,268 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte einer Gegend im Nordosten Frankreichs (Elsaß, Lothringen, Franche-Comté)
+# und legt sie als Kartenpaket in ein Release (map.tar.00, map.tar.01, … – was das Spiel
+# unter Einstellungen → Karte lädt).
+#
+# Warum das hier läuft: ein Bau braucht mehrere Gigabyte Platte und mehr Speicher, als ein
+# Notebook hat; ein Läufer von GitHub hat 4 CPUs, 16 GB Speicher und ~14 GB Platte, und seine
+# Minuten sind für ein öffentliches Repository frei.  Die Karte geht nie über GitHub Pages
+# (dort sind es 1 GB): Releases haben keine Größenbeschränkung.
+#
+# Starten: Actions → "Karte Frankreich Nordost" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (RGE ALTI 5 m, IGN/Géoplateforme)              -> data/work/dgm2
+#   2. OpenStreetMap, auf die Region geschnitten               -> npm run map:extract
+#   3. Straßennetz und Kacheln                                 -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Keine Gebäudemodelle: das IGN gibt seine 3D-Gebäude nur gegen einen Schlüssel heraus
+# (wxs.ign.fr) – anders als in Deutschland und den Niederlanden gibt es in Frankreich kein
+# offenes 3D-Gebäudemodell ohne Schlüssel.  Die Gebäude dieser Karte kommen deshalb aus
+# OpenStreetMap (Wohnumrisse, die der Kartenbau aus dem Fußabdruck hochzieht); amtlich ist
+# allein das Gelände.
+#
+# Auch keine Fahrpläne: die Fahrplanwerkzeuge lesen die deutschen Feeds von gtfs.de; ein
+# offener französischer Feed (transport.data.gouv.fr) ist dort nicht angebunden.
+#
+# Die Region ist ein Rechteck aus UTM32-Kilometerquadraten (EPSG:25832), dasselbe Gitter, nach
+# dem die Kacheln benannt sind: 376_5290 ist das Quadrat, in dem das Rathaus von Mulhouse
+# steht.  Ein Rechteck nach dem anderen: zwei Abläufe dürfen kein Kilometerquadrat gemeinsam
+# haben.  Das Gelände liefert das IGN in Lambert-93 (EPSG:2154) und nach Départements
+# verpackt; tools/fetch-fr.py rechnet das Rechteck um und holt, was es braucht.
+
+name: Karte Frankreich Nordost
+
+on:
+  workflow_dispatch:
+    inputs:
+      east_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Osten (UTM32, EPSG:25832)'
+        type: string
+        default: '369'
+      east_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Osten'
+        type: string
+        default: '383'
+      north_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Norden'
+        type: string
+        default: '5283'
+      north_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Norden'
+        type: string
+        default: '5297'
+      label:
+        description: Name der Karte (steht im Spiel und im map.json)
+        type: string
+        default: 'Mülhausen und Umgebung'
+      tag:
+        description: 'Name des Releases (leer: karte-fr-mulhouse-<Datum>)'
+        type: string
+        default: ''
+      region:
+        description: 'Geofabrik-Region unter europe/france, aus der OpenStreetMap kommt'
+        type: choice
+        options: [alsace, lorraine, franche-comte]
+        default: 'alsace'
+      dept:
+        description: 'Départements, aus denen das Gelände kommt (leer: das Skript fragt geo.api.gouv.fr)'
+        type: string
+        default: ''
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: das Gelände des IGN – das Holen
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      # py7zr, weil das IGN seine Blätter als .7z liefert; numpy und Pillow für das Raster
+      - run: pip install --quiet numpy pillow py7zr
+      # Was ein früherer Lauf schon geholt hat: das Skript läßt liegen, was da ist, und holt
+      # nur, was fehlt (die Quadrate unter data/work/dgm2).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name="geodata-fr"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          echo "Artefakt von Lauf $RUN: $id"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2
+      # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
+      # Kacheln von 500 m eine andere Karte hat; tools/fetch-fr.py läßt sie aus.
+      - name: Index der schon veröffentlichten Karten
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 20 \
+            -o "$RUNNER_TEMP/published-index.json" \
+            https://raw.githubusercontent.com/${{ github.repository }}/main/map-assets/index.json
+          python3 -c "import json;d=json.load(open('$RUNNER_TEMP/published-index.json'));print('Kacheln in anderen Karten:',len({t for f in d['files'] for t in f['tiles']}))"
+      - name: Gelände (RGE ALTI 5 m, IGN) holen
+        env:
+          BOX_E: ${{ inputs.east_from }}..${{ inputs.east_to }}
+          BOX_N: ${{ inputs.north_from }}..${{ inputs.north_to }}
+          DEPT: ${{ inputs.dept }}
+        run: |
+          set -euo pipefail
+          # --dept ist wiederholbar ('68 67'); leer bestimmt das Skript sie selbst
+          depts=""
+          for d in $DEPT; do depts="$depts --dept $d"; done
+          python3 -I tools/fetch-fr.py --east "$BOX_E" --north "$BOX_N" $depts \
+            --published "$RUNNER_TEMP/published-index.json" \
+            --on-overlap skip --jobs 4 --gaps data/work/gaps.txt
+          du -sh data/work/dgm2
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste
+      # Lauf kann mit geodata_run hier weiterfahren
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-fr
+          path: data/work/dgm2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    env:
+      # Die Werkzeuge lesen sonst data/raw/osm/hessen-latest.osm.pbf – jedes von ihnen
+      # bekommt die Datei dieser Region ausdrücklich.
+      OSM: data/raw/osm/${{ inputs.region }}-latest.osm.pbf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-fr
+          path: data/work
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, Frankreich)
+        run: |
+          mkdir -p data/raw/osm
+          p=${{ inputs.region }}
+          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
+            "https://download.geofabrik.de/europe/france/$p/$p-latest.osm.pbf"
+          ls -l data/raw/osm
+      # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
+      # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
+      # Vorgängerkarte, deren Bytes stehen bleiben müßten.
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract -- "$OSM"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        env:
+          DETAIL_REGION: all
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Tankstellen
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
+          npm run map:far
+          npm run map:services -- "$OSM"
+      # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
+      # die hessische Verwaltung; beides wird hier berichtigt.  Der Wortlaut der
+      # Namensnennung ist der, den das IGN selbst nennt: die Metadaten des Bezugsverzeichnisses
+      # und die Lizenzdatei im Archiv schreiben „Licence Ouverte / Open Licence" (ETALAB).
+      - name: Der Name der Karte und ihre Quellenzeilen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            j.meta.attribution = [
+              "Straßennetz, Verkehrsregelung, Flächennutzung, Gebäude: © OpenStreetMap-Mitwirkende (ODbL 1.0)",
+              "Gelände (RGE ALTI, 5 m): © IGN (2021), Licence Ouverte / Open Licence (ETALAB) [Daten bearbeitet]",
+            ];
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      - name: Kartenpaket hochheben (ehe das Release es will)
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-fr
+          path: data/work/map.tar.*
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          BOX: ${{ inputs.east_from }}..${{ inputs.east_to }} / ${{ inputs.north_from }}..${{ inputs.north_to }}
+          REGION: ${{ inputs.region }}
+        run: |
+          set -euo pipefail
+          tag="${WANTED:-karte-fr-${REGION}-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL für den Fahrsimulator – im Spiel unter Einstellungen → Karte laden (Kartenpaket).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (ODbL 1.0, Auszug $REGION von Geofabrik) und dem
+          Geländemodell RGE ALTI des IGN in 5 m, das die Géoplateforme ohne Schlüssel und ohne
+          Anmeldung herausgibt (https://data.geopf.fr/telechargement/).  Deren Lizenz heißt, wie in
+          den Metadaten und in der Lizenzdatei des Archivs vermerkt: „Licence Ouverte / Open Licence"
+          (ETALAB).
+          Rechteck aus Kilometerquadraten (UTM32): $BOX.
+
+          Gebäude: **keine** amtlichen 3D-Gebäudemodelle.  Das IGN gibt die französischen
+          3D-Gebäude nur gegen einen Schlüssel heraus (wxs.ign.fr); anders als in Deutschland und
+          den Niederlanden gibt es in Frankreich kein offenes Modell ohne Schlüssel.  Die Gebäude
+          dieser Karte sind deshalb aus OpenStreetMap hochgezogene Umrisse – amtlich ist allein
+          das Gelände.
+
+          Fahrpläne: keine.  Die Fahrplanwerkzeuge lesen die deutschen Feeds von gtfs.de; ein
+          offener französischer Feed ist dort nicht angebunden.
+          EOF
+          # (ein verwehrtes gh release create darf Stunden von Bau nicht wegwerfen: das Paket
+          #  liegt schon als Artefakt oben; hier ein zweiter Versuch nach einer Weile)
+          for versuch in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+                 --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Release $tag ging schief (Versuch $versuch); noch einmal in 60 s"
+            sleep 60
+          done
+          echo "release $tag"
