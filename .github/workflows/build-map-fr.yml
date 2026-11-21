@@ -196,11 +196,11 @@ jobs:
           mkdir -p data/raw/osm
           base="https://download.geofabrik.de/europe/france/$REGION"
           url="$base/$REGION-latest.osm.pbf"
-          probe() { curl -fsSL --retry 5 --retry-delay 20 --retry-all-errors -r 0-1023 -o /dev/null "$1"; }
+          probe() { curl -fsSL --retry 12 --retry-delay 25 --retry-all-errors -r 0-1023 -o /dev/null "$1"; }
           if ! probe "$url"; then
             echo "$url gibt es nicht – neueste Tagesausgabe suchen"
-            tage=$(curl -fsSL --retry 5 --retry-delay 20 --retry-all-errors "$base/" \
-                   | grep -oE "$REGION-[0-9]{6}\.osm\.pbf" | grep -oE "[0-9]{6}" | sort -u | tac)
+            tage=$(curl -fsSL --retry 12 --retry-delay 25 --retry-all-errors "$base/" 2>/dev/null \
+                   | grep -oE "$REGION-[0-9]{6}\.osm\.pbf" | grep -oE "[0-9]{6}" | sort -u | tac || true)
             # antwortet das Verzeichnis einmal nicht: die letzten acht Tage von selbst
             if [ -z "$tage" ]; then
               echo "kein Verzeichnis – die letzten acht Tage versuchen"
