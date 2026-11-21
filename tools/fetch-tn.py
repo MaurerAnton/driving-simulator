@@ -127,12 +127,25 @@ def tile_keys(east, north):
 
 
 def curl_code(url, dest, extra=()):
-    """Download with curl (resumes a partial file); its exit code comes back."""
+    """Download with curl into a file of its own; only a whole file is put in place.
+
+    Nothing is continued: a half file resumed onto another half file was the one tile that
+    broke a whole run.
+    """
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    return subprocess.call(
-        ['curl', '-fsSL', '-A', AGENT, '-C', '-', '--retry', '3', '--connect-timeout', '30',
-         '-o', dest, *extra, url]
+    part = dest + '.part'
+    if os.path.exists(part):
+        os.remove(part)
+    code = subprocess.call(
+        ['curl', '-fsSL', '-A', AGENT, '--retry', '3', '--retry-delay', '10',
+         '--connect-timeout', '30', '-o', part, *extra, url]
     )
+    if code != 0:
+        if os.path.exists(part):
+            os.remove(part)
+        return code
+    os.replace(part, dest)
+    return 0
 
 
 def curl_to(url, dest, attempts=5):
@@ -141,9 +154,6 @@ def curl_to(url, dest, attempts=5):
         code = curl_code(url, dest)
         if code == 0:
             return True
-        # 33: the server would not resume – start again
-        if code == 33 and os.path.exists(dest):
-            os.remove(dest)
         say(f'[tn] curl meldet {code} für {os.path.basename(dest)}; noch einmal')
         time.sleep(10 * (attempt + 1))
     return False
@@ -176,19 +186,26 @@ def source_of(north):
 
 
 def read_asc(path):
-    """One ESRI ASCII grid: 1000 rows of 1000 cells of 0.5 m, the first row the northern one."""
+    """One ESRI ASCII grid: 1000 rows of 1000 cells of 0.5 m, the first row the northern one.
+
+    None: the file is no grid – which happens when the server answers with an error page or
+    with a torn file.
+    """
     import numpy as np
     head = {}
     with open(path) as f:
         for _ in range(6):
             line = f.readline().split()
             if len(line) == 2:
-                head[line[0]] = float(line[1])
+                # some sheets write NCOLS, others ncols
+                head[line[0].lower()] = float(line[1])
         a = np.array(' '.join(f).split(), dtype=np.float32)
     rows = int(head.get('nrows', 0))
     cols = int(head.get('ncols', 0))
-    if rows * cols != a.size:
-        raise RuntimeError(f'{path}: header says {rows} x {cols}, found {a.size} cells')
+    if rows * cols != a.size or rows == 0:
+        say(f'[tn] {os.path.basename(path)} ist kein Blatt ({rows} x {cols} geschrieben, '
+            f'{a.size} Zahlen gefunden)')
+        return None
     return a.reshape(rows, cols)
 
 
@@ -201,19 +218,31 @@ def trento_sheets(east, north, tmp):
             south = (north * 1000 + dz * 500) // 100
             url = ASC % (west, south)
             dest = os.path.join(tmp, f'5h{west:04d}{south:05d}.asc')
-            if not curl_to(url, dest) and missing(url):
+            cells = None
+            for tries in range(3):
+                if curl_to(url, dest, attempts=3) and os.path.exists(dest):
+                    cells = read_asc(dest)
+                    if cells is not None:
+                        break
+                    say(f'[tn] Blatt {west}_{south} noch einmal (Versuch {tries + 2})')
+                    os.remove(dest)
+                elif missing(url):
+                    say(f'[tn] {east}_{north}: Blatt {west}_{south} liegt nicht im Dienst '
+                        f'(dort ist nicht beflogen)')
+                    return None
+                time.sleep(10 * (tries + 1))
+            if cells is None:
+                say(f'[tn] {east}_{north}: Blatt {west}_{south} kam drei Mal unbrauchbar '
+                    f'– die Kachel bleibt weg')
                 return None
-            if not os.path.exists(dest) or os.path.getsize(dest) < 1000:
-                say(f'[tn] {url} kam leer an')
-                return None
-            sheets.append(((dx, dz), dest))
+            sheets.append(((dx, dz), cells))
     return sheets
 
 
 def trento_grid(sheets):
     """Four sheets of 500 m → 2000 x 2000 cells of 0.5 m, rows from north to south."""
     import numpy as np
-    cells = {key: read_asc(path) for key, path in sheets}
+    cells = dict(sheets)
     north = np.concatenate([cells[(0, 1)], cells[(1, 1)]], axis=1)
     south = np.concatenate([cells[(0, 0)], cells[(1, 0)]], axis=1)
     return np.concatenate([north, south], axis=0)
@@ -477,7 +506,11 @@ def main():
     def one(item):
         product, east, north, url = item
         if product == 'dgm':
-            made = take_dgm(east, north, qualities, os.path.join(GD.TMP, f'tn-{east}_{north}'))
+            try:
+                made = take_dgm(east, north, qualities, os.path.join(GD.TMP, f'tn-{east}_{north}'))
+            except Exception as e:  # noqa: BLE001 - one tile must not end the whole run
+                say(f'[tn] {east}_{north}: {e} – diese Kachel bleibt weg')
+                return product, east, north, None
         else:
             made = take_lod2(url, east, north, args.lod2_name, os.path.join(GD.TMP, f'tn-lod2-{east}_{north}'))
         return product, east, north, made
