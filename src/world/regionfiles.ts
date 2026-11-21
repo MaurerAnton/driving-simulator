@@ -14,14 +14,13 @@
  *
  * This is a `MapFiles`: the loader asks for `map.json`, then `w/…` and
  * `net.bin.gz` by path, and the paths are the ones inside the region's folder.
- * Reading `map.json` sets the world frame (geo/utm.ts) to the region's own
- * origin, so its coordinates are its own instead of Baunatal's.
  *
- * The UTM zone is the caller's to give (the region index names it): a map.json
- * carries its origin in easting/northing but no latitude/longitude, so the zone
- * cannot be read from it.
+ * The world frame is NOT set here.  Every region – Germany and abroad alike –
+ * was built in one shared frame: origin E 528000 / N 5678000, UTM zone 32
+ * (the site's own map; geo/utm.ts).  Bremen sits at z ≈ −215000, Rethel at
+ * x ≈ −363500, all in that one frame, so the default frame serves them all and
+ * a region loads with it as the site's map does.
  */
-import { setWorldOrigin } from '../geo/utm.ts';
 import type { MapFiles } from './loader.ts';
 
 /** How a file of map-assets is had (a part's source: world/partcache.ts). */
@@ -51,27 +50,14 @@ async function inflateIfGzip(bytes: Uint8Array): Promise<ArrayBuffer> {
 
 /**
  * The loader's `MapFiles` for one region: every path asked for is read from the
- * region's folder, and the first `map.json` sets the world frame to the region's
- * origin (in `zone`).
+ * region's folder.  The world frame is left as it is – every region was built
+ * in the same shared frame (see the note above), so the default serves them.
  */
-export function regionFiles(id: string, source: RegionSource, zone = 32): MapFiles {
-  let frameSet = false;
+export function regionFiles(id: string, source: RegionSource): MapFiles {
   return {
     async bytes(path: string): Promise<ArrayBuffer | null> {
       const bytes = await source(regionPath(id, path));
       if (!bytes) return null;
-      // (the first index sets the frame: the region's origin is its own — map.json for a
-      //  map in pieces, world.json for one in one piece)
-      if (!frameSet && (path === 'map.json' || path === 'world.json')) {
-        frameSet = true;
-        try {
-          const json = JSON.parse(new TextDecoder().decode(bytes)) as { meta?: { originE?: number; originN?: number } };
-          const o = json.meta;
-          if (typeof o?.originE === 'number' && typeof o?.originN === 'number') setWorldOrigin(o.originE, o.originN, zone);
-        } catch {
-          // (an unreadable index: the loader reports it; the frame stays as it was)
-        }
-      }
       return inflateIfGzip(bytes);
     },
   };

@@ -4,12 +4,11 @@
  * as a region the game can load: its map.json, its road network and its small
  * files, under `map-assets/regions/<id>/`, plus the entry for `regions.json`.
  *
- *   node tools/build-regions.ts --map work/map --id bremen --zone 32 \
+ *   node tools/build-regions.ts --map work/map --id bremen \
  *        --name Bremen [--tiles 34.tar] [--out map-assets] [--index regions.json]
  *
  * A region is a map of its own: the game loads one at a time (world/regionfiles.ts
- * reads its files; the first index sets the world frame to its origin).  What a
- * region needs, and what this copies:
+ * reads its files).  What a region needs, and what this copies:
  *
  *   map.json              the index: extent, places, spawns, tile/chunk sets  (required)
  *   net.bin.gz            every road of it in a few numbers                  (required for a map in pieces)
@@ -20,13 +19,13 @@
  * + N.tar, made by .github/workflows/map-assets-parts.yml), and `tiles` names
  * which parts hold this region's tiles.
  *
- * `--zone` is the UTM zone the region's origin lies in: a map.json carries its
- * origin in easting/northing but no latitude/longitude, so the zone cannot be
- * read from it (the map is built in one zone; the builder knows which).
+ * Every region was built in one shared world frame (origin E 528000 / N 5678000,
+ * UTM zone 32 – the site's own map), so no origin or zone is chosen here: a
+ * region loads with the frame it was built in.
  *
  * The index entry is written into `--index` (regions.json): this region's id,
- * name, box (from map.json meta), map path, the parts that carry its tiles, and
- * its zone.  An entry with the same id is replaced; the rest are kept.
+ * name, box (from map.json meta), map path and the parts that carry its tiles.
+ * An entry with the same id is replaced; the rest are kept.
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -40,18 +39,13 @@ const value = (name: string): string | undefined => (argv.includes(name) ? argv[
 const mapDir = value('--map');
 const id = value('--id');
 if (!mapDir || !id) {
-  console.error('usage: node tools/build-regions.ts --map <map-folder> --id <region> --zone <utm-zone> [--name <name>] [--tiles <part.tar> ...] [--out <dir>] [--index <regions.json>]');
+  console.error('usage: node tools/build-regions.ts --map <map-folder> --id <region> [--name <name>] [--tiles <part.tar> ...] [--out <dir>] [--index <regions.json>]');
   process.exit(1);
 }
-const zone = Number(value('--zone'));
 const name = value('--name') ?? id;
 const out = resolve(root, value('--out') ?? 'map-assets');
 const indexPath = resolve(root, value('--index') ?? join(out, 'regions.json'));
 const tiles = argv.reduce<string[]>((acc, a, i) => (a === '--tiles' ? [...acc, argv[i + 1]] : acc), []);
-if (!Number.isFinite(zone) || zone < 1 || zone > 60) {
-  console.error(`--zone must be a UTM zone (1…60), got ${value('--zone')}`);
-  process.exit(1);
-}
 
 /** The small files a region carries when its map has them. */
 const SMALL = ['rails.json.gz', 'stops.json.gz', 'lines.json.gz', 'timetable.json.gz', 'far.bin.gz', 'air.json.gz'];
@@ -96,14 +90,13 @@ for (const f of SMALL) {
   }
 }
 
-// the index entry: this region, with its box, its map path, its tiles, its zone
+// the index entry: this region, with its box, its map path, its tiles
 const entry: Region = {
   id,
   name: typeof meta.name === 'string' && meta.name ? meta.name : name,
   box,
   map: `regions/${id}/map.json`,
   tiles,
-  zone,
 };
 let index: RegionIndex = { latest: '', regions: [] };
 if (existsSync(indexPath)) {
@@ -132,7 +125,6 @@ console.log(
     {
       id,
       name: entry.name,
-      zone,
       box,
       map_bytes: bytes(join(dest, 'map.json')),
       net_bytes: bytes(join(dest, 'net.bin.gz')),

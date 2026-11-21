@@ -49,8 +49,6 @@ export interface Region {
   map: string;
   /** the parts (files of map-assets) that carry its tiles */
   tiles: string[];
-  /** the UTM zone its coordinates are in (a map.json carries an origin but no lat/lon) */
-  zone: number;
 }
 
 /** The index of map-assets: what regions exist, which one is the default. */
@@ -88,7 +86,6 @@ export function parseRegions(json: unknown): RegionIndex | null {
     const box = Array.isArray(e.box) && e.box.length === 4 && e.box.every((n) => typeof n === 'number' && Number.isFinite(n)) ? (e.box as [number, number, number, number]) : null;
     if (!box) continue;
     const map = typeof e.map === 'string' && e.map ? e.map : regionMapPath(id);
-    const zone = typeof e.zone === 'number' && Number.isFinite(e.zone) && e.zone >= 1 && e.zone <= 60 ? Math.round(e.zone) : 32;
     seen.add(id);
     regions.push({
       id,
@@ -96,7 +93,6 @@ export function parseRegions(json: unknown): RegionIndex | null {
       box,
       map,
       tiles: Array.isArray(e.tiles) ? e.tiles.filter((t): t is string => typeof t === 'string') : [],
-      zone,
     });
   }
   const latest = typeof o.latest === 'string' && regions.some((r) => r.id === o.latest) ? o.latest : regions[0]?.id ?? '';
