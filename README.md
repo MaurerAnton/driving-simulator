@@ -175,6 +175,12 @@ Läuft im Browser, ohne Installation, ohne Konto, ohne Tracking. Freie Software 
   Stimmen, Vollbild und Anzeige ausblenden (F2). **Gemeinsam spielen:** ein eigener Server (Konten mit Zugangscode,
   Fortschritt auf allen Geräten, Fotos und 360°-Panoramen, mehrere Spieler in einer Welt) – siehe `server/`.
   In „Neu“ auch die Entwicklungsversionen 0.1.0–0.9.0 (0.8.0 und 0.9.0 spielbar) und die Größe jeder Version.
+- **Neu in 1.7.4:** Das Spiel ist nicht mehr an eine Karte gebunden: es kann **eine Region für sich
+  laden** – die Regionen von map-assets stehen in den Einstellungen neben dem Kartenpaket, eine davon
+  zu wählen lädt ihre eigenen Straßen, Orte und Ausdehnung statt die Karte der Website (eine Region ist
+  eine eigene Karte, gelesen während des Spielns, und kommt, sobald die Karten dafür veröffentlicht sind).
+  Die Weltkoordinaten sind erwachsen: eine Karte von überall kann ihren eigenen Ort benennen, und eine
+  Projektion für jede UTM-Zone liegt bereit.
 - **Neu in 1.7.3:** Das Spiel deckt nun **ganz Hessen** ab und hängt nicht mehr an einer Karte – neue
   Karten und Patches kommen als Karten-Teile, werden beim Start gesucht und mitgenommen, ohne neue
   Spielversion; ein **Entwicklermodus** zeigt an der Ecke, welche Kachel mehrere Versionen hat, und
@@ -809,6 +815,11 @@ class, from the moped to the bus with a trailer, with the tram, on foot and in a
   camera, "Teleport here", better voices, full screen and hiding the display (F2). Play together: an own server
   (accounts with access codes, progress on all devices, photos and 360° panoramas, several players in one world) –
   see `server/`. "What's new" lists the development versions 0.1.0–0.9.0 and every version's size.
+- **New in 1.7.4:** the game is no longer tied to one map: it can **load a region of its own** – the
+  regions of map-assets are listed in the settings beside the map pack; choosing one loads its own
+  streets, places and extent instead of the website's map (a region is one map of its own, read while
+  playing, and arrives as the maps for it are published). The world's coordinates grew up: a map
+  anywhere can name its own place, and a projection for every UTM zone is ready.
 - **New in 1.7.3:** the game now covers **all of Hesse** and no longer depends on one map – new maps
   and patches arrive as map parts, are looked for at startup and taken up without a new game version;
   a **developer mode** shows in the corner which tile has several versions and lets one be loaded (now
