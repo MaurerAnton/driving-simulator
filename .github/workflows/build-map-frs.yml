@@ -1,0 +1,298 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Builds the map of one rectangle of south-eastern France and puts it into a release as a
+# map pack (map.tar.00, map.tar.01, … – what the game loads in its settings, src/ui/mappacks.ts).
+#
+# The sources are key-free open data of the French national mapping agency on the Géoplateforme
+# (Licence Ouverte / Open Licence 2.0): the terrain model RGE ALTI® as a height raster over WMS
+# and the buildings of BD TOPO® V3 over WFS; both are cut to the kilometre square by
+# tools/fetch-frs.py.  Nothing needs a key, an account or a registration.
+#
+# Start it by hand: Actions → "Karte Südostfrankreich" → Run workflow.
+#
+# The order is the one of docs/MAP_DATA.md:
+#   1. terrain (RGE ALTI) and buildings (BD TOPO) of the rectangle -> data/work/dgm2, data/work/lod2
+#   2. OpenStreetMap, cut to the rectangle                         -> npm run map:extract
+#   3. road network and tiles                                      -> npm run map:build
+#   4. addresses, stops, tram and bus lines, signs, far view, timetables, services
+#   5. packed into parts of 100 MB, uploaded to a release
+#
+# Two jobs, so that a network error while fetching does not lose the build, and so that each
+# part has six hours to itself.
+
+name: Karte Südostfrankreich
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: Name der Karte (erscheint im Spiel und im Release)
+        type: string
+        default: Lyon
+      east_from:
+        description: Rechteck – Ostkilometer von (UTM32)
+        type: number
+        default: 170
+      east_to:
+        description: Rechteck – Ostkilometer bis
+        type: number
+        default: 184
+      north_from:
+        description: Rechteck – Nordkilometer von
+        type: number
+        default: 5069
+      north_to:
+        description: Rechteck – Nordkilometer bis
+        type: number
+        default: 5083
+      osm:
+        description: Geofabrik-Auszug, der das Rechteck enthält (Rhône-Alpes für Lyon und Grenoble, PACA für Marseille und Nizza)
+        type: choice
+        default: rhone-alpes
+        options: [rhone-alpes, paca]
+      tag:
+        description: 'Name des Releases (leer: karte-fr-<label>-<Datum>-r<Lauf>)'
+        type: string
+        default: ''
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        # build-timetable.ts lädt seine Fahrplandaten von gtfs.de (Deutschland).  Für französische
+        # Betriebe findet sich dort nichts – die Straßenbahnen und Busse bekommen also aller
+        # Voraussicht nach keinen Fahrplan, die Linien selbst aber sehr wohl.  Wer einen
+        # französischen Feed hat, trägt ihn hier ein; dann füllt sich auch der Fahrplan.
+        default: 'SNCF|TER|Transdev|Keolis|Zou|Sytral|RTM|Lignes'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: '^(?!.*)^\b$'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+        type: string
+        default: ''
+      lod2_name:
+        description: Verzeichnis unter data/work/lod2 für Gebäude, die in keiner Gemeinde liegen
+        type: string
+        default: Frankreich
+
+permissions:
+  contents: write
+  actions: read   # artefacts of an earlier run (geodata_run)
+
+jobs:
+  # 1: the open geodata – terrain height raster and building footprints of the rectangle
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      # map-assets/ is 2.8 GB of map packs that neither job reads; only the parts run does.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy
+      # Was ein früherer Lauf schon geholt hat: das Skript lässt liegen, was da ist, und holt nur,
+      # was fehlt (die .done-Marken unter data/work/dgm2 und data/work/lod2).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          echo "Artefakte von Lauf $RUN:"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=geodata" --jq '.artifacts[0].id')
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/geodata.zip
+          ls -l /tmp/geodata.zip
+          # Im Artefakt liegen die Kacheln als dgm2/… und lod2/… (beim Hochladen zweier Pfade
+          # bleibt nur deren gemeinsamer Vorfahr weg, data/work) – also nach data/work.
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" /tmp/geodata.zip
+          du -sh data/work/dgm2 data/work/lod2
+      # Zwei Karten dürfen dieselbe Kachel von 500 m nicht beide enthalten: der Index der schon
+      # veröffentlichten Karten sagt, welche das sind (652 kB, aus dem API statt mit ausgecheckt).
+      - name: Index der veröffentlichten Karten
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          url=$(gh api "repos/$GITHUB_REPOSITORY/contents/map-assets/index.json" --jq .download_url 2>/dev/null || true)
+          if [ -n "${url:-}" ] && curl -fsSL -o map-assets-index.json "$url"; then
+            echo "index: $(wc -c < map-assets-index.json) Bytes"
+          else
+            echo "kein Index zu haben – ohne --published"
+          fi
+      - name: Gelände (RGE ALTI) und Gebäude (BD TOPO) holen
+        env:
+          E0: ${{ inputs.east_from }}
+          E1: ${{ inputs.east_to }}
+          N0: ${{ inputs.north_from }}
+          N1: ${{ inputs.north_to }}
+          NAME: ${{ inputs.lod2_name }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -s map-assets-index.json ]; then
+            args+=(--published map-assets-index.json --on-overlap skip)
+          fi
+          # die Géoplateforme bricht eine Verbindung schon einmal ab; das Skript überspringt, was
+          # daliegt, ein neuer Versuch kostet also nur das Warten
+          attempt=1
+          waits=(60 300 900)
+          while :; do
+            if python3 -I tools/fetch-frs.py --east "$E0..$E1" --north "$N0..$N1" --jobs 4 \
+                 --lod2-name "$NAME" --gaps gaps.txt "${args[@]}"; then
+              break
+            fi
+            if [ "$attempt" -gt "${#waits[@]}" ]; then
+              echo "alle Versuche sind gescheitert" >&2
+              exit 1
+            fi
+            echo "Versuch $attempt gescheitert – Stand: $(du -sh data/work/dgm2 | cut -f1) Gelände, $(du -sh data/work/lod2 | cut -f1) Gebäude"
+            echo "warte $((waits[attempt - 1] / 60)) min"
+            sleep "${waits[attempt - 1]}"
+            attempt=$((attempt + 1))
+          done
+          du -sh data/work/dgm2 data/work/lod2
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste Lauf
+      # kann mit geodata_run hier weiterfahren (.done-Marken müssen mit hoch)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata
+          path: |
+            data/work/dgm2
+            data/work/lod2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, the build, and the release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata
+          # dito: the artefact holds dgm2/… and lod2/…, without data/work
+          path: data/work
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          ls data/work
+          du -sh data/work/dgm2 data/work/lod2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, kleinster Auszug über dem Rechteck)
+        env:
+          OSM: ${{ inputs.osm }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/raw/osm
+          case "$OSM" in
+            rhone-alpes) url=https://download.geofabrik.de/europe/france/rhone-alpes/rhone-alpes-latest.osm.pbf ;;
+            paca)        url=https://download.geofabrik.de/europe/france/provence-alpes-cote-d-azur/provence-alpes-cote-d-azur-latest.osm.pbf ;;
+            *) echo "kein solcher Auszug: $OSM" >&2; exit 1 ;;
+          esac
+          curl -fsSL --retry 5 --retry-delay 20 -o data/raw/osm/france-latest.osm.pbf "$url"
+          ls -l data/raw/osm
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract -- data/raw/osm/france-latest.osm.pbf
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        env:
+          DETAIL_REGION: all
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          DETAIL_REGION: all
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- data/raw/osm/france-latest.osm.pbf
+          npm run map:buslines -- data/raw/osm/france-latest.osm.pbf
+          npm run map:signs -- data/raw/osm/france-latest.osm.pbf
+          npm run map:far
+          npm run map:timetable
+          npm run map:services -- data/raw/osm/france-latest.osm.pbf
+      - name: Der Name der Karte und ihre Quellen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+        run: |
+          node -e 'const fs=require("fs"),p="public/map/map.json";const j=JSON.parse(fs.readFileSync(p,"utf8"));
+          j.meta.name=process.env.NAME;
+          j.meta.attribution=[
+            "Straßennetz, Verkehrsregelung, Flächennutzung: © OpenStreetMap-Mitwirkende (ODbL 1.0)",
+            "Gelände RGE ALTI® und Gebäude BD TOPO® V3: IGN – Géoplateforme (https://data.geopf.fr), Licence Ouverte / Open Licence 2.0"
+          ];
+          fs.writeFileSync(p,JSON.stringify(j));
+          console.log(j.meta.name,"-",j.nodes,"Knoten,",j.edges,"Kanten");console.log(j.meta.attribution.join(" | "))'
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      # Ein verweigertes gh release create darf Stunden von Bauen nicht wegwerfen.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: map-${{ inputs.label }}
+          path: data/work/map.tar.*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          E0: ${{ inputs.east_from }}
+          E1: ${{ inputs.east_to }}
+          N0: ${{ inputs.north_from }}
+          N1: ${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          label=$(echo "$LABEL" | tr ' ' '-')
+          tag="${WANTED:-karte-fr-$label-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL (Frankreich) für den Fahrsimulator – im Spiel unter Einstellungen → Karte laden
+          (Kartenpaket).  Gebaut am $(date -u +%F) aus einem Rechteck von Ost $E0–$E1 km, Nord $N0–$N1 km (UTM32).
+
+          Quellen und Lizenzen:
+          * Straßennetz, Verkehrsregelung, Flächennutzung: © OpenStreetMap-Mitwirkende, ODbL 1.0
+            (https://www.openstreetmap.org/copyright), Auszug von Geofabrik (https://download.geofabrik.de)
+          * Gelände: RGE ALTI® – IGN, Géoplateforme (https://data.geopf.fr), 1 m-Raster über WMS,
+            Licence Ouverte / Open Licence 2.0 (https://www.etalab.gouv.fr/licence-ouverte-open-licence)
+          * Gebäude: BD TOPO® V3 – IGN, Géoplateforme (https://data.geopf.fr), WFS BDTOPO_V3:batiment,
+            Licence Ouverte / Open Licence 2.0.  DieModelle sind Grundrisse mit echter First-, Trauf- und
+            Geländehöhe, aber ohne Dachform: jedes Dach ist eine Fläche über dem Umriss.
+            Ein Verzeichnis je Gemeinde, damit die OSM-Umrisse nicht zusätzlich hochgezogen werden.
+
+          Bekannte Lücken: keine Fahrpläne (build-timetable.ts kennt nur gtfs.de, also Deutschland), und
+          am Rand des Rechtecks fehlen Gebäude, deren Schwerpunkt in der Nachbarkachel liegt.
+
+          Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
+          zusammengesetzt.
+          EOF
+          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+            --notes-file notes.md data/work/map.tar.*
+          echo "release $tag"
