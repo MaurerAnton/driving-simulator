@@ -211,7 +211,25 @@ jobs:
       - name: Kartenpaket 2/4 – Straßennetz und Kacheln
         env:
           DETAIL_REGION: all
-        run: npm run map:build -- --jobs 3
+        run: |
+          set -euo pipefail
+          # Ein Block – die Innenstadt mit ihren tausenden Gebäudemodellen – braucht mehr
+          # Speicher, als drei Blöcke zugleich bekommen (der Läufer hat 16 GB).  Darum erst
+          # zwei zugleich; und was dann noch fehlt, einzeln mit großem Haufen, danach der
+          # Index (map.json) aus allen Blöcken.
+          if ! npm run map:build -- --jobs 2; then
+            missing=$(node -e '
+              const fs = require("fs");
+              const p = JSON.parse(fs.readFileSync("data/work/graph/plan.json", "utf8"));
+              console.log(p.blocks.filter(([x, z]) => !fs.existsSync(`data/work/graph/r_${x}_${z}.json`))
+                .map(([x, z]) => `${x}_${z}`).join(" "));
+            ')
+            echo "fehlende Blöcke einzeln: $missing"
+            for b in $missing; do
+              node --max-old-space-size=10240 tools/build-tiles.ts "$b"
+            done
+            npm run map:build -- --resume --jobs 1
+          fi
       - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Tankstellen
         run: |
           npm run map:addresses
