@@ -204,6 +204,8 @@ export interface Settings {
   mapOnScreen: boolean;
   /** the map: '' the site's, else the id of a map stored in this browser from files (world/mappack.ts) */
   mapPack: string;
+  /** the region: '' the site's own map, else the id of a region in map-assets (world/regions.ts) – loaded instead of the site's map */
+  region: string;
   /** a tap on the vehicle's screen in the driver's seat: the big map, or the map back in the corner of the HUD (another tap: on the screen again) */
   screenTap: 'bigmap' | 'minimap';
   /** when a zoomed view (on foot, in the driver's seat) goes back by itself once let go (input/camzoom.ts) */
@@ -295,6 +297,7 @@ export const DEFAULT_SETTINGS: Settings = {
   placeExact: false,
   mapOnScreen: true,
   mapPack: '',
+  region: '',
   screenTap: 'bigmap',
   zoomRelease: 'auto',
   insideMirror: { mode: 'car', shift: 0, size: 1, fx: 0.5, fy: 0.09 },
@@ -377,6 +380,7 @@ function merge(parsed: Partial<Settings>): Settings {
   if (typeof s.placeExact !== 'boolean') s.placeExact = d.placeExact;
   if (typeof s.mapOnScreen !== 'boolean') s.mapOnScreen = d.mapOnScreen;
   if (typeof s.mapPack !== 'string') s.mapPack = d.mapPack;
+  if (typeof s.region !== 'string') s.region = d.region;
   if (s.screenTap !== 'bigmap' && s.screenTap !== 'minimap') s.screenTap = d.screenTap;
   if (!ZOOM_RELEASES.includes(s.zoomRelease)) s.zoomRelease = d.zoomRelease;
   if (s.wasm !== 'auto' && s.wasm !== 'off') s.wasm = d.wasm;
@@ -432,6 +436,7 @@ export function resetSettings(s: Settings): Settings {
   r.lang = s.lang;
   r.lastStart = { ...s.lastStart };
   r.mapPack = s.mapPack;
+  r.region = s.region;
   r.fuelKey = s.fuelKey;
   r.server = s.server;
   r.reality.mapillaryToken = s.reality.mapillaryToken;

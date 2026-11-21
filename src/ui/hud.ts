@@ -37,6 +37,7 @@ import { playVersionButton, versionSettings } from './versionpicker.ts';
 import { voiceSettings } from './voicesettings.ts';
 import { speech } from '../audio/speech.ts';
 import { mapPackSettings } from './mappacks.ts';
+import { regionSettings } from './regions.ts';
 
 /** the weathers and seasons one may choose, and the names of each */
 export const WEATHER_CHOICES: ReadonlyArray<Settings['weather']> = ['real', 'off', 'cloudy', 'fog', 'drizzle', 'rain', 'snow', 'storm'];
@@ -1272,10 +1273,10 @@ export class Hud {
       if (!v) speech.stop();
     });
     p.append(voiceBox);
-    // the version of the game (an earlier one is a page of its own: ui/versionpicker.ts) and the map (one stored from files: ui/mappacks.ts)
+    // the version of the game (an earlier one is a page of its own: ui/versionpicker.ts), the map (one stored from files: ui/mappacks.ts) and the region (ui/regions.ts)
     {
       const when = new Intl.DateTimeFormat(localeOf(this.lang), { dateStyle: 'medium', timeStyle: 'short' });
-      p.append(versionSettings((k, v) => this.t(k, v), (iso) => when.format(new Date(iso))), mapPackSettings(s, (k, v) => this.t(k, v), localeOf(this.lang)));
+      p.append(versionSettings((k, v) => this.t(k, v), (iso) => when.format(new Date(iso))), mapPackSettings(s, (k, v) => this.t(k, v), localeOf(this.lang)), regionSettings(s, (k, v) => this.t(k, v)));
     }
     // the server: an account, the progress kept there, photos, playing together (ui/netpanels.ts)
     if (this.onAccount) {
