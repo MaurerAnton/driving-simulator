@@ -153,11 +153,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Das Paket hält nur die Quadrate (ein Pfad beim Hochheben), also genau dorthin ablegen
       - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
         uses: actions/download-artifact@v4
         with:
           name: geodata-luxemburg
-          path: data/work
+          path: data/work/dgm2
       - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
         run: |
           du -sh data/work/dgm2
