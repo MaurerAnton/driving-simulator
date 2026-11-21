@@ -3,16 +3,27 @@
  * The fuel gauge of the HUD's dashboard strip: a pump, and beside it a bar
  * that shows how full the tank is – amber and the pump lit, as the lamp of
  * an instrument cluster, once the reserve is reached.  A vehicle without a
- * tank (the tram, on foot) shows none.
+ * tank (the tram, on foot) shows none.  The exact amount is in the tooltip
+ * as a percentage to three decimals ("Fuel — 9.536%") and in the bar's
+ * accessible name.
  */
+
+/** The tank's share (0 … 1) as a percentage to three decimals: "9.536". */
+export function fuelPercent(share: number): string {
+  if (!Number.isFinite(share)) return '0.000';
+  return (Math.max(0, Math.min(1, share)) * 100).toFixed(3);
+}
 export class FuelGauge {
   readonly el: HTMLElement;
   private readonly bar: HTMLElement;
   private shown = '';
-
+  private readonly title: string;
+  private readonly lowTitle: string;
   constructor(title: string, lowTitle: string) {
     this.el = document.createElement('span');
     this.el.className = 'fuel';
+    this.title = title;
+    this.lowTitle = lowTitle;
     this.el.title = title;
     this.el.dataset.low = lowTitle;
     this.el.innerHTML =
@@ -23,13 +34,19 @@ export class FuelGauge {
 
   /** How full the tank is (0 … 1; undefined: no tank), and whether the reserve is reached. */
   update(share: number | undefined, low: boolean): void {
-    const key = share === undefined ? '' : `${Math.round(share * 100)}|${low ? 1 : 0}`;
+    // (the key carries the exact percentage: the tooltip changes when it does)
+    const pct = share === undefined ? '' : fuelPercent(share);
+    const key = share === undefined ? '' : `${pct}|${low ? 1 : 0}`;
     if (key === this.shown) return;
     this.shown = key;
     this.el.hidden = share === undefined;
     if (share === undefined) return;
-    this.bar.style.width = `${Math.max(0, Math.min(100, share * 100)).toFixed(0)}%`;
+    const n = Math.max(0, Math.min(100, share * 100));
+    this.bar.style.width = `${n.toFixed(0)}%`;
     this.el.classList.toggle('low', low);
-    this.el.setAttribute('aria-label', low ? (this.el.dataset.low ?? '') : this.el.title);
+    // the exact amount: "Fuel — 9.536%" ("Fuel low …" when the reserve is reached)
+    const exact = `${pct}%`;
+    this.el.title = `${low ? this.lowTitle : this.title} — ${exact}`;
+    this.el.setAttribute('aria-label', this.el.title);
   }
 }
