@@ -107,7 +107,10 @@ jobs:
           echo "Artefakt von Lauf $RUN: $id"
           curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
-          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          # Ein Artefakt mit genau einem Pfad legt dessen Inhalt an die Wurzel (die 225
+          # .dgm liegen also lose in der Zip), deshalb hier nach data/work/dgm2.
+          mkdir -p data/work/dgm2
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work/dgm2')" "/tmp/$name.zip"
           du -sh data/work/dgm2
       # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
       # Kacheln von 500 m eine andere Karte hat; tools/fetch-be.py läßt sie aus.
