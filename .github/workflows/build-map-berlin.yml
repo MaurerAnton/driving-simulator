@@ -1,0 +1,276 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Baut die Karte eines Teils von Berlin und legt sie als Kartenpaket in ein Release
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte lädt).
+#
+# Warum das hier läuft: ein Bau braucht mehrere Gigabyte Platte und mehr Speicher, als ein
+# Notebook hat; ein Läufer von GitHub hat 4 CPUs, 16 GB Speicher und ~14 GB Platte, und seine
+# Minuten sind für ein öffentliches Repository frei.  Die Karte geht nie über GitHub Pages
+# (dort sind es 1 GB): Releases haben keine Größenbeschränkung.
+#
+# Starten: Actions → "Karte Berlin" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (DGM1) und Gebäudemodelle (LoD2)                          -> data/work/dgm2, data/work/lod2
+#   2. OpenStreetMap, auf die Region geschnitten                          -> npm run map:extract
+#   3. Straßennetz und Kacheln                                            -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Die Region ist ein Rechteck aus UTM32-Kilometerquadraten (EPSG:25832), dasselbe Gitter, nach
+# dem die Kacheln des Landes benannt sind: 799_5828 ist das Quadrat, in dem Berlin Mitte
+# liegt.  Zwei Abläufe dürfen kein Kilometerquadrat gemeinsam haben.
+#
+# Woher die Geodaten kommen, beide offen und ohne Schlüssel:
+#   * Gelände: das DGM1 des Landes Brandenburg („Brandenburg mit Berlin“) als WCS-Kachel
+#     bb_dgm des Landesvermessung und Geobasisinformation Brandenburg (LGB),
+#     tools/fetch-berlin.py holt es Quadrat für Quadrat – in UTM32, dem Gitter der Karte.
+#   * Gebäude: die LoD2-Modelle des Geoportals Berlin, ein CityGML-File je Quadratkilometer,
+#     aus dessen ATOM-Feed; sie liegen in UTM33 und werden beim Holen umgerechnet.
+#
+# Zwei Aufträge, damit ein Netzfehler während des Holens nicht den ganzen Bau verdirbt und
+# damit jeder Teil seine sechs Stunden für sich hat.
+
+name: Karte Berlin
+
+on:
+  workflow_dispatch:
+    inputs:
+      east_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Osten (UTM32, EPSG:25832)'
+        type: string
+        default: '791'
+      east_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Osten'
+        type: string
+        default: '805'
+      north_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Norden'
+        type: string
+        default: '5821'
+      north_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Norden'
+        type: string
+        default: '5835'
+      label:
+        description: Name der Karte (steht im Spiel und im map.json)
+        type: string
+        default: 'Berlin und Umgebung'
+      tag:
+        description: 'Name des Releases (leer: karte-berlin-<Datum>-<Lauf>)'
+        type: string
+        default: ''
+      lod2_name:
+        description: 'Verzeichnis unter data/work/lod2, in das die Gebäudemodelle kommen'
+        type: string
+        default: 'Berlin'
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        # VBB = Verkehrsverbund Berlin-Brandenburg; Berlin liegt darin.
+        # Ohne diesen Eintrag bekommt keine Linie einen Fahrplan.
+        default: '^VBB\b|Verkehrsverbund Berlin-Brandenburg|BVG|S-Bahn Berlin|DB Regio'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: '^VBB\b|Verkehrsverbund Berlin-Brandenburg|BVG'
+      geodata_run:
+        description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
+
+jobs:
+  # 1: die offenen Geodaten – ein langes Holen: 225 Quadrate Gelände und die Berliner
+  # Quadrate von 1 km mit Gebäuden, jedes einzelne ein CityGML-File von ~30 MB.
+  geodata:
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # node ebenfalls: die Gebäudemodelle liest tools/lod2-extract.ts, das selbst nichts holt
+      # – das Skript gibt ihm jede Datei –, aber node_modules braucht es (saxes).
+      # Das Umrechnen der Koordinaten (UTM33 → UTM32) und das Lesen der GeoTIFF brauchen
+      # numpy und pillow.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # Was ein früherer Lauf schon geholt hat: das Skript läßt liegen, was da ist, und holt
+      # nur, was fehlt (die .done-Marken unter data/work/dgm2 und data/work/lod2).
+      - name: Vorhandene Geodaten (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
+        run: |
+          set -euo pipefail
+          name="geodata-berlin"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          echo "Artefakt von Lauf $RUN: $id"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work')" "/tmp/$name.zip"
+          du -sh data/work/dgm2 data/work/lod2
+      # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
+      # Kacheln von 500 m eine andere Karte hat; tools/fetch-berlin.py läßt sie aus.
+      - name: Index der schon veröffentlichten Karten
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 20 \
+            -o "$RUNNER_TEMP/published-index.json" \
+            https://raw.githubusercontent.com/${{ github.repository }}/main/map-assets/index.json
+          python3 -c "import json;d=json.load(open('$RUNNER_TEMP/published-index.json'));print('Kacheln in anderen Karten:',len({t for f in d['files'] for t in f['tiles']}))"
+      - name: Gelände (DGM1) und Gebäudemodelle (LoD2) holen
+        env:
+          BOX_E: ${{ inputs.east_from }}..${{ inputs.east_to }}
+          BOX_N: ${{ inputs.north_from }}..${{ inputs.north_to }}
+          NAME: ${{ inputs.lod2_name }}
+        run: |
+          set -euo pipefail
+          python3 -I tools/fetch-berlin.py --east "$BOX_E" --north "$BOX_N" \
+            --lod2-name "$NAME" --published "$RUNNER_TEMP/published-index.json" \
+            --on-overlap skip --jobs 6 --gaps data/work/gaps.txt
+          du -sh data/work/dgm2 data/work/lod2
+      # auch nach einem Fehlschlag: Stunden von Holen sind sonst verloren, und der nächste
+      # Lauf kann mit geodata_run hier weiterfahren (.done-Marken müssen mit hoch)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-berlin
+          path: |
+            data/work/dgm2
+            data/work/lod2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geodaten des Rechtecks (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-berlin
+          path: data/work
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          du -sh data/work/dgm2 data/work/lod2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      # Geofabrik schickt berlin-latest.osm.pbf erst auf den Stand der Woche weiter
+      # (HTTP 307) – darum -L.
+      - name: OpenStreetMap (Geofabrik, Berlin)
+        run: |
+          mkdir -p data/raw/osm
+          curl -fsSL --retry 5 --retry-delay 20 -o data/raw/osm/berlin-latest.osm.pbf \
+            https://download.geofabrik.de/europe/germany/berlin/berlin-latest.osm.pbf
+          ls -l data/raw/osm
+      # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
+      # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
+      # Vorgängerkarte, deren Bytes stehen bleiben müßten.
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract -- data/raw/osm/berlin-latest.osm.pbf
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        env:
+          DETAIL_REGION: all
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          # osm-extract, build-lines, build-buslines, build-signs und build-services lesen ohne
+          # Argument denselben hessischen Namen, der hier nie liegt – alle vier bekommen ihn.
+          OSM: data/raw/osm/berlin-latest.osm.pbf
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
+        run: |
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- "$OSM"
+          npm run map:buslines -- "$OSM"
+          npm run map:signs -- "$OSM"
+          npm run map:far
+          npm run map:timetable
+          npm run map:services -- "$OSM"
+      # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
+      # die hessische Verwaltung; beides wird hier berichtigt.
+      - name: Der Name der Karte und ihre Quellenzeilen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            j.meta.attribution = [
+              "Straßennetz, Verkehrsregelung, Flächennutzung: © OpenStreetMap-Mitwirkende (ODbL 1.0)",
+              "Gelände (DGM1): © GeoBasis-DE/LGB, dl-de/by-2-0; © Geoportal Berlin, dl-de/by-2-0",
+              "Gebäude (LoD2): Geoportal Berlin, Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen, dl-de/zero-2-0",
+            ];
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      # Auch wenn das Release nicht klappt: das Paket liegt dann als Artefakt bereit und die
+      # Stunden des Bauens sind nicht verloren.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: karte-berlin-paket
+          path: data/work/map.tar.*
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          BOX: ${{ inputs.east_from }}..${{ inputs.east_to }} / ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          tag="${WANTED:-karte-berlin-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL für den Fahrsimulator – im Spiel unter Einstellungen → Karte laden (Kartenpaket).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (ODbL 1.0), dem Geländemodell DGM1 des Landes
+          Brandenburg (Landesvermessung und Geobasisinformation Brandenburg / Geoportal Berlin,
+          dl-de/by-2-0) und den Gebäudemodellen LoD2 des Geoportals Berlin (Senatsverwaltung für
+          Stadtentwicklung, Bauen und Wohnen, dl-de/zero-2-0).  Rechteck aus Kilometerquadraten
+          (UTM32): $BOX.
+
+          Nur ein Rechteck Berlins: die ganze Stadt paßt nicht in eine Karte; weitere Rechtecke
+          kommen aus demselben Ablauf "Karte Berlin" mit anderen Zahlen.
+          EOF
+          # GitHub weist ein Release mitunter mit HTTP 403 ab, obwohl der Ablauf contents: write
+          # hat (so bei NRW und Rheinland-Pfalz); dann liegt das Paket schon als Artefakt bereit
+          # und der fertige Bau gilt nicht als gescheitert.
+          for try in 1 2 3; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" \
+                 --title "Karte $LABEL" --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Versuch $try: Release abgewiesen, noch einmal"
+            sleep 30
+          done
+          echo "release $tag"
