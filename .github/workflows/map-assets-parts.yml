@@ -275,6 +275,20 @@ jobs:
             first=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[-1]['n']+1)" "$RUNNER_TEMP/frag-$i.json")
             echo "$tag" >> "$RUNNER_TEMP/tags"
             echo "$RUNNER_TEMP/frag-$i.json" >> "$RUNNER_TEMP/fragments"
+            # die Region: die Karte als Region in map-assets/regions/<id>/ (map.json, net, w/, kleine Dateien)
+            # – die Region, die das Spiel lädt, wenn man sie in den Einstellungen wählt (world/regionfiles.ts).
+            # Die Karte ist noch da: die Dateien kommen, bevor work weg ist.
+            if [ -f tools/build-regions.ts ]; then
+              rid=$(echo "$tag" | sed -E 's/^karte-//; s/-[0-9]{4}-[0-9]{2}-[0-9]{2}(-r[0-9]+)?$//')
+              echo "Region: $rid (aus $tag)"
+              node tools/build-regions.ts --map "$work/map" --id "$rid" \
+                --out "$RUNNER_TEMP/region-assets" --index "$RUNNER_TEMP/regions.json" \
+                | tee "$RUNNER_TEMP/region-$i.json"
+              echo "$rid" >> "$RUNNER_TEMP/region-ids"
+              echo "$tag" >> "$RUNNER_TEMP/region-tags"
+            else
+              echo "::notice::tools/build-regions.ts liegt nicht im Repository – die Region wird nicht mitgeschrieben"
+            fi
             rm -rf "$work"
             df -h / | tail -1
           done
@@ -524,7 +538,61 @@ jobs:
             pushed=$(( pushed + 1 ))
           fi
           echo "$pushed Pushes, $(du -sh "$TARGET" | cut -f1) in $TARGET"
-          git log --oneline -n "$pushed"
+          git log --oneline -n "$pushed
+
+      # die Regionen dieses Laufs: map-assets/regions/<id>/ und regions.json – was das Spiel
+      # lädt, wenn man eine Region in den Einstellungen wählt (world/regionfiles.ts).  Die
+      # Regionen früherer Läufe bleiben: regions.json wird mit dem, was schon da ist, zusammen-
+      # gesetzt (wie der Teil-Index), und jedes regions/<id>/ wird nur überschrieben, wenn dieser
+      # Lauf es neu geschrieben hat.
+      - name: Regionen in das Repository legen (map-assets/regions/)
+        if: ${{ inputs.commit }}
+        env:
+          TARGET: ${{ inputs.commit_path }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$RUNNER_TEMP/regions.json" ]; then
+            echo "Keine Regionen in diesem Lauf – nichts zu schreiben"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --quiet origin main
+          git reset --quiet --hard origin/main
+          # die Regionen dieses Laufs: ihre Ordner
+          mkdir -p "$TARGET/regions"
+          if [ -d "$RUNNER_TEMP/region-assets/regions" ]; then
+            cp -r "$RUNNER_TEMP/region-assets/regions/." "$TARGET/regions/"
+          fi
+          # regions.json: die Einträge dieses Laufs ersetzen die gleicher ids, die übrigen bleiben
+          python3 - "$TARGET" "$RUNNER_TEMP/regions.json" <<'PY'
+          import json, os, sys
+
+          target, new_path = sys.argv[1], sys.argv[2]
+          path = os.path.join(target, 'regions.json')
+          new = json.load(open(new_path))
+          old = json.load(open(path)) if os.path.exists(path) else {'regions': []}
+          by_id = {r['id']: r for r in old.get('regions', [])}
+          for r in new.get('regions', []):
+              by_id[r['id']] = r
+          regions = list(by_id.values())
+          # latest: die Region dieses Laufs, sonst die, die schon da war
+          latest = new.get('latest') or old.get('latest') or (regions[0]['id'] if regions else '')
+          if latest not in by_id:
+              latest = regions[0]['id'] if regions else ''
+          json.dump({'latest': latest, 'regions': regions}, open(path, 'w'), indent=2, ensure_ascii=False)
+          print(f'regions.json: {len(old.get("regions", []))} von früher + {len(new.get("regions", []))} von diesem Lauf = {len(regions)}, latest {latest}')
+          PY
+          git add "$TARGET/regions" "$TARGET/regions.json"
+          if ! git diff --cached --quiet; then
+            n=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["regions"]))' "$TARGET/regions.json")
+            git commit -q -m "map-assets: regions ($n)"
+            git push --quiet origin HEAD:main
+            echo "Regionen sind im Repository ($n insgesamt)"
+            git log --oneline -n 1
+          else
+            echo "Regionen unverändert"
+          fi"
 
       # nur wenn ein Name genannt ist: die Teile in ein Release legen – von dort holt man sie
       # herunter und legt sie unter map-assets/ im Repository ab (nur so kommen sie mit CORS
