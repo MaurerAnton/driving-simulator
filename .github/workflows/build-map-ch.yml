@@ -155,11 +155,18 @@ jobs:
           df -h /
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
           df -h /
-      - name: OpenStreetMap (Geofabrik, Schweiz)
+      # Zwei Quellen, weil die erste gerade nicht liegt: auf 2026-11-21 zeigte
+      # download.geofabrik.de/europe/switzerland-latest.osm.pbf auf
+      # switzerland-261120.osm.pbf, und die antwortete 404 (der Stand vom Vortag war noch nicht
+      # fertig geschrieben).  Die Auszüge von openstreetmap.fr sind dieselben Daten unter
+      # derselben Lizenz (ODbL 1.0, © OpenStreetMap-Mitwirkende); sie sind der zweite Versuch.
+      - name: OpenStreetMap (Geofabrik, Schweiz – sonst openstreetmap.fr)
         run: |
           mkdir -p data/raw/osm
           curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
-            https://download.geofabrik.de/europe/switzerland/switzerland-latest.osm.pbf
+            https://download.geofabrik.de/europe/switzerland-latest.osm.pbf \
+          || curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
+            https://download.openstreetmap.fr/extracts/europe/switzerland-latest.osm.pbf
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
