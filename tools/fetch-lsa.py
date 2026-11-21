@@ -146,11 +146,13 @@ class Http:
         self.pos = 0
         self.buf = b''
         self.buf_start = 0
-        request = urllib.request.Request(url, headers={'User-Agent': AGENT})
+        request = urllib.request.Request(url, headers={'User-Agent': AGENT, 'Range': 'bytes=0-0'})
         for attempt in range(5):
             try:
                 with urllib.request.urlopen(request, timeout=120) as r:
-                    self.size = int(r.headers['Content-Length'])
+                    # Content-Range: bytes 0-0/878507635 – the size, without pulling a gigabyte
+                    total = (r.headers.get('Content-Range') or '').split('/')[-1]
+                    self.size = int(total) if total.isdigit() else int(r.headers['Content-Length'])
                     ranges = r.headers.get('Accept-Ranges')
                 break
             except Exception:  # noqa: BLE001
@@ -200,8 +202,14 @@ class Http:
             if not (self.buf_start <= self.pos < self.buf_start + len(self.buf)):
                 self._fill(n - len(out))
             off = self.pos - self.buf_start
-            out += self.buf[off:off + (n - len(out))]
-            self.pos = min(self.size, self.pos + (n - len(out)))
+            # only as much as the buffer holds and is still wanted: an answer of the server
+            # may be shorter than asked for, and the position must then not move further
+            # than what really came in (else the rest is read from the wrong place)
+            take = min(len(self.buf) - off, n - len(out))
+            if take <= 0:
+                break
+            out += self.buf[off:off + take]
+            self.pos += take
         return out
 
     def get(self, start, length):
@@ -270,7 +278,17 @@ def read_member(handle, member):
     if head[:4] != b'PK\x03\x04':
         raise RuntimeError(f"{member['name']}: no local file header")
     name_len, extra_len = struct.unpack('<HH', head[26:30])
-    raw = handle.get(member['offset'] + 30 + name_len + extra_len, member['csize'])
+    start = member['offset'] + 30 + name_len + extra_len
+    # an answer of the server is sometimes shorter (or longer) than asked for; rather than
+    # handing a broken stream to node, read it again
+    for attempt in range(3):
+        raw = handle.get(start, member['csize'])
+        if len(raw) == member['csize']:
+            break
+        say(f"[lsa] {member['name']}: {len(raw)} of {member['csize']} compressed bytes; again")
+        time.sleep(5)
+    else:
+        raise RuntimeError(f"{member['name']}: {len(raw)} of {member['csize']} compressed bytes")
     if member['method'] == 0:
         return raw
     if member['method'] != 8:
