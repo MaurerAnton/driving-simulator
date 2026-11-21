@@ -4,11 +4,22 @@ import * as THREE from 'three';
 import { Sky } from '../render/sky.ts';
 import { TileManager } from '../render/tiles.ts';
 import { lightsOutBy } from '../sim/signals.ts';
-import { MapLoader } from '../world/loader.ts';
+import { MapLoader, type MapFiles } from '../world/loader.ts';
 import { mapFetch, siteBytes, useMapPack } from '../world/mappack.ts';
 import { applyNetDiff, unpackNetDiff } from '../world/netdiff.ts';
 import { packNet, unpackNet } from '../world/netfile.ts';
+import { regionFiles, type RegionSource } from '../world/regionfiles.ts';
 import { loadSettings } from './settings.ts';
+
+/** A region chosen to load instead of the site's own map: its files and its zone. */
+export interface LoadedRegion {
+  /** the region's id (its folder under map-assets/regions/) */
+  id: string;
+  /** how its files are had (from map-assets) */
+  source: RegionSource;
+  /** the UTM zone its coordinates are in */
+  zone: number;
+}
 
 /** The bytes of a typed array as an ArrayBuffer (what the loader is handed). */
 function toArrayBuffer(b: Uint8Array): ArrayBuffer {
@@ -55,7 +66,7 @@ export class App {
     window.addEventListener('resize', () => this.resize());
   }
 
-  async loadWorld(onProgress?: (text: string) => void): Promise<void> {
+  async loadWorld(onProgress?: (text: string) => void, region?: LoadedRegion): Promise<void> {
     onProgress?.('world');
     // the map: in one piece, or an index with the road network in chunks around the car (world/loader.ts)
     const base = this.baseUrl;
@@ -68,8 +79,12 @@ export class App {
     const share = Number.isFinite(asked) ? Math.max(0, Math.min(1, asked)) : LIGHTS_OUT;
     const today = new Date();
     const day = today.getFullYear() * 372 + today.getMonth() * 31 + today.getDate();
+    // a region chosen (settings: region) comes from map-assets beside its tiles: its own
+    // map.json/network, and its own origin sets the world frame (world/regionfiles.ts)
+    const regionFilesMap: MapFiles | null = region ? regionFiles(region.id, region.source, region.zone) : null;
     this.map = await MapLoader.open({
       async bytes(path: string): Promise<ArrayBuffer | null> {
+        if (regionFilesMap) return regionFilesMap.bytes(path);
         const res = await mapFetch(base + path + (version ? `?v=${version}` : ''), path === 'map.json' ? { cache: 'no-cache' } : undefined);
         // (not there: a 404 – or, from a development server, the start page in its place)
         if (res.status === 404 || (res.headers.get('content-type') ?? '').includes('text/html')) return null;
