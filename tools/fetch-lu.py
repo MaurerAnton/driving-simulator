@@ -555,6 +555,14 @@ def main():
         col1 = max(w[1] for w in windows.values())
         row0 = max(0, min(w[2] for w in windows.values()))
         row1 = min(raster['high'] - 1, max(w[3] for w in windows.values()) - 1)
+        if row1 < row0:
+            # The whole row of the rectangle lies outside the raster (south of the
+            # Grand Duchy or north of it): say so and go on instead of asking for a
+            # window of negative height.
+            for east, north in band:
+                say(f'[lu] {east}_{north}: outside the raster - no height')
+                gaps.append(f'{east}_{north}')
+            continue
         window = read_window(raster, row0, row1, col0, col1)
         for east, north in band:
             if not (0 <= windows[(east, north)][2] and windows[(east, north)][3] <= raster['high']
