@@ -200,16 +200,29 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/raw/osm
-          # kleinster Ausschnitt mit dem Rechteck: Geofabrik hält Österreich nur als ganzes Land
-          # (austria-latest.osm.pbf, 816 MB am 21.11.2026), ODbL 1.0, kein Schlüssel
-          url="https://download.geofabrik.de/europe/$OSM-latest.osm.pbf"
-          echo "$url"
-          # der erste Versuch kann schon am Verbinden scheitern – curl nimmt das nicht als
-          # Fehler zum Wiederholen, darum die Schleife
-          for try in 1 2 3 4 5; do
-            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors --connect-timeout 60 \
-              -o "$OSM_FILE" "$url" && break
-            echo "Versuch $try: $url nicht geholt"
+          # Kleinster Ausschnitt mit dem Rechteck: Geofabrik hält Österreich nur als ganzes
+          # Land – die Bundesländer (vorarlberg-latest.osm.pbf, tirol-latest.osm.pbf, …)
+          # antworten mit 404 (nachgemessen am 21.11.2026).  ODbL 1.0, kein Schlüssel.
+          #
+          # Die Adresse „…-latest" zeigt derzeit auf austria-261120.osm.pbf, das der Server
+          # (noch) nicht hat – genau wie bei der Schweiz am selben Tag.  Darum werden die
+          # Stände der letzten sieben Tage durchprobiert und erst danach auf den Spiegel von
+          # openstreetmap.fr (974 MB, Stand 19.11.2026, dieselben Daten, dieselbe Lizenz)
+          # zurückgefallen.
+          urls="https://download.geofabrik.de/europe/$OSM-latest.osm.pbf"
+          for back in 0 1 2 3 4 5 6 7; do
+            urls="$urls https://download.geofabrik.de/europe/$OSM/$OSM-$(date -u -d "-$back day" +%y%m%d).osm.pbf"
+          done
+          urls="$urls https://download.openstreetmap.fr/extracts/europe/$OSM-latest.osm.pbf"
+          for try in 1 2 3; do
+            for url in $urls; do
+              rm -f "$OSM_FILE"
+              echo "Versuch: $url"
+              curl -fsSL --retry 3 --retry-delay 30 --retry-all-errors --connect-timeout 60 \
+                -o "$OSM_FILE" "$url" && break 2
+              rm -f "$OSM_FILE"
+            done
+            echo "Runde $try: keine der Adressen hat geliefert"
             sleep 30
           done
           test -s "$OSM_FILE"
