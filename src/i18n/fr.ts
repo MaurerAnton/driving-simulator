@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "Tout supprimer",
   "demoNone": "Aucune destination pour l’instant.",
   "demoRunning": "La voiture roule seule · destination {n} sur {max} · braquez ou freinez pour reprendre la main",
+  "autoStop": "Arrêter le pilote automatique",
   "demoTaken": "C’est vous qui conduisez",
   "demoTakenSub": "Vous pouvez relancer la conduite commentée depuis la carte.",
   "demoHeld": "C’est vous qui conduisez – le pilote automatique reprend quand vous lâchez",

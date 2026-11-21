@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "Ukloni sve",
   "demoNone": "Još nema odredišta.",
   "demoRunning": "Automobil vozi sam · odredište {n} od {max} · upravljaj ili koči da preuzmeš",
+  "autoStop": "Zaustavi autopilota",
   "demoTaken": "Sada voziš ti",
   "demoTakenSub": "Pokaznu vožnju možeš ponovno pokrenuti s karte.",
   "demoHeld": "Voziš ti – autopilot nastavlja kad pustiš",

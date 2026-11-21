@@ -959,6 +959,10 @@ export class Game {
     window.addEventListener('pagehide', () => this.path.save());
     this.hud.onSettingsChanged = () => this.applySettings();
     this.hud.onTiltSteer = (on) => this.setTiltSteer(on);
+    // (the autopilot's stop button: the player takes over the drive it was doing)
+    this.hud.onStopAutopilot = () => {
+      if (this.demo) this.endDemo('taken');
+    };
     this.hud.onTileVersion = (tile, part, when) => this.onTileVersion(tile, part, when);
     this.rules.onViolation = (v) => {
       this.hud.toast(v);
@@ -7007,6 +7011,8 @@ export class Game {
       // (on foot there is nothing to read off a dashboard)
       showDash: this.cameraMode !== 'cockpit' || this.def.dash,
       onFoot: !!this.walker,
+      // (the autopilot drives by itself: a stop button is offered to take over)
+      autopilotDriving: this.autopilotDriving(),
       // (the reminder of the keys is the car's: not for the tram – its lesson says how it is driven – nor for the
       // aeroplane, whose keys the tip line names)
       noKeyHints: !!this.tram || !!this.aircraft,

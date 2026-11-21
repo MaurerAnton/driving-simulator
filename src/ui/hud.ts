@@ -74,6 +74,8 @@ export interface HudState {
   showDash: boolean;
   /** on foot beside the vehicle: no dashboard strip, no reminder of the driving keys */
   onFoot?: boolean;
+  /** the autopilot is driving the vehicle by itself (a demo or a tour): a stop button is offered */
+  autopilotDriving?: boolean;
   /** no reminder of the driving keys (the tram, the aeroplane) */
   noKeyHints?: boolean;
   indicator: number;
@@ -233,6 +235,8 @@ export class Hud {
   /** after the vehicle went up in flames: the button for a new one */
   private wreckBtn!: HTMLButtonElement;
   onNewVehicle: () => void = () => {};
+  /** the stop button while the autopilot drives by itself (HudState.autopilotDriving) */
+  private autoStopBtn!: HTMLButtonElement;
   private keysBox!: HTMLElement;
   private keysFor = '';
   private input: Input | null = null;
@@ -290,6 +294,8 @@ export class Hud {
   onSettingsChanged: () => void = () => {};
   /** the tilt steering was switched (ui/tiltsteer.ts): asked for from the toggle's gesture (iOS asks permission there) */
   onTiltSteer: (on: boolean) => Promise<void> = async () => {};
+  /** the autopilot's stop was pressed: take over / end the drive the autopilot was doing (game.ts endDemo) */
+  onStopAutopilot: () => void = () => {};
   /** "Account / server" in the settings and "Play together" in the pause menu (net/online.ts; null: not offered) */
   onAccount: ((back: () => void) => void) | null = null;
   onTogether: (() => void) | null = null;
@@ -2020,8 +2026,14 @@ export class Hud {
     this.wreckBtn.type = 'button';
     this.wreckBtn.hidden = true;
     this.wreckBtn.onclick = () => this.onNewVehicle();
+    // (while the autopilot drives by itself: a stop to take over)
+    this.autoStopBtn = el('button', 'btn auto-stop');
+    this.autoStopBtn.type = 'button';
+    this.autoStopBtn.hidden = true;
+    this.autoStopBtn.onclick = () => this.onStopAutopilot();
+    this.autoStopBtn.textContent = `⏹ ${this.t('autoStop')}`;
     this.fpsBox.hidden = true;
-    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox, this.fpsBox, this.clockBox, this.wreckBtn);
+    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox, this.fpsBox, this.clockBox, this.autoStopBtn, this.wreckBtn);
     // full screen and hiding the display, in the top middle (ui/viewbuttons.ts)
     if (!this.view) {
       this.view = viewButtons(this.root, (k) => this.t(k));
@@ -2292,6 +2304,8 @@ export class Hud {
       this.tip.classList.toggle('tap', this.mode === 'touch' && s.tipAction !== '');
       // ("back to the road" is easy to miss: it pulses – still, with reduced motion – ui/style.css)
       this.tip.classList.toggle('urgent', s.tipAction === 'KeyT');
+      // (while the autopilot drives by itself: a stop to take over – hidden again once it does not)
+      this.autoStopBtn.hidden = !s.autopilotDriving;
       this.score.innerHTML = `${this.t('faults')}: <b>${s.faults}</b> · ${this.t('points')}: <b>${s.points}</b>`;
       this.last = s;
       if (this.mode === 'touch') {

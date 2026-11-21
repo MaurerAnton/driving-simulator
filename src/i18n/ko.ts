@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "모두 삭제",
   "demoNone": "아직 목적지가 없어요.",
   "demoRunning": "자동 주행 중 · 목적지 {n}/{max} · 핸들이나 브레이크로 직접 운전",
+  "autoStop": "자동조종 멈추기",
   "demoTaken": "이제 직접 운전해요",
   "demoTakenSub": "시범 주행은 지도에서 다시 시작할 수 있어요.",
   "demoHeld": "직접 운전 중 – 손을 떼면 자동 주행이 다시 이어져요",

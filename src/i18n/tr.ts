@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "Tümünü kaldırın",
   "demoNone": "Henüz hedef yok.",
   "demoRunning": "Araç kendisi gidiyor · hedef {n}/{max} · devralmak için direksiyonu çevirin veya fren yapın",
+  "autoStop": "Otopilotu durdur",
   "demoTaken": "Artık siz sürüyorsunuz",
   "demoTakenSub": "Gösterim sürüşünü haritadan yeniden başlatabilirsiniz.",
   "demoHeld": "Siz sürüyorsunuz – bıraktığınızda otopilot devam eder",

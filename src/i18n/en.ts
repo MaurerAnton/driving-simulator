@@ -682,6 +682,7 @@ const dict: Dict = {
   "demoNone": "No destination yet.",
   "demoRunning": "The car drives by itself · destination {n} of {max} · steer or brake to take over",
   "demoTaken": "You are driving now",
+  "autoStop": "Stop the autopilot",
   "demoTakenSub": "The demonstration drive can be started again from the map.",
   "demoHeld": "You are driving – the autopilot drives on when you let go",
   "demoResumed": "The autopilot drives on",

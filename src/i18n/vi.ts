@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "Xóa tất cả",
   "demoNone": "Chưa có điểm đến nào.",
   "demoRunning": "Xe đang tự chạy · điểm đến {n}/{max} · đánh lái hoặc phanh để tự lái",
+  "autoStop": "Dừng bay tự động",
   "demoTaken": "Bây giờ bạn tự lái",
   "demoTakenSub": "Có thể bắt đầu lại lái xe mẫu từ bản đồ.",
   "demoHeld": "Bạn đang lái – xe sẽ tự lái tiếp khi bạn buông tay",

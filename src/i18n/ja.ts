@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "すべて削除",
   "demoNone": "目的地はまだありません。",
   "demoRunning": "自動走行中 · 目的地 {n}/{max} · ハンドルかブレーキで運転を交代",
+  "autoStop": "オートパイロットを停止",
   "demoTaken": "あなたの運転に交代",
   "demoTakenSub": "模範走行は地図から再開できます。",
   "demoHeld": "あなたが運転中 ― 手を離すと自動走行が再開します",

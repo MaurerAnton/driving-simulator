@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "Hiqi të gjitha",
   "demoNone": "Ende asnjë destinacion.",
   "demoRunning": "Makina ngan vetë · destinacioni {n} nga {max} · kthe timonin ose freno për ta marrë në dorë",
+  "autoStop": "Ndal pilotin automatik",
   "demoTaken": "Tani po ngas ti",
   "demoTakenSub": "Ngarjen demonstruese mund ta nisësh sërish nga harta.",
   "demoHeld": "Po ngas ti – autopiloti vazhdon kur e lëshon",

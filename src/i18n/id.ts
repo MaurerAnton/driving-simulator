@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "Hapus semua",
   "demoNone": "Belum ada tujuan.",
   "demoRunning": "Mobil melaju sendiri · tujuan {n} dari {max} · setir atau rem untuk mengambil alih",
+  "autoStop": "Hentikan autopilot",
   "demoTaken": "Sekarang Anda yang mengemudi",
   "demoTakenSub": "Demo mengemudi dapat dimulai lagi dari peta.",
   "demoHeld": "Anda yang mengemudi – autopilot melanjutkan saat Anda melepas setir",

@@ -633,6 +633,9 @@ kbd { direction: ltr; unicode-bidi: isolate; }
 /* ---- after the vehicle went up in flames: a new one (game.ts explode / newVehicle) ---- */
 .hud .new-vehicle { position: absolute; left: 50%; bottom: 128px; transform: translateX(-50%); pointer-events: auto; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
 .hud .new-vehicle[hidden] { display: none; }
+/* while the autopilot drives by itself: a stop to take over */
+.hud .auto-stop { position: absolute; left: 50%; bottom: 178px; transform: translateX(-50%); pointer-events: auto; background: var(--accent); color: #111; border-color: var(--accent); font-weight: 700; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
+.hud .auto-stop[hidden] { display: none; }
 
 /* ---- a phone (touch, a short side of 500 px or less): a compact HUD – the controls no bigger than a thumb
    needs, the street-name block, the signs, the speed strip and the map smaller, so the road keeps the screen ---- */

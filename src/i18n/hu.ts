@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "Összes törlése",
   "demoNone": "Még nincs cél.",
   "demoRunning": "Az autó magától megy · {n}. cél / {max} · kormányozz vagy fékezz az átvételhez",
+  "autoStop": "Autopilóta leállítása",
   "demoTaken": "Most te vezetsz",
   "demoTakenSub": "A bemutató vezetést a térképről indíthatod újra.",
   "demoHeld": "Te vezetsz – ha elengeded, a robotpilóta továbbmegy",

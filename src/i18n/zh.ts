@@ -675,6 +675,7 @@ const dict: Dict = {
   "demoClear": "全部移除",
   "demoNone": "还没有目的地。",
   "demoRunning": "车辆自动行驶中 · 目的地 {n}/{max} · 转向或刹车即可接管",
+  "autoStop": "停止自动驾驶",
   "demoTaken": "现在由你驾驶",
   "demoTakenSub": "可以在地图上重新开始示范驾驶。",
   "demoHeld": "现在由你驾驶——松手后自动驾驶会继续行驶",
