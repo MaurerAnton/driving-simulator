@@ -1,12 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * ETRS89 / UTM zone 32N (EPSG:25832) <-> geographic coordinates, plus the
- * simulator's local world frame.
+ * ETRS89 / UTM <-> geographic coordinates, plus the simulator's local world
+ * frame.
  *
  * Transverse Mercator via the Krüger n-series (sub-millimetre inside a zone).
  *
+ * A UTM zone is 6° of longitude wide, its central meridian at the middle of it
+ * (zone 32 is 6°E…12°E, central meridian 9°E).  The zone a place lies in is
+ * `zoneForLon(lon)`; the conversion functions take it, so a map anywhere in the
+ * world – Italy, France, Belgium, east Germany – projects correctly instead of
+ * being forced through zone 32.  The zone-32 functions are kept as they were,
+ * for the Baunatal map and its build tools.
+ *
  * World frame (metres):  x = east, y = up (height above sea level, DHHN2016),
  * z = south.  North is therefore -Z, which matches three.js' default camera.
+ * The frame's origin is the active region's (see setWorldOrigin) – the Baunatal
+ * origin until a map says otherwise.
  */
 
 const A_GRS80 = 6378137.0;
@@ -38,10 +47,20 @@ const DELTA = [
 ];
 const E_CONF = (2 * Math.sqrt(N1)) / (1 + N1);
 
-/** Geographic (degrees) -> UTM32 easting/northing (metres). */
-export function latLonToUtm32(latDeg: number, lonDeg: number): [number, number] {
+/** The UTM zone (1…60) a longitude lies in: each zone is 6° wide, 180°W…180°E. */
+export function zoneForLon(lonDeg: number): number {
+  return Math.floor((lonDeg + 180) / 6) + 1;
+}
+
+/** The central meridian (radians) of a UTM zone: the middle of its 6° of longitude. */
+export function lon0ForZone(zone: number): number {
+  return (((zone - 1) * 6 - 180 + 3) * Math.PI) / 180;
+}
+
+/** Geographic (degrees) -> UTM easting/northing (metres) in the given zone. */
+export function latLonToUtm(latDeg: number, lonDeg: number, zone: number): [number, number] {
   const phi = (latDeg * Math.PI) / 180;
-  const dLam = (lonDeg * Math.PI) / 180 - LON0_ZONE32;
+  const dLam = (lonDeg * Math.PI) / 180 - lon0ForZone(zone);
   const sinPhi = Math.sin(phi);
   const t = Math.sinh(Math.atanh(sinPhi) - E_CONF * Math.atanh(E_CONF * sinPhi));
   const xiP = Math.atan2(t, Math.cos(dLam));
@@ -56,8 +75,8 @@ export function latLonToUtm32(latDeg: number, lonDeg: number): [number, number] 
   return [FALSE_EASTING + K0 * A_RECT * eta, K0 * A_RECT * xi];
 }
 
-/** UTM32 easting/northing (metres) -> geographic [lat, lon] in degrees. */
-export function utm32ToLatLon(easting: number, northing: number): [number, number] {
+/** UTM easting/northing (metres) in a zone -> geographic [lat, lon] in degrees. */
+export function utmToLatLon(easting: number, northing: number, zone: number): [number, number] {
   const xi = northing / (K0 * A_RECT);
   const eta = (easting - FALSE_EASTING) / (K0 * A_RECT);
   let xiP = xi;
@@ -70,8 +89,18 @@ export function utm32ToLatLon(easting: number, northing: number): [number, numbe
   const chi = Math.asin(Math.sin(xiP) / Math.cosh(etaP));
   let phi = chi;
   for (let j = 0; j < 3; j++) phi += DELTA[j] * Math.sin(2 * (j + 1) * chi);
-  const lam = LON0_ZONE32 + Math.atan2(Math.sinh(etaP), Math.cos(xiP));
+  const lam = lon0ForZone(zone) + Math.atan2(Math.sinh(etaP), Math.cos(xiP));
   return [(phi * 180) / Math.PI, (lam * 180) / Math.PI];
+}
+
+/** Geographic (degrees) -> UTM32 easting/northing (metres) – zone 32 (EPSG:25832). */
+export function latLonToUtm32(latDeg: number, lonDeg: number): [number, number] {
+  return latLonToUtm(latDeg, lonDeg, 32);
+}
+
+/** UTM32 easting/northing (metres) -> geographic [lat, lon] in degrees. */
+export function utm32ToLatLon(easting: number, northing: number): [number, number] {
+  return utmToLatLon(easting, northing, 32);
 }
 
 /** UTM32 origin of the Baunatal world frame (close to the town centre). */
@@ -88,20 +117,60 @@ export const WORLD_MAX_E = 540000;
 export const WORLD_MIN_N = 5674000;
 export const WORLD_MAX_N = 5692000;
 
+/** The active world frame: where the world's (0,0) lies in UTM, and its zone. */
+export interface WorldFrame {
+  /** the UTM easting of world x = 0 (metres) */
+  originE: number;
+  /** the UTM northing of world z = 0 (metres) */
+  originN: number;
+  /** the UTM zone the frame's coordinates are in */
+  zone: number;
+}
+
+/** The Baunatal frame – what the game uses until a map says otherwise. */
+export const BAUNATAL_FRAME: WorldFrame = { originE: WORLD_ORIGIN_E, originN: WORLD_ORIGIN_N, zone: 32 };
+
+let activeFrame: WorldFrame = BAUNATAL_FRAME;
+
+/** The frame the world's coordinates are currently relative to. */
+export function worldFrame(): WorldFrame {
+  return activeFrame;
+}
+
+/**
+ * Set the world frame – called when a map is loaded, with the origin (and zone)
+ * its own map.json carries, so a map anywhere in the world puts its (0,0) at the
+ * frame's origin instead of being forced through Baunatal's.  The default frame
+ * is Baunatal's, so a map that does not say leaves things as they were.
+ */
+export function setWorldOrigin(originE: number, originN: number, zone = 32): WorldFrame {
+  activeFrame = { originE, originN, zone };
+  return activeFrame;
+}
+
+/** Put the frame back to Baunatal's (a map that is not one, or a test). */
+export function resetWorldOrigin(): void {
+  activeFrame = BAUNATAL_FRAME;
+}
+
 export function utmToWorld(easting: number, northing: number): [number, number] {
-  return [easting - WORLD_ORIGIN_E, -(northing - WORLD_ORIGIN_N)];
+  const f = activeFrame;
+  return [easting - f.originE, -(northing - f.originN)];
 }
 
 export function worldToUtm(x: number, z: number): [number, number] {
-  return [x + WORLD_ORIGIN_E, WORLD_ORIGIN_N - z];
+  const f = activeFrame;
+  return [x + f.originE, f.originN - z];
 }
 
 export function latLonToWorld(latDeg: number, lonDeg: number): [number, number] {
-  const [e, n] = latLonToUtm32(latDeg, lonDeg);
-  return utmToWorld(e, n);
+  const f = activeFrame;
+  const [e, n] = latLonToUtm(latDeg, lonDeg, f.zone);
+  return [e - f.originE, -(n - f.originN)];
 }
 
 export function worldToLatLon(x: number, z: number): [number, number] {
-  const [e, n] = worldToUtm(x, z);
-  return utm32ToLatLon(e, n);
+  const f = activeFrame;
+  const [e, n] = [x + f.originE, f.originN - z];
+  return utmToLatLon(e, n, f.zone);
 }
