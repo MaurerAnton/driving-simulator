@@ -69,6 +69,11 @@ on:
           - limburg
           - overijssel
           - groningen
+          - gelderland
+          - friesland
+          - drenthe
+          - flevoland
+          - zeeland
         default: 'noord-holland'
       geodata_run:
         description: 'Lauf, aus dem schon geholte Geodaten übernommen werden (leer: alles neu holen)'
