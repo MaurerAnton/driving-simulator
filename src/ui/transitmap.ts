@@ -388,6 +388,23 @@ export class TransitLayer {
     if (this.pop) this.pop.hidden = true;
   }
 
+  /**
+   * Show a line's whole way on the map (and hide it again with null): what a
+   * tap on one of its vehicles offers, and what the search for a line number
+   * asks for (bigmap.ts).  `colour` is the line's own; `index` its number in
+   * its own list (tram lines or bus lines).
+   */
+  showLine(kind: TransitKind, index: number, colour: string): void {
+    this.line = { kind, index, colour };
+    this.render();
+    this.host.redraw();
+  }
+
+  /** Is this line's way shown now? */
+  lineShown(kind: TransitKind, index: number): boolean {
+    return this.line !== null && this.line.kind === kind && this.line.index === index;
+  }
+
   /** where the menu of a vehicle was put last (px of the map), so that it is moved only when its vehicle has */
   private menuAt: { x: number; y: number } | null = null;
 

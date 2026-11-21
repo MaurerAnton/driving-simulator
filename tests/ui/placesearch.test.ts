@@ -45,3 +45,31 @@ test('the addresses come after the towns and the stops, each place once, and at 
   assert.equal(searchPlaces('', towns, stops, addresses).length, 0);
   assert.ok(searchPlaces('a', towns, stops, addresses, 2).length <= 2);
 });
+
+test('a line number finds the line of public transport', () => {
+  const lines = [
+    { ref: '5', kind: 'tram' as const, x: 100, z: 50, index: 0 },
+    { ref: '52', kind: 'bus' as const, x: 6600, z: -7100, index: 3 },
+    { ref: 'N3', kind: 'bus' as const, x: 6700, z: -7000, index: 7 },
+  ];
+  const hits = searchPlaces('5', towns, stops, null, 8, null, lines);
+  const line = hits.find((h) => h.what === 'line');
+  assert.ok(line, 'the line 5 is found');
+  assert.equal(line.line?.ref, '5');
+  assert.equal(line.line?.kind, 'tram');
+  assert.equal(line.x, 100); // (where its first stop is)
+  // a line number wins over a town that begins with it
+  assert.equal(hits[0].what, 'line');
+});
+
+test('a line number with letters, and one that matches nothing', () => {
+  const lines = [
+    { ref: 'N3', kind: 'bus' as const, x: 1, z: 2, index: 0 },
+    { ref: '52', kind: 'bus' as const, x: 3, z: 4, index: 1 },
+  ];
+  const n3 = searchPlaces('n3', towns, stops, null, 8, null, lines).find((h) => h.what === 'line');
+  assert.equal(n3?.line?.ref, 'N3');
+  // a number no line has: no line hit (but the towns/stops as before)
+  const none = searchPlaces('99', towns, stops, null, 8, null, lines);
+  assert.ok(!none.some((h) => h.what === 'line'));
+});

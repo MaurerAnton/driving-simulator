@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /** A text field that finds addresses of the map while one types (street, house number, town). */
-import type { AddressHit, AddressIndex } from '../game/address.ts';
+import type { AddressHit } from '../game/address.ts';
 
-export interface AddressPickerOptions {
+export interface AddressPickerOptions<T extends AddressHit = AddressHit> {
   placeholder: string;
   loading: string;
   none: string;
   /** fetches the address list the first time it is needed */
-  load(): Promise<Pick<AddressIndex, 'search'> | null>;
-  pick(hit: AddressHit): void;
+  load(): Promise<{ search(query: string, limit?: number, near?: { x: number; z: number } | null): T[] } | null>;
+  pick(hit: T): void;
   /** where the one who asks is (a place of the map): what lies near comes first */
   near?(): { x: number; z: number } | null;
 }
 
-export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; input: HTMLInputElement } {
+export function addressPicker<T extends AddressHit = AddressHit>(o: AddressPickerOptions<T>): { node: HTMLElement; input: HTMLInputElement } {
   const node = document.createElement('div');
   node.className = 'addr';
   const input = document.createElement('input');
@@ -35,9 +35,9 @@ export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; inp
   input.setAttribute('aria-controls', listId);
   input.setAttribute('aria-expanded', 'false');
 
-  let index: Pick<AddressIndex, 'search'> | null = null;
+  let index: { search(query: string, limit?: number, near?: { x: number; z: number } | null): T[] } | null = null;
   let asked = false;
-  let hits: AddressHit[] = [];
+  let hits: T[] = [];
   let buttons: HTMLButtonElement[] = [];
   /** the entry the arrow keys have reached, -1: none yet */
   let active = -1;
@@ -67,7 +67,7 @@ export function addressPicker(o: AddressPickerOptions): { node: HTMLElement; inp
     p.textContent = text;
     list.append(p);
   };
-  const choose = (h: AddressHit): void => {
+  const choose = (h: T): void => {
     input.value = h.label;
     clear();
     o.pick(h);

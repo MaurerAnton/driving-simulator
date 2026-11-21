@@ -26,10 +26,30 @@ export interface StopSource {
   z: number;
 }
 
+/**
+ * A line of public transport as the search may find it: its number ("5", "52",
+ * "N3"), whether it is a tram or a bus, and where it runs (for putting the map
+ * there).  The lines come from lines.json.gz (trams) and buslines.json.gz
+ * (world/buslines.ts); `ref` is what the player types.
+ */
+export interface LineSource {
+  /** the line's number as it is shown ("5", "52") */
+  ref: string;
+  /** 'tram' or 'bus' (the timetable's kinds) */
+  kind: 'tram' | 'bus';
+  /** where it runs: its first stop (for putting the map there) */
+  x: number;
+  z: number;
+  /** the line's index in its own list (to show its whole way) */
+  index: number;
+}
+
 /** What the map's search field finds: an address hit, with what kind of place it is. */
 export interface PlaceHit extends AddressHit {
-  /** 'town' (also a village or a part of a town), 'stop', or 'address' (a street or a house) */
-  what: 'town' | 'stop' | 'address';
+  /** 'town' (also a village or a part of a town), 'stop', 'line' (public transport), or 'address' (a street or a house) */
+  what: 'town' | 'stop' | 'line' | 'address';
+  /** for a 'line': the line itself (transitmap.ts shows its way) */
+  line?: LineSource;
 }
 
 /** how big a kind of town is (a city first) */
@@ -55,6 +75,7 @@ export function searchPlaces(
   addresses: ((q: string, limit: number, near: { x: number; z: number } | null) => AddressHit[]) | null,
   limit = 8,
   near: { x: number; z: number } | null = null,
+  lines: readonly LineSource[] = [],
 ): PlaceHit[] {
   const words = normaliseAddress(query).split(' ').filter(Boolean);
   if (words.length === 0) return [];
@@ -67,6 +88,12 @@ export function searchPlaces(
     seen.add(key);
     out.push(h);
   };
+  // a line number asked for: the line comes first ("5" finds the tram 5)
+  const q = normaliseAddress(query).trim();
+  if (q) {
+    const lm = lines.filter((l) => normaliseAddress(l.ref) === q);
+    for (const l of lm.slice(0, 2)) add({ label: `${l.ref} · ${l.kind === 'tram' ? 'tram' : 'bus'}`, street: '', x: l.x, z: l.z, exact: true, what: 'line', line: l });
+  }
   // towns and villages: the name begun with first, the bigger the earlier
   const t = towns
     .map((p) => ({ p, m: matches(p.name, words) }))

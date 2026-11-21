@@ -27,7 +27,7 @@ import type { RoadSource } from './pathdraw.ts';
 import { addGrip, foldButton } from './mapwindow.ts';
 import type { RoadEventInfo } from '../sim/roadevents.ts';
 import { searchPlaces } from './placesearch.ts';
-import type { StopSource } from './placesearch.ts';
+import type { LineSource, StopSource } from './placesearch.ts';
 import { locate } from './geolocate.ts';
 import { LAYERS, LAYER_KEYS, drawLayerIcons, extraLayers, layerIconAt, loadLayers, saveLayers } from './maplayers.ts';
 import type { MapEmergency, MapService } from './maplayers.ts';
@@ -274,12 +274,19 @@ export class BigMap {
         const idx = await this.host.loadAddresses();
         // (the favourite places first, among the towns)
         const towns = (): Array<{ name: string; kind: string; x: number; z: number }> => [...loadFavourites().map((f) => ({ name: f.name, kind: 'city', x: f.x, z: f.z })), ...(this.host.world.json.places ?? [])];
-        return { search: (q: string, n = 8, near: { x: number; z: number } | null = null) => searchPlaces(q, towns(), this.host.stops?.() ?? [], idx ? (qq, nn, nr) => idx.search(qq, nn, nr) : null, n, near) };
+        return { search: (q: string, n = 8, near: { x: number; z: number } | null = null) => searchPlaces(q, towns(), this.host.stops?.() ?? [], idx ? (qq, nn, nr) => idx.search(qq, nn, nr) : null, n, near, this.lineSources()) };
       },
       near: () => ({ x: this.cx, z: this.cz }),
       pick: (hit) => {
         search.input.value = '';
         search.input.blur();
+        // (a line: show its whole way and go to where it runs)
+        if (hit.what === 'line' && hit.line) {
+          const l = hit.line;
+          this.transit.showLine(l.kind, l.index, '#e3000f');
+          this.goTo(l.x, l.z, 0.5, hit.label);
+          return;
+        }
         this.goTo(hit.x, hit.z, hit.exact || hit.street ? 1.2 : 0.3, hit.label);
       },
     });
@@ -876,6 +883,34 @@ export class BigMap {
     const x = this.cx + (px - r.left - r.width / 2) / this.scale;
     const z = this.cz + (py - r.top - r.height / 2) / this.scale;
     this.showSpot(x, z);
+  }
+
+  /**
+   * The lines of public transport as the search may find them (world/…: trams
+   * of lines.json.gz and buses of buslines.json.gz, by their number): each with
+   * where its first stop is, for putting the map there.
+   */
+  private lineSources(): LineSource[] {
+    const src = this.host.transit?.() ?? null;
+    const tt = src?.timetable() ?? null;
+    if (!src || !tt) return [];
+    const stops = this.host.stops?.() ?? [];
+    const at = (name: string): { x: number; z: number } | null => {
+      const s = stops.find((p) => p.name === name);
+      return s ? { x: s.x, z: s.z } : null;
+    };
+    const out: LineSource[] = [];
+    const add = (kind: 'tram' | 'bus', list: Array<{ index: number; ref: string; patterns: Array<{ stops: string[] }> } | undefined>): void => {
+      for (const l of list) {
+        if (!l) continue;
+        const first = l.patterns[0]?.stops[0];
+        const p = first ? at(first) : null;
+        out.push({ ref: l.ref, kind, index: l.index, x: p?.x ?? 0, z: p?.z ?? 0 });
+      }
+    };
+    add('tram', tt.lines);
+    add('bus', tt.buses);
+    return out;
   }
 
   /** The map to a place (a search hit, the player's position): centred, zoomed to `scale` at least, its place panel open. */
