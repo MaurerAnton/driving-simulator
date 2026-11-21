@@ -184,12 +184,29 @@ jobs:
           df -h /
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
           df -h /
+      # Die französischen Regionen haben kein <Region>-latest.osm.pbf, sondern nur
+      # Tagesausgaben <Region>-YYMMDD; die neueste davon liegt zuweilen erst am nächsten
+      # Tag da (Geofabrik schreibt sie ins Verzeichnis, ehe sie holbar ist).  Darum wird
+      # von oben nach unten probiert, bis eine Ausgabe antwortet.
       - name: OpenStreetMap (Geofabrik, Frankreich)
+        env:
+          REGION: ${{ inputs.region }}
         run: |
+          set -euo pipefail
           mkdir -p data/raw/osm
-          p=${{ inputs.region }}
-          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
-            "https://download.geofabrik.de/europe/france/$p/$p-latest.osm.pbf"
+          base="https://download.geofabrik.de/europe/france/$REGION"
+          url="$base/$REGION-latest.osm.pbf"
+          probe() { curl -fsSL -r 0-1023 -o /dev/null "$1"; }
+          if ! probe "$url"; then
+            echo "$url gibt es nicht – neueste Tagesausgabe suchen"
+            url=""
+            for d in $(curl -fsSL "$base/" | grep -oE "$REGION-[0-9]{6}\.osm\.pbf" | sort -u | tac); do
+              if probe "$base/$d"; then url="$base/$d"; break; fi
+            done
+            [ -n "$url" ] || { echo "keine Ausgabe für $REGION gefunden"; exit 1; }
+          fi
+          echo "OpenStreetMap: $url"
+          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" "$url"
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
