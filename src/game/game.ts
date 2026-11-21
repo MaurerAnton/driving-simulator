@@ -106,6 +106,9 @@ import { newPolySample, projectOnPolyline, samplePolyline } from '../core/geom.t
 import type { SignPost } from '../world/tilefmt.ts';
 import { tileKey } from '../world/tilefmt.ts';
 import { PartCache, sourceFor } from '../world/partcache.ts';
+import { regionSourceFor, type RegionSource } from '../world/regionfiles.ts';
+import type { Region } from '../world/regions.ts';
+import { loadRegionIndex } from '../ui/regions.ts';
 import { useTileSource } from '../world/mappack.ts';
 import { versionedTiles, versionsOfTile, type PartIndex } from '../world/tileversions.ts';
 import { TILE, gridIndex } from '../world/grid.ts';
@@ -113,7 +116,7 @@ import { CLS, CTRL, EF, RAIL, STOP_FLAG, SURF_ROLLING, XING } from '../world/typ
 import type { SpawnJson } from '../world/types.ts';
 import { newSurfaceHit } from '../world/world.ts';
 import type { Edge, Node as Junction } from '../world/world.ts';
-import { App } from './app.ts';
+import { App, type LoadedRegion } from './app.ts';
 import { turnedSpot } from './turnaround.ts';
 import { LESSONS, Navigator, findTarget } from './nav.ts';
 import { planTourInSlices } from './tour.ts';
@@ -592,7 +595,10 @@ export class Game {
     const creep = setInterval(() => show(from + (to - from) * 0.9 * (1 - Math.exp(-(performance.now() - since) / 2500))), 120);
     show(0.05);
     try {
-      await app.loadWorld();
+      // a region chosen in the settings loads instead of the site's own map; if it
+      // is not there (or cannot be read), the site's map loads as always
+      const region = await this.chosenRegion();
+      await app.loadWorld(undefined, region ?? undefined);
     } finally {
       // (on an error the message takes the screen: the bar stops)
       if (!app.world) clearInterval(creep);
@@ -1253,6 +1259,28 @@ export class Game {
       this.rail.far = Math.min(900, app.tiles.viewRadius * 1.1);
     }
     this.applyDevMap();
+  }
+
+  /**
+   * The region chosen in the settings (settings: region): its files from
+   * map-assets, ready to hand to loadWorld.  Reads regions.json, finds the
+   * region and builds its source; null when none is chosen, or the region is
+   * not there (the site's own map is loaded then).
+   */
+  private async chosenRegion(): Promise<LoadedRegion | null> {
+    const id = this.settings.region;
+    if (!id) return null;
+    const index = await loadRegionIndex(true, 'map-assets/');
+    const region: Region | null = index ? index.regions.find((r) => r.id === id) ?? null : null;
+    if (!region) {
+      console.warn(`[region] ${id} is not in regions.json: the site's map is loaded`);
+      return null;
+    }
+    const source: RegionSource = regionSourceFor(
+      { repo: this.settings.devMapRepo, ref: 'main', dir: 'map-assets' },
+      'map-assets/',
+    );
+    return { id: region.id, source };
   }
 
   /**
