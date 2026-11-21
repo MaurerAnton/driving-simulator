@@ -215,14 +215,20 @@ jobs:
           # Stand 21.11.2026, ODbL 1.0, kein Schlüssel – nachgemessen: HTTP 206 auf
           # "Range: bytes=0-999").  Die Adresse „…-latest" zeigt mitunter auf einen Stand, den
           # der Spiegel noch nicht hat; darum werden die Stände der letzten sieben Tage
-          # durchprobiert und erst danach auf den Spiegel von openstreetmap.fr
-          # (dieselben Daten, dieselbe Lizenz) zurückgefallen.
+          # durchprobiert, und „ganz Deutschland" (dasselbe Haus, 4 GB) ist die letzte Adresse.
+          # Der Spiegel von openstreetmap.fr fällt hier aus: er hält für Deutschland nur
+          # Nordrhein-Westfalen (nachgemessen am 21.11.2026: hessen-latest.osm.pbf → HTTP 404,
+          # Verzeichnis /extracts/europe/germany/ nennt nur nordrhein_westfalen).
           urls="https://download.geofabrik.de/europe/germany/hessen/hessen-latest.osm.pbf"
           for back in 0 1 2 3 4 5 6 7; do
             urls="$urls https://download.geofabrik.de/europe/germany/hessen/hessen-$(date -u -d "-$back day" +%y%m%d).osm.pbf"
           done
-          urls="$urls https://download.openstreetmap.fr/extracts/europe/germany/hessen-latest.osm.pbf"
-          for try in 1 2 3; do
+          urls="$urls https://download.geofabrik.de/europe/germany/germany-latest.osm.pbf"
+          # Der Spiegel wehrt mitunter jede Verbindung ab (gemessen: "Failed to connect to
+          # download.geofabrik.de port 443" über zehn Minuten, Lauf 44882600959); darum sechs
+          # Runden mit wachsender Pause – ein Rechteck Holen dauert Stunden, ein Scheitern am
+          # Netz wäre sie umsonst.
+          for try in 1 2 3 4 5 6; do
             for url in $urls; do
               rm -f "$OSM_FILE"
               echo "Versuch: $url"
@@ -231,7 +237,7 @@ jobs:
               rm -f "$OSM_FILE"
             done
             echo "Runde $try: keine der Adressen hat geliefert"
-            sleep 30
+            sleep $(( try * 60 ))
           done
           test -s "$OSM_FILE"
           ls -l data/raw/osm
@@ -301,7 +307,11 @@ jobs:
           Nur ein Rechteck Hessens: das ganze Land paßt nicht in eine Karte; weitere Rechtecke
           kommen aus demselben Ablauf "Karte Hessen" mit anderen Zahlen.
           EOF
-          for try in 1 2 3; do
+          # Der Spiegel wehrt mitunter jede Verbindung ab (gemessen: "Failed to connect to
+          # download.geofabrik.de port 443" über zehn Minuten, Lauf 44882600959); darum sechs
+          # Runden mit wachsender Pause – ein Rechteck Holen dauert Stunden, ein Scheitern am
+          # Netz wäre sie umsonst.
+          for try in 1 2 3 4 5 6; do
             if gh release create "$tag" --latest=false --target "$GITHUB_SHA" \
                  --title "Karte $LABEL" --notes-file notes.md data/work/map.tar.*; then
               break
