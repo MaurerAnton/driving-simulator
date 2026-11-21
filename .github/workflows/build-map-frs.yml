@@ -214,8 +214,27 @@ jobs:
             paca)        url=https://download.geofabrik.de/europe/france/provence-alpes-cote-d-azur/provence-alpes-cote-d-azur-latest.osm.pbf ;;
             *) echo "kein solcher Auszug: $OSM" >&2; exit 1 ;;
           esac
-          curl -fsSL --retry 5 --retry-delay 20 -o data/raw/osm/france-latest.osm.pbf "$url"
-          ls -l data/raw/osm
+          # Geofabrik lehnt Verbindungen gelegentlich ab (exit 7), wenn mehrere Läufe gleichzeitig
+          # ziehen.  Dann hilft nur Warten und nochmal: 8 Versuche, wachsende Pause, ~8 min.
+          out=data/raw/osm/france-latest.osm.pbf
+          for versuch in 1 2 3 4 5 6 7 8; do
+            if curl -fsSL --retry 3 --retry-connrefused --retry-all-errors --retry-delay 10 \
+                 --connect-timeout 30 --max-time 1800 -o "$out.part" "$url"; then
+              size=$(stat -c %s "$out.part")
+              if [ "$size" -gt 20000000 ]; then
+                mv "$out.part" "$out"
+                echo "OSM-Auszug: $size B"
+                ls -l data/raw/osm
+                exit 0
+              fi
+              echo "zu kleiner Auszug ($size B) – nochmal"
+            fi
+            echo "Versuch $versuch von 8 gescheitert, warte $((versuch * 30)) s"
+            rm -f "$out.part"
+            sleep $((versuch * 30))
+          done
+          echo "kein OSM-Auszug zu bekommen: $url" >&2
+          exit 1
       - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
         run: npm run map:extract -- data/raw/osm/france-latest.osm.pbf
       - name: Kartenpaket 2/4 – Straßennetz und Kacheln
@@ -293,6 +312,12 @@ jobs:
           Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
           zusammengesetzt.
           EOF
-          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
-            --notes-file notes.md data/work/map.tar.*
+          # gh release create scheitert manchmal repo-weit mit HTTP 403; dann ein zweiter Versuch.
+          for versuch in 1 2 3; do
+            gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+              --notes-file notes.md data/work/map.tar.* && break
+            echo "Release-Versuch $versuch gescheitert, warte 60 s"
+            gh release view "$tag" >/dev/null 2>&1 && break
+            sleep 60
+          done
           echo "release $tag"
