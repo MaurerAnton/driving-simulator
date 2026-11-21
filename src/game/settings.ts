@@ -62,8 +62,6 @@ export function lowDevice(): boolean {
   return cores <= 4 || mem <= 3;
 }
 
-/** What the low preset sets beside the graphics: the resolutions (the biggest saving on a weak phone). */
-export const LOW_RESOLUTIONS = { pixelCap: 1, render3d: 0.75 } as const;
 /** the ground beyond the map: off, or so far (m) */
 export const FAR_VIEWS = [0, 5000, 8000, 12000, 20000, 30000];
 /** running on foot (km/h): a jog … a sprint */
@@ -365,10 +363,9 @@ function merge(parsed: Partial<Settings>): Settings {
   // (stored before there were advanced graphics settings: what the level gave then)
   if (!parsed.graphics) {
     s.graphics = { ...GRAPHICS_PRESETS[s.quality === 'custom' ? 'medium' : s.quality] };
-    if (parsed.quality === 'low') {
-      s.pixelCap = 1;
-      s.render3d = 0.7;
-    } else if (parsed.quality === 'high') s.pixelCap = 3;
+    // (a graphics preset does not take the resolutions over: they are settings of their own –
+    //  the low preset draws less, but the render and display resolution stay as chosen)
+    if (parsed.quality === 'high') s.pixelCap = 3;
   }
   const g = s.graphics;
   if (!['off', 'near', 'far'].includes(g.shadows)) g.shadows = d.graphics.shadows;

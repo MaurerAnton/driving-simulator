@@ -10,7 +10,7 @@ import { routeMode } from '../game/routepresets.ts';
 import type { VehicleKind } from '../game/vehicles.ts';
 import { RELEASES, VERSION, sizeWords } from '../game/releases.ts';
 import type { Settings } from '../game/settings.ts';
-import { DEFAULT_SETTINGS, FAR_VIEWS, GRAPHICS_PRESETS, LOW_RESOLUTIONS, RUN_SPEEDS, VIEW_DISTANCES, resetSettings, saveSettings } from '../game/settings.ts';
+import { DEFAULT_SETTINGS, FAR_VIEWS, GRAPHICS_PRESETS, RUN_SPEEDS, VIEW_DISTANCES, resetSettings, saveSettings } from '../game/settings.ts';
 import { closeX } from './closex.ts';
 import { setWasmMode, wasmSupported } from '../wasm/kernels.ts';
 import type { Input } from '../input/input.ts';
@@ -1098,18 +1098,22 @@ export class Hud {
       }
       s.quality = v as Settings['quality'];
       if (v !== 'custom') s.graphics = { ...GRAPHICS_PRESETS[v as Exclude<Settings['quality'], 'custom'>] };
-      // (the low preset is for weak phones: the resolutions go down with it)
-      if (v === 'low') {
-        s.pixelCap = LOW_RESOLUTIONS.pixelCap;
-        s.render3d = LOW_RESOLUTIONS.render3d;
-      }
+      // (the resolutions are settings of their own: a graphics preset does not take them over –
+      //  the low preset draws less, but the render and display resolution stay as chosen)
       // (the advanced settings below show the preset's values)
       queueMicrotask(() => this.showSettings(back));
     });
     const pct = (list: number[]): Array<[string, string]> => list.map((n) => [String(n), `${Math.round(n * 100)} %`]);
     select(this.t('uiScale'), String(s.uiScale), pct([0.75, 0.85, 1, 1.15, 1.3, 1.5]), (v) => (s.uiScale = Number(v)));
-    select(this.t('pixelCap'), String(s.pixelCap), [['1', this.t('pixelStandard')], ['1.5', this.t('pixelSharp')], ['3', this.t('pixelNative')]], (v) => (s.pixelCap = Number(v)));
-    select(this.t('render3d'), String(s.render3d), pct([0.5, 0.6, 0.7, 0.8, 0.9, 1]), (v) => (s.render3d = Number(v)));
+    // (a resolution of one's own takes the preset to "custom": it is no longer what the preset sets)
+    select(this.t('pixelCap'), String(s.pixelCap), [['1', this.t('pixelStandard')], ['1.5', this.t('pixelSharp')], ['3', this.t('pixelNative')]], (v) => {
+      s.pixelCap = Number(v);
+      s.quality = 'custom';
+    });
+    select(this.t('render3d'), String(s.render3d), pct([0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1]), (v) => {
+      s.render3d = Number(v);
+      s.quality = 'custom';
+    });
     {
       // the advanced graphics settings, folded away; changing one makes the preset "custom"
       const box = el('details', 'advanced');
