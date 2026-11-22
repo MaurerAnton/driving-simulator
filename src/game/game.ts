@@ -6715,7 +6715,7 @@ export class Game {
       const wn = weatherNow();
       const wind = windVector(wn, { x: 0, z: 0 });
       const ws = this.windscreen;
-      ws.frame({ renderer: app.renderer, model, detail: this.settings.graphics.vehicleDetail && this.settings.graphics.weatherFx && !this.aircraft, cockpit: this.cameraMode === 'cockpit' && !this.walker && this.doorT < 0 && !this.watcher, dt: this.state === 'drive' ? dt : 0, rain: rainIntensity(wn), snow: snowIntensity(wn), temperature: wn.temperature, roadWet: wn.wet, windX: wind.x, windZ: wind.z, heater: this.vehicle.engineRunning, washer: this.input.washer, light: app.sky.hemi.intensity / 1.2 });
+      ws.frame({ renderer: app.renderer, scene: app.scene, camera: app.camera, model, detail: this.settings.graphics.vehicleDetail && this.settings.graphics.weatherFx && !this.aircraft, cockpit: this.cameraMode === 'cockpit' && !this.walker && this.doorT < 0 && !this.watcher, dt: this.state === 'drive' ? dt : 0, rain: rainIntensity(wn), snow: snowIntensity(wn), temperature: wn.temperature, roadWet: wn.wet, windX: wind.x, windZ: wind.z, heater: this.vehicle.engineRunning, washer: this.input.washer, light: app.sky.hemi.intensity / 1.2 });
       this.hud.setWipers(this.walker || this.aircraft ? null : ws.mode);
       if (ws.blindFor > 4 && this.state === 'drive') this.rules.note('noView', 'minor', {}, 60);
     } else {

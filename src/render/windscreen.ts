@@ -106,6 +106,16 @@ function flatGlass(x0: number, x1: number, y0: number, y1: number, z: number): G
 const tmpBox = new THREE.Box3();
 const tmpM = new THREE.Matrix4();
 
+/** The target the scene behind the glass is drawn into for its blur: kept at the drawing size, reused between frames. */
+function ensureTarget(t: THREE.WebGLRenderTarget | null, w: number, h: number): THREE.WebGLRenderTarget {
+  if (t && t.width === w && t.height === h) return t;
+  t?.dispose();
+  const next = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true, stencilBuffer: false });
+  next.texture.minFilter = THREE.LinearFilter;
+  next.texture.magFilter = THREE.LinearFilter;
+  return next;
+}
+
 /**
  * Where the windscreen of a model is (null: it has none – a motorcycle, the
  * aeroplane's canopy is not done).  Found once per model.
@@ -260,6 +270,9 @@ void main() {
 /** What the game gives each frame. */
 export interface WindscreenFrame {
   renderer: THREE.WebGLRenderer;
+  /** the scene and camera: to draw the background once without the glass for its blur (world, not part of the glass) */
+  scene: THREE.Scene;
+  camera: THREE.Camera;
   /** the vehicle the player drives (null: none) */
   model: ScreenModel | null;
   /** the "very high" graphics: there is a windscreen to see */
@@ -300,6 +313,8 @@ export class WindscreenView {
   private readonly genData = new Uint8Array(STATE_COLS * STATE_ROWS);
   private readonly genTex = new THREE.DataTexture(this.genData, STATE_COLS, STATE_ROWS, THREE.RedFormat);
   private bg: THREE.FramebufferTexture | null = null;
+  /** the scene behind the glass drawn into a target of its own, for the blur (kept clean: no glass in it) */
+  private offscreen: THREE.WebGLRenderTarget | null = null;
   private readonly material: THREE.ShaderMaterial;
   private readonly lastPos = new THREE.Vector3();
   private havePos = false;
@@ -405,7 +420,7 @@ export class WindscreenView {
     }
     (u.uIn.value as THREE.Vector2).set(s.arms[0]?.rIn ?? 0, s.arms[1]?.rIn ?? 0);
     // the picture just drawn: what the glass blurs in the next frame (only while there is something on it)
-    if (ob > 0.002 || s.wipers.running) this.keepPicture(f.renderer);
+    if (ob > 0.002 || s.wipers.running) this.keepPicture(f.renderer, f.scene, f.camera);
     return speed;
   }
 
@@ -452,7 +467,7 @@ export class WindscreenView {
     this.genTex.needsUpdate = true;
   }
 
-  private keepPicture(renderer: THREE.WebGLRenderer): void {
+  private keepPicture(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): void {
     if (renderer.getRenderTarget() !== null) return;
     renderer.getDrawingBufferSize(this.size);
     const w = Math.floor(this.size.x);
@@ -469,9 +484,21 @@ export class WindscreenView {
       (u.uRes.value as THREE.Vector2).set(w, h);
     }
     try {
+      // (the glass itself is in the picture just drawn: it must not be captured,
+      //  or the blur would show last frame's water.  Draw the scene behind the
+      //  glass once into a target of its own – the picture the player sees keeps
+      //  the glass – and capture that.)
+      const wasVisible = this.mesh?.visible ?? false;
+      if (this.mesh) this.mesh.visible = false;
+      this.offscreen = ensureTarget(this.offscreen, w, h);
+      renderer.setRenderTarget(this.offscreen);
+      renderer.render(scene, camera);
       renderer.copyFramebufferToTexture(this.bg);
+      renderer.setRenderTarget(null);
+      if (this.mesh) this.mesh.visible = wasVisible;
       u.uHaveBg.value = 1;
     } catch {
+      renderer.setRenderTarget(null);
       u.uHaveBg.value = 0;
     }
   }
@@ -482,5 +509,7 @@ export class WindscreenView {
     this.stateTex.dispose();
     this.genTex.dispose();
     this.bg?.dispose();
+    this.offscreen?.dispose();
+    this.offscreen = null;
   }
 }
