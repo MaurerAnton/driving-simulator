@@ -73,6 +73,12 @@ html, body {
 .panel p { color: var(--muted); line-height: 1.45; margin: 6px 0; }
 .panel p.note { font-size: 13px; margin: -2px 0 8px; }
 .panel p.note.warn { color: var(--warn); margin-top: 10px; }
+/* the settings in tabs: a bar of buttons over the pages, one group of rows at a time */
+.settings-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; }
+.settings-tab-btn { flex: 1 1 auto; min-width: 88px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.settings-tab-btn:hover { border-color: var(--accent); }
+.settings-tab-btn.on { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+.settings-tab[hidden] { display: none; }
 .fault .when { display: block; color: var(--muted); font-size: 12px; }
 .fault .rule a, .rv-links a { color: #8fc4ff; text-decoration: underline; text-underline-offset: 2px; }
 .log { max-height: 56vh; overflow: auto; margin: 8px 0; }

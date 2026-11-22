@@ -1026,6 +1026,45 @@ export class Hud {
     const o = el('div', 'overlay');
     const p = el('div', 'panel narrow');
     p.append(closeX(this.t('back'), back), el('h1', '', this.t('settings')));
+    // the settings in tabs: one group of rows at a time, chosen by the bar (a page each,
+    //  so a long list of settings is not one wall of rows)
+    type TabId = 'drive' | 'graphics' | 'sound' | 'display' | 'map';
+    const tabs: Array<[TabId, string]> = [
+      ['drive', this.t('settingsTab.drive')],
+      ['graphics', this.t('settingsTab.graphics')],
+      ['sound', this.t('settingsTab.sound')],
+      ['display', this.t('settingsTab.display')],
+      ['map', this.t('settingsTab.map')],
+    ];
+    const bar = el('div', 'settings-tabs');
+    const pages = new Map<TabId, HTMLElement>();
+    for (const [id] of tabs) {
+      const page = el('div', 'settings-tab');
+      page.hidden = id !== 'drive';
+      pages.set(id, page);
+      p.append(page);
+    }
+    let target: HTMLElement = pages.get('drive')!;
+    const goTab = (id: TabId): void => {
+      for (const [tid] of tabs) {
+        const page = pages.get(tid)!;
+        page.hidden = tid !== id;
+        const btn = bar.querySelector<HTMLElement>(`[data-tab="${tid}"]`);
+        btn?.classList.toggle('on', tid === id);
+        btn?.setAttribute('aria-selected', tid === id ? 'true' : 'false');
+      }
+      target = pages.get(id)!;
+    };
+    for (const [id, label] of tabs) {
+      const btn = el('button', 'settings-tab-btn', label);
+      btn.type = 'button';
+      btn.dataset.tab = id;
+      btn.setAttribute('role', 'tab');
+      btn.onclick = () => goTab(id);
+      bar.append(btn);
+    }
+    p.append(bar);
+    goTab('drive');
     const select = (label: string, value: string, options: Array<[string, string]>, set: (v: string) => void): void => {
       const row = el('div', 'row');
       const sel = el('select');
@@ -1042,7 +1081,7 @@ export class Hud {
         this.onSettingsChanged();
       };
       row.append(el('label', '', label), sel);
-      p.append(row);
+      target.append(row);
     };
     const check = (label: string, value: boolean, set: (v: boolean) => void): void => {
       const row = el('div', 'row');
@@ -1058,7 +1097,7 @@ export class Hud {
       l.style.minWidth = '0';
       l.style.flex = '1';
       row.append(c, l);
-      p.append(row);
+      target.append(row);
     };
     const range = (label: string, value: number, set: (v: number) => void): void => {
       const row = el('div', 'row');
@@ -1074,17 +1113,17 @@ export class Hud {
         this.onSettingsChanged();
       };
       row.append(el('label', '', label), r);
-      p.append(row);
+      target.append(row);
     };
     {
       const row = el('div', 'row');
       row.append(el('label', '', this.t('language')), this.languagePicker(() => this.showSettings(back), true));
-      p.append(row);
+      target.append(row);
     }
     select(this.t('transmission'), s.transmission, [['assist', this.t('trAssist')], ['manual', this.t('trManual')], ['automatic', this.t('trAutomatic')]], (v) => (s.transmission = v as Settings['transmission']));
-    p.append(el('p', 'note', this.t('settingsNextDrive')));
+    target.append(el('p', 'note', this.t('settingsNextDrive')));
     // where the lessons take place (game/lessonplaces.ts)
-    p.append(...lessonPlaceRows((k, v) => this.t(k, v), s, this.world.json.spawns, () => {
+    target.append(...lessonPlaceRows((k, v) => this.t(k, v), s, this.world.json.spawns, () => {
       saveSettings(s);
       this.onSettingsChanged();
     }));
@@ -1092,7 +1131,7 @@ export class Hud {
     check(this.t('autopilotAssist'), s.autopilotAssist, (v) => (s.autopilotAssist = v));
     // the simulator's chores left out (game/arcadedrive.ts) and the road physics off (sim/ground.ts) – also in the arcade panel
     check(this.t('arcadeDrive'), s.arcadeDrive, (v) => (s.arcadeDrive = v));
-    p.append(el('p', 'note', this.t('arcadeDriveNote')));
+    target.append(el('p', 'note', this.t('arcadeDriveNote')));
     check(this.t('evenRoads'), s.evenRoads, (v) => (s.evenRoads = v));
     // (the ground flattened: a field rides as flat as a road – its bumps and camber gone)
     check(this.t('evenTerrain'), s.evenTerrain, (v) => (s.evenTerrain = v));
@@ -1104,11 +1143,15 @@ export class Hud {
     select(this.t('daylight'), s.daylight, [['day', this.t('daylightDay')], ['clock', this.t('daylightClock')]], (v) => (s.daylight = v as Settings['daylight']));
     // on foot: how fast running is
     select(this.t('runSpeed'), String(s.runSpeed), RUN_SPEEDS.map((k): [string, string] => [String(k), `${k} km/h`]), (v) => (s.runSpeed = Number(v)));
+    // --- display ---
+    goTab('display');
     // the main menu: the vehicle large in the 3D picture with icons, rows over the 3D scene, or the simple list of before
     select(this.t('menuStyle'), s.menuStyle, [['stage', this.t('menuStage')], ['carousel', this.t('menuCarousel')], ['classic', this.t('menuClassic')]], (v) => (s.menuStyle = v as Settings['menuStyle']));
     // the picture
     select(this.t('startView'), s.view, [['chase', this.t('viewChase')], ['cockpit', this.t('viewCockpit')]], (v) => (s.view = v as Settings['view']));
     range(this.t('cabinOpacity'), (s.cabinOpacity - 0.2) / 0.8, (v) => (s.cabinOpacity = 0.2 + 0.8 * v));
+    // --- graphics ---
+    goTab('graphics');
     // Graphics: a preset – and, apart from it, the resolutions; the parts of the preset one by one below
     select(this.t('quality'), s.quality, [['low', this.t('qLow')], ['medium', this.t('qMedium')], ['high', this.t('qHigh')], ['ultra', this.t('qUltra')], ['nomercy', this.t('qNoMercy')], ['custom', this.t('qCustom')]], (v) => {
       // ("No mercy" never comes by itself: only after a warning, and an OK – 1.7.1)
@@ -1138,7 +1181,7 @@ export class Hud {
       // the advanced graphics settings, folded away; changing one makes the preset "custom"
       const box = el('details', 'advanced');
       box.append(el('summary', '', this.t('gfxAdvanced')));
-      const at = p.childElementCount;
+      const at = target.childElementCount;
       const g = s.graphics;
       const custom = (f: () => void) => (): void => {
         f();
@@ -1165,13 +1208,15 @@ export class Hud {
         custom(() => (g.weatherFx = v))();
       });
       // (the rows were added to the panel: into the folded box with them)
-      while (p.childElementCount > at) box.append(p.children[at]);
-      p.append(box);
+      while (target.childElementCount > at) box.append(target.children[at]);
+      target.append(box);
     }
     select(this.t('mirrors'), s.mirrors, [['off', this.t('mOff')], ['alternate', this.t('mAlt')], ['full', this.t('mFull')]], (v) => (s.mirrors = v as Settings['mirrors']));
     range(this.t('traffic'), s.traffic, (v) => (s.traffic = v));
     // steering sensitivity: how sharply A/D turn (0.5 gentle … 1 as built … 2 sharp)
     range(this.t('steerSensitivity'), (s.steerSensitivity - 0.5) / 1.5, (v) => (s.steerSensitivity = Math.round((0.5 + v * 1.5) * 100) / 100));
+    // --- sound & weather ---
+    goTab('sound');
     range(this.t('volume'), s.volume, (v) => (s.volume = v));
     // music made as it plays: off unless asked for
     select(this.t('music'), s.music, [['off', this.t('musicOff')], ['quiet', this.t('musicQuiet')], ['on', this.t('musicOn')]], (v) => (s.music = v as Settings['music']));
@@ -1188,7 +1233,7 @@ export class Hud {
     lic.target = '_blank';
     lic.rel = 'noopener';
     credit.append(link, ' (', lic, ') – ', this.t('weatherNote'));
-    p.append(credit);
+    target.append(credit);
     select(this.t('season'), s.season, SEASON_CHOICES.map((k): [string, string] => [k, this.t(SEASON_KEYS[k])]), (v) => (s.season = v as Settings['season']));
     // today's fuel prices: with one's own key of Tankerkönig (free, asked for there) – else typical prices
     {
@@ -1204,15 +1249,17 @@ export class Hud {
         saveSettings(s);
       };
       row.append(el('span', '', this.t('fuelKey')), input);
-      p.append(row);
+      target.append(row);
       const note = el('p', 'note');
       const a = el('a', '', 'creativecommons.tankerkoenig.de');
       a.href = 'https://creativecommons.tankerkoenig.de';
       a.target = '_blank';
       a.rel = 'noopener';
       note.append(this.t('fuelKeyNote'), ' ', a);
-      p.append(note);
+      target.append(note);
     }
+    // --- display (the on-screen controls, the hints, the picture's aids) ---
+    goTab('display');
     select(this.t('touchControls'), s.touchControls, [['auto', this.t('tcAuto')], ['on', this.t('tcOn')], ['off', this.t('tcOff')]], (v) => (s.touchControls = v as Settings['touchControls']));
     range(this.t('touchOpacity'), s.touchOpacity, (v) => (s.touchOpacity = Math.max(0.15, v)));
     // steer by tilting the phone: the toggle's change is the gesture iOS asks its permission on
@@ -1228,17 +1275,19 @@ export class Hud {
         });
       };
       row.append(c, el('label', '', this.t('tiltSteer')));
-      p.append(row);
+      target.append(row);
     }
     check(this.t('keyHints'), s.keyHints, (v) => (s.keyHints = v));
     check(this.t('showFps'), s.showFps, (v) => (s.showFps = v));
+    // --- map & region ---
+    goTab('map');
     // developer mode: which map tiles have several versions, and where the parts come from (world/partcache.ts)
     {
       const head = el('h2', '', this.t('devMap.title'));
-      p.append(head);
+      target.append(head);
       check(this.t('devMap'), s.devMap, (v) => (s.devMap = v));
       select(this.t('devMapFetch'), s.devMapFetch, (['repo', 'site', 'pack'] as const).map((k): [string, string] => [k, this.t(`devMapFetch.${k}`)]), (v) => (s.devMapFetch = v as Settings['devMapFetch']));
-      p.append(el('p', 'note', this.t('devMapFetch.note')));
+      target.append(el('p', 'note', this.t('devMapFetch.note')));
       {
         const row = el('label', 'row');
         const input = el('input');
@@ -1255,18 +1304,20 @@ export class Hud {
         l.style.minWidth = '0';
         l.style.flex = '1';
         row.append(input, l);
-        p.append(row);
+        target.append(row);
       }
       select(this.t('devMapRam'), String(s.devMapRam), [['64', '64 MB'], ['128', '128 MB'], ['256', '256 MB'], ['512', '512 MB'], ['1024', '1024 MB']], (v) => (s.devMapRam = Number(v)));
       check(this.t('devMapProgress'), s.devMapProgress, (v) => (s.devMapProgress = v));
-      p.append(el('p', 'note', this.t('devMap.note')));
+      target.append(el('p', 'note', this.t('devMap.note')));
     }
     // the tiles and the quickest way in WebAssembly (wasm/kernels.ts) – or in JavaScript only
     select(this.t('wasm'), s.wasm, [['auto', this.t(wasmSupported() ? 'wasm.auto' : 'wasm.missing')], ['off', this.t('wasm.off')]], (v) => {
       s.wasm = v === 'off' ? 'off' : 'auto';
       setWasmMode(s.wasm);
     });
-    p.append(el('p', 'note', this.t('wasm.note')));
+    target.append(el('p', 'note', this.t('wasm.note')));
+    // --- display again (the start, the walk, the screen's aids) ---
+    goTab('display');
     check(this.t('startOutside'), s.startOutside, (v) => (s.startOutside = v));
     // where a drive begins: where the player is (asked of the browser when the game starts), and exactly at the place chosen
     check(this.t('startHere'), s.startHere, (v) => (s.startHere = v));
@@ -1281,7 +1332,7 @@ export class Hud {
     select(this.t('insideMirror'), s.insideMirror.mode, [['car', this.t('insideMirror.car')], ['hud', this.t('insideMirror.hud')]], (v) => (s.insideMirror.mode = v === 'hud' ? 'hud' : 'car'));
     range(this.t('insideMirror.shift'), (s.insideMirror.shift + 0.3) / 0.6, (v) => (s.insideMirror.shift = Math.round((v * 0.6 - 0.3) * 100) / 100));
     range(this.t('insideMirror.size'), (s.insideMirror.size - 0.6) / 1.4, (v) => (s.insideMirror.size = Math.round((0.6 + 1.4 * v) * 100) / 100));
-    p.append(el('p', 'note', this.t('insideMirror.note')));
+    target.append(el('p', 'note', this.t('insideMirror.note')));
     // arranging the HUD's parts (ui/hudlayout.ts): while driving, over the picture
     {
       const b = el('div', 'buttons');
@@ -1296,11 +1347,11 @@ export class Hud {
       const rs = el('button', 'btn ghost', this.t('hudLayout.reset'));
       rs.onclick = () => this.layout.reset();
       b.append(rs);
-      p.append(b);
+      target.append(b);
     }
     // the aerial photographs under the maps – and where they come from
     check(this.t('mapAerialSetting'), s.reality.aerial, (v) => (s.reality.aerial = v));
-    p.append(el('p', 'note', this.t('mapAerialNote')));
+    target.append(el('p', 'note', this.t('mapAerialNote')));
     check(this.t('hudRules'), s.hudRules, (v) => (s.hudRules = v));
     check(this.t('signalTimers'), s.signalTimers, (v) => (s.signalTimers = v));
     check(this.t('queueLabels'), s.queueLabels, (v) => (s.queueLabels = v));
@@ -1313,18 +1364,20 @@ export class Hud {
       voiceBox.hidden = !v;
       if (!v) speech.stop();
     });
-    p.append(voiceBox);
+    target.append(voiceBox);
+    // --- map & region again (the version, the map pack, the region) ---
+    goTab('map');
     // the version of the game (an earlier one is a page of its own: ui/versionpicker.ts), the map (one stored from files: ui/mappacks.ts) and the region (ui/regions.ts)
     {
       const when = new Intl.DateTimeFormat(localeOf(this.lang), { dateStyle: 'medium', timeStyle: 'short' });
-      p.append(versionSettings((k, v) => this.t(k, v), (iso) => when.format(new Date(iso))), mapPackSettings(s, (k, v) => this.t(k, v), localeOf(this.lang)), regionSettings(s, (k, v) => this.t(k, v)));
+      target.append(versionSettings((k, v) => this.t(k, v), (iso) => when.format(new Date(iso))), mapPackSettings(s, (k, v) => this.t(k, v), localeOf(this.lang)), regionSettings(s, (k, v) => this.t(k, v)));
     }
     // the server: an account, the progress kept there, photos, playing together (ui/netpanels.ts)
     if (this.onAccount) {
       const go = this.onAccount;
       const acc = el('button', 'btn ghost', `👤 ${this.t('net.account')}`);
       acc.onclick = () => go(() => this.showSettings(back));
-      p.append(acc);
+      target.append(acc);
     }
     // settings live in the browser's storage; say so if this browser keeps none
     if (!saveSettings(s)) p.append(el('p', 'note warn', this.t('settingsNotSaved')));
