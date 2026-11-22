@@ -60,6 +60,7 @@ import { CyclistModel } from '../render/cyclist.ts';
 import { PeopleRenderer } from '../render/people.ts';
 import type { CarVisualState } from '../render/car.ts';
 import { PropRenderer } from '../render/props.ts';
+import { GrassRenderer } from '../render/grass.ts';
 import { SignRenderer } from '../render/signs.ts';
 import { SignalTimers } from '../ui/signaltimers.ts';
 import { TiltSteer } from '../ui/tiltsteer.ts';
@@ -284,6 +285,8 @@ export class Game {
   vehicle!: Vehicle;
   ground!: WorldGround;
   readonly props = new PropRenderer();
+  /** vertical grass on the ground ("No mercy"): render/grass.ts */
+  readonly grass = new GrassRenderer();
   signs!: SignRenderer;
   readonly car = new PlayerCar();
   readonly actors = new TrafficRenderer();
@@ -1187,6 +1190,7 @@ export class Game {
       }
       this.signsBesideRoad(tile.header.signs);
       this.props.add(tile);
+      this.grass.add(tile);
       this.signs.add(tile);
       const discs: number[] = [];
       for (const s of tile.header.signs) discs.push(s.x, s.y, s.z, 0.06);
@@ -1208,6 +1212,7 @@ export class Game {
       else this.collider.add({ key: tile.key, rings, ringCounts, ringSkip: tile.data.get('collSkip') as Uint8Array | null, segments, discs });
     } else {
       this.props.remove(tile);
+      this.grass.remove(tile.key);
       this.signs.remove(tile);
       this.collider.remove(tile.key);
     }
@@ -1245,6 +1250,9 @@ export class Game {
     app.camera.updateProjectionMatrix();
     this.props.density = gx.propDensity;
     this.props.setShadows(gx.propShadows);
+    // (vertical grass on the ground: the "No mercy" graphics only – many blades, only that pays for them)
+    this.grass.setEnabled(gx.weatherFx);
+    this.grass.density = gx.propDensity;
     // as many raindrops and snowflakes as the graphics allow
     if (this.outdoors) this.outdoors.view.quality = WEATHER_PARTICLES[s.quality === 'custom' ? 'medium' : s.quality];
     if (this.outdoors) this.outdoors.water.enabled = gx.water;
@@ -6589,6 +6597,7 @@ export class Game {
       const [fx, fz] = this.focus();
       tiles.update(fx, fz);
       this.props.update(fx, fz);
+      this.grass.update(fx, fz, dt);
       this.updateVisuals(dt);
       // a crane posed as it works, the loads of its site where they are
       if (this.crane && isCraneModel(model)) this.crane.render(model, this.time, this.state === 'drive' && !this.walker);
@@ -6608,6 +6617,7 @@ export class Game {
       const cz = this.menuFocus.z + Math.sin(a) * 260;
       tiles.update(this.menuFocus.x, this.menuFocus.z);
       this.props.update(cx, cz);
+      this.grass.update(cx, cz, dt);
       const gy = tiles.heightAt(this.menuFocus.x, this.menuFocus.z);
       const base = Number.isNaN(gy) ? 230 : gy;
       app.camera.position.set(cx, base + 95, cz);
