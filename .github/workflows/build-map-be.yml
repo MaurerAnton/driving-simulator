@@ -193,15 +193,23 @@ jobs:
           df -h /
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
           df -h /
-      - name: OpenStreetMap (Geofabrik, Belgien)
+      - name: OpenStreetMap (Belgien)
         run: |
           mkdir -p data/raw/osm
           # --retry-connrefused / --retry-all-errors: der Server verweigert manchmal
           # vom Läufer aus die Verbindung (curl: (7)); ohne diese beiden Zeichen
-          # zählt das nicht als vorübergehend und der Lauf bricht ab.
-          curl -fsSL --retry 8 --retry-delay 20 --retry-connrefused \
-            --retry-all-errors -o "$OSM" \
-            https://download.geofabrik.de/europe/belgium/belgium-261119.osm.pbf
+          # zählt das nicht als vorübergehend und der Lauf bricht ab.  Bleibt er
+          # dabei, geht es über den Auszug von openstreetmap.fr weiter — gleiche
+          # Daten (OSM, ODbL), anderer Weg dorthin.
+          if ! curl -fsSL --retry 4 --retry-delay 20 --retry-connrefused \
+               --retry-all-errors -o "$OSM" \
+               https://download.geofabrik.de/europe/belgium/belgium-261119.osm.pbf; then
+            echo "Geofabrik verweigert die Verbindung - zweiter Weg ueber openstreetmap.fr"
+            rm -f "$OSM"
+            curl -fsSL --retry 4 --retry-delay 20 --retry-connrefused \
+              --retry-all-errors -o "$OSM" \
+              https://download.openstreetmap.fr/extracts/europe/belgium-latest.osm.pbf
+          fi
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
