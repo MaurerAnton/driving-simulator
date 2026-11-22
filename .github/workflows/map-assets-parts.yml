@@ -545,7 +545,7 @@ jobs:
             pushed=$(( pushed + 1 ))
           fi
           echo "$pushed Pushes, $(du -sh "$TARGET" | cut -f1) in $TARGET"
-          git log --oneline -n "$pushed
+          git log --oneline -n "$pushed"
 
       # die Regionen dieses Laufs: map-assets/regions/<id>/ und regions.json – was das Spiel
       # lädt, wenn man eine Region in den Einstellungen wählt (world/regionfiles.ts).  Die
