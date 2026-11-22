@@ -242,15 +242,15 @@ jobs:
           freien Kanal nur als DWG und ESRI FileGDB – die Gebäude kommen aus OpenStreetMap.
           EOF
           # (ein verwehrtes gh release create darf Stunden von Bau nicht wegwerfen: das Paket
-          #  liegt schon als Artefakt oben; hier ein zweiter Versuch nach einer Weile – und am
+          #  liegt schon als Artefakt oben; hier sieben Versuche mit wachsender Pause – und am
           #  Ende steht fest, dass das Release wirklich da ist, sonst schlägt der Schritt fehl)
-          for versuch in 1 2 3; do
+          for versuch in 1 2 3 4 5 6 7; do
             if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
                  --notes-file notes.md data/work/map.tar.*; then
               break
             fi
             echo "Versuch $versuch: Release $tag wurde nicht angelegt"
-            sleep 30
+            sleep $((versuch * 60))
           done
           gh release view "$tag" --json tagName --jq .tagName
           echo "release $tag"
