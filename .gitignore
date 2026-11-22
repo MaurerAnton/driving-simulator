@@ -22,3 +22,6 @@ public/map/
 public/map.new/
 public/map.old/
 public/map.fetching/
+
+# Python bytecode of the map-fetch scripts
+__pycache__/
