@@ -206,14 +206,6 @@ jobs:
       # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
       # die hessische Verwaltung; beides wird hier berichtigt.  Der Wortlaut der Namensnennung
       # ist der von geoshop.rlp.de/dl-de_by-2-0.html.
-      # Rückhalt: wenn das Anlegen des Release scheitert, sind die Teile hiermit nicht
-      # verloren, und man kann sie aus diesem Lauf von Hand ins Release legen.
-      - uses: actions/upload-artifact@v4
-        with:
-          name: karte-rlp-paket
-          path: data/work/map.tar.*
-          if-no-files-found: error
-          retention-days: 7
       - name: Der Name der Karte und ihre Quellenzeilen (map.json)
         env:
           NAME: ${{ inputs.label }}
@@ -234,6 +226,14 @@ jobs:
         run: |
           npm run map:pack
           du -sh public/map
+      # Rückhalt: wenn das Anlegen des Release scheitert, sind die Teile hiermit nicht
+      # verloren, und man kann sie aus diesem Lauf von Hand ins Release legen.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: karte-rlp-paket
+          path: data/work/map.tar.*
+          if-no-files-found: error
+          retention-days: 7
       - name: Ins Release legen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
