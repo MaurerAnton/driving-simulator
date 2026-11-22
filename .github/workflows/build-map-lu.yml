@@ -169,11 +169,21 @@ jobs:
           df -h /
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
           df -h /
-      - name: OpenStreetMap (Geofabrik, Luxemburg)
+      - name: OpenStreetMap (Luxemburg)
         run: |
           mkdir -p data/raw/osm
-          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
-            https://download.geofabrik.de/europe/luxembourg/luxembourg-261119.osm.pbf
+          # Wie bei Belgien: verweigert Geofabrik vom Läufer aus die Verbindung
+          # (curl: (7)), geht es über den Auszug von openstreetmap.fr weiter —
+          # dieselben OSM-Daten unter derselben ODbL, anderer Weg dorthin.
+          if ! curl -fsSL --retry 4 --retry-delay 20 --retry-connrefused \
+               --retry-all-errors -o "$OSM" \
+               https://download.geofabrik.de/europe/luxembourg/luxembourg-261119.osm.pbf; then
+            echo "Geofabrik verweigert die Verbindung - zweiter Weg ueber openstreetmap.fr"
+            rm -f "$OSM"
+            curl -fsSL --retry 4 --retry-delay 20 --retry-connrefused \
+              --retry-all-errors -o "$OSM" \
+              https://download.openstreetmap.fr/extracts/europe/luxembourg-latest.osm.pbf
+          fi
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
