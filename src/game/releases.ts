@@ -65,6 +65,13 @@ export interface Release {
 
 export const RELEASES: readonly Release[] = [
   {
+    version: '1.7.5',
+    date: '2026-11-22',
+    at: '',
+    items: ['news.1_7_5.steer', 'news.1_7_5.mobile', 'news.1_7_5.autopilot', 'news.1_7_5.map', 'news.1_7_5.windscreen', 'news.1_7_5.more'],
+    size: { lines: 299418, code: 169048, tests: 28801, i18n: 70114, bytes: 21957983, maps: 2835708591 },
+  },
+  {
     version: '1.7.4',
     date: '2026-11-21',
     at: '2026-11-21T19:27:22Z',
