@@ -196,7 +196,11 @@ jobs:
       - name: OpenStreetMap (Geofabrik, Belgien)
         run: |
           mkdir -p data/raw/osm
-          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" \
+          # --retry-connrefused / --retry-all-errors: der Server verweigert manchmal
+          # vom Läufer aus die Verbindung (curl: (7)); ohne diese beiden Zeichen
+          # zählt das nicht als vorübergehend und der Lauf bricht ab.
+          curl -fsSL --retry 8 --retry-delay 20 --retry-connrefused \
+            --retry-all-errors -o "$OSM" \
             https://download.geofabrik.de/europe/belgium/belgium-261119.osm.pbf
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
