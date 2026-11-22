@@ -74,7 +74,9 @@ export function addressPicker<T extends AddressHit = AddressHit>(o: AddressPicke
   };
   const show = (): void => {
     const q = input.value.trim();
-    if (q.length < 2) {
+    // (one character is enough for a line number of public transport – "5", "N3" – where it is a
+    //  whole token; for text a single letter would match half the map, so it waits for the second)
+    if (q.length < (isLineToken(q) ? 1 : 2)) {
       say('');
       return;
     }
@@ -145,3 +147,12 @@ export function addressPicker<T extends AddressHit = AddressHit>(o: AddressPicke
 }
 
 let pickers = 0;
+
+/**
+ * Is a query a line number of public transport, enough on its own to search
+ * for ("5", "52", "N3"): digits, or a letter before digits.  Such a token is
+ * whole at one character, where a single letter of a name is not.
+ */
+export function isLineToken(q: string): boolean {
+  return /^(?:[a-zäöüß]{1,3}\d{1,3}|\d{1,3})$/i.test(q.trim());
+}
