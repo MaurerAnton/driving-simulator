@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Conduite arcade : pas de vitesses, pas de frein à main, pas de calage",
   "arcadeDriveNote": "La pédale de droite avance, celle de gauche freine ; à l’arrêt, maintenez la pédale de gauche pour reculer – et celle de droite pour repartir en avant. Quand vous vous arrêtez, le véhicule reste où il est. Le moteur tourne toujours, et rien de cela ne compte comme une faute. Une voiture à boîte manuelle reçoit la boîte automatique.",
   "evenRoads": "Pas de physique de la route : chaque route et chaque champ, par tous les temps, adhère comme de l’asphalte sec",
+  "evenTerrain": "Aplatir le sol : un champ est plat comme une route, sans bosses ni dévers (les collines du paysage restent)",
   "view.fullscreen": "Plein écran",
   "view.fullscreenOff": "Quitter le plein écran",
   "view.hudHide": "Masquer l’affichage (F2)",

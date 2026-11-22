@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Condução arcade: sem mudanças, sem travão de mão, sem deixar ir abaixo",
   "arcadeDriveNote": "O pedal direito anda, o esquerdo trava; parado, mantenha o pedal esquerdo premido para fazer marcha-atrás – e o direito para voltar a andar para a frente. Quando para, o veículo fica onde está. O motor está sempre a trabalhar, e nada disto conta como falta. Um carro manual recebe a caixa automática.",
   "evenRoads": "Sem física da estrada: cada estrada e cada campo, com qualquer tempo, agarra como asfalto seco",
+  "evenTerrain": "Alisar o terreno: um campo fica plano como uma estrada, sem buracos nem inclinações (as colinas da paisagem ficam)",
   "view.fullscreen": "Ecrã inteiro",
   "view.fullscreenOff": "Sair do ecrã inteiro",
   "view.hudHide": "Esconder a interface (F2)",

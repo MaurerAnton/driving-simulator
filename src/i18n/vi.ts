@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Lái kiểu arcade: không số, không phanh tay, không chết máy",
   "arcadeDriveNote": "Bàn đạp phải để chạy, bàn đạp trái để phanh; khi đứng yên, giữ bàn đạp trái để lùi – và bàn đạp phải để tiến lại. Khi bạn dừng, xe đứng yên tại chỗ. Động cơ luôn chạy, và không điều nào trong số này bị tính là lỗi. Xe số sàn được chuyển sang hộp số tự động.",
   "evenRoads": "Không có vật lý mặt đường: mọi con đường và cánh đồng, trong mọi thời tiết, đều bám như nhựa đường khô",
+  "evenTerrain": "Làm phẳng mặt đất: cánh đồng phẳng như đường, không gồ ghề hay dốc (đồi cảnh quan vẫn giữ)",
   "view.fullscreen": "Toàn màn hình",
   "view.fullscreenOff": "Thoát toàn màn hình",
   "view.hudHide": "Ẩn màn hình hiển thị (F2)",

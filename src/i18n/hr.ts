@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Arkadna vožnja: bez mjenjača, bez ručne kočnice, bez gašenja motora",
   "arcadeDriveNote": "Desna pedala vozi, lijeva koči; dok stojiš, drži lijevu pedalu za vožnju unatrag – i desnu da opet kreneš naprijed. Kad staneš, vozilo ostaje gdje jest. Motor uvijek radi i ništa od toga ne računa se kao pogreška. Automobil s ručnim mjenjačem dobiva automatski mjenjač.",
   "evenRoads": "Bez fizike ceste: svaka cesta i svako polje, po svakom vremenu, prianja kao suhi asfalt",
+  "evenTerrain": "Poravnanje terena: polje je ravno kao cesta, bez neravnina i nagiba (brijegovi krajolika ostaju)",
   "view.fullscreen": "Cijeli zaslon",
   "view.fullscreenOff": "Izađi iz cijelog zaslona",
   "view.hudHide": "Sakrij prikaz (F2)",

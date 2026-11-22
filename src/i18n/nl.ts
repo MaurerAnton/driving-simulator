@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Arcaderijden: geen versnellingen, geen handrem, geen afslaan",
   "arcadeDriveNote": "Het rechterpedaal rijdt, het linker remt; stilstaand houd je het linkerpedaal ingedrukt om achteruit te rijden – en het rechter om weer vooruit te gaan. Als je stopt, blijft het voertuig staan waar het is. De motor draait altijd, en niets hiervan telt als fout. Een auto met handgeschakelde bak krijgt de automaat.",
   "evenRoads": "Geen wegfysica: elke weg en elk veld geeft bij elk weer grip als droog asfalt",
+  "evenTerrain": "De grond effenmaken: een veld ligt plat als een weg, zonder bobbels of helling (de heuvels van het landschap blijven)",
   "view.fullscreen": "Volledig scherm",
   "view.fullscreenOff": "Volledig scherm verlaten",
   "view.hudHide": "Weergave verbergen (F2)",

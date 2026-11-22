@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Mengemudi arkade: tanpa gigi, tanpa rem tangan, mesin tidak mati",
   "arcadeDriveNote": "Pedal kanan untuk melaju, pedal kiri untuk mengerem; saat berhenti, tahan pedal kiri untuk mundur – dan pedal kanan untuk maju lagi. Saat Anda berhenti, kendaraan tetap di tempatnya. Mesin selalu menyala, dan semua ini tidak dihitung sebagai kesalahan. Mobil manual mendapat transmisi otomatis.",
   "evenRoads": "Tanpa fisika jalan: setiap jalan dan ladang, dalam cuaca apa pun, mencengkeram seperti aspal kering",
+  "evenTerrain": "Ratakan tanah: ladang datar seperti jalan, tanpa gundukan atau kemiringan (bukit lanskap tetap ada)",
   "view.fullscreen": "Layar penuh",
   "view.fullscreenOff": "Keluar dari layar penuh",
   "view.hudHide": "Sembunyikan tampilan (F2)",

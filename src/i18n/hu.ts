@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Arcade vezetés: sebességváltás, kézifék és lefulladás nélkül",
   "arcadeDriveNote": "A jobb pedál visz, a bal fékez; állva tartsd lenyomva a bal pedált a tolatáshoz – és a jobbat, hogy újra előre menj. Ha megállsz, a jármű ott marad, ahol van. A motor mindig jár, és mindez nem számít hibának. A kézi váltós autó automata váltót kap.",
   "evenRoads": "Útfizika nélkül: minden út és szántó minden időben úgy tapad, mint a száraz aszfalt",
+  "evenTerrain": "A talaj kiegyenlítése: a mező sík, mint az út, dombok és lejtők nélkül (a táj dombjai maradnak)",
   "view.fullscreen": "Teljes képernyő",
   "view.fullscreenOff": "Kilépés a teljes képernyőből",
   "view.hudHide": "Kijelző elrejtése (F2)",

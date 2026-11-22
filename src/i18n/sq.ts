@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Ngarje arkade: pa marsha, pa frenin e dorës, pa fikje të motorit",
   "arcadeDriveNote": "Pedali i djathtë të çon, i majti frenon; kur je i ndalur, mbaj pedalin e majtë për të ecur prapa – dhe të djathtin për të ecur sërish përpara. Kur ndalon, automjeti qëndron aty ku është. Motori punon gjithmonë, dhe asgjë nga këto nuk llogaritet si gabim. Një makinë me marsha manuale merr kutinë automatike.",
   "evenRoads": "Pa fizikë rruge: çdo rrugë dhe arë, në çdo mot, kap si asfalt i thatë",
+  "evenTerrain": "Sheshirja e tokës: një fushë është e sheshtë si rrugë, pa gropa ose pjerrësi ( kodrat e peizazhit mbeten)",
   "view.fullscreen": "Ekran i plotë",
   "view.fullscreenOff": "Dil nga ekrani i plotë",
   "view.hudHide": "Fshih ekranin e informacionit (F2)",

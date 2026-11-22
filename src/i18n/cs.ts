@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Arkádová jízda: bez řazení, bez ruční brzdy, bez zhasnutí motoru",
   "arcadeDriveNote": "Pravý pedál jede, levý brzdí; na místě drž levý pedál a pojedeš vzad – a pravý, abys jel znovu vpřed. Když zastavíš, vozidlo zůstane stát. Motor běží stále a nic z toho se nepočítá jako chyba. Auto s manuální převodovkou dostane automatickou.",
   "evenRoads": "Bez fyziky vozovky: každá silnice i pole drží za každého počasí jako suchý asfalt",
+  "evenTerrain": "Srovnat terén: pole leží rovno jako silnice, bez nerovností a sklonu (krajinné kopcе zůstávají)",
   "view.fullscreen": "Celá obrazovka",
   "view.fullscreenOff": "Ukončit celou obrazovku",
   "view.hudHide": "Skrýt prvky obrazovky (F2)",

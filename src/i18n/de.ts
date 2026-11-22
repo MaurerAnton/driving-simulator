@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Arcade-Fahren: keine Gänge, keine Handbremse, kein Abwürgen",
   "arcadeDriveNote": "Das rechte Pedal fährt, das linke bremst; im Stand das linke Pedal halten, um rückwärts zu fahren – und das rechte, um wieder vorwärts zu fahren. Wenn du anhältst, bleibt das Fahrzeug stehen, wo es ist. Der Motor läuft immer, und nichts davon zählt als Fehler. Ein Schaltwagen bekommt das Automatikgetriebe.",
   "evenRoads": "Keine Straßenphysik: Jede Straße und jedes Feld haftet bei jedem Wetter wie trockener Asphalt",
+  "evenTerrain": "Den Boden flachlegen: ein Feld liegt flach wie eine Straße, ohne Hügel oder Böschung (die Landschaftshügel bleiben)",
   "view.fullscreen": "Vollbild",
   "view.fullscreenOff": "Vollbild verlassen",
   "view.hudHide": "Anzeige ausblenden (F2)",

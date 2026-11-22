@@ -711,6 +711,7 @@ const dict: Dict = {
   "arcadeDrive": "Arcade driving: no gears, no handbrake, no stalling",
   "arcadeDriveNote": "The right pedal drives, the left one brakes; standing still, hold the left pedal to reverse – and the right one to go forwards again. When you stop, the vehicle stays where it is. The engine always runs, and none of this counts as a fault. A manual car gets the automatic gearbox.",
   "evenRoads": "No road physics: every road and field, in any weather, grips like dry asphalt",
+  "evenTerrain": "Flatten the ground: a field lies flat as a road, without bumps or camber (the hills stay)",
   "view.fullscreen": "Full screen",
   "view.fullscreenOff": "Leave full screen",
   "view.hudHide": "Hide the display (F2)",

@@ -1094,6 +1094,8 @@ export class Hud {
     check(this.t('arcadeDrive'), s.arcadeDrive, (v) => (s.arcadeDrive = v));
     p.append(el('p', 'note', this.t('arcadeDriveNote')));
     check(this.t('evenRoads'), s.evenRoads, (v) => (s.evenRoads = v));
+    // (the ground flattened: a field rides as flat as a road – its bumps and camber gone)
+    check(this.t('evenTerrain'), s.evenTerrain, (v) => (s.evenTerrain = v));
     // the main beam on and off by itself at night (game/beamplay.ts)
     check(this.t('beam.assist'), s.beamAssist, (v) => (s.beamAssist = v));
     // the aeroplane by hand: how much the help does

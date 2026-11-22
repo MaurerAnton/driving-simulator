@@ -106,6 +106,12 @@ export interface Settings {
   arcadeDrive: boolean;
   /** the road physics off (sim/ground.ts WorldGround.even): every road and land, in any weather, grips as dry asphalt */
   evenRoads: boolean;
+  /**
+   * the ground flattened (sim/ground.ts WorldGround.evenTerrain): a piece of
+   * land lies flat as a road – no bumps, no camber – so it rides and grips the
+   * same.  The landscape's hills stay (one may still drive up them).
+   */
+  evenTerrain: boolean;
   /** the main-beam assist: at night the main beam goes on and off by itself (game/beamplay.ts) */
   beamAssist: boolean;
   /** the light of day: the game's fair afternoon always, or the sun as it stands at the time (night at night) */
@@ -260,6 +266,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autopilotAssist: true,
   arcadeDrive: false,
   evenRoads: true,
+  evenTerrain: false,
   beamAssist: false,
   daylight: 'day',
   fuelKey: '',
@@ -425,6 +432,7 @@ function merge(parsed: Partial<Settings>): Settings {
   if (typeof s.beamAssist !== 'boolean') s.beamAssist = d.beamAssist;
   if (typeof s.arcadeDrive !== 'boolean') s.arcadeDrive = d.arcadeDrive;
   if (typeof s.evenRoads !== 'boolean') s.evenRoads = d.evenRoads;
+  if (typeof s.evenTerrain !== 'boolean') s.evenTerrain = d.evenTerrain;
   if (s.daylight !== 'day' && s.daylight !== 'clock') s.daylight = d.daylight;
   if (s.music !== 'off' && s.music !== 'quiet' && s.music !== 'on') s.music = d.music;
   if (typeof s.fuelKey !== 'string') s.fuelKey = d.fuelKey;

@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Condus arcade: fără trepte de viteză, fără frână de mână, fără calare",
   "arcadeDriveNote": "Pedala din dreapta merge, cea din stânga frânează; pe loc, ține apăsată pedala din stânga ca să mergi înapoi – și pe cea din dreapta ca să mergi iar înainte. Când te oprești, vehiculul rămâne pe loc. Motorul merge mereu și nimic din toate acestea nu contează ca greșeală. O mașină cu cutie manuală primește cutie automată.",
   "evenRoads": "Fără fizica drumului: fiecare drum și câmp, pe orice vreme, aderă ca asfaltul uscat",
+  "evenTerrain": "Nivelarea terenului: un câmp este plat ca un drum, fără denivelări sau pante (colinele peisajului rămân)",
   "view.fullscreen": "Ecran complet",
   "view.fullscreenOff": "Ieși din ecranul complet",
   "view.hudHide": "Ascunde afișajul (F2)",

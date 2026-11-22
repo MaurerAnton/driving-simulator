@@ -26,6 +26,12 @@ export class WorldGround implements Ground {
    * piece of land grips and rolls as dry asphalt, whatever the weather – water stays water.
    */
   even = false;
+  /**
+   * The ground flattened (settings evenTerrain): a piece of land lies flat as a
+   * road – its bumps and camber gone – so it rides and grips the same.  The
+   * landscape's hills stay (one still drives up them); water stays water.
+   */
+  evenTerrain = false;
   /** places that are paved for the time being, whatever the map says (the practice yard laid over a field) */
   paved: ((x: number, z: number) => boolean) | null = null;
   /** how much a thing laid on the ground for the time being raises it (m – the ramp of the hill start on the practice yard, game/drillplay.ts) */
@@ -98,9 +104,17 @@ export class WorldGround implements Ground {
     const nz = -(hz - y) / e;
     const l = Math.hypot(nx, 1, nz);
     out.y = y;
-    out.nx = nx / l;
-    out.ny = 1 / l;
-    out.nz = nz / l;
+    // (flattened: the bumps and camber of the land are gone, as on a road – the height of the
+    //  landscape is kept, so a hill is still a hill; water, above, is left as it is)
+    if (this.evenTerrain) {
+      out.nx = 0;
+      out.ny = 1;
+      out.nz = 0;
+    } else {
+      out.nx = nx / l;
+      out.ny = 1 / l;
+      out.nz = nz / l;
+    }
     const c = t.coverAt(x, z);
     if (c === COVER.ASPHALT || c === COVER.PAVED || this.paved?.(x, z)) {
       out.grip = 0.95 * this.weatherGrip;

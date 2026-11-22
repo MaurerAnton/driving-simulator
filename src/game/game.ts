@@ -6830,6 +6830,7 @@ export class Game {
     this.ground.weatherGrip = od.grip;
     // (the road physics switched off in the arcade options: every surface as dry asphalt)
     this.ground.even = this.settings.evenRoads;
+    this.ground.evenTerrain = this.settings.evenTerrain;
     // (bare winter crowns throw no full shadows: the trees' shadows go while they are bare)
     this.props.setShadows(this.settings.graphics.propShadows && !od.look.thinCrowns);
   }

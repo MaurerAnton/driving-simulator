@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Guida arcade: niente marce, niente freno a mano, niente spegnimenti",
   "arcadeDriveNote": "Il pedale destro fa andare, il sinistro frena; da fermo tieni premuto il pedale sinistro per andare in retromarcia – e il destro per ripartire in avanti. Quando ti fermi, il veicolo resta dov'è. Il motore è sempre acceso, e niente di tutto ciò conta come errore. Un'auto con cambio manuale riceve il cambio automatico.",
   "evenRoads": "Niente fisica della strada: ogni strada e ogni campo, con qualsiasi tempo, fa presa come asfalto asciutto",
+  "evenTerrain": "Appianare il terreno: un campo è piano come una strada, senza buchi né dislivelli (le colline del paesaggio restano)",
   "view.fullscreen": "Schermo intero",
   "view.fullscreenOff": "Esci dallo schermo intero",
   "view.hudHide": "Nascondi il display (F2)",

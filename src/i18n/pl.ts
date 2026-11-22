@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Jazda arcade: bez biegów, bez hamulca ręcznego, bez gaśnięcia silnika",
   "arcadeDriveNote": "Prawy pedał jedzie, lewy hamuje; na postoju przytrzymaj lewy pedał, aby jechać do tyłu – i prawy, aby znów jechać do przodu. Gdy się zatrzymasz, pojazd stoi w miejscu. Silnik zawsze pracuje i nic z tego nie liczy się jako błąd. Auto z ręczną skrzynią dostaje automatyczną skrzynię biegów.",
   "evenRoads": "Bez fizyki drogi: każda droga i każde pole przy każdej pogodzie trzyma jak suchy asfalt",
+  "evenTerrain": "Wyrównać teren: pole leży płasko jak droga, bez nierówności i pochyłości (wzgórza krajobrazu zostają)",
   "view.fullscreen": "Pełny ekran",
   "view.fullscreenOff": "Zamknij pełny ekran",
   "view.hudHide": "Ukryj elementy ekranu (F2)",

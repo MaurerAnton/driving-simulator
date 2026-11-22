@@ -705,6 +705,7 @@ const dict: Dict = {
   "arcadeDrive": "Arcade sürüş: vites yok, el freni yok, stop etme yok",
   "arcadeDriveNote": "Sağ pedal sürer, sol pedal fren yapar; dururken geri gitmek için sol pedalı basılı tutun – yeniden ileri gitmek için de sağ pedalı. Durduğunuzda araç olduğu yerde kalır. Motor hep çalışır ve bunların hiçbiri hata sayılmaz. Manuel vitesli bir araba otomatik şanzıman alır.",
   "evenRoads": "Yol fiziği yok: her yol ve tarla, her havada kuru asfalt gibi tutar",
+  "evenTerrain": "Yeri düzleştirmek: bir tarla yol gibi düz, çukur veya eğim olmadan (manzaranın tepeleri kalır)",
   "view.fullscreen": "Tam ekran",
   "view.fullscreenOff": "Tam ekrandan çık",
   "view.hudHide": "Göstergeleri gizle (F2)",
