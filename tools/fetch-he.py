@@ -77,6 +77,30 @@ def say(text):
     print(f'[he] {text}', flush=True)
 
 
+# The download centre refuses connections when it has just answered many requests
+# (measured: urllib.error.URLError, Errno 111, in the middle of a list of pages).
+# tools/fetch-geodata.py asks without a second try, so its api() is wrapped here:
+# the same question again after a growing pause, six times, then the error stands.
+_api_once = GD.api
+
+
+def _api(path, page=1):
+    for attempt in range(6):
+        try:
+            return _api_once(path, page)
+        except Exception as error:                                  # Connection refused, timeout, …
+            last = error
+            if attempt == 5:
+                raise
+            say(f'{path} (Seite {page}) abgewiesen ({error}) – Versuch {attempt + 2} in '
+                f'{10 * (attempt + 1)} s')
+            time.sleep(10 * (attempt + 1))
+    raise last
+
+
+GD.api = _api
+
+
 def fold(name):
     """The two products spell some districts differently (Meißner / Meissner)."""
     return name.lower().replace('ß', 'ss')
