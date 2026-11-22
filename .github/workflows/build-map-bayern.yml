@@ -210,14 +210,6 @@ jobs:
           npm run map:services -- "$OSM"
       # build-graph.ts schreibt Namen und Quellen der hessischen Karte („Nordhessen", Hessische
       # Verwaltung für Bodenmanagement und Geoinformation); hier stehen die von Bayern.
-      # Rückhalt: wenn das Anlegen des Release scheitert, sind die Teile hiermit nicht
-      # verloren, und man kann sie aus diesem Lauf von Hand ins Release legen.
-      - uses: actions/upload-artifact@v4
-        with:
-          name: karte-bayern-paket
-          path: data/work/map.tar.*
-          if-no-files-found: error
-          retention-days: 7
       - name: Der Name der Karte und ihre Quellen (map.json)
         env:
           NAME: ${{ inputs.label }}
@@ -238,6 +230,14 @@ jobs:
         run: |
           npm run map:pack
           du -sh public/map
+      # Rückhalt: wenn das Anlegen des Release scheitert, sind die Teile hiermit nicht
+      # verloren, und man kann sie aus diesem Lauf von Hand ins Release legen.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: karte-bayern-paket
+          path: data/work/map.tar.*
+          if-no-files-found: error
+          retention-days: 7
       - name: Ins Release legen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
