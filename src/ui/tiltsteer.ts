@@ -75,16 +75,28 @@ export class TiltSteer implements TiltSource {
 
   async start(): Promise<boolean> {
     if (this.listener) return true;
-    const D = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
     if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return false;
-    try {
-      if (D && typeof D.requestPermission === 'function' && (await D.requestPermission()) !== 'granted') return false;
-    } catch {
-      return false;
-    }
+    // (the listener is attached at once: on Android and most browsers the events come with no
+    //  asking.  iOS asks a permission that only a gesture may be given for, so there it is asked
+    //  at the first touch or key – until then the events simply do not arrive, and the setting
+    //  stays on rather than being turned off for want of a gesture at start-up)
     this.value = null; // (the next event calibrates)
     this.listener = this.onOrient;
     window.addEventListener('deviceorientation', this.listener);
+    const D = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
+    if (D && typeof D.requestPermission === 'function') {
+      const ask = async (): Promise<void> => {
+        window.removeEventListener('pointerdown', ask, true);
+        window.removeEventListener('keydown', ask, true);
+        try {
+          if ((await D.requestPermission!()) !== 'granted') this.stop();
+        } catch {
+          this.stop();
+        }
+      };
+      window.addEventListener('pointerdown', ask, true);
+      window.addEventListener('keydown', ask, true);
+    }
     return true;
   }
 

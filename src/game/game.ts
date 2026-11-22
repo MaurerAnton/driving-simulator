@@ -990,6 +990,10 @@ export class Game {
     // ?onfoot=1: this visit's drives begin beside the vehicle (the setting itself is not changed)
     if (q.get('onfoot') === '1') this.settings.startOutside = true;
     this.applySettings();
+    // (the tilt steering saved on: the listener is started here, so a phone held to steer does
+    //  so without the switch being touched again – iOS asks its permission at the first touch,
+    //  which ui/tiltsteer.ts waits for; a device that reports nothing leaves the setting off)
+    if (this.settings.tiltSteer) void this.setTiltSteer(true);
 
     // developer / test shortcuts: ?start=<mode>&spawn=<n>&view=chase&auto=<throttle>&cam=x,y,z,yaw,pitch&look=yaw,pitch
     const view = q.get('view');
