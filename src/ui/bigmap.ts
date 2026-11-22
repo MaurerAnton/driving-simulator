@@ -925,8 +925,18 @@ export class BigMap {
   /** A short line in the place panel (a position that could not be found). */
   private note(text: string): void {
     this.spot = null;
-    this.spotBar.replaceChildren(el('span', '', text));
-    this.spotBar.hidden = false;
+    const bar = this.spotBar;
+    bar.replaceChildren();
+    bar.hidden = false;
+    const close = el('button', 'btn ghost bm-spot-close', '✕');
+    close.type = 'button';
+    close.title = this.t('realityClose');
+    close.setAttribute('aria-label', this.t('realityClose'));
+    close.onclick = () => {
+      bar.hidden = true;
+      this.redraw();
+    };
+    bar.append(close, el('span', '', text));
     this.redraw();
   }
 
@@ -937,6 +947,17 @@ export class BigMap {
     const bar = this.spotBar;
     bar.replaceChildren();
     bar.hidden = false;
+    // (a way out of the panel without choosing anything: close it)
+    const close = el('button', 'btn ghost bm-spot-close', '✕');
+    close.type = 'button';
+    close.title = this.t('realityClose');
+    close.setAttribute('aria-label', this.t('realityClose'));
+    close.onclick = () => {
+      this.spot = null;
+      bar.hidden = true;
+      this.redraw();
+    };
+    bar.append(close);
     if (!this.spot) {
       bar.append(el('span', '', this.t('addressNoRoad')));
     } else {

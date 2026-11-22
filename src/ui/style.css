@@ -107,6 +107,7 @@ html, body {
 .bm-spot { align-self: center; display: flex; gap: 14px; align-items: center; max-width: 100%; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); flex-wrap: wrap; justify-content: center; row-gap: 8px; pointer-events: auto; }
 .bm-spot[hidden] { display: none; }
 .bm-spot .btn { padding: 9px 14px; font-size: 14px; min-height: 40px; }
+.bm-spot .bm-spot-close { min-width: 40px; padding: 9px 10px; font-size: 17px; }
 /* planning a drive: the places in their order, a tour of the streets, and who drives */
 .bm-plan {
   pointer-events: auto; max-height: 100%; width: min(360px, 100%); overflow-y: auto; overscroll-behavior: contain;
