@@ -262,13 +262,13 @@ jobs:
           EOF
           # GitHub weist ein Release mitunter mit HTTP 403 ab, obwohl der Ablauf contents: write
           # hat (so bei NRW und Rheinland-Pfalz); dann liegt das Paket schon als Artefakt bereit
-          # und der fertige Bau gilt nicht als gescheitert.
-          for try in 1 2 3; do
+          # und der fertige Bau gilt nicht als gescheitert. Sieben Versuche mit wachsender Pause.
+          for try in 1 2 3 4 5 6 7; do
             if gh release create "$tag" --latest=false --target "$GITHUB_SHA" \
                  --title "Karte $LABEL" --notes-file notes.md data/work/map.tar.*; then
               break
             fi
             echo "Versuch $try: Release abgewiesen, noch einmal"
-            sleep 30
+            sleep $((try * 60))
           done
           echo "release $tag"
