@@ -210,6 +210,14 @@ jobs:
           npm run map:services -- "$OSM"
       # build-graph.ts schreibt Namen und Quellen der hessischen Karte („Nordhessen", Hessische
       # Verwaltung für Bodenmanagement und Geoinformation); hier stehen die von Bayern.
+      # Rückhalt: wenn das Anlegen des Release scheitert, sind die Teile hiermit nicht
+      # verloren, und man kann sie aus diesem Lauf von Hand ins Release legen.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: karte-bayern-paket
+          path: data/work/map.tar.*
+          if-no-files-found: error
+          retention-days: 7
       - name: Der Name der Karte und ihre Quellen (map.json)
         env:
           NAME: ${{ inputs.label }}
@@ -255,6 +263,14 @@ jobs:
           Die Dateien map.tar.00 … sind ein Kartenpaket: sie gehören zusammen und werden im Spiel
           zusammengesetzt.
           EOF
-          gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
-            --notes-file notes.md data/work/map.tar.*
+          # auch hier darf der erste Versuch scheitern (403): sieben Versuche mit wachsender Pause,
+          # und am Ende steht fest, dass das Release wirklich da ist
+          for try in 1 2 3 4 5 6 7; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
+              --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Versuch $try: Release $tag wurde nicht angelegt"
+            sleep $((try * 60))
+          done
           echo "release $tag"
