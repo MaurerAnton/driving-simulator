@@ -599,7 +599,7 @@ jobs:
             git log --oneline -n 1
           else
             echo "Regionen unverändert"
-          fi"
+          fi
 
       # nur wenn ein Name genannt ist: die Teile in ein Release legen – von dort holt man sie
       # herunter und legt sie unter map-assets/ im Repository ab (nur so kommen sie mit CORS
