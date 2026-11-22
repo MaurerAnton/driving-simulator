@@ -474,7 +474,17 @@ def main():
     made = 0
     started = time.time()
     for east, north in todo:
-        h, empty = take(east, north)
+        try:
+            h, empty = take(east, north)
+        except OSError as e:
+            # Now and then the WCS answers with a GeoTIFF that ends early.  Rather
+            # than leaving the rectangle unfinished, take the other open source
+            # for this one square: 30 m where 1 m was wanted, but no hole.
+            if source != 'dhmv':
+                raise
+            say(f'[be] {east}_{north}: DHMV answered truncated ({e}) - '
+                f'this square from Copernicus')
+            h, empty = heights_from_copernicus(east, north)
         if empty.all():
             say(f'[be] {east}_{north}: the source has no height there')
             gaps.append(f'{east}_{north}')
