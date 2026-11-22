@@ -1,0 +1,56 @@
+{
+  "latest": "suedwest",
+  "regions": [
+    {
+      "id": "suedwest",
+      "name": "Südwest-Hessen",
+      "box": [
+        -116000,
+        72000,
+        -17000,
+        207000
+      ],
+      "map": "regions/suedwest/map.json",
+      "tiles": [
+        "37.tar",
+        "38.tar",
+        "39.tar",
+        "40.tar",
+        "41.tar",
+        "42.tar",
+        "43.tar",
+        "44.tar",
+        "45.tar",
+        "46.tar",
+        "47.tar"
+      ]
+    },
+    {
+      "id": "suedost",
+      "name": "Südost-Hessen",
+      "box": [
+        -91000,
+        28000,
+        49000,
+        146000
+      ],
+      "map": "regions/suedost/map.json",
+      "tiles": [
+        "48.tar",
+        "49.tar",
+        "50.tar",
+        "51.tar",
+        "52.tar",
+        "53.tar",
+        "54.tar",
+        "55.tar",
+        "56.tar",
+        "57.tar",
+        "58.tar",
+        "59.tar",
+        "60.tar",
+        "61.tar"
+      ]
+    }
+  ]
+}
