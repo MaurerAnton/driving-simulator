@@ -195,9 +195,21 @@ jobs:
           set -euo pipefail
           mkdir -p data/raw/osm
           base="https://download.geofabrik.de/europe/france/$REGION"
+          # zweiter Weg: OpenStreetMap Frankreich gibt dieselben alten Regionen ohne Schlüssel
+          mirror="https://download.openstreetmap.fr/extracts/europe/france"
           url="$base/$REGION-latest.osm.pbf"
           probe() { curl -fsSL --retry 12 --retry-delay 25 --retry-all-errors -r 0-1023 -o /dev/null "$1"; }
-          if ! probe "$url"; then
+          fertig=nein
+          if probe "$url"; then
+            fertig=ja
+          else
+            echo "$url antwortet nicht – zweiter Weg: $REGION bei OpenStreetMap Frankreich"
+            if probe "$mirror/$REGION-latest.osm.pbf"; then
+              url="$mirror/$REGION-latest.osm.pbf"
+              fertig=ja
+            fi
+          fi
+          if [ "$fertig" = nein ]; then
             echo "$url gibt es nicht – neueste Tagesausgabe suchen"
             tage=$(curl -fsSL --retry 12 --retry-delay 25 --retry-all-errors "$base/" 2>/dev/null \
                    | grep -oE "$REGION-[0-9]{6}\.osm\.pbf" | grep -oE "[0-9]{6}" | sort -u | tac || true)
@@ -213,7 +225,7 @@ jobs:
             [ -n "$url" ] || { echo "keine Ausgabe für $REGION gefunden"; exit 1; }
           fi
           echo "OpenStreetMap: $url"
-          curl -fsSL --retry 5 --retry-delay 20 -o "$OSM" "$url"
+          curl -fsSL --retry 12 --retry-delay 25 --retry-all-errors -o "$OSM" "$url"
           ls -l data/raw/osm
       # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
       # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
