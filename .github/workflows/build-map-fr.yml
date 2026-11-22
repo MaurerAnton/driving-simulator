@@ -204,8 +204,12 @@ jobs:
             fertig=ja
           else
             echo "$url antwortet nicht – zweiter Weg: $REGION bei OpenStreetMap Frankreich"
+            # bei OpenStreetMap Frankreich heißen die Ausgaben mit Unterstrich
             if probe "$mirror/$REGION-latest.osm.pbf"; then
               url="$mirror/$REGION-latest.osm.pbf"
+              fertig=ja
+            elif probe "$mirror/${REGION//-/_}-latest.osm.pbf"; then
+              url="$mirror/${REGION//-/_}-latest.osm.pbf"
               fertig=ja
             fi
           fi
