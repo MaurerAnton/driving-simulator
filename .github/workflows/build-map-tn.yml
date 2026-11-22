@@ -381,9 +381,9 @@ jobs:
           if [ "$DEM" = "25m" ]; then
             printf '\nBozen wurde mit dem Modell von **2,5 m** gebaut: für die 225 Kacheln von 0,5 m\n(16 777 748 B je Kachel, 3,6 GB) brauchte der Läufer über 90 min und wurde nicht fertig,\ndas Modell von 2,5 m war in 1 min da.  Hier auf dem Rechner antwortet der Dienst auf eine\nKachel von 0,5 m in 6 s – die Langsamkeit lag also am Weg zum Läufer, nicht am Dienst.\nBeide Modelle sind CC0; bei 2 m je Zelle in der Karte ist der Unterschied klein\n(gemessen an 682_5152: im Mittel 0,86 m, an Felswänden bis 17 m).\n' >> notes.md
           fi
-          # auch hier darf der erste Versuch scheitern: dreimal, und am Ende steht fest, dass das
-          # Release wirklich da ist
-          for try in 1 2 3; do
+          # auch hier darf der erste Versuch scheitern: sieben Versuche mit wachsender Pause, und am Ende
+          # steht fest, dass das Release wirklich da ist
+          for try in 1 2 3 4 5 6 7; do
             if gh release create "$tag" --latest=false --target "$GITHUB_SHA" --title "Karte $LABEL" \
               --notes-file notes.md data/work/map.tar.*; then
               break
@@ -394,7 +394,7 @@ jobs:
                gh release upload "$tag" data/work/map.tar.* --clobber; then
               break
             fi
-            sleep 30
+            sleep $((try * 60))
           done
           gh release view "$tag" --json tagName --jq .tagName
           echo "release $tag"
