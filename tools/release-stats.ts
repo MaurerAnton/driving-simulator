@@ -30,6 +30,7 @@ import { RELEASES } from '../src/game/releases.ts';
 import type { ReleaseSize } from '../src/game/releases.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const EMPTY = new Uint8Array(0);
 
 const CODE_EXT = /\.(ts|cpp|css|html|mjs|py)$/;
 
@@ -103,6 +104,17 @@ export function statsAt(ref: string): ReleaseSize {
 export function statsOfWorktree(): ReleaseSize {
   const paths = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard']).toString('utf8').split('\0').filter(Boolean);
   const files = [...new Set(paths)].flatMap((path) => {
+    // (the maps are data: only counted as bytes, so their contents are never read – a whole
+    //  map-assets/ of parts would not fit in memory, and tally would skip them anyway)
+    if (path.startsWith('map-assets/') || path.startsWith('public/map/')) {
+      try {
+        const st = statSync(resolve(root, path));
+        if (st.isFile()) return [{ path, bytes: st.size, data: EMPTY }];
+      } catch {
+        // (gone)
+      }
+      return [];
+    }
     const p = resolve(root, path);
     try {
       if (!statSync(p).isFile()) return [];
