@@ -308,16 +308,16 @@ jobs:
           kommen aus demselben Ablauf "Karte Hessen" mit anderen Zahlen.
           EOF
           # Der Spiegel wehrt mitunter jede Verbindung ab (gemessen: "Failed to connect to
-          # download.geofabrik.de port 443" über zehn Minuten, Lauf 44882600959); darum sechs
+          # download.geofabrik.de port 443" über zehn Minuten, Lauf 44882600959); darum sieben
           # Runden mit wachsender Pause – ein Rechteck Holen dauert Stunden, ein Scheitern am
           # Netz wäre sie umsonst.
-          for try in 1 2 3 4 5 6; do
+          for try in 1 2 3 4 5 6 7; do
             if gh release create "$tag" --latest=false --target "$GITHUB_SHA" \
                  --title "Karte $LABEL" --notes-file notes.md data/work/map.tar.*; then
               break
             fi
             echo "Versuch $try: Release $tag wurde nicht angelegt"
-            sleep 30
+            sleep $((try * 60))
           done
           # In diesem Repository ist gh release create gelegentlich verwehrt (HTTP 403
           # „Resource not accessible by integration", bei anderen Bögen gemessen).  Ein
