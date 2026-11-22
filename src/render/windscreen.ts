@@ -113,6 +113,9 @@ function ensureTarget(t: THREE.WebGLRenderTarget | null, w: number, h: number): 
   const next = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true, stencilBuffer: false });
   next.texture.minFilter = THREE.LinearFilter;
   next.texture.magFilter = THREE.LinearFilter;
+  // (the default framebuffer is written in sRGB (app.ts outputColorSpace): the picture kept for
+  //  the blur must be too, or it comes back linear – far too dark under the glass)
+  next.texture.colorSpace = THREE.SRGBColorSpace;
   return next;
 }
 

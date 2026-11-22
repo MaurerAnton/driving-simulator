@@ -330,6 +330,8 @@ kbd {
 .hud .dash .fuel svg { width: 18px; height: 18px; opacity: 0.35; }
 .hud .dash .fuel .bar { width: 44px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .hud .dash .fuel .bar i { display: block; height: 100%; background: #cfd6dc; }
+.hud .dash .fuel .amount { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 3.4em; color: #cfd6dc; }
+.hud .dash .fuel.low .amount { color: #ffb020; }
 .hud .dash .fuel.low svg { opacity: 1; color: #ffb020; filter: drop-shadow(0 0 4px rgba(255, 176, 32, 0.85)); }
 .hud .dash .fuel.low .bar i { background: #ffb020; }
 .hud.touchmode .dash .fuel .bar { width: 30px; }
