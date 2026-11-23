@@ -1,5 +1,5 @@
 {
-  "latest": "bw-crailsheim",
+  "latest": "niedersachsen-celle",
   "regions": [
     {
       "id": "suedwest",
@@ -1152,6 +1152,258 @@
       "map": "regions/bw-karlsruhe/map.json",
       "tiles": [
         "147.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-celle",
+      "name": "Celle",
+      "box": [
+        38000,
+        -161000,
+        53000,
+        -146000
+      ],
+      "map": "regions/niedersachsen-celle/map.json",
+      "tiles": [
+        "148.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-cloppenburg",
+      "name": "Cloppenburg und Umgebung",
+      "box": [
+        -98000,
+        -186000,
+        -83000,
+        -171000
+      ],
+      "map": "regions/niedersachsen-cloppenburg/map.json",
+      "tiles": [
+        "149.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-emden",
+      "name": "Emden und Umgebung",
+      "box": [
+        -154000,
+        -245000,
+        -139000,
+        -230000
+      ],
+      "map": "regions/niedersachsen-emden/map.json",
+      "tiles": [
+        "150.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-goettingen",
+      "name": "Göttingen",
+      "box": [
+        29000,
+        -40000,
+        44000,
+        -25000
+      ],
+      "map": "regions/niedersachsen-goettingen/map.json",
+      "tiles": [
+        "151.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-goslar",
+      "name": "Goslar",
+      "box": [
+        63000,
+        -82000,
+        78000,
+        -67000
+      ],
+      "map": "regions/niedersachsen-goslar/map.json",
+      "tiles": [
+        "152.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hameln",
+      "name": "Hameln",
+      "box": [
+        -10000,
+        -103000,
+        5000,
+        -88000
+      ],
+      "map": "regions/niedersachsen-hameln/map.json",
+      "tiles": [
+        "153.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hildesheim",
+      "name": "Hildesheim",
+      "box": [
+        30000,
+        -108000,
+        45000,
+        -93000
+      ],
+      "map": "regions/niedersachsen-hildesheim/map.json",
+      "tiles": [
+        "154.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-meppen",
+      "name": "Meppen und Umgebung",
+      "box": [
+        -151000,
+        -169000,
+        -136000,
+        -154000
+      ],
+      "map": "regions/niedersachsen-meppen/map.json",
+      "tiles": [
+        "155.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-nienburg",
+      "name": "Nienburg und Umgebung",
+      "box": [
+        -21000,
+        -162000,
+        -6000,
+        -147000
+      ],
+      "map": "regions/niedersachsen-nienburg/map.json",
+      "tiles": [
+        "156.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-northeim",
+      "name": "Northeim und Umgebung",
+      "box": [
+        34000,
+        -59000,
+        49000,
+        -44000
+      ],
+      "map": "regions/niedersachsen-northeim/map.json",
+      "tiles": [
+        "157.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-osnabrueck",
+      "name": "Osnabrück",
+      "box": [
+        -100000,
+        -123000,
+        -85000,
+        -108000
+      ],
+      "map": "regions/niedersachsen-osnabrueck/map.json",
+      "tiles": [
+        "158.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-peine",
+      "name": "Peine",
+      "box": [
+        49000,
+        -127000,
+        64000,
+        -112000
+      ],
+      "map": "regions/niedersachsen-peine/map.json",
+      "tiles": [
+        "159.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-stade",
+      "name": "Stade",
+      "box": [
+        -3000,
+        -269000,
+        12000,
+        -254000
+      ],
+      "map": "regions/niedersachsen-stade/map.json",
+      "tiles": [
+        "160.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-uelzen",
+      "name": "Uelzen und Umgebung",
+      "box": [
+        70000,
+        -200000,
+        85000,
+        -185000
+      ],
+      "map": "regions/niedersachsen-uelzen/map.json",
+      "tiles": [
+        "161.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-verden",
+      "name": "Verden",
+      "box": [
+        -19000,
+        -194000,
+        -4000,
+        -179000
+      ],
+      "map": "regions/niedersachsen-verden/map.json",
+      "tiles": [
+        "162.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wolfsburg",
+      "name": "Wolfsburg",
+      "box": [
+        87000,
+        -140000,
+        102000,
+        -125000
+      ],
+      "map": "regions/niedersachsen-wolfsburg/map.json",
+      "tiles": [
+        "163.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-braunschweig-sued",
+      "name": "Braunschweig",
+      "box": [
+        65000,
+        -107000,
+        80000,
+        -92000
+      ],
+      "map": "regions/niedersachsen-braunschweig-sued/map.json",
+      "tiles": [
+        "164.tar"
+      ]
+    },
+    {
+      "id": "rlp-alzey",
+      "name": "Alzey und Umgebung",
+      "box": [
+        -99000,
+        159000,
+        -84000,
+        174000
+      ],
+      "map": "regions/rlp-alzey/map.json",
+      "tiles": [
+        "165.tar"
       ]
     }
   ]
