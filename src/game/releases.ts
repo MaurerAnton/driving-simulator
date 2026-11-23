@@ -65,6 +65,13 @@ export interface Release {
 
 export const RELEASES: readonly Release[] = [
   {
+    version: '1.7.7',
+    date: '2026-11-23',
+    at: '',
+    items: ['news.1_7_7.regions', 'news.1_7_7.archive', 'news.1_7_7.controls'],
+    size: { lines: 300492, code: 169557, tests: 28963, i18n: 70478, bytes: 22064866, maps: 17437101391 },
+  },
+  {
     version: '1.7.6',
     date: '2026-11-22',
     at: '',
