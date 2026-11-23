@@ -52,7 +52,6 @@ export function steerFromTilt(gammaDeg: number, neutralDeg: number): number {
 /** The listeners and state of the tilt steering, when the setting is on. */
 export class TiltSteer implements TiltSource {
   private listener: ((e: DeviceOrientationEvent) => void) | null = null;
-  private neutral = 0;
   private value: number | null = null;
   /** where the steer goes every event (input.touch.steer); null: not wired */
   private readonly out: (steer: number) => void;
@@ -68,18 +67,28 @@ export class TiltSteer implements TiltSource {
   private readonly onOrient = (e: DeviceOrientationEvent): void => {
     if (e.gamma === null || e.beta === null) return;
     // (the first reading calibrates: what the phone is held at then is straight ahead)
-    if (this.value === null) this.neutral = e.gamma;
-    this.value = steerFromTilt(e.gamma, this.neutral);
+    if (this.value === null) {
+      this.neutralG = e.gamma;
+      this.neutralB = e.beta;
+    }
+    // (a phone turned left/right usually moves gamma; held another way – flat, or in a mount –
+    //  it moves beta instead.  Whichever strays further from where it was held is the turn.)
+    const dg = e.gamma - this.neutralG;
+    const db = e.beta - this.neutralB;
+    const axis = Math.abs(db) > Math.abs(dg) + 4 ? db : dg;
+    this.value = steerFromTilt(this.neutralG + axis, this.neutralG);
     // (a line in the console now and then, so a phone one cannot see into still says whether
     //  the sensor speaks and what it says – console.debug, once a second at most)
     const now = Date.now();
     if (now - this.lastLog > 1000) {
       this.lastLog = now;
-      console.debug(`[tilt] gamma ${e.gamma.toFixed(1)}° neutral ${this.neutral.toFixed(1)}° → steer ${this.value.toFixed(2)}`);
+      console.debug(`[tilt] gamma ${e.gamma.toFixed(1)}° (Δ${dg.toFixed(1)}) beta ${e.beta.toFixed(1)}° (Δ${db.toFixed(1)}) → steer ${this.value.toFixed(2)}`);
     }
     this.out(this.value);
   };
   private lastLog = 0;
+  private neutralG = 0;
+  private neutralB = 0;
 
   async start(): Promise<boolean> {
     if (this.listener) return true;
