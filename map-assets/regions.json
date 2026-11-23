@@ -1,5 +1,5 @@
 {
-  "latest": "niedersachsen-celle",
+  "latest": "berlin-ost",
   "regions": [
     {
       "id": "suedwest",
@@ -1404,6 +1404,244 @@
       "map": "regions/rlp-alzey/map.json",
       "tiles": [
         "165.tar"
+      ]
+    },
+    {
+      "id": "berlin-ost",
+      "name": "Berlin Ost und Umgebung",
+      "box": [
+        278000,
+        -158000,
+        293000,
+        -143000
+      ],
+      "map": "regions/berlin-ost/map.json",
+      "tiles": [
+        "166.tar"
+      ]
+    },
+    {
+      "id": "berlin-sued",
+      "name": "Berlin Süd und Umgebung",
+      "box": [
+        263000,
+        -143000,
+        278000,
+        -128000
+      ],
+      "map": "regions/berlin-sued/map.json",
+      "tiles": [
+        "167.tar"
+      ]
+    },
+    {
+      "id": "rlp-badkreuznach",
+      "name": "Bad Kreuznach und Umgebung",
+      "box": [
+        -117000,
+        148000,
+        -102000,
+        163000
+      ],
+      "map": "regions/rlp-badkreuznach/map.json",
+      "tiles": [
+        "168.tar"
+      ]
+    },
+    {
+      "id": "rlp-badneuenahr",
+      "name": "Bad Neuenahr-Ahrweiler und Umgebung",
+      "box": [
+        -168000,
+        69000,
+        -153000,
+        84000
+      ],
+      "map": "regions/rlp-badneuenahr/map.json",
+      "tiles": [
+        "169.tar"
+      ]
+    },
+    {
+      "id": "rlp-bitburg",
+      "name": "Bitburg und Umgebung",
+      "box": [
+        -212000,
+        131000,
+        -197000,
+        146000
+      ],
+      "map": "regions/rlp-bitburg/map.json",
+      "tiles": [
+        "170.tar"
+      ]
+    },
+    {
+      "id": "rlp-boppard",
+      "name": "Boppard und Umgebung",
+      "box": [
+        -136000,
+        105000,
+        -121000,
+        120000
+      ],
+      "map": "regions/rlp-boppard/map.json",
+      "tiles": [
+        "171.tar"
+      ]
+    },
+    {
+      "id": "rlp-cochem",
+      "name": "Cochem und Umgebung",
+      "box": [
+        -166000,
+        113000,
+        -151000,
+        128000
+      ],
+      "map": "regions/rlp-cochem/map.json",
+      "tiles": [
+        "172.tar"
+      ]
+    },
+    {
+      "id": "rlp-gerolstein",
+      "name": "Gerolstein und Umgebung",
+      "box": [
+        -202000,
+        104000,
+        -187000,
+        119000
+      ],
+      "map": "regions/rlp-gerolstein/map.json",
+      "tiles": [
+        "173.tar"
+      ]
+    },
+    {
+      "id": "rlp-gruenstadt",
+      "name": "Grünstadt und Umgebung",
+      "box": [
+        -95000,
+        178000,
+        -80000,
+        193000
+      ],
+      "map": "regions/rlp-gruenstadt/map.json",
+      "tiles": [
+        "174.tar"
+      ]
+    },
+    {
+      "id": "rlp-hachenburg",
+      "name": "Hachenburg und Umgebung",
+      "box": [
+        -119000,
+        57000,
+        -104000,
+        72000
+      ],
+      "map": "regions/rlp-hachenburg/map.json",
+      "tiles": [
+        "175.tar"
+      ]
+    },
+    {
+      "id": "rlp-hermeskeil",
+      "name": "Hermeskeil",
+      "box": [
+        -183000,
+        167000,
+        -168000,
+        182000
+      ],
+      "map": "regions/rlp-hermeskeil/map.json",
+      "tiles": [
+        "176.tar"
+      ]
+    },
+    {
+      "id": "rlp-idaroberstein",
+      "name": "Idar-Oberstein und Umgebung",
+      "box": [
+        -156000,
+        163000,
+        -141000,
+        178000
+      ],
+      "map": "regions/rlp-idaroberstein/map.json",
+      "tiles": [
+        "177.tar"
+      ]
+    },
+    {
+      "id": "rlp-kusel",
+      "name": "Kusel",
+      "box": [
+        -150000,
+        182000,
+        -135000,
+        197000
+      ],
+      "map": "regions/rlp-kusel/map.json",
+      "tiles": [
+        "178.tar"
+      ]
+    },
+    {
+      "id": "rlp-landau",
+      "name": "Landau und Umgebung",
+      "box": [
+        -99000,
+        220000,
+        -84000,
+        235000
+      ],
+      "map": "regions/rlp-landau/map.json",
+      "tiles": [
+        "179.tar"
+      ]
+    },
+    {
+      "id": "rlp-mayen",
+      "name": "Mayen und Umgebung",
+      "box": [
+        -161000,
+        93000,
+        -146000,
+        108000
+      ],
+      "map": "regions/rlp-mayen/map.json",
+      "tiles": [
+        "180.tar"
+      ]
+    },
+    {
+      "id": "rlp-montabaur",
+      "name": "Montabaur und Umgebung",
+      "box": [
+        -118000,
+        82000,
+        -103000,
+        97000
+      ],
+      "map": "regions/rlp-montabaur/map.json",
+      "tiles": [
+        "181.tar"
+      ]
+    },
+    {
+      "id": "rlp-neustadt",
+      "name": "Neustadt an der Weinstraße und Umgebung",
+      "box": [
+        -98000,
+        203000,
+        -83000,
+        218000
+      ],
+      "map": "regions/rlp-neustadt/map.json",
+      "tiles": [
+        "182.tar"
       ]
     }
   ]
