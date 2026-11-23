@@ -1,5 +1,5 @@
 {
-  "latest": "bayern-aichach",
+  "latest": "bayern-altoetting",
   "regions": [
     {
       "id": "suedwest",
@@ -578,6 +578,174 @@
       "map": "regions/bayern-kempten/map.json",
       "tiles": [
         "106.tar"
+      ]
+    },
+    {
+      "id": "bayern-altoetting",
+      "name": "Altötting",
+      "box": [
+        238000,
+        322000,
+        253000,
+        337000
+      ],
+      "map": "regions/bayern-altoetting/map.json",
+      "tiles": [
+        "107.tar"
+      ]
+    },
+    {
+      "id": "bayern-bad-toelz",
+      "name": "Bad Tölz",
+      "box": [
+        157000,
+        377000,
+        172000,
+        392000
+      ],
+      "map": "regions/bayern-bad-toelz/map.json",
+      "tiles": [
+        "108.tar"
+      ]
+    },
+    {
+      "id": "bayern-badkissingen",
+      "name": "Bad Kissingen und Umgebung",
+      "box": [
+        42000,
+        108000,
+        57000,
+        123000
+      ],
+      "map": "regions/bayern-badkissingen/map.json",
+      "tiles": [
+        "109.tar"
+      ]
+    },
+    {
+      "id": "bayern-cham",
+      "name": "Cham",
+      "box": [
+        232000,
+        212000,
+        247000,
+        227000
+      ],
+      "map": "regions/bayern-cham/map.json",
+      "tiles": [
+        "110.tar"
+      ]
+    },
+    {
+      "id": "bayern-deggendorf",
+      "name": "Deggendorf",
+      "box": [
+        255000,
+        253000,
+        270000,
+        268000
+      ],
+      "map": "regions/bayern-deggendorf/map.json",
+      "tiles": [
+        "111.tar"
+      ]
+    },
+    {
+      "id": "bayern-dillingen",
+      "name": "Dillingen an der Donau",
+      "box": [
+        75000,
+        288000,
+        90000,
+        303000
+      ],
+      "map": "regions/bayern-dillingen/map.json",
+      "tiles": [
+        "112.tar"
+      ]
+    },
+    {
+      "id": "bayern-donauwoerth",
+      "name": "Donauwörth und Umgebung",
+      "box": [
+        96000,
+        272000,
+        111000,
+        287000
+      ],
+      "map": "regions/bayern-donauwoerth/map.json",
+      "tiles": [
+        "113.tar"
+      ]
+    },
+    {
+      "id": "bayern-eggenfelden",
+      "name": "Eggenfelden",
+      "box": [
+        244000,
+        302000,
+        259000,
+        317000
+      ],
+      "map": "regions/bayern-eggenfelden/map.json",
+      "tiles": [
+        "114.tar"
+      ]
+    },
+    {
+      "id": "bayern-eichstaett",
+      "name": "Eichstätt und Umgebung",
+      "box": [
+        126000,
+        252000,
+        141000,
+        267000
+      ],
+      "map": "regions/bayern-eichstaett/map.json",
+      "tiles": [
+        "115.tar"
+      ]
+    },
+    {
+      "id": "bayern-garmisch",
+      "name": "Garmisch-Partenkirchen und Umgebung",
+      "box": [
+        123000,
+        408000,
+        138000,
+        423000
+      ],
+      "map": "regions/bayern-garmisch/map.json",
+      "tiles": [
+        "116.tar"
+      ]
+    },
+    {
+      "id": "bayern-hassfurt",
+      "name": "Haßfurt und Umgebung",
+      "box": [
+        73000,
+        127000,
+        88000,
+        142000
+      ],
+      "map": "regions/bayern-hassfurt/map.json",
+      "tiles": [
+        "117.tar"
+      ]
+    },
+    {
+      "id": "bayern-kelheim",
+      "name": "Kelheim",
+      "box": [
+        175000,
+        247000,
+        190000,
+        262000
+      ],
+      "map": "regions/bayern-kelheim/map.json",
+      "tiles": [
+        "118.tar"
       ]
     }
   ]
