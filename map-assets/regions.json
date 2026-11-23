@@ -1,5 +1,5 @@
 {
-  "latest": "bw-freiburg",
+  "latest": "bayern-aichach",
   "regions": [
     {
       "id": "suedwest",
@@ -438,6 +438,146 @@
       "map": "regions/nrw-wesel/map.json",
       "tiles": [
         "96.tar"
+      ]
+    },
+    {
+      "id": "bayern-aichach",
+      "name": "Aichach",
+      "box": [
+        122000,
+        300000,
+        137000,
+        315000
+      ],
+      "map": "regions/bayern-aichach/map.json",
+      "tiles": [
+        "97.tar"
+      ]
+    },
+    {
+      "id": "bayern-allgaeu",
+      "name": "Augsburg und Umgebung",
+      "box": [
+        74000,
+        358000,
+        89000,
+        373000
+      ],
+      "map": "regions/bayern-allgaeu/map.json",
+      "tiles": [
+        "98.tar"
+      ]
+    },
+    {
+      "id": "bayern-ansbach",
+      "name": "Ansbach und Umgebung",
+      "box": [
+        84000,
+        208000,
+        99000,
+        223000
+      ],
+      "map": "regions/bayern-ansbach/map.json",
+      "tiles": [
+        "99.tar"
+      ]
+    },
+    {
+      "id": "bayern-aschaffenburg",
+      "name": "Aschaffenburg und Umgebung",
+      "box": [
+        -24000,
+        134000,
+        -9000,
+        149000
+      ],
+      "map": "regions/bayern-aschaffenburg/map.json",
+      "tiles": [
+        "100.tar"
+      ]
+    },
+    {
+      "id": "bayern-bamberg",
+      "name": "Bamberg und Umgebung",
+      "box": [
+        102000,
+        141000,
+        117000,
+        156000
+      ],
+      "map": "regions/bayern-bamberg/map.json",
+      "tiles": [
+        "101.tar"
+      ]
+    },
+    {
+      "id": "bayern-bayreuth",
+      "name": "Bayreuth und Umgebung",
+      "box": [
+        150000,
+        135000,
+        165000,
+        150000
+      ],
+      "map": "regions/bayern-bayreuth/map.json",
+      "tiles": [
+        "102.tar"
+      ]
+    },
+    {
+      "id": "bayern-coburg",
+      "name": "Coburg und Umgebung",
+      "box": [
+        105000,
+        101000,
+        120000,
+        116000
+      ],
+      "map": "regions/bayern-coburg/map.json",
+      "tiles": [
+        "103.tar"
+      ]
+    },
+    {
+      "id": "bayern-freising",
+      "name": "Freising und Umgebung",
+      "box": [
+        168000,
+        305000,
+        183000,
+        320000
+      ],
+      "map": "regions/bayern-freising/map.json",
+      "tiles": [
+        "104.tar"
+      ]
+    },
+    {
+      "id": "bayern-ingolstadt",
+      "name": "Ingolstadt und Umgebung",
+      "box": [
+        143000,
+        266000,
+        158000,
+        281000
+      ],
+      "map": "regions/bayern-ingolstadt/map.json",
+      "tiles": [
+        "105.tar"
+      ]
+    },
+    {
+      "id": "bayern-kempten",
+      "name": "Kempten und Umgebung",
+      "box": [
+        64000,
+        383000,
+        79000,
+        398000
+      ],
+      "map": "regions/bayern-kempten/map.json",
+      "tiles": [
+        "106.tar"
       ]
     }
   ]
