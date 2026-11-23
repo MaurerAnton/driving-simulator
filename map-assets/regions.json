@@ -1,5 +1,5 @@
 {
-  "latest": "nrw-duesseldorf",
+  "latest": "nrw-bielefeld",
   "regions": [
     {
       "id": "suedwest",
@@ -139,6 +139,65 @@
       "tiles": [
         "71.tar",
         "72.tar"
+      ]
+    },
+    {
+      "id": "nrw-bielefeld",
+      "name": "Bielefeld",
+      "box": [
+        -67000,
+        -94000,
+        -52000,
+        -79000
+      ],
+      "map": "regions/nrw-bielefeld/map.json",
+      "tiles": [
+        "73.tar",
+        "74.tar"
+      ]
+    },
+    {
+      "id": "nrw-muenster",
+      "name": "Münster",
+      "box": [
+        -129000,
+        -88000,
+        -114000,
+        -73000
+      ],
+      "map": "regions/nrw-muenster/map.json",
+      "tiles": [
+        "75.tar"
+      ]
+    },
+    {
+      "id": "nrw-wuppertal",
+      "name": "Wuppertal",
+      "box": [
+        -163000,
+        -10000,
+        -148000,
+        5000
+      ],
+      "map": "regions/nrw-wuppertal/map.json",
+      "tiles": [
+        "76.tar",
+        "77.tar"
+      ]
+    },
+    {
+      "id": "nrw-duisburg",
+      "name": "Duisburg",
+      "box": [
+        -191000,
+        -31000,
+        -176000,
+        -16000
+      ],
+      "map": "regions/nrw-duisburg/map.json",
+      "tiles": [
+        "78.tar",
+        "79.tar"
       ]
     }
   ]
