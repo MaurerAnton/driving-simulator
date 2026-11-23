@@ -1,5 +1,5 @@
 {
-  "latest": "berlin-ost",
+  "latest": "at-amstetten",
   "regions": [
     {
       "id": "suedwest",
@@ -1642,6 +1642,286 @@
       "map": "regions/rlp-neustadt/map.json",
       "tiles": [
         "182.tar"
+      ]
+    },
+    {
+      "id": "at-amstetten",
+      "name": "Amstetten und Umgebung",
+      "box": [
+        402000,
+        324000,
+        417000,
+        339000
+      ],
+      "map": "regions/at-amstetten/map.json",
+      "tiles": [
+        "183.tar"
+      ]
+    },
+    {
+      "id": "at-bludenz",
+      "name": "Bludenz",
+      "box": [
+        27000,
+        448000,
+        42000,
+        463000
+      ],
+      "map": "regions/at-bludenz/map.json",
+      "tiles": [
+        "184.tar"
+      ]
+    },
+    {
+      "id": "at-bregenz",
+      "name": "Bregenz",
+      "box": [
+        21000,
+        409000,
+        36000,
+        424000
+      ],
+      "map": "regions/at-bregenz/map.json",
+      "tiles": [
+        "185.tar"
+      ]
+    },
+    {
+      "id": "at-feldbach",
+      "name": "Feldbach und Umgebung",
+      "box": [
+        489000,
+        447000,
+        504000,
+        462000
+      ],
+      "map": "regions/at-feldbach/map.json",
+      "tiles": [
+        "186.tar"
+      ]
+    },
+    {
+      "id": "at-feldkirch",
+      "name": "Feldkirch",
+      "box": [
+        3000,
+        439000,
+        18000,
+        454000
+      ],
+      "map": "regions/at-feldkirch/map.json",
+      "tiles": [
+        "187.tar"
+      ]
+    },
+    {
+      "id": "at-graz",
+      "name": "Graz und Umgebung",
+      "box": [
+        454000,
+        437000,
+        469000,
+        452000
+      ],
+      "map": "regions/at-graz/map.json",
+      "tiles": [
+        "188.tar"
+      ]
+    },
+    {
+      "id": "at-gussing",
+      "name": "Güssing und Umgebung",
+      "box": [
+        521000,
+        432000,
+        536000,
+        447000
+      ],
+      "map": "regions/at-gussing/map.json",
+      "tiles": [
+        "189.tar"
+      ]
+    },
+    {
+      "id": "at-hartberg",
+      "name": "Hartberg und Umgebung",
+      "box": [
+        494000,
+        410000,
+        509000,
+        425000
+      ],
+      "map": "regions/at-hartberg/map.json",
+      "tiles": [
+        "190.tar"
+      ]
+    },
+    {
+      "id": "at-imst",
+      "name": "Imst",
+      "box": [
+        96000,
+        435000,
+        111000,
+        450000
+      ],
+      "map": "regions/at-imst/map.json",
+      "tiles": [
+        "191.tar"
+      ]
+    },
+    {
+      "id": "at-innsbruck",
+      "name": "Innsbruck",
+      "box": [
+        147000,
+        432000,
+        162000,
+        447000
+      ],
+      "map": "regions/at-innsbruck/map.json",
+      "tiles": [
+        "192.tar"
+      ]
+    },
+    {
+      "id": "at-judenburg",
+      "name": "Judenburg und Umgebung",
+      "box": [
+        394000,
+        430000,
+        409000,
+        445000
+      ],
+      "map": "regions/at-judenburg/map.json",
+      "tiles": [
+        "193.tar"
+      ]
+    },
+    {
+      "id": "at-klagenfurt",
+      "name": "Klagenfurt und Umgebung",
+      "box": [
+        371000,
+        492000,
+        386000,
+        507000
+      ],
+      "map": "regions/at-klagenfurt/map.json",
+      "tiles": [
+        "194.tar"
+      ]
+    },
+    {
+      "id": "at-landeck",
+      "name": "Landeck",
+      "box": [
+        84000,
+        455000,
+        99000,
+        470000
+      ],
+      "map": "regions/at-landeck/map.json",
+      "tiles": [
+        "195.tar"
+      ]
+    },
+    {
+      "id": "at-lienz",
+      "name": "Lienz und Umgebung",
+      "box": [
+        257000,
+        477000,
+        272000,
+        492000
+      ],
+      "map": "regions/at-lienz/map.json",
+      "tiles": [
+        "196.tar"
+      ]
+    },
+    {
+      "id": "at-liezen",
+      "name": "Liezen und Umgebung",
+      "box": [
+        358000,
+        388000,
+        373000,
+        403000
+      ],
+      "map": "regions/at-liezen/map.json",
+      "tiles": [
+        "197.tar"
+      ]
+    },
+    {
+      "id": "at-lilienfeld",
+      "name": "Lilienfeld und Umgebung",
+      "box": [
+        457000,
+        331000,
+        472000,
+        346000
+      ],
+      "map": "regions/at-lilienfeld/map.json",
+      "tiles": [
+        "198.tar"
+      ]
+    },
+    {
+      "id": "at-linz",
+      "name": "Linz und Umgebung",
+      "box": [
+        357000,
+        306000,
+        372000,
+        321000
+      ],
+      "map": "regions/at-linz/map.json",
+      "tiles": [
+        "199.tar"
+      ]
+    },
+    {
+      "id": "at-murau",
+      "name": "Murau und Umgebung",
+      "box": [
+        357000,
+        440000,
+        372000,
+        455000
+      ],
+      "map": "regions/at-murau/map.json",
+      "tiles": [
+        "200.tar"
+      ]
+    },
+    {
+      "id": "at-neunkirchen",
+      "name": "Neunkirchen und Umgebung",
+      "box": [
+        496000,
+        359000,
+        511000,
+        374000
+      ],
+      "map": "regions/at-neunkirchen/map.json",
+      "tiles": [
+        "201.tar"
+      ]
+    },
+    {
+      "id": "at-probe",
+      "name": "Bregenz (Probe 2 km)",
+      "box": [
+        28000,
+        415000,
+        30000,
+        417000
+      ],
+      "map": "regions/at-probe/map.json",
+      "tiles": [
+        "202.tar"
       ]
     }
   ]
