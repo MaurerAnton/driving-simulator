@@ -1,5 +1,5 @@
 {
-  "latest": "be-florenville",
+  "latest": "norwegen-alesund",
   "regions": [
     {
       "id": "suedwest",
@@ -2749,6 +2749,342 @@
       "map": "regions/be-oostende/map.json",
       "tiles": [
         "262.tar"
+      ]
+    },
+    {
+      "id": "norwegen-alesund",
+      "name": "Alesund",
+      "box": [
+        -182000,
+        -1260000,
+        -167000,
+        -1245000
+      ],
+      "map": "regions/norwegen-alesund/map.json",
+      "tiles": [
+        "263.tar"
+      ]
+    },
+    {
+      "id": "norwegen-alver",
+      "name": "Alver",
+      "box": [
+        -250000,
+        -1060000,
+        -235000,
+        -1045000
+      ],
+      "map": "regions/norwegen-alver/map.json",
+      "tiles": [
+        "264.tar"
+      ]
+    },
+    {
+      "id": "norwegen-andalsnes",
+      "name": "Åndalsnes",
+      "box": [
+        -103000,
+        -1268000,
+        -88000,
+        -1253000
+      ],
+      "map": "regions/norwegen-andalsnes/map.json",
+      "tiles": [
+        "265.tar"
+      ]
+    },
+    {
+      "id": "norwegen-arendal",
+      "name": "Arendal",
+      "box": [
+        -49000,
+        -809000,
+        -34000,
+        -794000
+      ],
+      "map": "regions/norwegen-arendal/map.json",
+      "tiles": [
+        "266.tar"
+      ]
+    },
+    {
+      "id": "norwegen-askim",
+      "name": "Askim",
+      "box": [
+        87000,
+        -937000,
+        102000,
+        -922000
+      ],
+      "map": "regions/norwegen-askim/map.json",
+      "tiles": [
+        "267.tar"
+      ]
+    },
+    {
+      "id": "norwegen-askvoll",
+      "name": "Askvoll",
+      "box": [
+        -250000,
+        -1135000,
+        -235000,
+        -1120000
+      ],
+      "map": "regions/norwegen-askvoll/map.json",
+      "tiles": [
+        "268.tar"
+      ]
+    },
+    {
+      "id": "norwegen-austevoll",
+      "name": "Austevoll",
+      "box": [
+        -250000,
+        -985000,
+        -235000,
+        -970000
+      ],
+      "map": "regions/norwegen-austevoll/map.json",
+      "tiles": [
+        "269.tar"
+      ]
+    },
+    {
+      "id": "norwegen-bergen",
+      "name": "Bergen",
+      "box": [
+        -238000,
+        -1031000,
+        -223000,
+        -1016000
+      ],
+      "map": "regions/norwegen-bergen/map.json",
+      "tiles": [
+        "270.tar"
+      ]
+    },
+    {
+      "id": "norwegen-bjornafjorden",
+      "name": "Bjørnafjorden",
+      "box": [
+        -235000,
+        -1000000,
+        -220000,
+        -985000
+      ],
+      "map": "regions/norwegen-bjornafjorden/map.json",
+      "tiles": [
+        "271.tar"
+      ]
+    },
+    {
+      "id": "norwegen-bo",
+      "name": "Bø",
+      "box": [
+        -32000,
+        -916000,
+        -17000,
+        -901000
+      ],
+      "map": "regions/norwegen-bo/map.json",
+      "tiles": [
+        "272.tar"
+      ]
+    },
+    {
+      "id": "norwegen-bokn",
+      "name": "Bokn",
+      "box": [
+        -235000,
+        -895000,
+        -220000,
+        -880000
+      ],
+      "map": "regions/norwegen-bokn/map.json",
+      "tiles": [
+        "273.tar"
+      ]
+    },
+    {
+      "id": "norwegen-brekstad",
+      "name": "Brekstad",
+      "box": [
+        -3000,
+        -1392000,
+        12000,
+        -1377000
+      ],
+      "map": "regions/norwegen-brekstad/map.json",
+      "tiles": [
+        "274.tar"
+      ]
+    },
+    {
+      "id": "norwegen-bremanger",
+      "name": "Bremanger",
+      "box": [
+        -250000,
+        -1180000,
+        -235000,
+        -1165000
+      ],
+      "map": "regions/norwegen-bremanger/map.json",
+      "tiles": [
+        "275.tar"
+      ]
+    },
+    {
+      "id": "norwegen-dombas",
+      "name": "Dombås",
+      "box": [
+        -29000,
+        -1212000,
+        -14000,
+        -1197000
+      ],
+      "map": "regions/norwegen-dombas/map.json",
+      "tiles": [
+        "276.tar"
+      ]
+    },
+    {
+      "id": "norwegen-drammen",
+      "name": "Drammen",
+      "box": [
+        33000,
+        -954000,
+        48000,
+        -939000
+      ],
+      "map": "regions/norwegen-drammen/map.json",
+      "tiles": [
+        "277.tar"
+      ]
+    },
+    {
+      "id": "norwegen-egersund",
+      "name": "Egersund",
+      "box": [
+        -210000,
+        -812000,
+        -195000,
+        -797000
+      ],
+      "map": "regions/norwegen-egersund/map.json",
+      "tiles": [
+        "278.tar"
+      ]
+    },
+    {
+      "id": "norwegen-eidsvoll",
+      "name": "Eidsvoll",
+      "box": [
+        89000,
+        -1022000,
+        104000,
+        -1007000
+      ],
+      "map": "regions/norwegen-eidsvoll/map.json",
+      "tiles": [
+        "279.tar"
+      ]
+    },
+    {
+      "id": "norwegen-elverum",
+      "name": "Elverum",
+      "box": [
+        112000,
+        -1087000,
+        127000,
+        -1072000
+      ],
+      "map": "regions/norwegen-elverum/map.json",
+      "tiles": [
+        "280.tar"
+      ]
+    },
+    {
+      "id": "norwegen-fagernes",
+      "name": "Fagernes",
+      "box": [
+        -23000,
+        -1091000,
+        -8000,
+        -1076000
+      ],
+      "map": "regions/norwegen-fagernes/map.json",
+      "tiles": [
+        "281.tar"
+      ]
+    },
+    {
+      "id": "norwegen-farsund",
+      "name": "Farsund",
+      "box": [
+        -165000,
+        -771000,
+        -150000,
+        -756000
+      ],
+      "map": "regions/norwegen-farsund/map.json",
+      "tiles": [
+        "282.tar"
+      ]
+    },
+    {
+      "id": "norwegen-fjaler",
+      "name": "Fjaler",
+      "box": [
+        -235000,
+        -1135000,
+        -220000,
+        -1120000
+      ],
+      "map": "regions/norwegen-fjaler/map.json",
+      "tiles": [
+        "283.tar"
+      ]
+    },
+    {
+      "id": "norwegen-flekkefjord",
+      "name": "Flekkefjord",
+      "box": [
+        -173000,
+        -794000,
+        -158000,
+        -779000
+      ],
+      "map": "regions/norwegen-flekkefjord/map.json",
+      "tiles": [
+        "284.tar"
+      ]
+    },
+    {
+      "id": "norwegen-fredrikstad",
+      "name": "Fredrikstad",
+      "box": [
+        76000,
+        -896000,
+        91000,
+        -881000
+      ],
+      "map": "regions/norwegen-fredrikstad/map.json",
+      "tiles": [
+        "285.tar"
+      ]
+    },
+    {
+      "id": "norwegen-gjovik",
+      "name": "Gjøvik",
+      "box": [
+        57000,
+        -1071000,
+        72000,
+        -1056000
+      ],
+      "map": "regions/norwegen-gjovik/map.json",
+      "tiles": [
+        "286.tar"
       ]
     }
   ]
