@@ -200,7 +200,10 @@ function main(): void {
   const archiveBase = arg('archive', '');
   // (an archive holds the earlier versions: this site only names it, and keeps no room of its own for them)
   const archiveUrl = arg('archive-url', '');
-  const mapBase = arg('map-base', archiveBase ? `${archiveBase.replace(/\/+$/, '')}/` : '../../');
+  // (where the map and the signs lie, seen from a version's page: this site's own, or – an archive –
+  //  the absolute address of the site that keeps the map)
+  const mapSite = arg('map-site', '');
+  const mapBase = arg('map-base', mapSite ? `${mapSite.replace(/\/+$/, '')}/` : '../../');
   const budget = archiveBase ? Number.POSITIVE_INFINITY : archiveUrl ? 0 : Number(arg('budget', String(DEFAULT_BUDGET)));
   const packDir = process.argv.includes('--pack') ? resolve(root, arg('pack', 'data/work/old-versions')) : null;
   // (an archive has no newest build of its own: the newest stays on the main site, and the archive

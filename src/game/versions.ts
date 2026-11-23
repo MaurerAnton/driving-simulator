@@ -82,8 +82,8 @@ export function siteRoot(baseHref: string): string {
 /** The address of a version: the top of the site for the latest one, v/<version>/ below it for the others. */
 export function versionHref(root: string, version: string, latest: string, archive?: string): string {
   if (version === latest) return root;
-  // (an archive of its own holds the earlier versions: their address is there, not below this site)
-  if (archive) return new URL(`${version}/`, archive.endsWith('/') ? archive : `${archive}/`).href;
+  // (an archive of its own holds the earlier versions under v/, as this site does)
+  if (archive) return new URL(`${VERSION_DIR}${version}/`, archive.endsWith('/') ? archive : `${archive}/`).href;
   return new URL(`${VERSION_DIR}${version}/`, root).href;
 }
 

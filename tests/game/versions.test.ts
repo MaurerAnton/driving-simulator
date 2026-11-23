@@ -159,7 +159,7 @@ test('an archive of its own holds the earlier versions: they are played from the
   assert.ok(playable(list, '1.6.0'));
   assert.ok(playable(list, '0.9.0'));
   assert.ok(!playable(list, '0.7.0'), 'cannot read the map of today');
-  assert.equal(versionHref('https://example.github.io/site/', '1.6.0', '1.7.0', list.archive), 'https://example.github.io/archive/1.6.0/');
+  assert.equal(versionHref('https://example.github.io/site/', '1.6.0', '1.7.0', list.archive), 'https://example.github.io/archive/v/1.6.0/');
   // (the newest is still this site's, and without an archive the versions lie below it)
   assert.equal(versionHref('https://example.github.io/site/', '1.7.0', '1.7.0', list.archive), 'https://example.github.io/site/');
   assert.equal(versionHref('https://example.github.io/site/', '1.6.0', '1.7.0'), 'https://example.github.io/site/v/1.6.0/');
