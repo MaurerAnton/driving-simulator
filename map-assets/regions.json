@@ -77,8 +77,8 @@
       ],
       "map": "regions/nrw-duesseldorf/map.json",
       "tiles": [
-        "62.tar",
-        "63.tar"
+        "63.tar",
+        "64.tar"
       ]
     },
     {
@@ -92,8 +92,8 @@
       ],
       "map": "regions/nrw-bonn/map.json",
       "tiles": [
-        "64.tar",
-        "65.tar"
+        "65.tar",
+        "66.tar"
       ]
     },
     {
@@ -107,8 +107,8 @@
       ],
       "map": "regions/nrw-dortmund/map.json",
       "tiles": [
-        "66.tar",
-        "67.tar"
+        "67.tar",
+        "68.tar"
       ]
     },
     {
@@ -122,8 +122,8 @@
       ],
       "map": "regions/nrw-essen/map.json",
       "tiles": [
-        "68.tar",
-        "69.tar"
+        "69.tar",
+        "70.tar"
       ]
     },
     {
@@ -137,8 +137,8 @@
       ],
       "map": "regions/nrw-bochum/map.json",
       "tiles": [
-        "70.tar",
-        "71.tar"
+        "71.tar",
+        "72.tar"
       ]
     }
   ]
