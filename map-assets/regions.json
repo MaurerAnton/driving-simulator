@@ -1,5 +1,5 @@
 {
-  "latest": "suedwest",
+  "latest": "nrw",
   "regions": [
     {
       "id": "suedwest",
@@ -50,6 +50,20 @@
         "59.tar",
         "60.tar",
         "61.tar"
+      ]
+    },
+    {
+      "id": "nrw",
+      "name": "Köln",
+      "box": [
+        -173000,
+        30000,
+        -167000,
+        36000
+      ],
+      "map": "regions/nrw/map.json",
+      "tiles": [
+        "62.tar"
       ]
     }
   ]
