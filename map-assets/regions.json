@@ -1,5 +1,5 @@
 {
-  "latest": "be-aalst",
+  "latest": "be-florenville",
   "regions": [
     {
       "id": "suedwest",
@@ -2441,6 +2441,314 @@
       "map": "regions/be-fauvillers/map.json",
       "tiles": [
         "240.tar"
+      ]
+    },
+    {
+      "id": "be-florenville",
+      "name": "Florenville und Umgebung",
+      "box": [
+        -302000,
+        159000,
+        -287000,
+        174000
+      ],
+      "map": "regions/be-florenville/map.json",
+      "tiles": [
+        "241.tar"
+      ]
+    },
+    {
+      "id": "be-genk",
+      "name": "Genk und Umgebung",
+      "box": [
+        -277000,
+        19000,
+        -262000,
+        34000
+      ],
+      "map": "regions/be-genk/map.json",
+      "tiles": [
+        "242.tar"
+      ]
+    },
+    {
+      "id": "be-gent",
+      "name": "Gent und Umgebung",
+      "box": [
+        -405000,
+        1000,
+        -390000,
+        16000
+      ],
+      "map": "regions/be-gent/map.json",
+      "tiles": [
+        "243.tar"
+      ]
+    },
+    {
+      "id": "be-geraardsbergen",
+      "name": "Geraardsbergen und Umgebung",
+      "box": [
+        -396000,
+        34000,
+        -381000,
+        49000
+      ],
+      "map": "regions/be-geraardsbergen/map.json",
+      "tiles": [
+        "244.tar"
+      ]
+    },
+    {
+      "id": "be-hasselt",
+      "name": "Hasselt und Umgebung",
+      "box": [
+        -292000,
+        21000,
+        -277000,
+        36000
+      ],
+      "map": "regions/be-hasselt/map.json",
+      "tiles": [
+        "245.tar"
+      ]
+    },
+    {
+      "id": "be-herentals",
+      "name": "Herentals und Umgebung",
+      "box": [
+        -327000,
+        -8000,
+        -312000,
+        7000
+      ],
+      "map": "regions/be-herentals/map.json",
+      "tiles": [
+        "246.tar"
+      ]
+    },
+    {
+      "id": "be-houffalize",
+      "name": "Houffalize und Umgebung",
+      "box": [
+        -266000,
+        112000,
+        -251000,
+        127000
+      ],
+      "map": "regions/be-houffalize/map.json",
+      "tiles": [
+        "247.tar"
+      ]
+    },
+    {
+      "id": "be-huy",
+      "name": "Huy und Umgebung",
+      "box": [
+        -302000,
+        67000,
+        -287000,
+        82000
+      ],
+      "map": "regions/be-huy/map.json",
+      "tiles": [
+        "248.tar"
+      ]
+    },
+    {
+      "id": "be-ieper",
+      "name": "Ieper und Umgebung",
+      "box": [
+        -466000,
+        19000,
+        -451000,
+        34000
+      ],
+      "map": "regions/be-ieper/map.json",
+      "tiles": [
+        "249.tar"
+      ]
+    },
+    {
+      "id": "be-kortrijk",
+      "name": "Kortrijk und Umgebung",
+      "box": [
+        -438000,
+        23000,
+        -423000,
+        38000
+      ],
+      "map": "regions/be-kortrijk/map.json",
+      "tiles": [
+        "250.tar"
+      ]
+    },
+    {
+      "id": "be-lalouviere",
+      "name": "La Louviere und Umgebung",
+      "box": [
+        -377000,
+        68000,
+        -362000,
+        83000
+      ],
+      "map": "regions/be-lalouviere/map.json",
+      "tiles": [
+        "251.tar"
+      ]
+    },
+    {
+      "id": "be-leuven",
+      "name": "Leuven und Umgebung",
+      "box": [
+        -337000,
+        25000,
+        -322000,
+        40000
+      ],
+      "map": "regions/be-leuven/map.json",
+      "tiles": [
+        "252.tar"
+      ]
+    },
+    {
+      "id": "be-lommel",
+      "name": "Lommel und Umgebung",
+      "box": [
+        -293000,
+        -10000,
+        -278000,
+        5000
+      ],
+      "map": "regions/be-lommel/map.json",
+      "tiles": [
+        "253.tar"
+      ]
+    },
+    {
+      "id": "be-luttich",
+      "name": "Lüttich und Umgebung",
+      "box": [
+        -278000,
+        55000,
+        -263000,
+        70000
+      ],
+      "map": "regions/be-luttich/map.json",
+      "tiles": [
+        "254.tar"
+      ]
+    },
+    {
+      "id": "be-maaseik",
+      "name": "Maaseik und Umgebung",
+      "box": [
+        -260000,
+        6000,
+        -245000,
+        21000
+      ],
+      "map": "regions/be-maaseik/map.json",
+      "tiles": [
+        "255.tar"
+      ]
+    },
+    {
+      "id": "be-malmedy",
+      "name": "Malmedy und Umgebung",
+      "box": [
+        -246000,
+        79000,
+        -231000,
+        94000
+      ],
+      "map": "regions/be-malmedy/map.json",
+      "tiles": [
+        "256.tar"
+      ]
+    },
+    {
+      "id": "be-marche",
+      "name": "Marche-en-Famenne und Umgebung",
+      "box": [
+        -297000,
+        100000,
+        -282000,
+        115000
+      ],
+      "map": "regions/be-marche/map.json",
+      "tiles": [
+        "257.tar"
+      ]
+    },
+    {
+      "id": "be-mechelen",
+      "name": "Mechelen und Umgebung",
+      "box": [
+        -352000,
+        9000,
+        -337000,
+        24000
+      ],
+      "map": "regions/be-mechelen/map.json",
+      "tiles": [
+        "258.tar"
+      ]
+    },
+    {
+      "id": "be-mons",
+      "name": "Mons und Umgebung",
+      "box": [
+        -393000,
+        69000,
+        -378000,
+        84000
+      ],
+      "map": "regions/be-mons/map.json",
+      "tiles": [
+        "259.tar"
+      ]
+    },
+    {
+      "id": "be-namur",
+      "name": "Namur und Umgebung",
+      "box": [
+        -328000,
+        71000,
+        -313000,
+        86000
+      ],
+      "map": "regions/be-namur/map.json",
+      "tiles": [
+        "260.tar"
+      ]
+    },
+    {
+      "id": "be-neufchateau",
+      "name": "Neufchateau und Umgebung",
+      "box": [
+        -291000,
+        144000,
+        -276000,
+        159000
+      ],
+      "map": "regions/be-neufchateau/map.json",
+      "tiles": [
+        "261.tar"
+      ]
+    },
+    {
+      "id": "be-oostende",
+      "name": "Oostende und Umgebung",
+      "box": [
+        -460000,
+        -22000,
+        -445000,
+        -7000
+      ],
+      "map": "regions/be-oostende/map.json",
+      "tiles": [
+        "262.tar"
       ]
     }
   ]
