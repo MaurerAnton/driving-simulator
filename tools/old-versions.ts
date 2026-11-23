@@ -251,6 +251,8 @@ function main(): void {
   // (builds of an earlier recipe: no longer of use)
   for (const e of readdirSync(cache)) if (!e.endsWith(`-r${RECIPE}`)) rmSync(join(cache, e), { recursive: true, force: true });
   rmSync(join(out, 'v'), { recursive: true, force: true });
+  // (an archive begins with an empty dist/ – no newest build there: make it)
+  mkdirSync(out, { recursive: true });
   const room = budget - folderSize(out) - 64 * 1024;
   const hosted = chooseHosted(tags, sizes, room);
   for (const v of hosted) cpSync(dirOf(v), join(out, 'v', v), { recursive: true });
