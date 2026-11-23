@@ -1,5 +1,5 @@
 {
-  "latest": "bayern",
+  "latest": "bw-freiburg",
   "regions": [
     {
       "id": "suedwest",
@@ -339,6 +339,105 @@
       "map": "regions/niedersachsen-oldenburg/map.json",
       "tiles": [
         "87.tar"
+      ]
+    },
+    {
+      "id": "bw-freiburg",
+      "name": "Freiburg und Umgebung",
+      "box": [
+        -121000,
+        354000,
+        -106000,
+        369000
+      ],
+      "map": "regions/bw-freiburg/map.json",
+      "tiles": [
+        "89.tar"
+      ]
+    },
+    {
+      "id": "bayern-nuernberg",
+      "name": "Nürnberg und Umgebung",
+      "box": [
+        116000,
+        190000,
+        131000,
+        205000
+      ],
+      "map": "regions/bayern-nuernberg/map.json",
+      "tiles": [
+        "90.tar",
+        "91.tar"
+      ]
+    },
+    {
+      "id": "nrw-krefeld",
+      "name": "Krefeld",
+      "box": [
+        -206000,
+        -20000,
+        -191000,
+        -5000
+      ],
+      "map": "regions/nrw-krefeld/map.json",
+      "tiles": [
+        "92.tar"
+      ]
+    },
+    {
+      "id": "nrw-hamm",
+      "name": "Hamm",
+      "box": [
+        -116000,
+        -56000,
+        -101000,
+        -41000
+      ],
+      "map": "regions/nrw-hamm/map.json",
+      "tiles": [
+        "93.tar"
+      ]
+    },
+    {
+      "id": "bw-ulm",
+      "name": "Ulm und Umgebung",
+      "box": [
+        38000,
+        309000,
+        53000,
+        324000
+      ],
+      "map": "regions/bw-ulm/map.json",
+      "tiles": [
+        "94.tar"
+      ]
+    },
+    {
+      "id": "nrw-recklinghausen",
+      "name": "Recklinghausen",
+      "box": [
+        -160000,
+        -53000,
+        -145000,
+        -38000
+      ],
+      "map": "regions/nrw-recklinghausen/map.json",
+      "tiles": [
+        "95.tar"
+      ]
+    },
+    {
+      "id": "nrw-wesel",
+      "name": "Wesel",
+      "box": [
+        -200000,
+        -56000,
+        -185000,
+        -41000
+      ],
+      "map": "regions/nrw-wesel/map.json",
+      "tiles": [
+        "96.tar"
       ]
     }
   ]
