@@ -41,7 +41,7 @@ import { compareVersions } from '../src/game/versions.ts';
 import type { HostedVersion, VersionList } from '../src/game/versions.ts';
 
 /** the way of building (part of the name of every cached build) */
-export const RECIPE = 1;
+export const RECIPE = 2;
 /**
  * The oldest version that reads the map of today.  The form of the map has
  * not changed since the development version 0.8.0 (map.json, the chunks w/…,
