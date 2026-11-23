@@ -50,7 +50,8 @@ jobs:
           key: old-versions-${{ hashFiles('tools/old-versions.ts') }}-${{ steps.tags.outputs.list }}
           restore-keys: old-versions-
       - name: Earlier versions (dist/v/X.Y.Z, sharing the one map) and versions.json
-        run: node tools/old-versions.ts --out dist --cache .old-versions
+        # (the earlier versions are played from the archive site: this one keeps the map and the newest)
+        run: node tools/old-versions.ts --out dist --cache .old-versions --archive-url https://maureranton.github.io/driving-simulator-archive/
       - name: Size of the site (GitHub Pages holds 1 GB)
         run: du -sh dist dist/map && (du -sh dist/v 2>/dev/null || true)
       - uses: actions/configure-pages@v5
