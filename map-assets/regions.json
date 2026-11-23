@@ -1,5 +1,5 @@
 {
-  "latest": "at-reutte",
+  "latest": "be-aalst",
   "regions": [
     {
       "id": "suedwest",
@@ -2160,6 +2160,287 @@
       "map": "regions/at-wolfsberg/map.json",
       "tiles": [
         "219.tar"
+      ]
+    },
+    {
+      "id": "be-aalst",
+      "name": "Aalst und Umgebung",
+      "box": [
+        -384000,
+        16000,
+        -369000,
+        31000
+      ],
+      "map": "regions/be-aalst/map.json",
+      "tiles": [
+        "220.tar"
+      ]
+    },
+    {
+      "id": "be-antwerpen",
+      "name": "Antwerpen und Umgebung",
+      "box": [
+        -356000,
+        -14000,
+        -341000,
+        1000
+      ],
+      "map": "regions/be-antwerpen/map.json",
+      "tiles": [
+        "221.tar"
+      ]
+    },
+    {
+      "id": "be-arlon",
+      "name": "Arlon und Umgebung",
+      "box": [
+        -265000,
+        160000,
+        -250000,
+        175000
+      ],
+      "map": "regions/be-arlon/map.json",
+      "tiles": [
+        "222.tar"
+      ]
+    },
+    {
+      "id": "be-ath",
+      "name": "Ath und Umgebung",
+      "box": [
+        -407000,
+        49000,
+        -392000,
+        64000
+      ],
+      "map": "regions/be-ath/map.json",
+      "tiles": [
+        "223.tar"
+      ]
+    },
+    {
+      "id": "be-bastogne",
+      "name": "Bastogne und Umgebung",
+      "box": [
+        -271000,
+        127000,
+        -256000,
+        142000
+      ],
+      "map": "regions/be-bastogne/map.json",
+      "tiles": [
+        "224.tar"
+      ]
+    },
+    {
+      "id": "be-beaumont",
+      "name": "Beaumont und Umgebung",
+      "box": [
+        -375000,
+        94000,
+        -360000,
+        109000
+      ],
+      "map": "regions/be-beaumont/map.json",
+      "tiles": [
+        "225.tar"
+      ]
+    },
+    {
+      "id": "be-beauraing",
+      "name": "Beauraing und Umgebung",
+      "box": [
+        -324000,
+        112000,
+        -309000,
+        127000
+      ],
+      "map": "regions/be-beauraing/map.json",
+      "tiles": [
+        "226.tar"
+      ]
+    },
+    {
+      "id": "be-bocholt",
+      "name": "Bocholt und Umgebung",
+      "box": [
+        -278000,
+        -7000,
+        -263000,
+        8000
+      ],
+      "map": "regions/be-bocholt/map.json",
+      "tiles": [
+        "227.tar"
+      ]
+    },
+    {
+      "id": "be-bouillon",
+      "name": "Bouillon und Umgebung",
+      "box": [
+        -331000,
+        147000,
+        -316000,
+        162000
+      ],
+      "map": "regions/be-bouillon/map.json",
+      "tiles": [
+        "228.tar"
+      ]
+    },
+    {
+      "id": "be-brugge",
+      "name": "Brugge und Umgebung",
+      "box": [
+        -439000,
+        -19000,
+        -424000,
+        -4000
+      ],
+      "map": "regions/be-brugge/map.json",
+      "tiles": [
+        "229.tar"
+      ]
+    },
+    {
+      "id": "be-brussel",
+      "name": "Brussel und Umgebung",
+      "box": [
+        -362000,
+        27000,
+        -347000,
+        42000
+      ],
+      "map": "regions/be-brussel/map.json",
+      "tiles": [
+        "230.tar",
+        "231.tar"
+      ]
+    },
+    {
+      "id": "be-buellingen",
+      "name": "Büllingen und Umgebung",
+      "box": [
+        -232000,
+        82000,
+        -217000,
+        97000
+      ],
+      "map": "regions/be-buellingen/map.json",
+      "tiles": [
+        "232.tar"
+      ]
+    },
+    {
+      "id": "be-charleroi",
+      "name": "Charleroi und Umgebung",
+      "box": [
+        -359000,
+        76000,
+        -344000,
+        91000
+      ],
+      "map": "regions/be-charleroi/map.json",
+      "tiles": [
+        "233.tar"
+      ]
+    },
+    {
+      "id": "be-chimay",
+      "name": "Chimay und Umgebung",
+      "box": [
+        -370000,
+        116000,
+        -355000,
+        131000
+      ],
+      "map": "regions/be-chimay/map.json",
+      "tiles": [
+        "234.tar"
+      ]
+    },
+    {
+      "id": "be-ciney",
+      "name": "Ciney und Umgebung",
+      "box": [
+        -313000,
+        92000,
+        -298000,
+        107000
+      ],
+      "map": "regions/be-ciney/map.json",
+      "tiles": [
+        "235.tar"
+      ]
+    },
+    {
+      "id": "be-diest",
+      "name": "Diest und Umgebung",
+      "box": [
+        -313000,
+        14000,
+        -298000,
+        29000
+      ],
+      "map": "regions/be-diest/map.json",
+      "tiles": [
+        "236.tar"
+      ]
+    },
+    {
+      "id": "be-dinant",
+      "name": "Dinant und Umgebung",
+      "box": [
+        -331000,
+        95000,
+        -316000,
+        110000
+      ],
+      "map": "regions/be-dinant/map.json",
+      "tiles": [
+        "237.tar"
+      ]
+    },
+    {
+      "id": "be-ebenael",
+      "name": "Eben-Emael und Umgebung",
+      "box": [
+        -270000,
+        40000,
+        -255000,
+        55000
+      ],
+      "map": "regions/be-ebenael/map.json",
+      "tiles": [
+        "238.tar"
+      ]
+    },
+    {
+      "id": "be-erneuville",
+      "name": "Erneuville und Umgebung",
+      "box": [
+        -282000,
+        112000,
+        -267000,
+        127000
+      ],
+      "map": "regions/be-erneuville/map.json",
+      "tiles": [
+        "239.tar"
+      ]
+    },
+    {
+      "id": "be-fauvillers",
+      "name": "Fauvillers und Umgebung",
+      "box": [
+        -273000,
+        143000,
+        -258000,
+        158000
+      ],
+      "map": "regions/be-fauvillers/map.json",
+      "tiles": [
+        "240.tar"
       ]
     }
   ]
