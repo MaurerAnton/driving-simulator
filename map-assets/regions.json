@@ -1,5 +1,5 @@
 {
-  "latest": "bayern-altoetting",
+  "latest": "bw-aalen",
   "regions": [
     {
       "id": "suedwest",
@@ -746,6 +746,202 @@
       "map": "regions/bayern-kelheim/map.json",
       "tiles": [
         "118.tar"
+      ]
+    },
+    {
+      "id": "bw-aalen",
+      "name": "Aalen und Umgebung",
+      "box": [
+        45000,
+        260000,
+        60000,
+        275000
+      ],
+      "map": "regions/bw-aalen/map.json",
+      "tiles": [
+        "119.tar"
+      ]
+    },
+    {
+      "id": "bw-achern",
+      "name": "achern",
+      "box": [
+        -103000,
+        284000,
+        -88000,
+        299000
+      ],
+      "map": "regions/bw-achern/map.json",
+      "tiles": [
+        "120.tar"
+      ]
+    },
+    {
+      "id": "bw-backnang",
+      "name": "Backnang und Umgebung",
+      "box": [
+        -4000,
+        248000,
+        11000,
+        263000
+      ],
+      "map": "regions/bw-backnang/map.json",
+      "tiles": [
+        "121.tar"
+      ]
+    },
+    {
+      "id": "bw-badenbaden",
+      "name": "Baden-Baden und Umgebung",
+      "box": [
+        -91000,
+        269000,
+        -76000,
+        284000
+      ],
+      "map": "regions/bw-badenbaden/map.json",
+      "tiles": [
+        "122.tar"
+      ]
+    },
+    {
+      "id": "bw-badmergentheim",
+      "name": "badmergentheim",
+      "box": [
+        20000,
+        187000,
+        35000,
+        202000
+      ],
+      "map": "regions/bw-badmergentheim/map.json",
+      "tiles": [
+        "123.tar"
+      ]
+    },
+    {
+      "id": "bw-badsaulgau",
+      "name": "Bad Saulgau",
+      "box": [
+        2000,
+        353000,
+        17000,
+        368000
+      ],
+      "map": "regions/bw-badsaulgau/map.json",
+      "tiles": [
+        "124.tar"
+      ]
+    },
+    {
+      "id": "bw-badwaldsee",
+      "name": "badwaldsee",
+      "box": [
+        21000,
+        363000,
+        36000,
+        378000
+      ],
+      "map": "regions/bw-badwaldsee/map.json",
+      "tiles": [
+        "125.tar"
+      ]
+    },
+    {
+      "id": "bw-balingen",
+      "name": "Balingen und Umgebung",
+      "box": [
+        -46000,
+        323000,
+        -31000,
+        338000
+      ],
+      "map": "regions/bw-balingen/map.json",
+      "tiles": [
+        "126.tar"
+      ]
+    },
+    {
+      "id": "bw-biberach",
+      "name": "Biberach",
+      "box": [
+        24000,
+        342000,
+        39000,
+        357000
+      ],
+      "map": "regions/bw-biberach/map.json",
+      "tiles": [
+        "127.tar"
+      ]
+    },
+    {
+      "id": "bw-blaubeuren",
+      "name": "Blaubeuren",
+      "box": [
+        22000,
+        308000,
+        37000,
+        323000
+      ],
+      "map": "regions/bw-blaubeuren/map.json",
+      "tiles": [
+        "128.tar"
+      ]
+    },
+    {
+      "id": "bw-bonndorf",
+      "name": "bonndorf",
+      "box": [
+        -85000,
+        374000,
+        -70000,
+        389000
+      ],
+      "map": "regions/bw-bonndorf/map.json",
+      "tiles": [
+        "129.tar"
+      ]
+    },
+    {
+      "id": "bw-bretten",
+      "name": "Bretten und Umgebung",
+      "box": [
+        -56000,
+        239000,
+        -41000,
+        254000
+      ],
+      "map": "regions/bw-bretten/map.json",
+      "tiles": [
+        "130.tar"
+      ]
+    },
+    {
+      "id": "bw-buchen",
+      "name": "Buchen",
+      "box": [
+        -12000,
+        185000,
+        3000,
+        200000
+      ],
+      "map": "regions/bw-buchen/map.json",
+      "tiles": [
+        "131.tar"
+      ]
+    },
+    {
+      "id": "bw-calw",
+      "name": "Calw",
+      "box": [
+        -54000,
+        275000,
+        -39000,
+        290000
+      ],
+      "map": "regions/bw-calw/map.json",
+      "tiles": [
+        "132.tar"
       ]
     }
   ]
