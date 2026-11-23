@@ -1,5 +1,5 @@
 {
-  "latest": "mecklenburg-vorpommern",
+  "latest": "bayern",
   "regions": [
     {
       "id": "suedwest",
@@ -239,7 +239,7 @@
       ],
       "map": "regions/rlp-trier/map.json",
       "tiles": [
-        "79.tar"
+        "88.tar"
       ]
     },
     {
@@ -268,6 +268,77 @@
       "map": "regions/rlp-kaiserslautern/map.json",
       "tiles": [
         "81.tar"
+      ]
+    },
+    {
+      "id": "bayern",
+      "name": "München",
+      "box": [
+        162000,
+        339000,
+        167000,
+        344000
+      ],
+      "map": "regions/bayern/map.json",
+      "tiles": [
+        "82.tar"
+      ]
+    },
+    {
+      "id": "bw",
+      "name": "Stuttgart-Mitte",
+      "box": [
+        -15000,
+        274000,
+        -13000,
+        276000
+      ],
+      "map": "regions/bw/map.json",
+      "tiles": [
+        "83.tar"
+      ]
+    },
+    {
+      "id": "hamburg",
+      "name": "Hamburg",
+      "box": [
+        33000,
+        -261000,
+        43000,
+        -251000
+      ],
+      "map": "regions/hamburg/map.json",
+      "tiles": [
+        "84.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hannover",
+      "name": "Hannover",
+      "box": [
+        15000,
+        -133000,
+        30000,
+        -118000
+      ],
+      "map": "regions/niedersachsen-hannover/map.json",
+      "tiles": [
+        "85.tar",
+        "86.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-oldenburg",
+      "name": "Oldenburg",
+      "box": [
+        -88000,
+        -219000,
+        -73000,
+        -204000
+      ],
+      "map": "regions/niedersachsen-oldenburg/map.json",
+      "tiles": [
+        "87.tar"
       ]
     }
   ]
