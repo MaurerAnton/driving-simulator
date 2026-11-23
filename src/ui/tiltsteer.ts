@@ -70,8 +70,16 @@ export class TiltSteer implements TiltSource {
     // (the first reading calibrates: what the phone is held at then is straight ahead)
     if (this.value === null) this.neutral = e.gamma;
     this.value = steerFromTilt(e.gamma, this.neutral);
+    // (a line in the console now and then, so a phone one cannot see into still says whether
+    //  the sensor speaks and what it says – console.debug, once a second at most)
+    const now = Date.now();
+    if (now - this.lastLog > 1000) {
+      this.lastLog = now;
+      console.debug(`[tilt] gamma ${e.gamma.toFixed(1)}° neutral ${this.neutral.toFixed(1)}° → steer ${this.value.toFixed(2)}`);
+    }
     this.out(this.value);
   };
+  private lastLog = 0;
 
   async start(): Promise<boolean> {
     if (this.listener) return true;
@@ -83,6 +91,7 @@ export class TiltSteer implements TiltSource {
     this.value = null; // (the next event calibrates)
     this.listener = this.onOrient;
     window.addEventListener('deviceorientation', this.listener);
+    console.debug('[tilt] listening for deviceorientation');
     const D = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
     if (D && typeof D.requestPermission === 'function') {
       const ask = async (): Promise<void> => {

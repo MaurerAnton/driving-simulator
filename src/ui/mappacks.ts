@@ -64,6 +64,10 @@ export function mapPackSettings(s: Settings, t: T, locale: string): HTMLElement 
 
   const draw = async (): Promise<void> => {
     const packs = await listMapPacks();
+    // (no map stored here: the picker would only repeat the region's – hide the choice itself,
+    //  keep the way to load one from files; it comes back the moment there is a map)
+    row.hidden = packs.length === 0 && !s.mapPack;
+    status.hidden = packs.length === 0 && !s.mapPack;
     sel.replaceChildren();
     const op = el('option', '', t('mapPack.site'));
     op.value = '';

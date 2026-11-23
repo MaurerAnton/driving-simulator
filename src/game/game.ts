@@ -111,6 +111,7 @@ import { PartCache, sourceFor } from '../world/partcache.ts';
 import { regionSourceFor, type RegionSource } from '../world/regionfiles.ts';
 import type { Region } from '../world/regions.ts';
 import { loadRegionIndex } from '../ui/regions.ts';
+import { ipPlace, ipRegion } from '../ui/geoip.ts';
 import { useTileSource } from '../world/mappack.ts';
 import { versionedTiles, versionsOfTile, type PartIndex } from '../world/tileversions.ts';
 import { TILE, gridIndex } from '../world/grid.ts';
@@ -608,8 +609,9 @@ export class Game {
     const creep = setInterval(() => show(from + (to - from) * 0.9 * (1 - Math.exp(-(performance.now() - since) / 2500))), 120);
     show(0.05);
     try {
-      // a region chosen in the settings loads instead of the site's own map; if it
-      // is not there (or cannot be read), the site's map loads as always
+      // (the first start: the region the player is in, from their IP – no permission asked;
+      //  a region chosen in the settings is kept, and if it is not there the site's map loads)
+      await this.firstRegionByIp();
       const region = await this.chosenRegion();
       await app.loadWorld(undefined, region ?? undefined);
     } finally {
@@ -1294,6 +1296,25 @@ export class Game {
    * region and builds its source; null when none is chosen, or the region is
    * not there (the site's own map is loaded then).
    */
+  /**
+   * The first start: the region the player is in, read from their IP address
+   * (ui/geoip.ts) – no permission asked, no prompt, the game simply opens where
+   * one is.  Only when no region is chosen yet, and only when the place is in a
+   * region that is not the one already loaded; otherwise nothing changes and the
+   * site's own map loads as always.  Never throws, never blocks: a slow or
+   * refusing service leaves the choice as it was.
+   */
+  private async firstRegionByIp(): Promise<void> {
+    if (this.settings.region) return; // (a region is chosen: it stays)
+    const index = await loadRegionIndex(true, 'map-assets/');
+    if (!index || index.regions.length === 0) return;
+    const place = await ipPlace();
+    const region = ipRegion(index, place);
+    if (!region || region.id === this.settings.region) return;
+    this.settings.region = region.id;
+    saveSettings(this.settings);
+  }
+
   private async chosenRegion(): Promise<LoadedRegion | null> {
     const id = this.settings.region;
     this.regionParts = null; // (no region until one is found)

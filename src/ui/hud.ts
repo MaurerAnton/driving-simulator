@@ -235,8 +235,8 @@ export class Hud {
   /** after the vehicle went up in flames: the button for a new one */
   private wreckBtn!: HTMLButtonElement;
   onNewVehicle: () => void = () => {};
-  /** the stop button while the autopilot drives by itself (HudState.autopilotDriving) */
-  private autoStopBtn!: HTMLButtonElement;
+  /** the autopilot's stop in the ⋯ sheet (shown while the autopilot drives) */
+  private autoStopItem: HTMLElement | null = null;
   private keysBox!: HTMLElement;
   private keysFor = '';
   private input: Input | null = null;
@@ -1143,6 +1143,8 @@ export class Hud {
     select(this.t('daylight'), s.daylight, [['day', this.t('daylightDay')], ['clock', this.t('daylightClock')]], (v) => (s.daylight = v as Settings['daylight']));
     // on foot: how fast running is
     select(this.t('runSpeed'), String(s.runSpeed), RUN_SPEEDS.map((k): [string, string] => [String(k), `${k} km/h`]), (v) => (s.runSpeed = Number(v)));
+    // steering sensitivity: how sharply A/D turn (0.5 gentle … 1 as built … 2 sharp)
+    range(this.t('steerSensitivity'), (s.steerSensitivity - 0.5) / 1.5, (v) => (s.steerSensitivity = Math.round((0.5 + v * 1.5) * 100) / 100));
     // --- display ---
     goTab('display');
     // the main menu: the vehicle large in the 3D picture with icons, rows over the 3D scene, or the simple list of before
@@ -1213,8 +1215,6 @@ export class Hud {
     }
     select(this.t('mirrors'), s.mirrors, [['off', this.t('mOff')], ['alternate', this.t('mAlt')], ['full', this.t('mFull')]], (v) => (s.mirrors = v as Settings['mirrors']));
     range(this.t('traffic'), s.traffic, (v) => (s.traffic = v));
-    // steering sensitivity: how sharply A/D turn (0.5 gentle … 1 as built … 2 sharp)
-    range(this.t('steerSensitivity'), (s.steerSensitivity - 0.5) / 1.5, (v) => (s.steerSensitivity = Math.round((0.5 + v * 1.5) * 100) / 100));
     // --- sound & weather ---
     goTab('sound');
     range(this.t('volume'), s.volume, (v) => (s.volume = v));
@@ -2082,13 +2082,8 @@ export class Hud {
     this.wreckBtn.hidden = true;
     this.wreckBtn.onclick = () => this.onNewVehicle();
     // (while the autopilot drives by itself: a stop to take over)
-    this.autoStopBtn = el('button', 'btn auto-stop');
-    this.autoStopBtn.type = 'button';
-    this.autoStopBtn.hidden = true;
-    this.autoStopBtn.onclick = () => this.onStopAutopilot();
-    this.autoStopBtn.textContent = `⏹ ${this.t('autoStop')}`;
     this.fpsBox.hidden = true;
-    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox, this.fpsBox, this.clockBox, this.autoStopBtn, this.wreckBtn);
+    h.append(side, assist, this.dash, this.tip, map, this.score, this.keysBox, this.fpsBox, this.clockBox, this.wreckBtn);
     // full screen and hiding the display, in the top middle (ui/viewbuttons.ts)
     if (!this.view) {
       this.view = viewButtons(this.root, (k) => this.t(k));
@@ -2360,7 +2355,7 @@ export class Hud {
       // ("back to the road" is easy to miss: it pulses – still, with reduced motion – ui/style.css)
       this.tip.classList.toggle('urgent', s.tipAction === 'KeyT');
       // (while the autopilot drives by itself: a stop to take over – hidden again once it does not)
-      this.autoStopBtn.hidden = !s.autopilotDriving;
+      this.autoStopItem && (this.autoStopItem.hidden = !s.autopilotDriving);
       this.score.innerHTML = `${this.t('faults')}: <b>${s.faults}</b> · ${this.t('points')}: <b>${s.points}</b>`;
       this.last = s;
       if (this.mode === 'touch') {
@@ -2614,6 +2609,9 @@ export class Hud {
     };
     viewItem(this.t('view.fullscreen'), () => this.view?.toggleFullscreen()).hidden = !document.documentElement.requestFullscreen;
     viewItem(this.t('view.hudHide'), () => this.view?.toggleHud());
+    // (the autopilot's stop: here in the sheet, while the autopilot drives – hidden again once it does not)
+    this.autoStopItem = viewItem(this.t('autoStop'), () => this.onStopAutopilot());
+    this.autoStopItem.hidden = true;
     const menu = el('button', 'mb', this.t('tbMenu'));
     menu.onclick = () => {
       more.hidden = true;
