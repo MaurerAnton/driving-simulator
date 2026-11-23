@@ -1,5 +1,5 @@
 {
-  "latest": "at-amstetten",
+  "latest": "at-reutte",
   "regions": [
     {
       "id": "suedwest",
@@ -1922,6 +1922,244 @@
       "map": "regions/at-probe/map.json",
       "tiles": [
         "202.tar"
+      ]
+    },
+    {
+      "id": "at-reutte",
+      "name": "Reutte",
+      "box": [
+        96000,
+        409000,
+        111000,
+        424000
+      ],
+      "map": "regions/at-reutte/map.json",
+      "tiles": [
+        "203.tar"
+      ]
+    },
+    {
+      "id": "at-ried",
+      "name": "Ried und Umgebung",
+      "box": [
+        299000,
+        321000,
+        314000,
+        336000
+      ],
+      "map": "regions/at-ried/map.json",
+      "tiles": [
+        "204.tar"
+      ]
+    },
+    {
+      "id": "at-schladming",
+      "name": "Schladming und Umgebung",
+      "box": [
+        313000,
+        335000,
+        314000,
+        336000
+      ],
+      "map": "regions/at-schladming/map.json",
+      "tiles": [
+        "205.tar"
+      ]
+    },
+    {
+      "id": "at-schwaz",
+      "name": "Schwaz und Umgebung",
+      "box": [
+        170000,
+        422000,
+        185000,
+        437000
+      ],
+      "map": "regions/at-schwaz/map.json",
+      "tiles": [
+        "206.tar"
+      ]
+    },
+    {
+      "id": "at-spittal",
+      "name": "Spittal und Umgebung",
+      "box": [
+        308000,
+        478000,
+        323000,
+        493000
+      ],
+      "map": "regions/at-spittal/map.json",
+      "tiles": [
+        "207.tar"
+      ]
+    },
+    {
+      "id": "at-stanton",
+      "name": "St. Anton am Arlberg",
+      "box": [
+        61000,
+        449000,
+        76000,
+        464000
+      ],
+      "map": "regions/at-stanton/map.json",
+      "tiles": [
+        "208.tar"
+      ]
+    },
+    {
+      "id": "at-steyr",
+      "name": "Steyr und Umgebung",
+      "box": [
+        369000,
+        335000,
+        384000,
+        350000
+      ],
+      "map": "regions/at-steyr/map.json",
+      "tiles": [
+        "209.tar"
+      ]
+    },
+    {
+      "id": "at-stjohann",
+      "name": "St. Johann in Tirol und Umgebung",
+      "box": [
+        222000,
+        401000,
+        237000,
+        416000
+      ],
+      "map": "regions/at-stjohann/map.json",
+      "tiles": [
+        "210.tar"
+      ]
+    },
+    {
+      "id": "at-stpoelten",
+      "name": "St. Pölten und Umgebung",
+      "box": [
+        458000,
+        310000,
+        473000,
+        325000
+      ],
+      "map": "regions/at-stpoelten/map.json",
+      "tiles": [
+        "211.tar"
+      ]
+    },
+    {
+      "id": "at-telfs",
+      "name": "Telfs und Seefeld",
+      "box": [
+        127000,
+        433000,
+        142000,
+        448000
+      ],
+      "map": "regions/at-telfs/map.json",
+      "tiles": [
+        "212.tar"
+      ]
+    },
+    {
+      "id": "at-villach",
+      "name": "Villach und Umgebung",
+      "box": [
+        336000,
+        497000,
+        351000,
+        512000
+      ],
+      "map": "regions/at-villach/map.json",
+      "tiles": [
+        "213.tar"
+      ]
+    },
+    {
+      "id": "at-voitsberg",
+      "name": "Voitsberg und Umgebung",
+      "box": [
+        432000,
+        441000,
+        447000,
+        456000
+      ],
+      "map": "regions/at-voitsberg/map.json",
+      "tiles": [
+        "214.tar"
+      ]
+    },
+    {
+      "id": "at-weiz",
+      "name": "Weiz und Umgebung",
+      "box": [
+        466000,
+        419000,
+        481000,
+        434000
+      ],
+      "map": "regions/at-weiz/map.json",
+      "tiles": [
+        "215.tar"
+      ]
+    },
+    {
+      "id": "at-wels",
+      "name": "Wels und Umgebung",
+      "box": [
+        338000,
+        324000,
+        353000,
+        339000
+      ],
+      "map": "regions/at-wels/map.json",
+      "tiles": [
+        "216.tar"
+      ]
+    },
+    {
+      "id": "at-wienerneustadt",
+      "name": "Wiener Neustadt und Umgebung",
+      "box": [
+        508000,
+        349000,
+        523000,
+        364000
+      ],
+      "map": "regions/at-wienerneustadt/map.json",
+      "tiles": [
+        "217.tar"
+      ]
+    },
+    {
+      "id": "at-woergl",
+      "name": "Wörgl und Umgebung",
+      "box": [
+        195000,
+        406000,
+        210000,
+        421000
+      ],
+      "map": "regions/at-woergl/map.json",
+      "tiles": [
+        "218.tar"
+      ]
+    },
+    {
+      "id": "at-wolfsberg",
+      "name": "Wolfsberg und Umgebung",
+      "box": [
+        410000,
+        466000,
+        425000,
+        481000
+      ],
+      "map": "regions/at-wolfsberg/map.json",
+      "tiles": [
+        "219.tar"
       ]
     }
   ]
