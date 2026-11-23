@@ -1,5 +1,5 @@
 {
-  "latest": "nrw",
+  "latest": "nrw-duesseldorf",
   "regions": [
     {
       "id": "suedwest",
@@ -64,6 +64,81 @@
       "map": "regions/nrw/map.json",
       "tiles": [
         "62.tar"
+      ]
+    },
+    {
+      "id": "nrw-duesseldorf",
+      "name": "Düsseldorf",
+      "box": [
+        -190000,
+        -7000,
+        -175000,
+        8000
+      ],
+      "map": "regions/nrw-duesseldorf/map.json",
+      "tiles": [
+        "62.tar",
+        "63.tar"
+      ]
+    },
+    {
+      "id": "nrw-bonn",
+      "name": "Bonn",
+      "box": [
+        -169000,
+        48000,
+        -154000,
+        63000
+      ],
+      "map": "regions/nrw-bonn/map.json",
+      "tiles": [
+        "64.tar",
+        "65.tar"
+      ]
+    },
+    {
+      "id": "nrw-dortmund",
+      "name": "Dortmund",
+      "box": [
+        -141000,
+        -38000,
+        -126000,
+        -23000
+      ],
+      "map": "regions/nrw-dortmund/map.json",
+      "tiles": [
+        "66.tar",
+        "67.tar"
+      ]
+    },
+    {
+      "id": "nrw-essen",
+      "name": "Essen",
+      "box": [
+        -173000,
+        -32000,
+        -158000,
+        -17000
+      ],
+      "map": "regions/nrw-essen/map.json",
+      "tiles": [
+        "68.tar",
+        "69.tar"
+      ]
+    },
+    {
+      "id": "nrw-bochum",
+      "name": "Bochum",
+      "box": [
+        -158000,
+        -35000,
+        -143000,
+        -20000
+      ],
+      "map": "regions/nrw-bochum/map.json",
+      "tiles": [
+        "70.tar",
+        "71.tar"
       ]
     }
   ]
