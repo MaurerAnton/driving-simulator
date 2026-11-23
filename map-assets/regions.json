@@ -1,5 +1,5 @@
 {
-  "latest": "norwegen-alesund",
+  "latest": "ch-altdorf",
   "regions": [
     {
       "id": "suedwest",
@@ -3085,6 +3085,426 @@
       "map": "regions/norwegen-gjovik/map.json",
       "tiles": [
         "286.tar"
+      ]
+    },
+    {
+      "id": "ch-altdorf",
+      "name": "Altdorf und Umgebung",
+      "box": [
+        -62000,
+        478000,
+        -47000,
+        493000
+      ],
+      "map": "regions/ch-altdorf/map.json",
+      "tiles": [
+        "287.tar"
+      ]
+    },
+    {
+      "id": "ch-baden",
+      "name": "Baden und Umgebung",
+      "box": [
+        -87000,
+        412000,
+        -72000,
+        427000
+      ],
+      "map": "regions/ch-baden/map.json",
+      "tiles": [
+        "288.tar"
+      ]
+    },
+    {
+      "id": "ch-basel",
+      "name": "Basel und Umgebung",
+      "box": [
+        -141000,
+        404000,
+        -126000,
+        417000
+      ],
+      "map": "regions/ch-basel/map.json",
+      "tiles": [
+        "289.tar"
+      ]
+    },
+    {
+      "id": "ch-bellinzona",
+      "name": "Bellinzona und Umgebung",
+      "box": [
+        -33000,
+        554000,
+        -18000,
+        569000
+      ],
+      "map": "regions/ch-bellinzona/map.json",
+      "tiles": [
+        "290.tar"
+      ]
+    },
+    {
+      "id": "ch-bern",
+      "name": "Bern und Umgebung",
+      "box": [
+        -153000,
+        469000,
+        -138000,
+        484000
+      ],
+      "map": "regions/ch-bern/map.json",
+      "tiles": [
+        "291.tar"
+      ]
+    },
+    {
+      "id": "ch-biasca",
+      "name": "Biasca und Umgebung",
+      "box": [
+        -38000,
+        529000,
+        -23000,
+        544000
+      ],
+      "map": "regions/ch-biasca/map.json",
+      "tiles": [
+        "292.tar"
+      ]
+    },
+    {
+      "id": "ch-biel",
+      "name": "Biel und Umgebung",
+      "box": [
+        -168000,
+        448000,
+        -153000,
+        463000
+      ],
+      "map": "regions/ch-biel/map.json",
+      "tiles": [
+        "293.tar"
+      ]
+    },
+    {
+      "id": "ch-brig",
+      "name": "Brig und Umgebung",
+      "box": [
+        -113000,
+        540000,
+        -98000,
+        555000
+      ],
+      "map": "regions/ch-brig/map.json",
+      "tiles": [
+        "294.tar"
+      ]
+    },
+    {
+      "id": "ch-buchs",
+      "name": "Buchs und Umgebung",
+      "box": [
+        1000,
+        446000,
+        16000,
+        461000
+      ],
+      "map": "regions/ch-buchs/map.json",
+      "tiles": [
+        "295.tar"
+      ]
+    },
+    {
+      "id": "ch-buelach",
+      "name": "Bülach und Umgebung",
+      "box": [
+        -70000,
+        407000,
+        -55000,
+        422000
+      ],
+      "map": "regions/ch-buelach/map.json",
+      "tiles": [
+        "296.tar"
+      ]
+    },
+    {
+      "id": "ch-bulle",
+      "name": "Bulle und Umgebung",
+      "box": [
+        -184000,
+        506000,
+        -169000,
+        521000
+      ],
+      "map": "regions/ch-bulle/map.json",
+      "tiles": [
+        "297.tar"
+      ]
+    },
+    {
+      "id": "ch-chur",
+      "name": "Chur und Umgebung",
+      "box": [
+        5000,
+        481000,
+        20000,
+        496000
+      ],
+      "map": "regions/ch-chur/map.json",
+      "tiles": [
+        "298.tar"
+      ]
+    },
+    {
+      "id": "ch-delemont",
+      "name": "Delsberg und Umgebung",
+      "box": [
+        -160000,
+        423000,
+        -145000,
+        438000
+      ],
+      "map": "regions/ch-delemont/map.json",
+      "tiles": [
+        "299.tar"
+      ]
+    },
+    {
+      "id": "ch-einsiedeln",
+      "name": "Einsiedeln und Umgebung",
+      "box": [
+        -54000,
+        451000,
+        -39000,
+        466000
+      ],
+      "map": "regions/ch-einsiedeln/map.json",
+      "tiles": [
+        "300.tar"
+      ]
+    },
+    {
+      "id": "ch-fribourg",
+      "name": "Freiburg im Uechtland und Umgebung",
+      "box": [
+        -175000,
+        485000,
+        -160000,
+        500000
+      ],
+      "map": "regions/ch-fribourg/map.json",
+      "tiles": [
+        "301.tar"
+      ]
+    },
+    {
+      "id": "ch-genf",
+      "name": "Genf und Umgebung",
+      "box": [
+        -255000,
+        549000,
+        -240000,
+        564000
+      ],
+      "map": "regions/ch-genf/map.json",
+      "tiles": [
+        "302.tar"
+      ]
+    },
+    {
+      "id": "ch-ilanz",
+      "name": "Ilanz und Umgebung",
+      "box": [
+        -19000,
+        490000,
+        -4000,
+        505000
+      ],
+      "map": "regions/ch-ilanz/map.json",
+      "tiles": [
+        "303.tar"
+      ]
+    },
+    {
+      "id": "ch-langenthal",
+      "name": "Langenthal und Umgebung",
+      "box": [
+        -127000,
+        440000,
+        -112000,
+        455000
+      ],
+      "map": "regions/ch-langenthal/map.json",
+      "tiles": [
+        "304.tar"
+      ]
+    },
+    {
+      "id": "ch-lausanne",
+      "name": "Lausanne und Umgebung",
+      "box": [
+        -217000,
+        515000,
+        -202000,
+        530000
+      ],
+      "map": "regions/ch-lausanne/map.json",
+      "tiles": [
+        "305.tar"
+      ]
+    },
+    {
+      "id": "ch-locarno",
+      "name": "Locarno und Umgebung",
+      "box": [
+        -50000,
+        557000,
+        -35000,
+        572000
+      ],
+      "map": "regions/ch-locarno/map.json",
+      "tiles": [
+        "306.tar"
+      ]
+    },
+    {
+      "id": "ch-lugano",
+      "name": "Lugano und Umgebung",
+      "box": [
+        -39000,
+        576000,
+        -24000,
+        591000
+      ],
+      "map": "regions/ch-lugano/map.json",
+      "tiles": [
+        "307.tar"
+      ]
+    },
+    {
+      "id": "ch-luzern",
+      "name": "Luzern und Umgebung",
+      "box": [
+        -87000,
+        459000,
+        -72000,
+        474000
+      ],
+      "map": "regions/ch-luzern/map.json",
+      "tiles": [
+        "308.tar"
+      ]
+    },
+    {
+      "id": "ch-martigny",
+      "name": "Martinach und Umgebung",
+      "box": [
+        -184000,
+        562000,
+        -169000,
+        577000
+      ],
+      "map": "regions/ch-martigny/map.json",
+      "tiles": [
+        "309.tar"
+      ]
+    },
+    {
+      "id": "ch-montreux",
+      "name": "Montreux und Umgebung",
+      "box": [
+        -195000,
+        526000,
+        -180000,
+        541000
+      ],
+      "map": "regions/ch-montreux/map.json",
+      "tiles": [
+        "310.tar"
+      ]
+    },
+    {
+      "id": "ch-neuchatel",
+      "name": "Neuenburg und Umgebung",
+      "box": [
+        -192000,
+        463000,
+        -177000,
+        478000
+      ],
+      "map": "regions/ch-neuchatel/map.json",
+      "tiles": [
+        "311.tar"
+      ]
+    },
+    {
+      "id": "ch-nyon",
+      "name": "Nyon und Umgebung",
+      "box": [
+        -247000,
+        530000,
+        -232000,
+        545000
+      ],
+      "map": "regions/ch-nyon/map.json",
+      "tiles": [
+        "312.tar"
+      ]
+    },
+    {
+      "id": "ch-olten",
+      "name": "Olten und Umgebung",
+      "box": [
+        -117000,
+        425000,
+        -102000,
+        440000
+      ],
+      "map": "regions/ch-olten/map.json",
+      "tiles": [
+        "313.tar"
+      ]
+    },
+    {
+      "id": "ch-payerne",
+      "name": "Payerne und Umgebung",
+      "box": [
+        -192000,
+        483000,
+        -177000,
+        498000
+      ],
+      "map": "regions/ch-payerne/map.json",
+      "tiles": [
+        "314.tar"
+      ]
+    },
+    {
+      "id": "ch-samedan",
+      "name": "Samedan und Umgebung",
+      "box": [
+        32000,
+        516000,
+        47000,
+        531000
+      ],
+      "map": "regions/ch-samedan/map.json",
+      "tiles": [
+        "315.tar"
+      ]
+    },
+    {
+      "id": "ch-schaffhausen",
+      "name": "Schaffhausen und Umgebung",
+      "box": [
+        -63000,
+        387000,
+        -48000,
+        402000
+      ],
+      "map": "regions/ch-schaffhausen/map.json",
+      "tiles": [
+        "316.tar"
       ]
     }
   ]
