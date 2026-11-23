@@ -1,5 +1,5 @@
 {
-  "latest": "nrw-bielefeld",
+  "latest": "mecklenburg-vorpommern",
   "regions": [
     {
       "id": "suedwest",
@@ -198,6 +198,76 @@
       "tiles": [
         "78.tar",
         "79.tar"
+      ]
+    },
+    {
+      "id": "mecklenburg-vorpommern",
+      "name": "Güstrow",
+      "box": [
+        174000,
+        -295000,
+        189000,
+        -280000
+      ],
+      "map": "regions/mecklenburg-vorpommern/map.json",
+      "tiles": [
+        "77.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen",
+      "name": "Hann. Münden und Umgebung",
+      "box": [
+        16000,
+        -27000,
+        25000,
+        -18000
+      ],
+      "map": "regions/niedersachsen/map.json",
+      "tiles": [
+        "78.tar"
+      ]
+    },
+    {
+      "id": "rlp-trier",
+      "name": "Trier und Umgebung",
+      "box": [
+        -205000,
+        157000,
+        -190000,
+        172000
+      ],
+      "map": "regions/rlp-trier/map.json",
+      "tiles": [
+        "79.tar"
+      ]
+    },
+    {
+      "id": "rlp-neuwied",
+      "name": "Neuwied und Umgebung",
+      "box": [
+        -144000,
+        82000,
+        -129000,
+        97000
+      ],
+      "map": "regions/rlp-neuwied/map.json",
+      "tiles": [
+        "80.tar"
+      ]
+    },
+    {
+      "id": "rlp-kaiserslautern",
+      "name": "Kaiserslautern und Umgebung",
+      "box": [
+        -124000,
+        193000,
+        -109000,
+        208000
+      ],
+      "map": "regions/rlp-kaiserslautern/map.json",
+      "tiles": [
+        "81.tar"
       ]
     }
   ]
