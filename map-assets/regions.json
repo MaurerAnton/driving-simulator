@@ -1,5 +1,5 @@
 {
-  "latest": "ch-altdorf",
+  "latest": "fr-abreschviller",
   "regions": [
     {
       "id": "suedwest",
@@ -3505,6 +3505,426 @@
       "map": "regions/ch-schaffhausen/map.json",
       "tiles": [
         "316.tar"
+      ]
+    },
+    {
+      "id": "fr-abreschviller",
+      "name": "Abreschviller und Umgebung",
+      "box": [
+        -172000,
+        285000,
+        -157000,
+        300000
+      ],
+      "map": "regions/fr-abreschviller/map.json",
+      "tiles": [
+        "317.tar"
+      ]
+    },
+    {
+      "id": "fr-aix",
+      "name": "Aix-Villemaur-Pâlis und Umgebung",
+      "box": [
+        -427000,
+        316000,
+        -412000,
+        331000
+      ],
+      "map": "regions/fr-aix/map.json",
+      "tiles": [
+        "318.tar"
+      ]
+    },
+    {
+      "id": "fr-altkirch",
+      "name": "Altkirch und Umgebung",
+      "box": [
+        -167000,
+        395000,
+        -152000,
+        410000
+      ],
+      "map": "regions/fr-altkirch/map.json",
+      "tiles": [
+        "319.tar"
+      ]
+    },
+    {
+      "id": "fr-arbois",
+      "name": "Arbois und Umgebung",
+      "box": [
+        -281000,
+        473000,
+        -266000,
+        488000
+      ],
+      "map": "regions/fr-arbois/map.json",
+      "tiles": [
+        "320.tar"
+      ]
+    },
+    {
+      "id": "fr-arcetsenans",
+      "name": "Arc-et-Senans und Umgebung",
+      "box": [
+        -279000,
+        456000,
+        -266000,
+        471000
+      ],
+      "map": "regions/fr-arcetsenans/map.json",
+      "tiles": [
+        "321.tar"
+      ]
+    },
+    {
+      "id": "fr-arcis",
+      "name": "Arcis-sur-Aube und Umgebung",
+      "box": [
+        -394000,
+        284000,
+        -379000,
+        299000
+      ],
+      "map": "regions/fr-arcis/map.json",
+      "tiles": [
+        "322.tar"
+      ]
+    },
+    {
+      "id": "fr-arnay-le-duc",
+      "name": "Arnay-le-Duc und Umgebung",
+      "box": [
+        -378000,
+        442000,
+        -363000,
+        457000
+      ],
+      "map": "regions/fr-arnay-le-duc/map.json",
+      "tiles": [
+        "323.tar"
+      ]
+    },
+    {
+      "id": "fr-autun",
+      "name": "Autun und Umgebung",
+      "box": [
+        -393000,
+        461000,
+        -378000,
+        476000
+      ],
+      "map": "regions/fr-autun/map.json",
+      "tiles": [
+        "324.tar"
+      ]
+    },
+    {
+      "id": "fr-auxerre",
+      "name": "Auxerre und Umgebung",
+      "box": [
+        -442000,
+        362000,
+        -427000,
+        377000
+      ],
+      "map": "regions/fr-auxerre/map.json",
+      "tiles": [
+        "325.tar"
+      ]
+    },
+    {
+      "id": "fr-avallon",
+      "name": "Avallon und Umgebung",
+      "box": [
+        -418000,
+        399000,
+        -403000,
+        414000
+      ],
+      "map": "regions/fr-avallon/map.json",
+      "tiles": [
+        "326.tar"
+      ]
+    },
+    {
+      "id": "fr-baccarat",
+      "name": "Baccarat und Umgebung",
+      "box": [
+        -202000,
+        301000,
+        -187000,
+        316000
+      ],
+      "map": "regions/fr-baccarat/map.json",
+      "tiles": [
+        "327.tar"
+      ]
+    },
+    {
+      "id": "fr-barleduc",
+      "name": "Bar-le-Duc und Umgebung",
+      "box": [
+        -311000,
+        260000,
+        -296000,
+        275000
+      ],
+      "map": "regions/fr-barleduc/map.json",
+      "tiles": [
+        "328.tar"
+      ]
+    },
+    {
+      "id": "fr-barsuraube",
+      "name": "Bar-sur-Aube und Umgebung",
+      "box": [
+        -354000,
+        319000,
+        -339000,
+        334000
+      ],
+      "map": "regions/fr-barsuraube/map.json",
+      "tiles": [
+        "329.tar"
+      ]
+    },
+    {
+      "id": "fr-barsurseine",
+      "name": "Bar-sur-Seine und Umgebung",
+      "box": [
+        -379000,
+        331000,
+        -364000,
+        346000
+      ],
+      "map": "regions/fr-barsurseine/map.json",
+      "tiles": [
+        "330.tar"
+      ]
+    },
+    {
+      "id": "fr-baume",
+      "name": "Baume-les-Dames und Umgebung",
+      "box": [
+        -236000,
+        423000,
+        -221000,
+        438000
+      ],
+      "map": "regions/fr-baume/map.json",
+      "tiles": [
+        "331.tar"
+      ]
+    },
+    {
+      "id": "fr-beaune",
+      "name": "Beaune und Umgebung",
+      "box": [
+        -351000,
+        454000,
+        -336000,
+        469000
+      ],
+      "map": "regions/fr-beaune/map.json",
+      "tiles": [
+        "332.tar"
+      ]
+    },
+    {
+      "id": "fr-belfort",
+      "name": "Belfort und Umgebung",
+      "box": [
+        -196000,
+        391000,
+        -181000,
+        406000
+      ],
+      "map": "regions/fr-belfort/map.json",
+      "tiles": [
+        "333.tar"
+      ]
+    },
+    {
+      "id": "fr-besancon",
+      "name": "Besançon und Umgebung",
+      "box": [
+        -260000,
+        434000,
+        -245000,
+        449000
+      ],
+      "map": "regions/fr-besancon/map.json",
+      "tiles": [
+        "334.tar"
+      ]
+    },
+    {
+      "id": "fr-bitche",
+      "name": "Bitche und Umgebung",
+      "box": [
+        -150000,
+        236000,
+        -135000,
+        251000
+      ],
+      "map": "regions/fr-bitche/map.json",
+      "tiles": [
+        "335.tar"
+      ]
+    },
+    {
+      "id": "fr-bourbonlancy",
+      "name": "Bourbon-Lancy und Umgebung",
+      "box": [
+        -436000,
+        494000,
+        -421000,
+        509000
+      ],
+      "map": "regions/fr-bourbonlancy/map.json",
+      "tiles": [
+        "336.tar"
+      ]
+    },
+    {
+      "id": "fr-bourbonne",
+      "name": "Bourbonne-les-Bains und Umgebung",
+      "box": [
+        -279000,
+        355000,
+        -264000,
+        370000
+      ],
+      "map": "regions/fr-bourbonne/map.json",
+      "tiles": [
+        "337.tar"
+      ]
+    },
+    {
+      "id": "fr-brazey",
+      "name": "Brazey-en-Plaine und Umgebung",
+      "box": [
+        -323000,
+        443000,
+        -308000,
+        458000
+      ],
+      "map": "regions/fr-brazey/map.json",
+      "tiles": [
+        "338.tar"
+      ]
+    },
+    {
+      "id": "fr-brienne",
+      "name": "Brienne-le-Château und Umgebung",
+      "box": [
+        -366000,
+        300000,
+        -351000,
+        315000
+      ],
+      "map": "regions/fr-brienne/map.json",
+      "tiles": [
+        "339.tar"
+      ]
+    },
+    {
+      "id": "fr-briey",
+      "name": "Briey und Umgebung",
+      "box": [
+        -258000,
+        209000,
+        -243000,
+        224000
+      ],
+      "map": "regions/fr-briey/map.json",
+      "tiles": [
+        "340.tar"
+      ]
+    },
+    {
+      "id": "fr-bruyeres",
+      "name": "Bruyères und Umgebung",
+      "box": [
+        -205000,
+        328000,
+        -190000,
+        343000
+      ],
+      "map": "regions/fr-bruyeres/map.json",
+      "tiles": [
+        "341.tar"
+      ]
+    },
+    {
+      "id": "fr-chalon",
+      "name": "Chalon-sur-Saône und Umgebung",
+      "box": [
+        -352000,
+        480000,
+        -337000,
+        495000
+      ],
+      "map": "regions/fr-chalon/map.json",
+      "tiles": [
+        "342.tar"
+      ]
+    },
+    {
+      "id": "fr-chalons",
+      "name": "Châlons-en-Champagne und Umgebung",
+      "box": [
+        -378000,
+        231000,
+        -363000,
+        246000
+      ],
+      "map": "regions/fr-chalons/map.json",
+      "tiles": [
+        "343.tar"
+      ]
+    },
+    {
+      "id": "fr-champagnole",
+      "name": "Champagnole und Umgebung",
+      "box": [
+        -273000,
+        489000,
+        -258000,
+        504000
+      ],
+      "map": "regions/fr-champagnole/map.json",
+      "tiles": [
+        "344.tar"
+      ]
+    },
+    {
+      "id": "fr-champlitte",
+      "name": "Champlitte und Umgebung",
+      "box": [
+        -298000,
+        389000,
+        -283000,
+        404000
+      ],
+      "map": "regions/fr-champlitte/map.json",
+      "tiles": [
+        "345.tar"
+      ]
+    },
+    {
+      "id": "fr-charleville",
+      "name": "Charleville-Mézières und Umgebung",
+      "box": [
+        -343000,
+        148000,
+        -328000,
+        163000
+      ],
+      "map": "regions/fr-charleville/map.json",
+      "tiles": [
+        "346.tar"
       ]
     }
   ]
