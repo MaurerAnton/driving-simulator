@@ -1,5 +1,5 @@
 {
-  "latest": "bw-aalen",
+  "latest": "bw-crailsheim",
   "regions": [
     {
       "id": "suedwest",
@@ -942,6 +942,216 @@
       "map": "regions/bw-calw/map.json",
       "tiles": [
         "132.tar"
+      ]
+    },
+    {
+      "id": "bw-crailsheim",
+      "name": "Crailsheim",
+      "box": [
+        43000,
+        227000,
+        58000,
+        242000
+      ],
+      "map": "regions/bw-crailsheim/map.json",
+      "tiles": [
+        "133.tar"
+      ]
+    },
+    {
+      "id": "bw-ehingen",
+      "name": "Ehingen",
+      "box": [
+        19000,
+        322000,
+        34000,
+        337000
+      ],
+      "map": "regions/bw-ehingen/map.json",
+      "tiles": [
+        "134.tar"
+      ]
+    },
+    {
+      "id": "bw-ellwangen",
+      "name": "Ellwangen und Umgebung",
+      "box": [
+        48000,
+        246000,
+        63000,
+        261000
+      ],
+      "map": "regions/bw-ellwangen/map.json",
+      "tiles": [
+        "135.tar"
+      ]
+    },
+    {
+      "id": "bw-emmendingen",
+      "name": "emmendingen",
+      "box": [
+        -121000,
+        340000,
+        -106000,
+        355000
+      ],
+      "map": "regions/bw-emmendingen/map.json",
+      "tiles": [
+        "136.tar"
+      ]
+    },
+    {
+      "id": "bw-freudenstadt",
+      "name": "Freudenstadt",
+      "box": [
+        -79000,
+        302000,
+        -64000,
+        317000
+      ],
+      "map": "regions/bw-freudenstadt/map.json",
+      "tiles": [
+        "137.tar"
+      ]
+    },
+    {
+      "id": "bw-friedrichshafen",
+      "name": "Friedrichshafen",
+      "box": [
+        0,
+        393000,
+        15000,
+        408000
+      ],
+      "map": "regions/bw-friedrichshafen/map.json",
+      "tiles": [
+        "138.tar"
+      ]
+    },
+    {
+      "id": "bw-furtwangen",
+      "name": "furtwangen",
+      "box": [
+        -95000,
+        348000,
+        -80000,
+        363000
+      ],
+      "map": "regions/bw-furtwangen/map.json",
+      "tiles": [
+        "139.tar"
+      ]
+    },
+    {
+      "id": "bw-goeppingen",
+      "name": "Göppingen und Umgebung",
+      "box": [
+        13000,
+        275000,
+        28000,
+        290000
+      ],
+      "map": "regions/bw-goeppingen/map.json",
+      "tiles": [
+        "140.tar"
+      ]
+    },
+    {
+      "id": "bw-haslach",
+      "name": "haslach",
+      "box": [
+        -103000,
+        323000,
+        -88000,
+        338000
+      ],
+      "map": "regions/bw-haslach/map.json",
+      "tiles": [
+        "141.tar"
+      ]
+    },
+    {
+      "id": "bw-heidelberg",
+      "name": "Heidelberg und Umgebung",
+      "box": [
+        -62000,
+        202000,
+        -47000,
+        217000
+      ],
+      "map": "regions/bw-heidelberg/map.json",
+      "tiles": [
+        "142.tar"
+      ]
+    },
+    {
+      "id": "bw-heidenheim",
+      "name": "Heidenheim an der Brenz",
+      "box": [
+        50000,
+        278000,
+        65000,
+        293000
+      ],
+      "map": "regions/bw-heidenheim/map.json",
+      "tiles": [
+        "143.tar"
+      ]
+    },
+    {
+      "id": "bw-heilbronn",
+      "name": "Heilbronn und Umgebung",
+      "box": [
+        -19000,
+        227000,
+        -4000,
+        242000
+      ],
+      "map": "regions/bw-heilbronn/map.json",
+      "tiles": [
+        "144.tar"
+      ]
+    },
+    {
+      "id": "bw-horb",
+      "name": "horb",
+      "box": [
+        -58000,
+        305000,
+        -43000,
+        320000
+      ],
+      "map": "regions/bw-horb/map.json",
+      "tiles": [
+        "145.tar"
+      ]
+    },
+    {
+      "id": "bw-isny",
+      "name": "isny",
+      "box": [
+        42000,
+        388000,
+        57000,
+        402000
+      ],
+      "map": "regions/bw-isny/map.json",
+      "tiles": [
+        "146.tar"
+      ]
+    },
+    {
+      "id": "bw-karlsruhe",
+      "name": "Karlsruhe und Umgebung",
+      "box": [
+        -79000,
+        242000,
+        -64000,
+        257000
+      ],
+      "map": "regions/bw-karlsruhe/map.json",
+      "tiles": [
+        "147.tar"
       ]
     }
   ]
