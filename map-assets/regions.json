@@ -1,5 +1,5 @@
 {
-  "latest": "fr-abreschviller",
+  "latest": "it-abbadia",
   "regions": [
     {
       "id": "suedwest",
@@ -3925,6 +3925,426 @@
       "map": "regions/fr-charleville/map.json",
       "tiles": [
         "346.tar"
+      ]
+    },
+    {
+      "id": "it-abbadia",
+      "name": "Abbadia San Salvatore",
+      "box": [
+        183000,
+        920000,
+        198000,
+        935000
+      ],
+      "map": "regions/it-abbadia/map.json",
+      "tiles": [
+        "347.tar"
+      ]
+    },
+    {
+      "id": "it-acceglio",
+      "name": "Acceglio",
+      "box": [
+        -196000,
+        743000,
+        -181000,
+        758000
+      ],
+      "map": "regions/it-acceglio/map.json",
+      "tiles": [
+        "348.tar"
+      ]
+    },
+    {
+      "id": "it-acqui",
+      "name": "Acqui Terme",
+      "box": [
+        -78000,
+        724000,
+        -63000,
+        739000
+      ],
+      "map": "regions/it-acqui/map.json",
+      "tiles": [
+        "349.tar"
+      ]
+    },
+    {
+      "id": "it-alba",
+      "name": "Alba",
+      "box": [
+        -112000,
+        720000,
+        -97000,
+        735000
+      ],
+      "map": "regions/it-alba/map.json",
+      "tiles": [
+        "350.tar"
+      ]
+    },
+    {
+      "id": "it-albenga",
+      "name": "Albenga",
+      "box": [
+        -99000,
+        793000,
+        -84000,
+        808000
+      ],
+      "map": "regions/it-albenga/map.json",
+      "tiles": [
+        "351.tar"
+      ]
+    },
+    {
+      "id": "it-alessandria",
+      "name": "Alessandria",
+      "box": [
+        -65000,
+        697000,
+        -50000,
+        712000
+      ],
+      "map": "regions/it-alessandria/map.json",
+      "tiles": [
+        "352.tar"
+      ]
+    },
+    {
+      "id": "it-anfo",
+      "name": "Anfo",
+      "box": [
+        80000,
+        601000,
+        95000,
+        616000
+      ],
+      "map": "regions/it-anfo/map.json",
+      "tiles": [
+        "353.tar"
+      ]
+    },
+    {
+      "id": "it-aosta",
+      "name": "Aosta",
+      "box": [
+        -166000,
+        604000,
+        -151000,
+        619000
+      ],
+      "map": "regions/it-aosta/map.json",
+      "tiles": [
+        "354.tar"
+      ]
+    },
+    {
+      "id": "it-arezzo",
+      "name": "Arezzo",
+      "box": [
+        197000,
+        854000,
+        212000,
+        869000
+      ],
+      "map": "regions/it-arezzo/map.json",
+      "tiles": [
+        "355.tar"
+      ]
+    },
+    {
+      "id": "it-arignano",
+      "name": "Arignano",
+      "box": [
+        -121000,
+        682000,
+        -106000,
+        697000
+      ],
+      "map": "regions/it-arignano/map.json",
+      "tiles": [
+        "356.tar"
+      ]
+    },
+    {
+      "id": "it-arona",
+      "name": "Arona",
+      "box": [
+        -70000,
+        603000,
+        -55000,
+        618000
+      ],
+      "map": "regions/it-arona/map.json",
+      "tiles": [
+        "357.tar"
+      ]
+    },
+    {
+      "id": "it-asola",
+      "name": "Asola",
+      "box": [
+        77000,
+        662000,
+        92000,
+        677000
+      ],
+      "map": "regions/it-asola/map.json",
+      "tiles": [
+        "358.tar"
+      ]
+    },
+    {
+      "id": "it-asti",
+      "name": "Asti",
+      "box": [
+        -98000,
+        698000,
+        -83000,
+        713000
+      ],
+      "map": "regions/it-asti/map.json",
+      "tiles": [
+        "359.tar"
+      ]
+    },
+    {
+      "id": "it-avigliana",
+      "name": "Avigliana",
+      "box": [
+        -162000,
+        678000,
+        -147000,
+        693000
+      ],
+      "map": "regions/it-avigliana/map.json",
+      "tiles": [
+        "360.tar"
+      ]
+    },
+    {
+      "id": "it-aymavilles",
+      "name": "Aymavilles",
+      "box": [
+        -184000,
+        614000,
+        -169000,
+        629000
+      ],
+      "map": "regions/it-aymavilles/map.json",
+      "tiles": [
+        "361.tar"
+      ]
+    },
+    {
+      "id": "it-baceno",
+      "name": "Baceno",
+      "box": [
+        -88000,
+        546000,
+        -73000,
+        561000
+      ],
+      "map": "regions/it-baceno/map.json",
+      "tiles": [
+        "362.tar"
+      ]
+    },
+    {
+      "id": "it-balme",
+      "name": "Balme",
+      "box": [
+        -175000,
+        653000,
+        -160000,
+        668000
+      ],
+      "map": "regions/it-balme/map.json",
+      "tiles": [
+        "363.tar"
+      ]
+    },
+    {
+      "id": "it-bardonecchia",
+      "name": "Bardonecchia",
+      "box": [
+        -214000,
+        677000,
+        -199000,
+        692000
+      ],
+      "map": "regions/it-bardonecchia/map.json",
+      "tiles": [
+        "364.tar"
+      ]
+    },
+    {
+      "id": "it-barga",
+      "name": "Barga",
+      "box": [
+        83000,
+        790000,
+        98000,
+        805000
+      ],
+      "map": "regions/it-barga/map.json",
+      "tiles": [
+        "365.tar"
+      ]
+    },
+    {
+      "id": "it-bedonia",
+      "name": "Bedonia",
+      "box": [
+        15000,
+        743000,
+        30000,
+        758000
+      ],
+      "map": "regions/it-bedonia/map.json",
+      "tiles": [
+        "366.tar"
+      ]
+    },
+    {
+      "id": "it-belluno",
+      "name": "Belluno und Umgebung",
+      "box": [
+        214000,
+        555000,
+        229000,
+        570000
+      ],
+      "map": "regions/it-belluno/map.json",
+      "tiles": [
+        "367.tar"
+      ]
+    },
+    {
+      "id": "it-bergamo",
+      "name": "Bergamo",
+      "box": [
+        17000,
+        609000,
+        32000,
+        624000
+      ],
+      "map": "regions/it-bergamo/map.json",
+      "tiles": [
+        "368.tar"
+      ]
+    },
+    {
+      "id": "it-biella",
+      "name": "Biella",
+      "box": [
+        -109000,
+        624000,
+        -94000,
+        639000
+      ],
+      "map": "regions/it-biella/map.json",
+      "tiles": [
+        "369.tar"
+      ]
+    },
+    {
+      "id": "it-bionaz",
+      "name": "Bionaz",
+      "box": [
+        -160000,
+        589000,
+        -145000,
+        604000
+      ],
+      "map": "regions/it-bionaz/map.json",
+      "tiles": [
+        "370.tar"
+      ]
+    },
+    {
+      "id": "it-bobbio",
+      "name": "Bobbio",
+      "box": [
+        -5000,
+        713000,
+        10000,
+        728000
+      ],
+      "map": "regions/it-bobbio/map.json",
+      "tiles": [
+        "371.tar"
+      ]
+    },
+    {
+      "id": "it-bobbiopellice",
+      "name": "Bobbio Pellice",
+      "box": [
+        -184000,
+        712000,
+        -169000,
+        727000
+      ],
+      "map": "regions/it-bobbiopellice/map.json",
+      "tiles": [
+        "372.tar"
+      ]
+    },
+    {
+      "id": "it-bologna",
+      "name": "Bologna",
+      "box": [
+        151000,
+        741000,
+        166000,
+        756000
+      ],
+      "map": "regions/it-bologna/map.json",
+      "tiles": [
+        "373.tar"
+      ]
+    },
+    {
+      "id": "it-bolzano",
+      "name": "Bozen",
+      "box": [
+        146000,
+        518000,
+        161000,
+        533000
+      ],
+      "map": "regions/it-bolzano/map.json",
+      "tiles": [
+        "374.tar"
+      ]
+    },
+    {
+      "id": "it-borgonovo",
+      "name": "Borgonovo Val Tidone",
+      "box": [
+        2000,
+        693000,
+        17000,
+        708000
+      ],
+      "map": "regions/it-borgonovo/map.json",
+      "tiles": [
+        "375.tar"
+      ]
+    },
+    {
+      "id": "it-borgosanlorenzo",
+      "name": "Borgo San Lorenzo",
+      "box": [
+        155000,
+        800000,
+        170000,
+        815000
+      ],
+      "map": "regions/it-borgosanlorenzo/map.json",
+      "tiles": [
+        "376.tar"
       ]
     }
   ]
