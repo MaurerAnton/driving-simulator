@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Versioni {v}",
   "version.play": "Luaj versionin {v}",
   "version.playNote": "Vetëm loja vetë është nga versioni {v} – harta është e sotmja, ndaj bota duket më e re se ç'ishte atëherë.",
+  "version.noRegions": "Ky version njeh vetëm hartën e Hessenit të Veriut – rajonet erdhën më vonë.",
   "version.title": "Versioni i lojës",
   "version.open": "Luaj këtë version",
   "version.running": "Po luhet: versioni {v}.",

@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Versi {v}",
   "version.play": "Mainkan versi {v}",
   "version.playNote": "Hanya game-nya sendiri yang berasal dari versi {v} – petanya adalah peta saat ini, jadi dunianya tampak lebih baru daripada dulu.",
+  "version.noRegions": "Versi ini hanya mengenal peta Hessen Utara – wilayah datang kemudian.",
   "version.title": "Versi game",
   "version.open": "Mainkan versi ini",
   "version.running": "Berjalan: versi {v}.",

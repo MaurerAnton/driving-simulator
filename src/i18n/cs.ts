@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Verze {v}",
   "version.play": "Hrát verzi {v}",
   "version.playNote": "Jen samotná hra pochází z verze {v} – mapa je dnešní, takže svět vypadá novější, než tehdy vypadal.",
+  "version.noRegions": "Tato verze zná jen mapu severního Hesenska – regiony přišly později.",
   "version.title": "Verze hry",
   "version.open": "Hrát tuto verzi",
   "version.running": "Běží: verze {v}.",

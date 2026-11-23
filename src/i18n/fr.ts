@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Version {v}",
   "version.play": "Jouer à la version {v}",
   "version.playNote": "Seul le jeu lui-même provient de la version {v} – la carte est celle d’aujourd’hui, si bien que le monde paraît plus récent qu’il ne l’était alors.",
+  "version.noRegions": "Cette version ne connaît que la carte de la Hesse du Nord – les régions sont venues plus tard.",
   "version.title": "Version du jeu",
   "version.open": "Jouer à cette version",
   "version.running": "En cours : version {v}.",

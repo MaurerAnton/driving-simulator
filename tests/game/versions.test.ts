@@ -143,3 +143,26 @@ test('an earlier version does not spoil the settings of the newest', () => {
   restoreAfterOldVersion(site, store);
   assert.equal(m.get('fahrsim-baunatal.settings.v2'), '{"vehicle":"bus"}');
 });
+
+test('an archive of its own holds the earlier versions: they are played from there, on this site\'s map', () => {
+  const list = parseVersions({
+    latest: '1.7.0',
+    archive: 'https://example.github.io/archive/',
+    versions: [
+      { version: '1.6.0', hosted: false, map: true },
+      { version: '0.9.0', hosted: false, map: true },
+      { version: '0.7.0', hosted: false, map: false },
+    ],
+  })!;
+  assert.equal(list.archive, 'https://example.github.io/archive/');
+  // (hosted: false here – the archive has them: playable, and the address is in the archive)
+  assert.ok(playable(list, '1.6.0'));
+  assert.ok(playable(list, '0.9.0'));
+  assert.ok(!playable(list, '0.7.0'), 'cannot read the map of today');
+  assert.equal(versionHref('https://example.github.io/site/', '1.6.0', '1.7.0', list.archive), 'https://example.github.io/archive/1.6.0/');
+  // (the newest is still this site's, and without an archive the versions lie below it)
+  assert.equal(versionHref('https://example.github.io/site/', '1.7.0', '1.7.0', list.archive), 'https://example.github.io/site/');
+  assert.equal(versionHref('https://example.github.io/site/', '1.6.0', '1.7.0'), 'https://example.github.io/site/v/1.6.0/');
+  // (an archive that is not a full http address is ignored)
+  assert.equal(parseVersions({ latest: '1.7.0', archive: 'nope', versions: [] })!.archive, undefined);
+});

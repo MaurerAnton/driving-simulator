@@ -160,22 +160,23 @@ function fromRelease(v: string, into: string): boolean {
 }
 
 /** Build version `v` from its tag or commit (`ref`) into `into`. */
-function build(v: string, ref: string, into: string, work: string): void {
+function build(v: string, ref: string, into: string, work: string, base = '../../', ownMap = false): void {
   const tree = join(work, `tree-${v}`);
   rmSync(tree, { recursive: true, force: true });
   spawnSync('git', ['worktree', 'prune'], { cwd: root });
   run('git', ['worktree', 'add', '--detach', '--force', tree, ref]);
   try {
     // the map – and the signs, where they are today's – two folders up: <site>/v/<version>/ → <site>/
-    patch(join(tree, 'src/game/app.ts'), "new URL('map/', document.baseURI)", "new URL('../../map/', document.baseURI)");
+    // (a version that cannot read today's map keeps the map it had, built in from its own public/map)
+    if (!ownMap) patch(join(tree, 'src/game/app.ts'), "new URL('map/', document.baseURI)", `new URL('${base}map/', document.baseURI)`);
     const sameSigns = spawnSync('git', ['diff', '--quiet', '--diff-filter=DM', ref, 'HEAD', '--', 'public/signs'], { cwd: root }).status === 0;
-    if (sameSigns) patch(join(tree, 'src/game/game.ts'), "new URL('signs/', document.baseURI)", "new URL('../../signs/', document.baseURI)");
+    if (sameSigns && !ownMap) patch(join(tree, 'src/game/game.ts'), "new URL('signs/', document.baseURI)", `new URL('${base}signs/', document.baseURI)`);
     run('npm', ['ci', '--no-audit', '--no-fund', '--loglevel=error'], tree);
     rmSync(into, { recursive: true, force: true });
     // (vite of the tag, its own config – the relative base './' that makes a build work in any folder)
     run(join(tree, 'node_modules/.bin/vite'), ['build', '--outDir', into, '--emptyOutDir', '--logLevel', 'warn'], tree);
-    if (sameSigns) rmSync(join(into, 'signs'), { recursive: true, force: true });
-    rmSync(join(into, 'map'), { recursive: true, force: true });
+    if (sameSigns && !ownMap) rmSync(join(into, 'signs'), { recursive: true, force: true });
+    if (!ownMap) rmSync(join(into, 'map'), { recursive: true, force: true });
     for (const f of readdirSync(join(into, 'assets'))) if (f.endsWith('.map')) rmSync(join(into, 'assets', f));
     const html = join(into, 'index.html');
     const page = readFileSync(html, 'utf8');
@@ -194,9 +195,17 @@ function main(): void {
   };
   const out = resolve(root, arg('out', 'dist'));
   const cache = resolve(root, arg('cache', '.old-versions'));
-  const budget = Number(arg('budget', String(DEFAULT_BUDGET)));
+  // (an archive of its own: the earlier versions are played from another site, which takes the map
+  //  and the signs from this one by their absolute address – every version fits, no budget)
+  const archiveBase = arg('archive', '');
+  // (an archive holds the earlier versions: this site only names it, and keeps no room of its own for them)
+  const archiveUrl = arg('archive-url', '');
+  const mapBase = arg('map-base', archiveBase ? `${archiveBase.replace(/\/+$/, '')}/` : '../../');
+  const budget = archiveBase ? Number.POSITIVE_INFINITY : archiveUrl ? 0 : Number(arg('budget', String(DEFAULT_BUDGET)));
   const packDir = process.argv.includes('--pack') ? resolve(root, arg('pack', 'data/work/old-versions')) : null;
-  if (!existsSync(join(out, 'index.html'))) throw new Error(`${out}: build the newest version first (npm run build)`);
+  // (an archive has no newest build of its own: the newest stays on the main site, and the archive
+  //  holds only the earlier ones – so its dist/ may begin empty)
+  if (!archiveBase && !existsSync(join(out, 'index.html'))) throw new Error(`${out}: build the newest version first (npm run build)`);
   const latest = (JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { version: string }).version;
   const tagList = run('git', ['tag', '-l', 'v*']).split('\n');
   const tagged = new Set(olderTags(tagList, latest));
@@ -219,14 +228,16 @@ function main(): void {
   const work = join(cache, '.work');
   const sizes = new Map<string, number>();
   for (const v of tags) {
-    if (compareVersions(v, MAP_READABLE_FROM) < 0) continue;
+    // (a version that cannot read today's map is built only for an archive, with the map it had)
+    const ownMap = compareVersions(v, MAP_READABLE_FROM) < 0;
+    if (ownMap && !archiveBase) continue;
     const dir = dirOf(v);
     if (!existsSync(join(dir, 'index.html'))) {
       rmSync(dir, { recursive: true, force: true });
       if (!devCommit(v) && fromRelease(v, dir)) console.log(`[old] ${v}: from the release`);
       else {
         console.log(`[old] ${v}: building from ${refOf(v)}`);
-        build(v, refOf(v), dir, work);
+        build(v, refOf(v), dir, work, mapBase, ownMap);
       }
     } else console.log(`[old] ${v}: cached`);
     sizes.set(v, folderSize(dir));
@@ -245,9 +256,11 @@ function main(): void {
   for (const v of hosted) cpSync(dirOf(v), join(out, 'v', v), { recursive: true });
   const list: VersionList = {
     latest,
+    ...(archiveBase || archiveUrl ? { archive: archiveBase || archiveUrl } : {}),
     versions: tags.map((v): HostedVersion => {
       const at = when(v);
-      return { version: v, hosted: hosted.has(v), map: compareVersions(v, MAP_READABLE_FROM) >= 0, ...(at ? { at } : {}) };
+      const oldMap = compareVersions(v, MAP_READABLE_FROM) < 0;
+      return { version: v, hosted: hosted.has(v), map: !oldMap, ...(oldMap && archiveBase ? { ownMap: true } : {}), ...(at ? { at } : {}) };
     }),
   };
   writeFileSync(join(out, 'versions.json'), JSON.stringify(list, null, 1));

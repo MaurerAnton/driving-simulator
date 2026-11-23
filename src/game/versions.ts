@@ -19,6 +19,8 @@ export interface HostedVersion {
   hosted: boolean;
   /** it can read the map the site has (false: built for a map of another form – listed, not playable) */
   map: boolean;
+  /** an old version played with the map it had (its own, built in: the archive hosts those) */
+  ownMap?: boolean;
 }
 
 export interface VersionList {
@@ -26,6 +28,12 @@ export interface VersionList {
   latest: string;
   /** the earlier versions, newest first */
   versions: HostedVersion[];
+  /**
+   * Where the earlier versions are played from, when they are not on this site
+   * (an archive site of its own, sharing this site's map): their address is
+   * `<archive><version>/`.  Absent: they lie under `v/<version>/` here.
+   */
+  archive?: string;
 }
 
 /** where an earlier version lies, below the top of the site */
@@ -44,17 +52,18 @@ export function compareVersions(a: string, b: string): number {
 /** versions.json as written by tools/old-versions.ts – null if it is not that */
 export function parseVersions(json: unknown): VersionList | null {
   if (typeof json !== 'object' || json === null) return null;
-  const o = json as { latest?: unknown; versions?: unknown };
+  const o = json as { latest?: unknown; versions?: unknown; archive?: unknown };
   if (typeof o.latest !== 'string' || !SEMVER.test(o.latest) || !Array.isArray(o.versions)) return null;
   const versions: HostedVersion[] = [];
   for (const v of o.versions as unknown[]) {
     if (typeof v !== 'object' || v === null) continue;
     const e = v as Partial<HostedVersion>;
     if (typeof e.version !== 'string' || !SEMVER.test(e.version) || e.version === o.latest) continue;
-    versions.push({ version: e.version, hosted: e.hosted === true, map: e.map !== false, ...(typeof e.at === 'string' ? { at: e.at } : {}) });
+    versions.push({ version: e.version, hosted: e.hosted === true, map: e.map !== false, ...(e.ownMap === true ? { ownMap: true } : {}), ...(typeof e.at === 'string' ? { at: e.at } : {}) });
   }
   versions.sort((a, b) => compareVersions(b.version, a.version));
-  return { latest: o.latest, versions };
+  const archive = typeof o.archive === 'string' && /^https?:\/\//.test(o.archive) ? o.archive : undefined;
+  return { latest: o.latest, versions, ...(archive ? { archive } : {}) };
 }
 
 /** The version an address is of, if it is one of the earlier ones (…/v/1.2.0/…) – else null. */
@@ -71,15 +80,21 @@ export function siteRoot(baseHref: string): string {
 }
 
 /** The address of a version: the top of the site for the latest one, v/<version>/ below it for the others. */
-export function versionHref(root: string, version: string, latest: string): string {
-  return version === latest ? root : new URL(`${VERSION_DIR}${version}/`, root).href;
+export function versionHref(root: string, version: string, latest: string, archive?: string): string {
+  if (version === latest) return root;
+  // (an archive of its own holds the earlier versions: their address is there, not below this site)
+  if (archive) return new URL(`${version}/`, archive.endsWith('/') ? archive : `${archive}/`).href;
+  return new URL(`${VERSION_DIR}${version}/`, root).href;
 }
 
 /** Can this version be played from the list? */
 export function playable(list: VersionList, version: string): boolean {
   if (version === list.latest) return true;
   const v = list.versions.find((e) => e.version === version);
-  return !!v && v.hosted && v.map;
+  // (an archived version is playable where the archive says so – on this site's map, or on its own)
+  if (!v) return false;
+  if (v.ownMap) return true;
+  return v.map && (v.hosted || !!list.archive);
 }
 
 let loaded: Promise<VersionList | null> | null = null;

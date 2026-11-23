@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Versiunea {v}",
   "version.play": "Joacă versiunea {v}",
   "version.playNote": "Doar jocul în sine este din versiunea {v} – harta este cea de azi, așa că lumea arată mai nouă decât arăta atunci.",
+  "version.noRegions": "Această versiune cunoaște doar harta Hessa de Nord – regiunile au venit mai târziu.",
   "version.title": "Versiunea jocului",
   "version.open": "Joacă această versiune",
   "version.running": "Rulează: versiunea {v}.",

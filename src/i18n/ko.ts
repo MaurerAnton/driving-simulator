@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "버전 {v}",
   "version.play": "버전 {v} 플레이",
   "version.playNote": "버전 {v}인 것은 게임 자체뿐이에요. 지도는 현재의 것이라 세상이 그때보다 새로워 보여요.",
+  "version.noRegions": "이 버전은 북헤센 지도만 알고 있습니다 – 지역은 나중에 추가되었습니다.",
   "version.title": "게임 버전",
   "version.open": "이 버전 플레이",
   "version.running": "실행 중: 버전 {v}.",

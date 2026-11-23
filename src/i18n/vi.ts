@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Phiên bản {v}",
   "version.play": "Chơi phiên bản {v}",
   "version.playNote": "Chỉ riêng trò chơi là từ phiên bản {v} – bản đồ là bản đồ hiện nay, nên thế giới trông mới hơn so với lúc đó.",
+  "version.noRegions": "Phiên bản này chỉ biết bản đồ Bắc Hessen – các khu vực đến sau.",
   "version.title": "Phiên bản trò chơi",
   "version.open": "Chơi phiên bản này",
   "version.running": "Đang chạy: phiên bản {v}.",

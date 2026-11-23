@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Verzija {v}",
   "version.play": "Igraj verziju {v}",
   "version.playNote": "Samo je sama igra iz verzije {v} – karta je današnja, pa svijet izgleda novije nego što je tada izgledao.",
+  "version.noRegions": "Ova verzija poznaje samo kartu Sjevernog Hessena – regije su došle kasnije.",
   "version.title": "Verzija igre",
   "version.open": "Igraj ovu verziju",
   "version.running": "Pokrenuto: verzija {v}.",

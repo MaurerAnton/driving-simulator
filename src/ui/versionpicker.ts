@@ -32,13 +32,21 @@ function warnOnPlay(b: HTMLButtonElement, version: () => string, latest: string,
   const label = (b.textContent ?? '').replace(/^▶\s*/, '');
   let note: HTMLElement | null = null;
   let shownFor = '';
+  /** The first version that could load a region of its own (before it, only the site's Nordhessen map). */
+  const REGIONS_FROM = '1.7.4';
+  const noRegions = (v: string): boolean => {
+    // (a version older than 1.7.4 knows no regions: it plays the one map of this website)
+    const [a, b2, c] = v.split('.').map(Number);
+    const [x, y, z] = REGIONS_FROM.split('.').map(Number);
+    return a * 1e6 + b2 * 1e3 + c < x * 1e6 + y * 1e3 + z;
+  };
   const describe = (): void => {
     if (version() === latest) {
       // (the newest: its map is its own)
       b.removeAttribute('title');
       b.removeAttribute('aria-label');
     } else {
-      b.title = t('version.playNote', { v: version() });
+      b.title = `${t('version.playNote', { v: version() })}${noRegions(version()) ? ` ${t('version.noRegions')}` : ''}`;
       b.setAttribute('aria-label', `${label}. ${b.title}`);
     }
     if (note && shownFor !== version()) {
@@ -52,7 +60,7 @@ function warnOnPlay(b: HTMLButtonElement, version: () => string, latest: string,
     if (touch && version() !== latest && shownFor !== version()) {
       shownFor = version();
       note ??= el('p', 'note');
-      note.textContent = `ⓘ ${t('version.playNote', { v: shownFor })}`;
+      note.textContent = `ⓘ ${t('version.playNote', { v: shownFor })}${noRegions(shownFor) ? ` ${t('version.noRegions')}` : ''}`;
       // (in the settings the button sits in a row with the choice: the note goes under the row)
       (b.parentElement?.classList.contains('row') ? b.parentElement : b).after(note);
       return;
@@ -64,10 +72,10 @@ function warnOnPlay(b: HTMLButtonElement, version: () => string, latest: string,
 }
 
 /** Go to (play) a version. */
-export function openVersion(version: string, latest: string): void {
+export function openVersion(version: string, latest: string, archive?: string): void {
   // (an earlier version would reset what it does not know: the settings are put back on return – game/versions.ts)
   if (version !== latest) keepForReturn(document.baseURI);
-  location.assign(versionHref(root(), version, latest));
+  location.assign(versionHref(root(), version, latest, archive));
 }
 
 /** The list of the site – null without one. */
@@ -122,8 +130,10 @@ export function versionSettings(t: T, formatTime: (iso: string) => string): HTML
     };
     add(list.latest, t('version.latest', { v: list.latest }), true);
     for (const v of list.versions) {
-      const why = !v.map ? ` – ${t('version.oldMap')}` : !v.hosted ? ` – ${t('version.notHosted')}` : '';
-      add(v.version, `${v.version}${v.at ? ` (${formatTime(v.at)})` : ''}${why}`, v.hosted && v.map);
+      // (an archived version is played from the archive: nothing to warn about but its map)
+      const here = v.hosted || !!list.archive || !!v.ownMap;
+      const why = !v.map && !v.ownMap ? ` – ${t('version.oldMap')}` : !here ? ` – ${t('version.notHosted')}` : '';
+      add(v.version, `${v.version}${v.at ? ` (${formatTime(v.at)})` : ''}${why}`, here && (v.map || !!v.ownMap));
     }
     sel.value = VERSION;
     if (sel.value !== VERSION) sel.value = list.latest;
@@ -133,7 +143,7 @@ export function versionSettings(t: T, formatTime: (iso: string) => string): HTML
       go.dispatchEvent(new Event('fs-describe'));
     };
     sel.onchange = refresh;
-    warnOnPlay(go, () => sel.value, list.latest, t, () => openVersion(sel.value, list.latest));
+    warnOnPlay(go, () => sel.value, list.latest, t, () => openVersion(sel.value, list.latest, list.archive));
     refresh();
     row.hidden = false;
     note.textContent = `${t('version.running', { v: VERSION })} ${t('version.note')}`;

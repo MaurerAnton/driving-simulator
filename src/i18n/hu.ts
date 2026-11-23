@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Verzió: {v}",
   "version.play": "A(z) {v} verzió játszása",
   "version.playNote": "Csak maga a játék származik a(z) {v} verzióból – a térkép a mai, így a világ újabbnak látszik, mint akkor volt.",
+  "version.noRegions": "Ez a verzió csak az Észak-Hessen térképet ismeri – a régiók később jöttek.",
   "version.title": "Játékverzió",
   "version.open": "Ennek a verziónak a játszása",
   "version.running": "Fut: {v} verzió.",

@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "Sürüm {v}",
   "version.play": "{v} sürümünü oynayın",
   "version.playNote": "Yalnızca oyunun kendisi {v} sürümünden – harita bugünkü harita, bu yüzden dünya o zamankinden daha yeni görünüyor.",
+  "version.noRegions": "Bu sürüm yalnızca Kuzey Hessen haritasını bilir – bölgeler sonra geldi.",
   "version.title": "Oyun sürümü",
   "version.open": "Bu sürümü oynayın",
   "version.running": "Çalışan: {v} sürümü.",

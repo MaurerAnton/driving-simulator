@@ -157,6 +157,7 @@ const dict: Dict = {
   "newsVersion": "版本 {v}",
   "version.play": "玩 {v} 版",
   "version.playNote": "只有游戏本身来自 {v} 版——地图是当前的，所以世界看起来比当时更新。",
+  "version.noRegions": "此版本只知道北黑森地图——区域是后来才有的。",
   "version.title": "游戏版本",
   "version.open": "玩这个版本",
   "version.running": "正在运行：{v} 版。",
