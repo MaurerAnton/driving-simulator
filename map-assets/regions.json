@@ -1,5 +1,5 @@
 {
-  "latest": "niedersachsen-harz-landkreis-goettingen",
+  "latest": "niedersachsen-markhausen",
   "regions": [
     {
       "id": "suedwest",
@@ -6039,6 +6039,426 @@
       "map": "regions/niedersachsen-lueneburg/map.json",
       "tiles": [
         "497.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-markhausen",
+      "name": "Markhausen",
+      "box": [
+        -114000,
+        -196000,
+        -99000,
+        -181000
+      ],
+      "map": "regions/niedersachsen-markhausen/map.json",
+      "tiles": [
+        "498.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-marschacht",
+      "name": "Marschacht",
+      "box": [
+        55000,
+        -243000,
+        70000,
+        -228000
+      ],
+      "map": "regions/niedersachsen-marschacht/map.json",
+      "tiles": [
+        "499.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-moringen",
+      "name": "Moringen",
+      "box": [
+        22000,
+        -59000,
+        34000,
+        -44000
+      ],
+      "map": "regions/niedersachsen-moringen/map.json",
+      "tiles": [
+        "500.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-mueden-aller",
+      "name": "Müden (Aller)",
+      "box": [
+        59000,
+        -153000,
+        74000,
+        -138000
+      ],
+      "map": "regions/niedersachsen-mueden-aller/map.json",
+      "tiles": [
+        "501.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-muenchehagen",
+      "name": "Münchehagen",
+      "box": [
+        -21000,
+        -138000,
+        -6000,
+        -123000
+      ],
+      "map": "regions/niedersachsen-muenchehagen/map.json",
+      "tiles": [
+        "502.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-munster",
+      "name": "Munster",
+      "box": [
+        37000,
+        -199000,
+        52000,
+        -184000
+      ],
+      "map": "regions/niedersachsen-munster/map.json",
+      "tiles": [
+        "503.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-neudorf-platendorf",
+      "name": "Neudorf-Platendorf",
+      "box": [
+        74000,
+        -153000,
+        89000,
+        -138000
+      ],
+      "map": "regions/niedersachsen-neudorf-platendorf/map.json",
+      "tiles": [
+        "504.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-neustadt-am-ruebenberge",
+      "name": "Neustadt am Rübenberge",
+      "box": [
+        -2000,
+        -155000,
+        13000,
+        -140000
+      ],
+      "map": "regions/niedersachsen-neustadt-am-ruebenberge/map.json",
+      "tiles": [
+        "505.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-nienburg-weser",
+      "name": "Nienburg/Weser",
+      "box": [
+        -18000,
+        -164000,
+        -3000,
+        -149000
+      ],
+      "map": "regions/niedersachsen-nienburg-weser/map.json",
+      "tiles": [
+        "506.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-nienstedt-deister",
+      "name": "Nienstedt (Deister)",
+      "box": [
+        -5000,
+        -119000,
+        10000,
+        -104000
+      ],
+      "map": "regions/niedersachsen-nienstedt-deister/map.json",
+      "tiles": [
+        "507.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-nikolausdorf",
+      "name": "Nikolausdorf",
+      "box": [
+        -97000,
+        -201000,
+        -82000,
+        -186000
+      ],
+      "map": "regions/niedersachsen-nikolausdorf/map.json",
+      "tiles": [
+        "508.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-nordstemmen",
+      "name": "Nordstemmen",
+      "box": [
+        15000,
+        -111000,
+        30000,
+        -96000
+      ],
+      "map": "regions/niedersachsen-nordstemmen/map.json",
+      "tiles": [
+        "509.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-obenstrohe",
+      "name": "Obenstrohe",
+      "box": [
+        -95000,
+        -244000,
+        -80000,
+        -229000
+      ],
+      "map": "regions/niedersachsen-obenstrohe/map.json",
+      "tiles": [
+        "510.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-oerie",
+      "name": "Oerie",
+      "box": [
+        15000,
+        -117000,
+        30000,
+        -102000
+      ],
+      "map": "regions/niedersachsen-oerie/map.json",
+      "tiles": [
+        "511.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-osterheide",
+      "name": "Osterheide",
+      "box": [
+        12000,
+        -179000,
+        27000,
+        -164000
+      ],
+      "map": "regions/niedersachsen-osterheide/map.json",
+      "tiles": [
+        "512.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-osterholz-scharmbeck",
+      "name": "Osterholz-Scharmbeck",
+      "box": [
+        -41000,
+        -233000,
+        -26000,
+        -218000
+      ],
+      "map": "regions/niedersachsen-osterholz-scharmbeck/map.json",
+      "tiles": [
+        "513.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-otter",
+      "name": "Otter",
+      "box": [
+        17000,
+        -224000,
+        32000,
+        -209000
+      ],
+      "map": "regions/niedersachsen-otter/map.json",
+      "tiles": [
+        "514.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-otterstedt",
+      "name": "Otterstedt",
+      "box": [
+        -26000,
+        -218000,
+        -11000,
+        -203000
+      ],
+      "map": "regions/niedersachsen-otterstedt/map.json",
+      "tiles": [
+        "515.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-papenburg",
+      "name": "Papenburg",
+      "box": [
+        -142000,
+        -212000,
+        -127000,
+        -197000
+      ],
+      "map": "regions/niedersachsen-papenburg/map.json",
+      "tiles": [
+        "516.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-quakenbruck",
+      "name": "Quakenbrück",
+      "box": [
+        -106000,
+        -166000,
+        -91000,
+        -151000
+      ],
+      "map": "regions/niedersachsen-quakenbruck/map.json",
+      "tiles": [
+        "517.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-rehlingen",
+      "name": "Rehlingen",
+      "box": [
+        40000,
+        -213000,
+        55000,
+        -198000
+      ],
+      "map": "regions/niedersachsen-rehlingen/map.json",
+      "tiles": [
+        "518.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-rieste",
+      "name": "Rieste",
+      "box": [
+        62000,
+        -215000,
+        77000,
+        -200000
+      ],
+      "map": "regions/niedersachsen-rieste/map.json",
+      "tiles": [
+        "519.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-rinteln",
+      "name": "Rinteln",
+      "box": [
+        -25000,
+        -108000,
+        -10000,
+        -93000
+      ],
+      "map": "regions/niedersachsen-rinteln/map.json",
+      "tiles": [
+        "520.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-ritterhude",
+      "name": "Ritterhude",
+      "box": [
+        -51000,
+        -221000,
+        -36000,
+        -206000
+      ],
+      "map": "regions/niedersachsen-ritterhude/map.json",
+      "tiles": [
+        "521.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-rodenkirchen",
+      "name": "Rodenkirchen",
+      "box": [
+        -72000,
+        -247000,
+        -57000,
+        -232000
+      ],
+      "map": "regions/niedersachsen-rodenkirchen/map.json",
+      "tiles": [
+        "522.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-rodewald",
+      "name": "Rodewald",
+      "box": [
+        -3000,
+        -162000,
+        12000,
+        -147000
+      ],
+      "map": "regions/niedersachsen-rodewald/map.json",
+      "tiles": [
+        "523.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-ronnenberg",
+      "name": "Ronnenberg",
+      "box": [
+        9000,
+        -123000,
+        24000,
+        -108000
+      ],
+      "map": "regions/niedersachsen-ronnenberg/map.json",
+      "tiles": [
+        "524.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-rostrup",
+      "name": "Rostrup",
+      "box": [
+        -103000,
+        -224000,
+        -88000,
+        -209000
+      ],
+      "map": "regions/niedersachsen-rostrup/map.json",
+      "tiles": [
+        "525.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-rotenburg",
+      "name": "Rotenburg",
+      "box": [
+        -11000,
+        -218000,
+        4000,
+        -203000
+      ],
+      "map": "regions/niedersachsen-rotenburg/map.json",
+      "tiles": [
+        "526.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sachsenhagen",
+      "name": "Sachsenhagen",
+      "box": [
+        -20000,
+        -134000,
+        -5000,
+        -119000
+      ],
+      "map": "regions/niedersachsen-sachsenhagen/map.json",
+      "tiles": [
+        "527.tar"
       ]
     }
   ]
