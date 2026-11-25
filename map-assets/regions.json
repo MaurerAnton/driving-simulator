@@ -1,5 +1,5 @@
 {
-  "latest": "niedersachsen-bokensdorf",
+  "latest": "nrw-paderborn",
   "regions": [
     {
       "id": "suedwest",
@@ -5185,6 +5185,20 @@
       "map": "regions/niedersachsen-einbeck/map.json",
       "tiles": [
         "436.tar"
+      ]
+    },
+    {
+      "id": "nrw-paderborn",
+      "name": "Paderborn",
+      "box": [
+        -52000,
+        -59000,
+        -37000,
+        -44000
+      ],
+      "map": "regions/nrw-paderborn/map.json",
+      "tiles": [
+        "437.tar"
       ]
     }
   ]
