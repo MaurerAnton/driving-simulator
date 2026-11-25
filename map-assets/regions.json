@@ -1,5 +1,5 @@
 {
-  "latest": "hamburg-wandsbek",
+  "latest": "thueringen-gera",
   "regions": [
     {
       "id": "suedwest",
@@ -7672,6 +7672,188 @@
       "map": "regions/thueringen-jena/map.json",
       "tiles": [
         "622.tar"
+      ]
+    },
+    {
+      "id": "thueringen-gera",
+      "name": "Gera",
+      "box": [
+        181000,
+        29000,
+        196000,
+        44000
+      ],
+      "map": "regions/thueringen-gera/map.json",
+      "tiles": [
+        "623.tar"
+      ]
+    },
+    {
+      "id": "sachsen-zwickau",
+      "name": "Zwickau",
+      "box": [
+        211000,
+        45000,
+        226000,
+        60000
+      ],
+      "map": "regions/sachsen-zwickau/map.json",
+      "tiles": [
+        "624.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-cottbus",
+      "name": "Cottbus",
+      "box": [
+        332000,
+        -77000,
+        347000,
+        -62000
+      ],
+      "map": "regions/brandenburg-cottbus/map.json",
+      "tiles": [
+        "625.tar"
+      ]
+    },
+    {
+      "id": "sachsen-plauen",
+      "name": "Plauen",
+      "box": [
+        187000,
+        72000,
+        202000,
+        87000
+      ],
+      "map": "regions/sachsen-plauen/map.json",
+      "tiles": [
+        "626.tar"
+      ]
+    },
+    {
+      "id": "thueringen-weimar",
+      "name": "Weimar",
+      "box": [
+        128000,
+        20000,
+        143000,
+        35000
+      ],
+      "map": "regions/thueringen-weimar/map.json",
+      "tiles": [
+        "627.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-brandenburg-an-der-havel",
+      "name": "Brandenburg an der Havel",
+      "box": [
+        206000,
+        -143000,
+        221000,
+        -128000
+      ],
+      "map": "regions/brandenburg-brandenburg-an-der-havel/map.json",
+      "tiles": [
+        "628.tar"
+      ]
+    },
+    {
+      "id": "sachsen-goerlitz",
+      "name": "Görlitz",
+      "box": [
+        383000,
+        -14000,
+        393000,
+        1000
+      ],
+      "map": "regions/sachsen-goerlitz/map.json",
+      "tiles": [
+        "629.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-frankfurt-oder",
+      "name": "Frankfurt (Oder)",
+      "box": [
+        342000,
+        -144000,
+        357000,
+        -129000
+      ],
+      "map": "regions/brandenburg-frankfurt-oder/map.json",
+      "tiles": [
+        "630.tar"
+      ]
+    },
+    {
+      "id": "thueringen-gotha",
+      "name": "Gotha",
+      "box": [
+        84000,
+        25000,
+        99000,
+        40000
+      ],
+      "map": "regions/thueringen-gotha/map.json",
+      "tiles": [
+        "631.tar"
+      ]
+    },
+    {
+      "id": "thueringen-nordhausen",
+      "name": "Nordhausen",
+      "box": [
+        89000,
+        -37000,
+        104000,
+        -22000
+      ],
+      "map": "regions/thueringen-nordhausen/map.json",
+      "tiles": [
+        "632.tar"
+      ]
+    },
+    {
+      "id": "sachsen-freiberg",
+      "name": "Freiberg",
+      "box": [
+        269000,
+        22000,
+        284000,
+        37000
+      ],
+      "map": "regions/sachsen-freiberg/map.json",
+      "tiles": [
+        "633.tar"
+      ]
+    },
+    {
+      "id": "thueringen-suhl",
+      "name": "Suhl",
+      "box": [
+        84000,
+        63000,
+        99000,
+        78000
+      ],
+      "map": "regions/thueringen-suhl/map.json",
+      "tiles": [
+        "634.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-eberswalde",
+      "name": "Eberswalde",
+      "box": [
+        289000,
+        -194000,
+        304000,
+        -179000
+      ],
+      "map": "regions/brandenburg-eberswalde/map.json",
+      "tiles": [
+        "635.tar"
       ]
     }
   ]
