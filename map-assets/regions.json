@@ -1,5 +1,5 @@
 {
-  "latest": "saarland-neunkirchen",
+  "latest": "sh-elmshorn",
   "regions": [
     {
       "id": "suedwest",
@@ -9861,6 +9861,90 @@
       "map": "regions/nrw-soest/map.json",
       "tiles": [
         "783.tar"
+      ]
+    },
+    {
+      "id": "sh-elmshorn",
+      "name": "Elmshorn",
+      "box": [
+        8000,
+        -285000,
+        23000,
+        -270000
+      ],
+      "map": "regions/sh-elmshorn/map.json",
+      "tiles": [
+        "784.tar"
+      ]
+    },
+    {
+      "id": "nrw-bornheim",
+      "name": "Bornheim",
+      "box": [
+        -177000,
+        45000,
+        -162000,
+        60000
+      ],
+      "map": "regions/nrw-bornheim/map.json",
+      "tiles": [
+        "785.tar"
+      ]
+    },
+    {
+      "id": "nrw-hennef-sieg",
+      "name": "Hennef (Sieg)",
+      "box": [
+        -157000,
+        44000,
+        -142000,
+        59000
+      ],
+      "map": "regions/nrw-hennef-sieg/map.json",
+      "tiles": [
+        "786.tar"
+      ]
+    },
+    {
+      "id": "bw-singen",
+      "name": "Singen",
+      "box": [
+        -47000,
+        381000,
+        -32000,
+        396000
+      ],
+      "map": "regions/bw-singen/map.json",
+      "tiles": [
+        "787.tar"
+      ]
+    },
+    {
+      "id": "nrw-duelmen",
+      "name": "Dülmen",
+      "box": [
+        -154000,
+        -73000,
+        -139000,
+        -58000
+      ],
+      "map": "regions/nrw-duelmen/map.json",
+      "tiles": [
+        "788.tar"
+      ]
+    },
+    {
+      "id": "mv-wismar",
+      "name": "Wismar",
+      "box": [
+        126000,
+        -304000,
+        141000,
+        -289000
+      ],
+      "map": "regions/mv-wismar/map.json",
+      "tiles": [
+        "789.tar"
       ]
     }
   ]
