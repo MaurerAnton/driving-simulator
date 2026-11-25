@@ -448,6 +448,16 @@ Ablauf `.github/workflows/build-map-thueringen.yml` („Karte Thüringen“), Ab
 | Gebäude | Umrisse aus OpenStreetMap (kein LoD2, s. o.) | ODbL 1.0 |
 | OpenStreetMap | Geofabrik `europe/germany/thueringen` | ODbL 1.0 |
 
+#### Brandenburg
+
+Ablauf `.github/workflows/build-map-brandenburg.yml` („Karte Brandenburg“), Abruf `tools/fetch-brandenburg.py`:
+
+| Inhalt | Quelle | Lizenz |
+| --- | --- | --- |
+| Gelände | DGM1 „Brandenburg mit Berlin“ der Landesvermessung und Geobasisinformation Brandenburg (LGB), WCS `bb_dgm` (`isk.geobasis-bb.de/ows/dgm_wcs`), in UTM32 abgefragt | [dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0) – „© GeoBasis-DE/LGB, dl-de/by-2-0“ |
+| Gebäude | LoD2 (CityGML) der LGB, eine Datei je km² in UTM33 von [OpenGeodata.Brandenburg](https://data.geobasis-bb.de/geobasis/daten/3d_gebaeude/lod2_gml/), beim Holen nach UTM32 umgerechnet; wo das Rechteck nach Berlin reicht, dazu die LoD2 des Geoportals Berlin | dl-de/by-2-0 (LGB); Berlin: [dl-de/zero-2-0](https://www.govdata.de/dl-de/zero-2-0) |
+| OpenStreetMap | Geofabrik `europe/germany/brandenburg` („Brandenburg (mit Berlin)“ – ein Auszug genügt auch an der Stadtgrenze) | ODbL 1.0 |
+
 ## Fahrpläne der Straßenbahnen und RegioTrams
 
 Welchen Weg eine Linie fährt, steht in `lines.json.gz`; wann ihre Bahnen fahren, in `timetable.json.gz`. Das
