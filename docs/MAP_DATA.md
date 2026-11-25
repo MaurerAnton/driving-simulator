@@ -458,6 +458,20 @@ Ablauf `.github/workflows/build-map-brandenburg.yml` („Karte Brandenburg“), 
 | Gebäude | LoD2 (CityGML) der LGB, eine Datei je km² in UTM33 von [OpenGeodata.Brandenburg](https://data.geobasis-bb.de/geobasis/daten/3d_gebaeude/lod2_gml/), beim Holen nach UTM32 umgerechnet; wo das Rechteck nach Berlin reicht, dazu die LoD2 des Geoportals Berlin | dl-de/by-2-0 (LGB); Berlin: [dl-de/zero-2-0](https://www.govdata.de/dl-de/zero-2-0) |
 | OpenStreetMap | Geofabrik `europe/germany/brandenburg` („Brandenburg (mit Berlin)“ – ein Auszug genügt auch an der Stadtgrenze) | ODbL 1.0 |
 
+#### Sachsen
+
+Ablauf `.github/workflows/build-map-sachsen.yml` („Karte Sachsen“), Abruf `tools/fetch-sachsen.py`. Das Rechteck wird
+wie überall im UTM32-Gitter der Karte angegeben; Sachsen liefert in UTM33 (EPSG:25833) und in Kacheln von 2 km, das
+Skript rechnet Gelände (bilinear, jede Zelle eines UTM32-Quadrats) und Gebäude (jede Koordinate) um. Welche Kacheln es
+gibt, sagt der ArcGIS-Dienst `rest_geosn_downloadlinks` hinter dem „Produktdownload“ (geoviewer.sachsen.de); die
+Dateien liegen ohne Anmeldung in der Geocloud des Landes.
+
+| Inhalt | Quelle | Lizenz |
+| --- | --- | --- |
+| Gelände | Digitales Geländemodell **DGM1** (1 m, GeoTIFF, `dgm1_33<E>_<N>_2_sn_tiff.zip`), Landesamt für Geobasisinformation Sachsen (GeoSN) | [Datenlizenz Deutschland – Namensnennung – 2.0](https://www.govdata.de/dl-de/by-2-0) laut [Allgemeinen Nutzungsbedingungen des GeoSN](https://www.landesvermessung.sachsen.de/allgemeine-nutzungsbedingungen-8954.html), kostenfrei – „Quelle: GeoSN, dl-de/by-2-0“ |
+| Gebäude mit Dachformen | 3D-Stadtmodell **LoD2** (CityGML 1.0, `lod2_33<E>_<N>_2_sn_citygml.zip`), GeoSN | wie oben |
+| OpenStreetMap | Geofabrik `europe/germany/sachsen` | ODbL 1.0 |
+
 ## Fahrpläne der Straßenbahnen und RegioTrams
 
 Welchen Weg eine Linie fährt, steht in `lines.json.gz`; wann ihre Bahnen fahren, in `timetable.json.gz`. Das
