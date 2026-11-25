@@ -1,5 +1,5 @@
 {
-  "latest": "niedersachsen-achim",
+  "latest": "niedersachsen-bokensdorf",
   "regions": [
     {
       "id": "suedwest",
@@ -4765,6 +4765,426 @@
       "map": "regions/niedersachsen-boffzen-gemeindefreies-gebiet/map.json",
       "tiles": [
         "406.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bokensdorf",
+      "name": "Bokensdorf",
+      "box": [
+        80000,
+        -148000,
+        95000,
+        -133000
+      ],
+      "map": "regions/niedersachsen-bokensdorf/map.json",
+      "tiles": [
+        "407.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-braak",
+      "name": "Braak",
+      "box": [
+        7000,
+        -74000,
+        22000,
+        -59000
+      ],
+      "map": "regions/niedersachsen-braak/map.json",
+      "tiles": [
+        "408.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-breddorf",
+      "name": "Breddorf",
+      "box": [
+        -33000,
+        -235000,
+        -18000,
+        -220000
+      ],
+      "map": "regions/niedersachsen-breddorf/map.json",
+      "tiles": [
+        "409.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bremerhaven",
+      "name": "Bremerhaven",
+      "box": [
+        -63000,
+        -265000,
+        -48000,
+        -250000
+      ],
+      "map": "regions/niedersachsen-bremerhaven/map.json",
+      "tiles": [
+        "410.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-brest",
+      "name": "Brest",
+      "box": [
+        -10000,
+        -252000,
+        5000,
+        -237000
+      ],
+      "map": "regions/niedersachsen-brest/map.json",
+      "tiles": [
+        "411.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-brockel",
+      "name": "Brockel",
+      "box": [
+        2000,
+        -209000,
+        17000,
+        -194000
+      ],
+      "map": "regions/niedersachsen-brockel/map.json",
+      "tiles": [
+        "412.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bruchhausen-vilsen",
+      "name": "Bruchhausen-Vilsen",
+      "box": [
+        -34000,
+        -182000,
+        -19000,
+        -167000
+      ],
+      "map": "regions/niedersachsen-bruchhausen-vilsen/map.json",
+      "tiles": [
+        "413.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-buchholz-aller",
+      "name": "Buchholz (Aller)",
+      "box": [
+        12000,
+        -162000,
+        27000,
+        -147000
+      ],
+      "map": "regions/niedersachsen-buchholz-aller/map.json",
+      "tiles": [
+        "414.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bucken",
+      "name": "Bücken",
+      "box": [
+        -27000,
+        -177000,
+        -12000,
+        -162000
+      ],
+      "map": "regions/niedersachsen-bucken/map.json",
+      "tiles": [
+        "415.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-burgdorf",
+      "name": "Burgdorf",
+      "box": [
+        30000,
+        -141000,
+        45000,
+        -126000
+      ],
+      "map": "regions/niedersachsen-burgdorf/map.json",
+      "tiles": [
+        "416.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-burgwedel",
+      "name": "Burgwedel",
+      "box": [
+        28000,
+        -155000,
+        43000,
+        -140000
+      ],
+      "map": "regions/niedersachsen-burgwedel/map.json",
+      "tiles": [
+        "417.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-cappeln-oldenburg",
+      "name": "Cappeln (Oldenburg)",
+      "box": [
+        -102000,
+        -180000,
+        -87000,
+        -165000
+      ],
+      "map": "regions/niedersachsen-cappeln-oldenburg/map.json",
+      "tiles": [
+        "418.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-clausthal-zellerfeld",
+      "name": "Clausthal-Zellerfeld",
+      "box": [
+        57000,
+        -68000,
+        72000,
+        -53000
+      ],
+      "map": "regions/niedersachsen-clausthal-zellerfeld/map.json",
+      "tiles": [
+        "419.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-coppenbruegge",
+      "name": "Coppenbrügge",
+      "box": [
+        0,
+        -102000,
+        15000,
+        -87000
+      ],
+      "map": "regions/niedersachsen-coppenbruegge/map.json",
+      "tiles": [
+        "420.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-dachtmissen",
+      "name": "Dachtmissen",
+      "box": [
+        36000,
+        -143000,
+        51000,
+        -128000
+      ],
+      "map": "regions/niedersachsen-dachtmissen/map.json",
+      "tiles": [
+        "421.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-damme",
+      "name": "Damme",
+      "box": [
+        -87000,
+        -150000,
+        -72000,
+        -135000
+      ],
+      "map": "regions/niedersachsen-damme/map.json",
+      "tiles": [
+        "422.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-dedelstorf",
+      "name": "Dedelstorf",
+      "box": [
+        67000,
+        -169000,
+        82000,
+        -154000
+      ],
+      "map": "regions/niedersachsen-dedelstorf/map.json",
+      "tiles": [
+        "423.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-delmenhorst",
+      "name": "Delmenhorst",
+      "box": [
+        -58000,
+        -205000,
+        -43000,
+        -190000
+      ],
+      "map": "regions/niedersachsen-delmenhorst/map.json",
+      "tiles": [
+        "424.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-diekholzen",
+      "name": "Diekholzen",
+      "box": [
+        30000,
+        -93000,
+        45000,
+        -87000
+      ],
+      "map": "regions/niedersachsen-diekholzen/map.json",
+      "tiles": [
+        "425.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-dielmissen",
+      "name": "Dielmissen",
+      "box": [
+        7000,
+        -89000,
+        22000,
+        -74000
+      ],
+      "map": "regions/niedersachsen-dielmissen/map.json",
+      "tiles": [
+        "426.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-drebber",
+      "name": "Drebber",
+      "box": [
+        -72000,
+        -165000,
+        -57000,
+        -150000
+      ],
+      "map": "regions/niedersachsen-drebber/map.json",
+      "tiles": [
+        "427.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-drentwede",
+      "name": "Drentwede",
+      "box": [
+        -65000,
+        -173000,
+        -50000,
+        -158000
+      ],
+      "map": "regions/niedersachsen-drentwede/map.json",
+      "tiles": [
+        "428.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-edemissen",
+      "name": "Edemissen",
+      "box": [
+        50000,
+        -133000,
+        65000,
+        -118000
+      ],
+      "map": "regions/niedersachsen-edemissen/map.json",
+      "tiles": [
+        "429.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-egestorf",
+      "name": "Egestorf",
+      "box": [
+        37000,
+        -219000,
+        52000,
+        -204000
+      ],
+      "map": "regions/niedersachsen-egestorf/map.json",
+      "tiles": [
+        "430.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-ehrenburg",
+      "name": "Ehrenburg",
+      "box": [
+        -58000,
+        -175000,
+        -43000,
+        -160000
+      ],
+      "map": "regions/niedersachsen-ehrenburg/map.json",
+      "tiles": [
+        "431.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-eickhorst",
+      "name": "Eickhorst",
+      "box": [
+        66000,
+        -131000,
+        81000,
+        -116000
+      ],
+      "map": "regions/niedersachsen-eickhorst/map.json",
+      "tiles": [
+        "432.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-eicklingen",
+      "name": "Eicklingen",
+      "box": [
+        44000,
+        -153000,
+        59000,
+        -138000
+      ],
+      "map": "regions/niedersachsen-eicklingen/map.json",
+      "tiles": [
+        "433.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-eime",
+      "name": "Eime",
+      "box": [
+        15000,
+        -102000,
+        30000,
+        -87000
+      ],
+      "map": "regions/niedersachsen-eime/map.json",
+      "tiles": [
+        "434.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-eimke",
+      "name": "Eimke",
+      "box": [
+        52000,
+        -199000,
+        67000,
+        -184000
+      ],
+      "map": "regions/niedersachsen-eimke/map.json",
+      "tiles": [
+        "435.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-einbeck",
+      "name": "Einbeck",
+      "box": [
+        22000,
+        -74000,
+        37000,
+        -59000
+      ],
+      "map": "regions/niedersachsen-einbeck/map.json",
+      "tiles": [
+        "436.tar"
       ]
     }
   ]
