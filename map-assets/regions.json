@@ -1,5 +1,5 @@
 {
-  "latest": "niedersachsen-markhausen",
+  "latest": "niedersachsen-salzgitter",
   "regions": [
     {
       "id": "suedwest",
@@ -6459,6 +6459,426 @@
       "map": "regions/niedersachsen-sachsenhagen/map.json",
       "tiles": [
         "527.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-salzgitter",
+      "name": "Salzgitter",
+      "box": [
+        60000,
+        -114000,
+        75000,
+        -99000
+      ],
+      "map": "regions/niedersachsen-salzgitter/map.json",
+      "tiles": [
+        "528.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-salzhemmendorf",
+      "name": "Salzhemmendorf",
+      "box": [
+        2000,
+        -99000,
+        17000,
+        -84000
+      ],
+      "map": "regions/niedersachsen-salzhemmendorf/map.json",
+      "tiles": [
+        "529.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sandkrug",
+      "name": "Sandkrug",
+      "box": [
+        -81000,
+        -206000,
+        -66000,
+        -191000
+      ],
+      "map": "regions/niedersachsen-sandkrug/map.json",
+      "tiles": [
+        "530.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-scheessel",
+      "name": "Scheeßel",
+      "box": [
+        2000,
+        -215000,
+        17000,
+        -200000
+      ],
+      "map": "regions/niedersachsen-scheessel/map.json",
+      "tiles": [
+        "531.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-schneverdingen",
+      "name": "Schneverdingen",
+      "box": [
+        22000,
+        -219000,
+        37000,
+        -204000
+      ],
+      "map": "regions/niedersachsen-schneverdingen/map.json",
+      "tiles": [
+        "532.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-seesen",
+      "name": "Seesen",
+      "box": [
+        45000,
+        -84000,
+        60000,
+        -69000
+      ],
+      "map": "regions/niedersachsen-seesen/map.json",
+      "tiles": [
+        "533.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-seevetal",
+      "name": "Seevetal",
+      "box": [
+        37000,
+        -247000,
+        52000,
+        -234000
+      ],
+      "map": "regions/niedersachsen-seevetal/map.json",
+      "tiles": [
+        "534.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sehnde",
+      "name": "Sehnde",
+      "box": [
+        30000,
+        -126000,
+        45000,
+        -111000
+      ],
+      "map": "regions/niedersachsen-sehnde/map.json",
+      "tiles": [
+        "535.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-settrup",
+      "name": "Settrup",
+      "box": [
+        -129000,
+        -145000,
+        -114000,
+        -130000
+      ],
+      "map": "regions/niedersachsen-settrup/map.json",
+      "tiles": [
+        "536.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sibbesse",
+      "name": "Sibbesse",
+      "box": [
+        30000,
+        -93000,
+        45000,
+        -84000
+      ],
+      "map": "regions/niedersachsen-sibbesse/map.json",
+      "tiles": [
+        "537.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sillium",
+      "name": "Sillium",
+      "box": [
+        45000,
+        -99000,
+        60000,
+        -84000
+      ],
+      "map": "regions/niedersachsen-sillium/map.json",
+      "tiles": [
+        "538.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sittensen",
+      "name": "Sittensen",
+      "box": [
+        2000,
+        -239000,
+        17000,
+        -224000
+      ],
+      "map": "regions/niedersachsen-sittensen/map.json",
+      "tiles": [
+        "539.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-soehlde",
+      "name": "Söhlde",
+      "box": [
+        45000,
+        -114000,
+        60000,
+        -99000
+      ],
+      "map": "regions/niedersachsen-soehlde/map.json",
+      "tiles": [
+        "540.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-solling",
+      "name": "Solling",
+      "box": [
+        7000,
+        -59000,
+        22000,
+        -44000
+      ],
+      "map": "regions/niedersachsen-solling/map.json",
+      "tiles": [
+        "541.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-soltau",
+      "name": "Soltau",
+      "box": [
+        18000,
+        -200000,
+        33000,
+        -185000
+      ],
+      "map": "regions/niedersachsen-soltau/map.json",
+      "tiles": [
+        "542.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-spahnharrenstatte",
+      "name": "Spahnharrenstätte",
+      "box": [
+        -130000,
+        -188000,
+        -115000,
+        -173000
+      ],
+      "map": "regions/niedersachsen-spahnharrenstatte/map.json",
+      "tiles": [
+        "543.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sprakensehl",
+      "name": "Sprakensehl",
+      "box": [
+        67000,
+        -184000,
+        82000,
+        -169000
+      ],
+      "map": "regions/niedersachsen-sprakensehl/map.json",
+      "tiles": [
+        "544.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-springe",
+      "name": "Springe",
+      "box": [
+        10000,
+        -119000,
+        25000,
+        -104000
+      ],
+      "map": "regions/niedersachsen-springe/map.json",
+      "tiles": [
+        "545.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-stadthagen",
+      "name": "Stadthagen",
+      "box": [
+        -21000,
+        -124000,
+        -6000,
+        -109000
+      ],
+      "map": "regions/niedersachsen-stadthagen/map.json",
+      "tiles": [
+        "546.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-staffhorst",
+      "name": "Staffhorst",
+      "box": [
+        -34000,
+        -167000,
+        -19000,
+        -152000
+      ],
+      "map": "regions/niedersachsen-staffhorst/map.json",
+      "tiles": [
+        "547.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-steinhorst",
+      "name": "Steinhorst",
+      "box": [
+        59000,
+        -168000,
+        74000,
+        -153000
+      ],
+      "map": "regions/niedersachsen-steinhorst/map.json",
+      "tiles": [
+        "548.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-stelle",
+      "name": "Stelle",
+      "box": [
+        40000,
+        -243000,
+        55000,
+        -228000
+      ],
+      "map": "regions/niedersachsen-stelle/map.json",
+      "tiles": [
+        "549.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-stemmen",
+      "name": "Stemmen",
+      "box": [
+        2000,
+        -230000,
+        17000,
+        -215000
+      ],
+      "map": "regions/niedersachsen-stemmen/map.json",
+      "tiles": [
+        "550.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-steyerberg",
+      "name": "Steyerberg",
+      "box": [
+        -34000,
+        -152000,
+        -19000,
+        -137000
+      ],
+      "map": "regions/niedersachsen-steyerberg/map.json",
+      "tiles": [
+        "551.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-stuhr",
+      "name": "Stuhr",
+      "box": [
+        -51000,
+        -206000,
+        -36000,
+        -191000
+      ],
+      "map": "regions/niedersachsen-stuhr/map.json",
+      "tiles": [
+        "552.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-suderburg",
+      "name": "Suderburg",
+      "box": [
+        59000,
+        -183000,
+        74000,
+        -168000
+      ],
+      "map": "regions/niedersachsen-suderburg/map.json",
+      "tiles": [
+        "553.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-suedheide",
+      "name": "Südheide",
+      "box": [
+        44000,
+        -183000,
+        59000,
+        -168000
+      ],
+      "map": "regions/niedersachsen-suedheide/map.json",
+      "tiles": [
+        "554.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sulbeck",
+      "name": "Sülbeck",
+      "box": [
+        -25000,
+        -123000,
+        -10000,
+        -108000
+      ],
+      "map": "regions/niedersachsen-sulbeck/map.json",
+      "tiles": [
+        "555.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-sulingen",
+      "name": "Sulingen",
+      "box": [
+        -49000,
+        -167000,
+        -34000,
+        -152000
+      ],
+      "map": "regions/niedersachsen-sulingen/map.json",
+      "tiles": [
+        "556.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-tetendorf",
+      "name": "Tetendorf",
+      "box": [
+        21000,
+        -199000,
+        36000,
+        -184000
+      ],
+      "map": "regions/niedersachsen-tetendorf/map.json",
+      "tiles": [
+        "557.tar"
       ]
     }
   ]
