@@ -1,5 +1,5 @@
 {
-  "latest": "bayern-rosenheim",
+  "latest": "bw-offenburg",
   "regions": [
     {
       "id": "suedwest",
@@ -9496,6 +9496,287 @@
       "map": "regions/brandenburg-angermuende/map.json",
       "tiles": [
         "756.tar"
+      ]
+    },
+    {
+      "id": "bw-offenburg",
+      "name": "Offenburg",
+      "box": [
+        -113000,
+        301000,
+        -98000,
+        316000
+      ],
+      "map": "regions/bw-offenburg/map.json",
+      "tiles": [
+        "757.tar"
+      ]
+    },
+    {
+      "id": "nrw-stolberg",
+      "name": "Stolberg",
+      "box": [
+        -231000,
+        42000,
+        -216000,
+        57000
+      ],
+      "map": "regions/nrw-stolberg/map.json",
+      "tiles": [
+        "758.tar"
+      ]
+    },
+    {
+      "id": "nrw-hattingen",
+      "name": "Hattingen",
+      "box": [
+        -162000,
+        -25000,
+        -147000,
+        -10000
+      ],
+      "map": "regions/nrw-hattingen/map.json",
+      "tiles": [
+        "759.tar",
+        "760.tar"
+      ]
+    },
+    {
+      "id": "nrw-euskirchen",
+      "name": "Euskirchen",
+      "box": [
+        -192000,
+        56000,
+        -177000,
+        71000
+      ],
+      "map": "regions/nrw-euskirchen/map.json",
+      "tiles": [
+        "761.tar"
+      ]
+    },
+    {
+      "id": "berlin-zehlendorf",
+      "name": "Zehlendorf",
+      "box": [
+        253000,
+        -147000,
+        263000,
+        -133000
+      ],
+      "map": "regions/berlin-zehlendorf/map.json",
+      "tiles": [
+        "762.tar"
+      ]
+    },
+    {
+      "id": "bayern-schweinfurt",
+      "name": "Schweinfurt",
+      "box": [
+        52000,
+        126000,
+        67000,
+        141000
+      ],
+      "map": "regions/bayern-schweinfurt/map.json",
+      "tiles": [
+        "763.tar"
+      ]
+    },
+    {
+      "id": "nrw-pulheim",
+      "name": "Pulheim",
+      "box": [
+        -189000,
+        18000,
+        -174000,
+        33000
+      ],
+      "map": "regions/nrw-pulheim/map.json",
+      "tiles": [
+        "764.tar"
+      ]
+    },
+    {
+      "id": "nrw-gummersbach",
+      "name": "Gummersbach",
+      "box": [
+        -136000,
+        17000,
+        -121000,
+        32000
+      ],
+      "map": "regions/nrw-gummersbach/map.json",
+      "tiles": [
+        "765.tar"
+      ]
+    },
+    {
+      "id": "hamburg-wilhelmsburg",
+      "name": "Wilhelmsburg",
+      "box": [
+        32000,
+        -257000,
+        46000,
+        -242000
+      ],
+      "map": "regions/hamburg-wilhelmsburg/map.json",
+      "tiles": [
+        "766.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-nordhorn",
+      "name": "Nordhorn",
+      "box": [
+        -167000,
+        -140000,
+        -152000,
+        -125000
+      ],
+      "map": "regions/niedersachsen-nordhorn/map.json",
+      "tiles": [
+        "767.tar"
+      ]
+    },
+    {
+      "id": "mv-universitaets-und-hansestadt-greifswald",
+      "name": "Universitäts- und Hansestadt Greifswald",
+      "box": [
+        252000,
+        -332000,
+        267000,
+        -317000
+      ],
+      "map": "regions/mv-universitaets-und-hansestadt-greifswald/map.json",
+      "tiles": [
+        "768.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-cuxhaven",
+      "name": "Cuxhaven",
+      "box": [
+        -55000,
+        -294000,
+        -40000,
+        -283000
+      ],
+      "map": "regions/niedersachsen-cuxhaven/map.json",
+      "tiles": [
+        "769.tar"
+      ]
+    },
+    {
+      "id": "nrw-bergkamen",
+      "name": "Bergkamen",
+      "box": [
+        -129000,
+        -49000,
+        -114000,
+        -34000
+      ],
+      "map": "regions/nrw-bergkamen/map.json",
+      "tiles": [
+        "770.tar"
+      ]
+    },
+    {
+      "id": "nrw-willich",
+      "name": "Willich",
+      "box": [
+        -207000,
+        -12000,
+        -192000,
+        3000
+      ],
+      "map": "regions/nrw-willich/map.json",
+      "tiles": [
+        "771.tar"
+      ]
+    },
+    {
+      "id": "bw-lahr",
+      "name": "Lahr",
+      "box": [
+        -119000,
+        316000,
+        -104000,
+        331000
+      ],
+      "map": "regions/bw-lahr/map.json",
+      "tiles": [
+        "772.tar"
+      ]
+    },
+    {
+      "id": "nrw-ibbenbueren",
+      "name": "Ibbenbueren",
+      "box": [
+        -123000,
+        -122000,
+        -108000,
+        -107000
+      ],
+      "map": "regions/nrw-ibbenbueren/map.json",
+      "tiles": [
+        "773.tar"
+      ]
+    },
+    {
+      "id": "nrw-gronau",
+      "name": "Gronau",
+      "box": [
+        -170000,
+        -116000,
+        -155000,
+        -101000
+      ],
+      "map": "regions/nrw-gronau/map.json",
+      "tiles": [
+        "774.tar"
+      ]
+    },
+    {
+      "id": "rlp-speyer",
+      "name": "Speyer",
+      "box": [
+        -77000,
+        207000,
+        -64000,
+        222000
+      ],
+      "map": "regions/rlp-speyer/map.json",
+      "tiles": [
+        "775.tar"
+      ]
+    },
+    {
+      "id": "sachsen-wurzen",
+      "name": "Wurzen",
+      "box": [
+        225000,
+        -27000,
+        240000,
+        -12000
+      ],
+      "map": "regions/sachsen-wurzen/map.json",
+      "tiles": [
+        "776.tar"
+      ]
+    },
+    {
+      "id": "sachsen-weisswasser",
+      "name": "Weißwasser",
+      "box": [
+        356000,
+        -50000,
+        371000,
+        -35000
+      ],
+      "map": "regions/sachsen-weisswasser/map.json",
+      "tiles": [
+        "777.tar"
       ]
     }
   ]
