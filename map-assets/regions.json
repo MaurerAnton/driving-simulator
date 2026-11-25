@@ -1,5 +1,5 @@
 {
-  "latest": "thueringen-gera",
+  "latest": "bw-reutlingen",
   "regions": [
     {
       "id": "suedwest",
@@ -7854,6 +7854,287 @@
       "map": "regions/brandenburg-eberswalde/map.json",
       "tiles": [
         "635.tar"
+      ]
+    },
+    {
+      "id": "bw-reutlingen",
+      "name": "Reutlingen",
+      "box": [
+        -20000,
+        300000,
+        -5000,
+        315000
+      ],
+      "map": "regions/bw-reutlingen/map.json",
+      "tiles": [
+        "636.tar"
+      ]
+    },
+    {
+      "id": "nrw-siegen",
+      "name": "Siegen",
+      "box": [
+        -104000,
+        34000,
+        -89000,
+        49000
+      ],
+      "map": "regions/nrw-siegen/map.json",
+      "tiles": [
+        "637.tar"
+      ]
+    },
+    {
+      "id": "bayern-erlangen",
+      "name": "Erlangen",
+      "box": [
+        110000,
+        175000,
+        125000,
+        190000
+      ],
+      "map": "regions/bayern-erlangen/map.json",
+      "tiles": [
+        "638.tar"
+      ]
+    },
+    {
+      "id": "nrw-iserlohn",
+      "name": "Iserlohn",
+      "box": [
+        -126000,
+        -22000,
+        -111000,
+        -7000
+      ],
+      "map": "regions/nrw-iserlohn/map.json",
+      "tiles": [
+        "639.tar"
+      ]
+    },
+    {
+      "id": "nrw-witten",
+      "name": "Witten",
+      "box": [
+        -150000,
+        -30000,
+        -135000,
+        -15000
+      ],
+      "map": "regions/nrw-witten/map.json",
+      "tiles": [
+        "640.tar",
+        "641.tar"
+      ]
+    },
+    {
+      "id": "nrw-ratingen",
+      "name": "Ratingen",
+      "box": [
+        -185000,
+        -15000,
+        -170000,
+        0
+      ],
+      "map": "regions/nrw-ratingen/map.json",
+      "tiles": [
+        "642.tar"
+      ]
+    },
+    {
+      "id": "nrw-marl",
+      "name": "Marl",
+      "box": [
+        -168000,
+        -54000,
+        -153000,
+        -39000
+      ],
+      "map": "regions/nrw-marl/map.json",
+      "tiles": [
+        "643.tar"
+      ]
+    },
+    {
+      "id": "nrw-luenen",
+      "name": "Lünen",
+      "box": [
+        -137000,
+        -49000,
+        -122000,
+        -34000
+      ],
+      "map": "regions/nrw-luenen/map.json",
+      "tiles": [
+        "644.tar"
+      ]
+    },
+    {
+      "id": "sachsen-bautzen",
+      "name": "Bautzen",
+      "box": [
+        344000,
+        -13000,
+        359000,
+        2000
+      ],
+      "map": "regions/sachsen-bautzen/map.json",
+      "tiles": [
+        "645.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-oranienburg",
+      "name": "Oranienburg",
+      "box": [
+        251000,
+        -182000,
+        266000,
+        -167000
+      ],
+      "map": "regions/brandenburg-oranienburg/map.json",
+      "tiles": [
+        "646.tar"
+      ]
+    },
+    {
+      "id": "thueringen-eisenach",
+      "name": "Eisenach",
+      "box": [
+        57000,
+        22000,
+        72000,
+        37000
+      ],
+      "map": "regions/thueringen-eisenach/map.json",
+      "tiles": [
+        "647.tar"
+      ]
+    },
+    {
+      "id": "sachsen-pirna",
+      "name": "Pirna",
+      "box": [
+        311000,
+        14000,
+        326000,
+        29000
+      ],
+      "map": "regions/sachsen-pirna/map.json",
+      "tiles": [
+        "648.tar"
+      ]
+    },
+    {
+      "id": "thueringen-ilmenau",
+      "name": "Ilmenau",
+      "box": [
+        100000,
+        54000,
+        115000,
+        69000
+      ],
+      "map": "regions/thueringen-ilmenau/map.json",
+      "tiles": [
+        "649.tar"
+      ]
+    },
+    {
+      "id": "thueringen-altenburg",
+      "name": "Altenburg",
+      "box": [
+        206000,
+        16000,
+        221000,
+        31000
+      ],
+      "map": "regions/thueringen-altenburg/map.json",
+      "tiles": [
+        "650.tar"
+      ]
+    },
+    {
+      "id": "thueringen-muehlhausen",
+      "name": "Mühlhausen",
+      "box": [
+        66000,
+        -4000,
+        81000,
+        11000
+      ],
+      "map": "regions/thueringen-muehlhausen/map.json",
+      "tiles": [
+        "651.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-bernau-bei-berlin",
+      "name": "Bernau bei Berlin",
+      "box": [
+        275000,
+        -176000,
+        290000,
+        -161000
+      ],
+      "map": "regions/brandenburg-bernau-bei-berlin/map.json",
+      "tiles": [
+        "652.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-schwedt-oder",
+      "name": "Schwedt (Oder)",
+      "box": [
+        318000,
+        -221000,
+        333000,
+        -206000
+      ],
+      "map": "regions/brandenburg-schwedt-oder/map.json",
+      "tiles": [
+        "653.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-fuerstenwalde",
+      "name": "Fürstenwalde",
+      "box": [
+        309000,
+        -143000,
+        324000,
+        -128000
+      ],
+      "map": "regions/brandenburg-fuerstenwalde/map.json",
+      "tiles": [
+        "654.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-eisenhuettenstadt",
+      "name": "Eisenhüttenstadt",
+      "box": [
+        351000,
+        -122000,
+        366000,
+        -107000
+      ],
+      "map": "regions/brandenburg-eisenhuettenstadt/map.json",
+      "tiles": [
+        "655.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-neuruppin",
+      "name": "Neuruppin",
+      "box": [
+        220000,
+        -201000,
+        235000,
+        -186000
+      ],
+      "map": "regions/brandenburg-neuruppin/map.json",
+      "tiles": [
+        "656.tar"
       ]
     }
   ]
