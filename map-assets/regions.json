@@ -1,5 +1,5 @@
 {
-  "latest": "nrw-paderborn",
+  "latest": "niedersachsen-eldingen",
   "regions": [
     {
       "id": "suedwest",
@@ -5199,6 +5199,426 @@
       "map": "regions/nrw-paderborn/map.json",
       "tiles": [
         "437.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-eldingen",
+      "name": "Eldingen",
+      "box": [
+        52000,
+        -169000,
+        67000,
+        -154000
+      ],
+      "map": "regions/niedersachsen-eldingen/map.json",
+      "tiles": [
+        "438.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-elsdorf",
+      "name": "Elsdorf",
+      "box": [
+        -11000,
+        -233000,
+        4000,
+        -218000
+      ],
+      "map": "regions/niedersachsen-elsdorf/map.json",
+      "tiles": [
+        "439.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-elsfleth",
+      "name": "Elsfleth",
+      "box": [
+        -81000,
+        -221000,
+        -66000,
+        -206000
+      ],
+      "map": "regions/niedersachsen-elsfleth/map.json",
+      "tiles": [
+        "440.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-elze",
+      "name": "Elze",
+      "box": [
+        10000,
+        -104000,
+        25000,
+        -89000
+      ],
+      "map": "regions/niedersachsen-elze/map.json",
+      "tiles": [
+        "441.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-emmerthal",
+      "name": "Emmerthal",
+      "box": [
+        -8000,
+        -89000,
+        7000,
+        -74000
+      ],
+      "map": "regions/niedersachsen-emmerthal/map.json",
+      "tiles": [
+        "442.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-emstek",
+      "name": "Emstek",
+      "box": [
+        -87000,
+        -180000,
+        -72000,
+        -165000
+      ],
+      "map": "regions/niedersachsen-emstek/map.json",
+      "tiles": [
+        "443.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-essel",
+      "name": "Essel",
+      "box": [
+        13000,
+        -170000,
+        28000,
+        -155000
+      ],
+      "map": "regions/niedersachsen-essel/map.json",
+      "tiles": [
+        "444.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-essern",
+      "name": "Essern",
+      "box": [
+        -51000,
+        -141000,
+        -37000,
+        -126000
+      ],
+      "map": "regions/niedersachsen-essern/map.json",
+      "tiles": [
+        "445.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-eydelstedt",
+      "name": "Eydelstedt",
+      "box": [
+        -64000,
+        -167000,
+        -49000,
+        -152000
+      ],
+      "map": "regions/niedersachsen-eydelstedt/map.json",
+      "tiles": [
+        "446.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-eystrup",
+      "name": "Eystrup",
+      "box": [
+        -18000,
+        -179000,
+        -3000,
+        -164000
+      ],
+      "map": "regions/niedersachsen-eystrup/map.json",
+      "tiles": [
+        "447.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-fintel",
+      "name": "Fintel",
+      "box": [
+        7000,
+        -219000,
+        22000,
+        -204000
+      ],
+      "map": "regions/niedersachsen-fintel/map.json",
+      "tiles": [
+        "448.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-freden-leine",
+      "name": "Freden (Leine)",
+      "box": [
+        30000,
+        -84000,
+        45000,
+        -69000
+      ],
+      "map": "regions/niedersachsen-freden-leine/map.json",
+      "tiles": [
+        "449.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-freienbuttel",
+      "name": "Freißenbüttel",
+      "box": [
+        -49000,
+        -231000,
+        -34000,
+        -216000
+      ],
+      "map": "regions/niedersachsen-freienbuttel/map.json",
+      "tiles": [
+        "450.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-ganderkesee",
+      "name": "Ganderkesee",
+      "box": [
+        -73000,
+        -205000,
+        -58000,
+        -190000
+      ],
+      "map": "regions/niedersachsen-ganderkesee/map.json",
+      "tiles": [
+        "451.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-garbsen",
+      "name": "Garbsen",
+      "box": [
+        -2000,
+        -140000,
+        13000,
+        -125000
+      ],
+      "map": "regions/niedersachsen-garbsen/map.json",
+      "tiles": [
+        "452.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-geestland",
+      "name": "Geestland",
+      "box": [
+        -48000,
+        -265000,
+        -33000,
+        -250000
+      ],
+      "map": "regions/niedersachsen-geestland/map.json",
+      "tiles": [
+        "453.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-gilten",
+      "name": "Gilten",
+      "box": [
+        -2000,
+        -170000,
+        13000,
+        -155000
+      ],
+      "map": "regions/niedersachsen-gilten/map.json",
+      "tiles": [
+        "454.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-gleichen",
+      "name": "Gleichen",
+      "box": [
+        42000,
+        -38000,
+        57000,
+        -23000
+      ],
+      "map": "regions/niedersachsen-gleichen/map.json",
+      "tiles": [
+        "455.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-godenstorf",
+      "name": "Gödenstorf",
+      "box": [
+        40000,
+        -228000,
+        55000,
+        -213000
+      ],
+      "map": "regions/niedersachsen-godenstorf/map.json",
+      "tiles": [
+        "456.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-goldenstedt",
+      "name": "Goldenstedt",
+      "box": [
+        -72000,
+        -180000,
+        -57000,
+        -165000
+      ],
+      "map": "regions/niedersachsen-goldenstedt/map.json",
+      "tiles": [
+        "457.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-gross-oesingen",
+      "name": "Groß Oesingen",
+      "box": [
+        65000,
+        -163000,
+        80000,
+        -148000
+      ],
+      "map": "regions/niedersachsen-gross-oesingen/map.json",
+      "tiles": [
+        "458.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-grossenkneten",
+      "name": "Großenkneten",
+      "box": [
+        -81000,
+        -191000,
+        -66000,
+        -176000
+      ],
+      "map": "regions/niedersachsen-grossenkneten/map.json",
+      "tiles": [
+        "459.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-gyhum",
+      "name": "Gyhum",
+      "box": [
+        -13000,
+        -224000,
+        2000,
+        -209000
+      ],
+      "map": "regions/niedersachsen-gyhum/map.json",
+      "tiles": [
+        "460.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hagen-im-bremischen",
+      "name": "Hagen im Bremischen",
+      "box": [
+        -63000,
+        -235000,
+        -48000,
+        -220000
+      ],
+      "map": "regions/niedersachsen-hagen-im-bremischen/map.json",
+      "tiles": [
+        "461.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hambergen",
+      "name": "Hambergen",
+      "box": [
+        -48000,
+        -235000,
+        -33000,
+        -220000
+      ],
+      "map": "regions/niedersachsen-hambergen/map.json",
+      "tiles": [
+        "462.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hambuehren",
+      "name": "Hambühren",
+      "box": [
+        27000,
+        -162000,
+        42000,
+        -147000
+      ],
+      "map": "regions/niedersachsen-hambuehren/map.json",
+      "tiles": [
+        "463.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hanstedt",
+      "name": "Hanstedt",
+      "box": [
+        55000,
+        -213000,
+        70000,
+        -198000
+      ],
+      "map": "regions/niedersachsen-hanstedt/map.json",
+      "tiles": [
+        "464.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-harpstedt",
+      "name": "Harpstedt",
+      "box": [
+        -66000,
+        -191000,
+        -51000,
+        -176000
+      ],
+      "map": "regions/niedersachsen-harpstedt/map.json",
+      "tiles": [
+        "465.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-harriehausen",
+      "name": "Harriehausen",
+      "box": [
+        39000,
+        -74000,
+        54000,
+        -59000
+      ],
+      "map": "regions/niedersachsen-harriehausen/map.json",
+      "tiles": [
+        "466.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-harsum",
+      "name": "Harsum",
+      "box": [
+        30000,
+        -114000,
+        45000,
+        -108000
+      ],
+      "map": "regions/niedersachsen-harsum/map.json",
+      "tiles": [
+        "467.tar"
       ]
     }
   ]
