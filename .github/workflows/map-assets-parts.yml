@@ -520,7 +520,9 @@ jobs:
             git add "$TARGET"
             if git diff --cached --quiet; then continue; fi
             git commit -q -m "map-assets: parts $(( i + 1 ))…$last of $n"
-            git push --quiet origin HEAD:main
+            # (others push to main too – the workflows of the states: on a race, onto theirs and again)
+            ok=0; for k in 1 2 3 4 5 6; do if git push --quiet origin HEAD:main; then ok=1; break; fi; sleep $(( k * 5 )); git pull --quiet --rebase origin main; done
+            [ "$ok" = 1 ] || { echo "::error::main kept moving: not pushed"; exit 1; }
             pushed=$(( pushed + 1 ))
             echo "Teile $(( i + 1 ))…$last sind im Repository"
           done
@@ -543,7 +545,9 @@ jobs:
           git add "$TARGET"
           if ! git diff --cached --quiet; then
             git commit -q -m "map-assets: index of $all parts"
-            git push --quiet origin HEAD:main
+            # (others push to main too – the workflows of the states: on a race, onto theirs and again)
+            ok=0; for k in 1 2 3 4 5 6; do if git push --quiet origin HEAD:main; then ok=1; break; fi; sleep $(( k * 5 )); git pull --quiet --rebase origin main; done
+            [ "$ok" = 1 ] || { echo "::error::main kept moving: not pushed"; exit 1; }
             pushed=$(( pushed + 1 ))
           fi
           echo "$pushed Pushes, $(du -sh "$TARGET" | cut -f1) in $TARGET"
@@ -596,7 +600,9 @@ jobs:
           if ! git diff --cached --quiet; then
             n=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["regions"]))' "$TARGET/regions.json")
             git commit -q -m "map-assets: regions ($n)"
-            git push --quiet origin HEAD:main
+            # (others push to main too – the workflows of the states: on a race, onto theirs and again)
+            ok=0; for k in 1 2 3 4 5 6; do if git push --quiet origin HEAD:main; then ok=1; break; fi; sleep $(( k * 5 )); git pull --quiet --rebase origin main; done
+            [ "$ok" = 1 ] || { echo "::error::main kept moving: not pushed"; exit 1; }
             echo "Regionen sind im Repository ($n insgesamt)"
             git log --oneline -n 1
           else
