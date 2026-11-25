@@ -438,6 +438,16 @@ setzt GitHub Pages: Eine Seite darf 1 GB groß sein. Für andere Bundesländer m
 für Höhenmodell und Gebäude an das jeweilige Lieferformat angepasst werden (viele Länder bieten ebenfalls
 offene DGM1/LoD2-Daten).
 
+#### Thüringen
+
+Ablauf `.github/workflows/build-map-thueringen.yml` („Karte Thüringen“), Abruf `tools/fetch-it.py` (rechnet jedes UTM32-Rechteck aus dem Copernicus DEM):
+
+| Inhalt | Quelle | Lizenz |
+| --- | --- | --- |
+| Gelände | Copernicus DEM GLO-30 (30 m, Oberflächenmodell) aus dem offenen Behälter `copernicus-dem-30m` – DGM1 und LoD2 des TLBG wären offen (© GDI-Th, CC BY 4.0 laut Katalog geomis.geoportal-th.de), sind aber nicht automatisch abrufbar: geoportal.thueringen.de zeigt jeder Anfrage eine CAPTCHA-Seite (Link11), der Dateiserver geoportal.geoportal-th.de meldet „nicht verfügbar“, der Geoproxy hat für Höhen nur WMS | GLO-30 frei und offen – „Produced using Copernicus DEM © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved“ |
+| Gebäude | Umrisse aus OpenStreetMap (kein LoD2, s. o.) | ODbL 1.0 |
+| OpenStreetMap | Geofabrik `europe/germany/thueringen` | ODbL 1.0 |
+
 ## Fahrpläne der Straßenbahnen und RegioTrams
 
 Welchen Weg eine Linie fährt, steht in `lines.json.gz`; wann ihre Bahnen fahren, in `timetable.json.gz`. Das

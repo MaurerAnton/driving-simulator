@@ -1,50 +1,315 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-name: TH source probe (temporary diagnostic)
+#
+# Baut die Karte eines Teils von Thüringen und legt sie als Kartenpaket
+# (map.tar.00, map.tar.01, … – was das Spiel unter Einstellungen → Karte laden liest)
+# in ein Release.
+#
+# Warum das hier läuft: ein Bau braucht mehrere Gigabyte Platte und mehr Speicher, als ein
+# Notebook hat; ein Läufer von GitHub hat 4 CPUs, 16 GB Speicher und ~14 GB Platte, und seine
+# Minuten sind für ein öffentliches Repository frei.  Die Karte geht nie über GitHub Pages
+# (dort sind es 1 GB): Releases haben keine Größenbeschränkung.
+#
+# Starten: Actions → "Karte Thüringen" → Run workflow.
+#
+# Die Reihenfolge ist die von docs/MAP_DATA.md:
+#   1. Gelände (Copernicus DEM GLO-30, siehe unten)                   -> data/work/dgm2
+#   2. OpenStreetMap, auf die Region geschnitten                      -> npm run map:extract
+#   3. Straßennetz und Kacheln                                        -> npm run map:build
+#   4. Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+#   5. in Teile von 100 MB gepackt und ins Release gelegt
+#
+# Die Region ist ein Rechteck aus UTM32-Kilometerquadraten (EPSG:25832), dasselbe Gitter, nach
+# dem die Kacheln der Länder benannt sind: 642_5648 ist das Quadrat mit der Erfurter Innenstadt.
+# Ganz Thüringen paßt nicht in eine Karte; weitere Rechtecke folgen mit demselben Ablauf und
+# anderen Zahlen.  Zwei Abläufe dürfen kein Kilometerquadrat gemeinsam haben.
+#
+# Gelände und Gebäude – warum nicht DGM1 und LoD2 des Landes:
+#   Das TLBG (Thüringer Landesamt für Bodenmanagement und Geoinformation) gibt DGM1 und LoD2
+#   als offene Daten heraus; die Metadaten im Katalog der GDI-Th (geomis.geoportal-th.de, CSW,
+#   Datensätze 14418d25-fcd7-4a3f-99a9-e3059a2772af „Digitales Geländemodell" und
+#   97d152b8-9e00-49f3-9ae4-8bbb30873562 „3D-Gebäudemodelle") nennen heute die Lizenz
+#   „Creative Commons BY 4.0 … Namensnennung: ‚© GDI-Th'" (nicht mehr dl-de/by-2.0).
+#   Geholt werden kann davon nichts ohne Mensch davor (nachgeprüft am 20. und 25.11.2026,
+#   vom Läufer – Lauf 44778748271 – und von außerhalb GitHubs):
+#     - geoportal.thueringen.de (die Downloadseiten download-hoehendaten und
+#       download-3d-gebaeudedaten, auf die die Metadaten zeigen) beantwortet jede Adresse
+#       mit einer CAPTCHA-Seite von Link11 („Link11 - CAPTCHA", friendly-challenge);
+#     - der frühere Dateiserver geoportal.geoportal-th.de (…/hoehendaten/DGM/…,
+#       …/3dgebaeude/LoD2/…, dienste/atom_th_hoehendaten_dgm) antwortet auf jede Adresse mit
+#       „Dieser Geodaten-Dienst ist im Moment leider noch nicht verfügbar";
+#     - der Geoproxy (www.geoproxy.geoportal-th.de) hat für Höhen nur WMS (DGM: Schummerung
+#       DGM2/DGM5, INSPIREel) und keinen WCS („No service for service type 'WCS'");
+#     - die INSPIRE-Atom-Feeds des Landes (www.geoproxy.geoportal-th.de/inspire-dl/) haben
+#       weder Höhen noch 3D-Gebäude (nur ALKIS-Umrisse, die der Bau nicht liest).
+#   Darum das offene Geländemodell der EU wie in build-map-it.yml: Copernicus DEM GLO-30
+#   (30 m Raster, ein Oberflächenmodell) aus dem frei lesbaren Behälter copernicus-dem-30m,
+#   gerechnet von tools/fetch-it.py (das UTM32 rechnet und nichts Italienisches außer seinen
+#   Meldungen hat).  Lizenz: „GLO-30 Public … available on a free basis for the general
+#   public" (copernicus-dem-30m.s3.amazonaws.com/readme.html), Quellenvermerk siehe unten.
+#   Die Gebäude kommen aus den OpenStreetMap-Umrissen.  Sobald das TLBG wieder ohne CAPTCHA
+#   liefert, gehört hier ein Abruf von DGM1/LoD2 (© GDI-Th, CC BY 4.0) hinein.
+#
+# Zwei Aufträge, damit ein Netzfehler während des Holens nicht den ganzen Bau verdirbt und
+# damit jeder Teil seine sechs Stunden für sich hat.
+
+name: Karte Thüringen
 
 on:
   workflow_dispatch:
+    inputs:
+      east_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Osten (UTM32, EPSG:25832)'
+        type: string
+        default: '635'
+      east_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Osten'
+        type: string
+        default: '649'
+      north_from:
+        description: 'Rechteck: erstes Kilometerquadrat nach Norden'
+        type: string
+        default: '5641'
+      north_to:
+        description: 'Rechteck: letztes Kilometerquadrat nach Norden'
+        type: string
+        default: '5655'
+      label:
+        description: Name der Karte (steht im Spiel und im map.json)
+        type: string
+        default: 'Erfurt'
+      tag:
+        description: 'Name des Releases (leer: karte-thueringen-<Datum>-r<Lauf>; sonst karte-thueringen-<Ort>-<Datum>)'
+        type: string
+        default: ''
+      lod2_name:
+        description: 'Ohne Wirkung: die LoD2-Modelle des TLBG sind nicht abrufbar (siehe Kopf der Datei)'
+        type: string
+        default: 'Thueringen'
+      gtfs_agency:
+        description: Nahverkehrsbetriebe, deren Fahrpläne genommen werden (RegExp, wie build-timetable.ts sie erwartet)
+        type: string
+        # Teilstücke der Namen in agency.txt von download.gtfs.de (build-timetable.ts vergleicht
+        # ohne Rücksicht auf Groß- und Kleinschreibung): Straßenbahnen Erfurt (EVAG), Jena,
+        # Gera, Gotha (Thüringerwaldbahn), Nordhausen, Erfurter Bahn, Süd-Thüringen-Bahn und
+        # die Regionalzüge Mitteldeutschlands.
+        default: 'Erfurter Verkehrsbetriebe|EVAG|Jenaer Nahverkehr|Verkehrs- und Betriebsgesellschaft Gera|Thüringerwaldbahn|Gothaer|Verkehrsbetriebe Nordhausen|Erfurter Bahn|Süd-Thüringen-Bahn|ABELLIO Rail Mitteldeutschland|Mitteldeutsche Regiobahn|DB Regio'
+      gtfs_bus_agency:
+        description: Dieselben für die Buslinien
+        type: string
+        default: 'Erfurter Verkehrsbetriebe|EVAG|Jenaer Nahverkehr|Verkehrs- und Betriebsgesellschaft Gera|Gothaer|Verkehrsbetriebe Nordhausen|RegioBus|Kreisverkehrsgesellschaft|Personennahverkehrsgesellschaft|Verkehrsgesellschaft'
+      geodata_run:
+        description: 'Lauf, aus dem schon gerechnetes Gelände übernommen wird (leer: alles neu holen)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: read   # Artefakte eines früheren Laufs (geodata_run)
 
 jobs:
-  probe:
+  # 1: das Gelände – Höhen aus dem Copernicus-Behälter rechnen (ein Kasten von 1° × 1°: ~30 MB)
+  geodata:
+    timeout-minutes: 350
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - name: Probe candidate sources
+      # map-assets/ liegt im Repository (2,8 GB) und wird hier nicht gebraucht: index.json wird
+      # aus dem Web geholt (unten), und kein Schritt des Baus liest die fertigen Karten.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet numpy pillow
+      # Was ein früherer Lauf schon gerechnet hat: das Skript läßt liegen, was da ist.
+      - name: Vorhandenes Gelände (aus dem Lauf geodata_run)
+        if: ${{ inputs.geodata_run != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ inputs.geodata_run }}
         run: |
-          set -u
-          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
-          for u in \
-            "https://geoportal.thueringen.de/gdi-th/download-offene-geodaten/download-hoehendaten" \
-            "https://geoportal.thueringen.de/gdi-th/download-offene-geodaten/download-3d-gebaeudedaten" \
-            "https://geoportal.geoportal-th.de/dienste/atom_th_hoehendaten_dgm" \
-            "https://geoportal.geoportal-th.de/3dgebaeude/LoD2/LoD2_634_5616_2_TH.zip" \
-            "https://www.geoproxy.geoportal-th.de/geoproxy/services/DGM?SERVICE=WCS&REQUEST=GetCapabilities&VERSION=1.0.0" \
-            "https://www.geoproxy.geoportal-th.de/geoproxy/services/DGM?REQUEST=GetCapabilities&version=1.1.1&service=WMS" \
-            "https://download.geofabrik.de/europe/germany/thueringen/thueringen-latest.osm.pbf" \
-            ; do
-            echo "=== $u"
-            curl -sS -m 40 -A "$UA" -o /tmp/o -w "code=%{http_code} size=%{size_download} type=%{content_type}\n" "$u" || echo "curl failed"
-            head -c 400 /tmp/o | tr -d '\0'
-            echo
+          set -euo pipefail
+          name="geodata-thueringen"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts?name=$name" --jq '.artifacts[0].id')
+          echo "Artefakt von Lauf $RUN: $id"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" -o /tmp/$name.zip
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('data/work/dgm2')" "/tmp/$name.zip"
+          du -sh data/work/dgm2
+      # Kein Quadrat zweimal: der Index der schon veröffentlichten Karten sagt, welche
+      # Kacheln von 500 m eine andere Karte hat; das Skript läßt sie aus.
+      - name: Index der schon veröffentlichten Karten
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 20 \
+            -o "$RUNNER_TEMP/published-index.json" \
+            https://raw.githubusercontent.com/${{ github.repository }}/main/map-assets/index.json
+          python3 -c "import json;d=json.load(open('$RUNNER_TEMP/published-index.json'));print('Kacheln in anderen Karten:',len({t for f in d['files'] for t in f['tiles']}))"
+      # tools/fetch-it.py rechnet jedes Kilometerquadrat in UTM32 aus den Kästen des Copernicus
+      # DEM (seine Meldungen beginnen mit [it]); --only dgm: Gebäudemodelle gibt es keine.
+      - name: Gelände (Copernicus DEM GLO-30) holen
+        env:
+          BOX_E: ${{ inputs.east_from }}..${{ inputs.east_to }}
+          BOX_N: ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/work/dgm2
+          python3 -I tools/fetch-it.py --east "$BOX_E" --north "$BOX_N" --only dgm \
+            --published "$RUNNER_TEMP/published-index.json" \
+            --on-overlap skip --jobs 4 --gaps data/work/gaps.txt
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | wc -l
+      # auch nach einem Fehlschlag: der nächste Lauf kann mit geodata_run hier weiterfahren
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geodata-thueringen
+          path: data/work/dgm2
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # 2-5: OpenStreetMap, der Bau und das Release
+  build:
+    needs: geodata
+    timeout-minutes: 350
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # DETAIL_REGION=all: die Feinheiten gelten in der ganzen Karte, es gibt hier keine
+    # Vorgängerkarte, deren Bytes stehen bleiben müßten.
+    # OSM_FILE: osm-extract, build-lines, build-buslines, build-signs und build-services lesen
+    # ohne Argument den hessischen Auszug, der hier nie liegt – alle bekommen diesen.
+    env:
+      DETAIL_REGION: all
+      OSM_FILE: data/raw/osm/thueringen-latest.osm.pbf
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !map-assets/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Gelände des Rechtecks (aus dem ersten Auftrag)
+        uses: actions/download-artifact@v4
+        with:
+          name: geodata-thueringen
+          path: data/work/dgm2
+      - name: Platz (der Läufer hat ~14 GB SSD; Android, .NET, Haskell und PowerShell braucht diese Karte nicht)
+        run: |
+          du -sh data/work/dgm2
+          ls data/work/dgm2 | head -3
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/powershell 2>/dev/null || true
+          df -h /
+      - name: OpenStreetMap (Geofabrik, Thüringen)
+        run: |
+          set -euo pipefail
+          mkdir -p data/raw/osm
+          for try in 1 2 3 4 5; do
+            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors --connect-timeout 60 -o "$OSM_FILE" \
+              https://download.geofabrik.de/europe/germany/thueringen-latest.osm.pbf && break
+            echo "Versuch $try: OpenStreetMap nicht geholt"
+            sleep 30
           done
-      - name: What the height download page links to
+          test -s "$OSM_FILE"
+          ls -l data/raw/osm
+      # Gebaut wird nur, wo Gelände liegt (tools/osm-extract.ts) – das Rechteck ist die Karte.
+      - name: Kartenpaket 1/4 – OpenStreetMap in Blöcke von 8 km schneiden
+        run: npm run map:extract -- "$OSM_FILE"
+      - name: Kartenpaket 2/4 – Straßennetz und Kacheln
+        run: npm run map:build -- --jobs 3
+      - name: Kartenpaket 3/4 – Adressen, Haltestellen, Linien, Schilder, Fernsicht, Fahrpläne, Tankstellen
+        env:
+          GTFS_AGENCY: ${{ inputs.gtfs_agency }}
+          GTFS_BUS_AGENCY: ${{ inputs.gtfs_bus_agency }}
         run: |
-          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
-          curl -sS -m 40 -A "$UA" "https://geoportal.thueringen.de/gdi-th/download-offene-geodaten/download-hoehendaten" -o /tmp/h.html
-          echo "size: $(wc -c < /tmp/h.html)"
-          grep -oE 'href="[^"]*"' /tmp/h.html | sort -u | grep -viE 'href="#|/gdi-th/|/themen/|\.css|\.js|thueringen\.de/(regierung|ts|)' | head -60
-          echo "--- text mentioning dienste/atom/zip:"
-          sed 's/<[^>]*>/ /g' /tmp/h.html | tr -s ' \n' ' \n' | grep -iE 'atom|dienste|\.zip|\.tif|kachel|wcs' | head -40
-      - name: Follow the ATOM service feed
+          npm run map:addresses
+          npm run map:stops
+          npm run map:lines -- "$OSM_FILE"
+          npm run map:buslines -- "$OSM_FILE"
+          npm run map:signs -- "$OSM_FILE"
+          npm run map:far
+          npm run map:timetable
+          npm run map:services -- "$OSM_FILE"
+      # Der Name steht in tools/build-graph.ts fest ('Nordhessen') und die Quellenzeile nennt
+      # die hessische Verwaltung; beides wird hier berichtigt.
+      - name: Der Name der Karte und ihre Quellenzeilen (map.json)
+        env:
+          NAME: ${{ inputs.label }}
         run: |
-          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
-          for u in \
-            "https://geoportal.geoportal-th.de/dienste/atom_th_hoehendaten_dgm" \
-            "https://geoportal.geoportal-th.de/dienste/atom_th_hoehendaten_dgm?type=dataset&id=14418d25-fcd7-4a3f-99a9-e3059a2772af" \
-            ; do
-            echo "=== $u"
-            curl -sS -m 40 -A "$UA" -o /tmp/a.xml -w "code=%{http_code} size=%{size_download}\n" "$u"
-            head -c 600 /tmp/a.xml
-            echo
-            grep -oE 'href="[^"]*"' /tmp/a.xml | head -10
+          set -euo pipefail
+          node -e '
+            const fs = require("fs"), p = "public/map/map.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.meta.name = process.env.NAME;
+            j.meta.attribution = [
+              "Straßennetz, Verkehrsregelung, Flächennutzung, Gebäude: © OpenStreetMap-Mitwirkende (ODbL 1.0)",
+              "Gelände (Copernicus DEM GLO-30): Produced using Copernicus DEM © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+            ];
+            fs.writeFileSync(p, JSON.stringify(j));
+            console.log(j.meta.name, "-", j.nodes, "Knoten,", j.edges, "Kanten");
+          '
+      - name: Kartenpaket 4/4 – in Teile von 100 MB packen
+        run: |
+          npm run map:pack
+          du -sh public/map
+      # Auch wenn das Release nicht klappt: das Paket liegt dann als Artefakt bereit und die
+      # Stunden des Bauens sind nicht verloren.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: karte-thueringen-paket
+          path: data/work/map.tar.*
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Ins Release legen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANTED: ${{ inputs.tag }}
+          LABEL: ${{ inputs.label }}
+          BOX: ${{ inputs.east_from }}..${{ inputs.east_to }} / ${{ inputs.north_from }}..${{ inputs.north_to }}
+        run: |
+          set -euo pipefail
+          tag="${WANTED:-karte-thueringen-$(date -u +%F)-r$GITHUB_RUN_NUMBER}"
+          cat > notes.md <<EOF
+          Karte von $LABEL (Thüringen) für den Fahrsimulator – im Spiel unter
+          Einstellungen → Karte laden (Kartenpaket).
+
+          Gebaut am $(date -u +%F) aus OpenStreetMap (© OpenStreetMap-Mitwirkende, ODbL 1.0,
+          Auszug Thüringen von https://download.geofabrik.de/europe/germany/thueringen.html)
+          und dem Geländemodell Copernicus DEM GLO-30 der Europäischen Union (30 m Raster;
+          „GLO-30 Public … available on a free basis for the general public").
+          Quellenvermerk: „Produced using Copernicus DEM © DLR e.V. 2010-2014 and © Airbus
+          Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and
+          ESA; all rights reserved".
+          Rechteck aus Kilometerquadraten (UTM32): $BOX.
+
+          Kein DGM1 und keine LoD2-Gebäudemodelle des Landes: das TLBG gibt sie zwar offen
+          heraus (© GDI-Th, CC BY 4.0), aber seine Downloadseiten auf geoportal.thueringen.de
+          stehen hinter einer CAPTCHA-Abfrage und der Dateiserver geoportal.geoportal-th.de
+          ist nicht erreichbar.  Die Häuser kommen darum aus den OpenStreetMap-Umrissen, das
+          Gelände ist gröber als in den Karten mit DGM1.
+
+          Nur ein Rechteck Thüringens: das ganze Land paßt nicht in eine Karte; weitere
+          Rechtecke kommen aus demselben Ablauf "Karte Thüringen" mit anderen Zahlen.
+          EOF
+          # GitHub weist ein Release mitunter mit HTTP 403 ab; dann liegt das Paket schon als
+          # Artefakt bereit. Sieben Versuche mit wachsender Pause.
+          for try in 1 2 3 4 5 6 7; do
+            if gh release create "$tag" --latest=false --target "$GITHUB_SHA" \
+                 --title "Karte $LABEL" --notes-file notes.md data/work/map.tar.*; then
+              break
+            fi
+            echo "Versuch $try: Release abgewiesen, noch einmal"
+            sleep $((try * 60))
           done
+          gh release view "$tag" --json tagName --jq .tagName
+          echo "release $tag"
