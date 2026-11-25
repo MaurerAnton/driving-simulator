@@ -1,5 +1,5 @@
 {
-  "latest": "nrw-bocholt",
+  "latest": "bayern-rosenheim",
   "regions": [
     {
       "id": "suedwest",
@@ -9187,6 +9187,315 @@
       "map": "regions/sachsen-schkeuditz/map.json",
       "tiles": [
         "733.tar"
+      ]
+    },
+    {
+      "id": "bayern-rosenheim",
+      "name": "Rosenheim",
+      "box": [
+        198000,
+        365000,
+        213000,
+        380000
+      ],
+      "map": "regions/bayern-rosenheim/map.json",
+      "tiles": [
+        "734.tar"
+      ]
+    },
+    {
+      "id": "nrw-langenfeld",
+      "name": "Langenfeld",
+      "box": [
+        -179000,
+        7000,
+        -164000,
+        22000
+      ],
+      "map": "regions/nrw-langenfeld/map.json",
+      "tiles": [
+        "735.tar",
+        "736.tar"
+      ]
+    },
+    {
+      "id": "nrw-ahlen",
+      "name": "Ahlen",
+      "box": [
+        -112000,
+        -65000,
+        -97000,
+        -50000
+      ],
+      "map": "regions/nrw-ahlen/map.json",
+      "tiles": [
+        "737.tar"
+      ]
+    },
+    {
+      "id": "nrw-huerth",
+      "name": "Hürth",
+      "box": [
+        -186000,
+        33000,
+        -171000,
+        48000
+      ],
+      "map": "regions/nrw-huerth/map.json",
+      "tiles": [
+        "738.tar"
+      ]
+    },
+    {
+      "id": "sachsen-aue",
+      "name": "Aue",
+      "box": [
+        227000,
+        60000,
+        242000,
+        75000
+      ],
+      "map": "regions/sachsen-aue/map.json",
+      "tiles": [
+        "739.tar"
+      ]
+    },
+    {
+      "id": "sachsen-loebau",
+      "name": "Löbau",
+      "box": [
+        361000,
+        -6000,
+        376000,
+        9000
+      ],
+      "map": "regions/sachsen-loebau/map.json",
+      "tiles": [
+        "740.tar"
+      ]
+    },
+    {
+      "id": "sachsen-crimmitschau",
+      "name": "Crimmitschau",
+      "box": [
+        203000,
+        38000,
+        214000,
+        51000
+      ],
+      "map": "regions/sachsen-crimmitschau/map.json",
+      "tiles": [
+        "741.tar"
+      ]
+    },
+    {
+      "id": "sachsen-grossenhain",
+      "name": "Großenhain",
+      "box": [
+        281000,
+        -21000,
+        296000,
+        -6000
+      ],
+      "map": "regions/sachsen-grossenhain/map.json",
+      "tiles": [
+        "742.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-templin",
+      "name": "Templin",
+      "box": [
+        266000,
+        -224000,
+        281000,
+        -209000
+      ],
+      "map": "regions/brandenburg-templin/map.json",
+      "tiles": [
+        "743.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-wittstock",
+      "name": "Wittstock",
+      "box": [
+        197000,
+        -225000,
+        212000,
+        -210000
+      ],
+      "map": "regions/brandenburg-wittstock/map.json",
+      "tiles": [
+        "744.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-zossen",
+      "name": "Zossen",
+      "box": [
+        268000,
+        -124000,
+        283000,
+        -109000
+      ],
+      "map": "regions/brandenburg-zossen/map.json",
+      "tiles": [
+        "745.tar"
+      ]
+    },
+    {
+      "id": "sachsen-kamenz",
+      "name": "Kamenz",
+      "box": [
+        320000,
+        -21000,
+        335000,
+        -6000
+      ],
+      "map": "regions/sachsen-kamenz/map.json",
+      "tiles": [
+        "746.tar"
+      ]
+    },
+    {
+      "id": "thueringen-bad-langensalza",
+      "name": "Bad Langensalza",
+      "box": [
+        80000,
+        7000,
+        95000,
+        22000
+      ],
+      "map": "regions/thueringen-bad-langensalza/map.json",
+      "tiles": [
+        "747.tar"
+      ]
+    },
+    {
+      "id": "sachsen-marienberg",
+      "name": "Marienberg",
+      "box": [
+        259000,
+        51000,
+        274000,
+        66000
+      ],
+      "map": "regions/sachsen-marienberg/map.json",
+      "tiles": [
+        "748.tar"
+      ]
+    },
+    {
+      "id": "sachsen-mittweida",
+      "name": "Mittweida",
+      "box": [
+        243000,
+        15000,
+        258000,
+        30000
+      ],
+      "map": "regions/sachsen-mittweida/map.json",
+      "tiles": [
+        "749.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-nauen",
+      "name": "Nauen",
+      "box": [
+        227000,
+        -165000,
+        242000,
+        -150000
+      ],
+      "map": "regions/brandenburg-nauen/map.json",
+      "tiles": [
+        "750.tar"
+      ]
+    },
+    {
+      "id": "sachsen-eilenburg",
+      "name": "Eilenburg",
+      "box": [
+        217000,
+        -37000,
+        232000,
+        -22000
+      ],
+      "map": "regions/sachsen-eilenburg/map.json",
+      "tiles": [
+        "751.tar"
+      ]
+    },
+    {
+      "id": "thueringen-bad-salzungen",
+      "name": "Bad Salzungen",
+      "box": [
+        52000,
+        41000,
+        67000,
+        56000
+      ],
+      "map": "regions/thueringen-bad-salzungen/map.json",
+      "tiles": [
+        "752.tar"
+      ]
+    },
+    {
+      "id": "sachsen-oschatz",
+      "name": "Oschatz",
+      "box": [
+        251000,
+        -21000,
+        266000,
+        -6000
+      ],
+      "map": "regions/sachsen-oschatz/map.json",
+      "tiles": [
+        "753.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-lubnjow",
+      "name": "Lubnjow",
+      "box": [
+        305000,
+        -87000,
+        320000,
+        -72000
+      ],
+      "map": "regions/brandenburg-lubnjow/map.json",
+      "tiles": [
+        "754.tar"
+      ]
+    },
+    {
+      "id": "thueringen-zeulenroda-triebes",
+      "name": "Zeulenroda-Triebes",
+      "box": [
+        175000,
+        55000,
+        190000,
+        70000
+      ],
+      "map": "regions/thueringen-zeulenroda-triebes/map.json",
+      "tiles": [
+        "755.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-angermuende",
+      "name": "Angermünde",
+      "box": [
+        300000,
+        -215000,
+        315000,
+        -200000
+      ],
+      "map": "regions/brandenburg-angermuende/map.json",
+      "tiles": [
+        "756.tar"
       ]
     }
   ]
