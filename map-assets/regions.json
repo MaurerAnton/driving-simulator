@@ -1,5 +1,5 @@
 {
-  "latest": "bw-offenburg",
+  "latest": "saarland-neunkirchen",
   "regions": [
     {
       "id": "suedwest",
@@ -9777,6 +9777,90 @@
       "map": "regions/sachsen-weisswasser/map.json",
       "tiles": [
         "777.tar"
+      ]
+    },
+    {
+      "id": "saarland-neunkirchen",
+      "name": "Neunkirchen",
+      "box": [
+        -168000,
+        203000,
+        -153000,
+        218000
+      ],
+      "map": "regions/saarland-neunkirchen/map.json",
+      "tiles": [
+        "778.tar"
+      ]
+    },
+    {
+      "id": "nrw-bad-oeynhausen",
+      "name": "Bad Oeynhausen",
+      "box": [
+        -49000,
+        -114000,
+        -34000,
+        -99000
+      ],
+      "map": "regions/nrw-bad-oeynhausen/map.json",
+      "tiles": [
+        "779.tar"
+      ]
+    },
+    {
+      "id": "bayern-hof",
+      "name": "Hof",
+      "box": [
+        172000,
+        93000,
+        187000,
+        108000
+      ],
+      "map": "regions/bayern-hof/map.json",
+      "tiles": [
+        "780.tar"
+      ]
+    },
+    {
+      "id": "nrw-kleve",
+      "name": "Kleve",
+      "box": [
+        -233000,
+        -71000,
+        -218000,
+        -56000
+      ],
+      "map": "regions/nrw-kleve/map.json",
+      "tiles": [
+        "781.tar"
+      ]
+    },
+    {
+      "id": "bw-ravensburg",
+      "name": "Ravensburg",
+      "box": [
+        10000,
+        378000,
+        25000,
+        393000
+      ],
+      "map": "regions/bw-ravensburg/map.json",
+      "tiles": [
+        "782.tar"
+      ]
+    },
+    {
+      "id": "nrw-soest",
+      "name": "Soest",
+      "box": [
+        -97000,
+        -44000,
+        -82000,
+        -29000
+      ],
+      "map": "regions/nrw-soest/map.json",
+      "tiles": [
+        "783.tar"
       ]
     }
   ]
