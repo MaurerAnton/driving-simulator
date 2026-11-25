@@ -43,8 +43,8 @@
 #       weder Höhen noch 3D-Gebäude (nur ALKIS-Umrisse, die der Bau nicht liest).
 #   Darum das offene Geländemodell der EU wie in build-map-it.yml: Copernicus DEM GLO-30
 #   (30 m Raster, ein Oberflächenmodell) aus dem frei lesbaren Behälter copernicus-dem-30m,
-#   gerechnet von tools/fetch-it.py (das UTM32 rechnet und nichts Italienisches außer seinen
-#   Meldungen hat).  Lizenz: „GLO-30 Public … available on a free basis for the general
+#   gerechnet von tools/fetch-thueringen.py (tools/fetch-it.py, dazu die Kästen nördlich von
+#   50°, die nur 2400 Spalten je Grad haben).  Lizenz: „GLO-30 Public … available on a free basis for the general
 #   public" (copernicus-dem-30m.s3.amazonaws.com/readme.html), Quellenvermerk siehe unten.
 #   Die Gebäude kommen aus den OpenStreetMap-Umrissen.  Sobald das TLBG wieder ohne CAPTCHA
 #   liefert, gehört hier ein Abruf von DGM1/LoD2 (© GDI-Th, CC BY 4.0) hinein.
@@ -148,7 +148,8 @@ jobs:
             -o "$RUNNER_TEMP/published-index.json" \
             https://raw.githubusercontent.com/${{ github.repository }}/main/map-assets/index.json
           python3 -c "import json;d=json.load(open('$RUNNER_TEMP/published-index.json'));print('Kacheln in anderen Karten:',len({t for f in d['files'] for t in f['tiles']}))"
-      # tools/fetch-it.py rechnet jedes Kilometerquadrat in UTM32 aus den Kästen des Copernicus
+      # tools/fetch-thueringen.py (tools/fetch-it.py mit den nördlich von 50° schmaleren Kästen:
+      # 2400 statt 3600 Spalten je Grad) rechnet jedes Kilometerquadrat in UTM32 aus den Kästen des Copernicus
       # DEM (seine Meldungen beginnen mit [it]); --only dgm: Gebäudemodelle gibt es keine.
       - name: Gelände (Copernicus DEM GLO-30) holen
         env:
@@ -157,7 +158,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/work/dgm2
-          python3 -I tools/fetch-it.py --east "$BOX_E" --north "$BOX_N" --only dgm \
+          python3 -I tools/fetch-thueringen.py --east "$BOX_E" --north "$BOX_N" --only dgm \
             --published "$RUNNER_TEMP/published-index.json" \
             --on-overlap skip --jobs 4 --gaps data/work/gaps.txt
           du -sh data/work/dgm2

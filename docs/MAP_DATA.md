@@ -440,7 +440,7 @@ offene DGM1/LoD2-Daten).
 
 #### Thüringen
 
-Ablauf `.github/workflows/build-map-thueringen.yml` („Karte Thüringen“), Abruf `tools/fetch-it.py` (rechnet jedes UTM32-Rechteck aus dem Copernicus DEM):
+Ablauf `.github/workflows/build-map-thueringen.yml` („Karte Thüringen“), Abruf `tools/fetch-thueringen.py` (`tools/fetch-it.py` mit den nördlich von 50° schmaleren Copernicus-Kästen):
 
 | Inhalt | Quelle | Lizenz |
 | --- | --- | --- |
