@@ -1,5 +1,5 @@
 {
-  "latest": "bayern-augsburg",
+  "latest": "nrw-luedenscheid",
   "regions": [
     {
       "id": "suedwest",
@@ -8529,6 +8529,398 @@
       "map": "regions/brandenburg-ludwigsfelde/map.json",
       "tiles": [
         "686.tar"
+      ]
+    },
+    {
+      "id": "nrw-luedenscheid",
+      "name": "Lüdenscheid",
+      "box": [
+        -131000,
+        -5000,
+        -116000,
+        10000
+      ],
+      "map": "regions/nrw-luedenscheid/map.json",
+      "tiles": [
+        "687.tar"
+      ]
+    },
+    {
+      "id": "nrw-rheine",
+      "name": "Rheine",
+      "box": [
+        -142000,
+        -123000,
+        -127000,
+        -108000
+      ],
+      "map": "regions/nrw-rheine/map.json",
+      "tiles": [
+        "688.tar"
+      ]
+    },
+    {
+      "id": "nrw-viersen",
+      "name": "Viersen",
+      "box": [
+        -217000,
+        -11000,
+        -202000,
+        4000
+      ],
+      "map": "regions/nrw-viersen/map.json",
+      "tiles": [
+        "689.tar"
+      ]
+    },
+    {
+      "id": "nrw-arnsberg",
+      "name": "Arnsberg",
+      "box": [
+        -99000,
+        -22000,
+        -84000,
+        -7000
+      ],
+      "map": "regions/nrw-arnsberg/map.json",
+      "tiles": [
+        "690.tar"
+      ]
+    },
+    {
+      "id": "nrw-troisdorf",
+      "name": "Troisdorf",
+      "box": [
+        -166000,
+        40000,
+        -151000,
+        55000
+      ],
+      "map": "regions/nrw-troisdorf/map.json",
+      "tiles": [
+        "691.tar"
+      ]
+    },
+    {
+      "id": "nrw-detmold",
+      "name": "Detmold",
+      "box": [
+        -44000,
+        -84000,
+        -29000,
+        -69000
+      ],
+      "map": "regions/nrw-detmold/map.json",
+      "tiles": [
+        "692.tar"
+      ]
+    },
+    {
+      "id": "mv-neubrandenburg",
+      "name": "Neubrandenburg",
+      "box": [
+        247000,
+        -272000,
+        262000,
+        -257000
+      ],
+      "map": "regions/mv-neubrandenburg/map.json",
+      "tiles": [
+        "693.tar"
+      ]
+    },
+    {
+      "id": "lsa-dessau",
+      "name": "Dessau",
+      "box": [
+        188000,
+        -78000,
+        203000,
+        -63000
+      ],
+      "map": "regions/lsa-dessau/map.json",
+      "tiles": [
+        "694.tar"
+      ]
+    },
+    {
+      "id": "nrw-grevenbroich",
+      "name": "Grevenbroich",
+      "box": [
+        -205000,
+        8000,
+        -190000,
+        23000
+      ],
+      "map": "regions/nrw-grevenbroich/map.json",
+      "tiles": [
+        "695.tar"
+      ]
+    },
+    {
+      "id": "sachsen-delitzsch",
+      "name": "Delitzsch",
+      "box": [
+        196000,
+        -43000,
+        211000,
+        -28000
+      ],
+      "map": "regions/sachsen-delitzsch/map.json",
+      "tiles": [
+        "696.tar"
+      ]
+    },
+    {
+      "id": "sachsen-zittau",
+      "name": "Zittau",
+      "box": [
+        373000,
+        16000,
+        387000,
+        31000
+      ],
+      "map": "regions/sachsen-zittau/map.json",
+      "tiles": [
+        "697.tar"
+      ]
+    },
+    {
+      "id": "thueringen-greiz",
+      "name": "Greiz",
+      "box": [
+        191000,
+        54000,
+        206000,
+        69000
+      ],
+      "map": "regions/thueringen-greiz/map.json",
+      "tiles": [
+        "698.tar"
+      ]
+    },
+    {
+      "id": "thueringen-sonneberg",
+      "name": "Sonneberg",
+      "box": [
+        119000,
+        90000,
+        134000,
+        105000
+      ],
+      "map": "regions/thueringen-sonneberg/map.json",
+      "tiles": [
+        "699.tar"
+      ]
+    },
+    {
+      "id": "sachsen-doebeln",
+      "name": "Döbeln",
+      "box": [
+        252000,
+        -1000,
+        267000,
+        14000
+      ],
+      "map": "regions/sachsen-doebeln/map.json",
+      "tiles": [
+        "700.tar"
+      ]
+    },
+    {
+      "id": "sachsen-limbach-oberfrohna",
+      "name": "Limbach-Oberfrohna",
+      "box": [
+        229000,
+        30000,
+        244000,
+        45000
+      ],
+      "map": "regions/sachsen-limbach-oberfrohna/map.json",
+      "tiles": [
+        "701.tar"
+      ]
+    },
+    {
+      "id": "sachsen-annaberg-buchholz",
+      "name": "Annaberg-Buchholz",
+      "box": [
+        248000,
+        60000,
+        263000,
+        75000
+      ],
+      "map": "regions/sachsen-annaberg-buchholz/map.json",
+      "tiles": [
+        "702.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-forst",
+      "name": "Forst",
+      "box": [
+        354000,
+        -76000,
+        369000,
+        -61000
+      ],
+      "map": "regions/brandenburg-forst/map.json",
+      "tiles": [
+        "703.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-werder",
+      "name": "Werder",
+      "box": [
+        232000,
+        -140000,
+        247000,
+        -125000
+      ],
+      "map": "regions/brandenburg-werder/map.json",
+      "tiles": [
+        "704.tar"
+      ]
+    },
+    {
+      "id": "sachsen-coswig",
+      "name": "Coswig",
+      "box": [
+        285000,
+        -4000,
+        300000,
+        11000
+      ],
+      "map": "regions/sachsen-coswig/map.json",
+      "tiles": [
+        "705.tar"
+      ]
+    },
+    {
+      "id": "thueringen-sondershausen",
+      "name": "Sondershausen",
+      "box": [
+        95000,
+        -22000,
+        110000,
+        -7000
+      ],
+      "map": "regions/thueringen-sondershausen/map.json",
+      "tiles": [
+        "706.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-luckenwalde",
+      "name": "Luckenwalde",
+      "box": [
+        250000,
+        -109000,
+        265000,
+        -94000
+      ],
+      "map": "regions/brandenburg-luckenwalde/map.json",
+      "tiles": [
+        "707.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-guben",
+      "name": "Guben",
+      "box": [
+        356000,
+        -100000,
+        371000,
+        -85000
+      ],
+      "map": "regions/brandenburg-guben/map.json",
+      "tiles": [
+        "708.tar"
+      ]
+    },
+    {
+      "id": "thueringen-meiningen",
+      "name": "Meiningen",
+      "box": [
+        65000,
+        68000,
+        80000,
+        83000
+      ],
+      "map": "regions/thueringen-meiningen/map.json",
+      "tiles": [
+        "709.tar"
+      ]
+    },
+    {
+      "id": "sachsen-glauchau",
+      "name": "Glauchau",
+      "box": [
+        214000,
+        35000,
+        229000,
+        50000
+      ],
+      "map": "regions/sachsen-glauchau/map.json",
+      "tiles": [
+        "710.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-prenzlau",
+      "name": "Prenzlau",
+      "box": [
+        288000,
+        -248000,
+        303000,
+        -233000
+      ],
+      "map": "regions/brandenburg-prenzlau/map.json",
+      "tiles": [
+        "711.tar"
+      ]
+    },
+    {
+      "id": "thueringen-soemmerda",
+      "name": "Sömmerda",
+      "box": [
+        112000,
+        1000,
+        127000,
+        16000
+      ],
+      "map": "regions/thueringen-soemmerda/map.json",
+      "tiles": [
+        "712.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-wittenberge",
+      "name": "Wittenberge",
+      "box": [
+        149000,
+        -205000,
+        164000,
+        -190000
+      ],
+      "map": "regions/brandenburg-wittenberge/map.json",
+      "tiles": [
+        "713.tar"
+      ]
+    },
+    {
+      "id": "thueringen-schmalkalden",
+      "name": "Schmalkalden",
+      "box": [
+        66000,
+        51000,
+        81000,
+        66000
+      ],
+      "map": "regions/thueringen-schmalkalden/map.json",
+      "tiles": [
+        "714.tar"
       ]
     }
   ]
