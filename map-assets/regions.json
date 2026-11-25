@@ -1,5 +1,5 @@
 {
-  "latest": "bw-reutlingen",
+  "latest": "bayern-augsburg",
   "regions": [
     {
       "id": "suedwest",
@@ -8135,6 +8135,400 @@
       "map": "regions/brandenburg-neuruppin/map.json",
       "tiles": [
         "656.tar"
+      ]
+    },
+    {
+      "id": "bayern-augsburg",
+      "name": "Augsburg",
+      "box": [
+        105000,
+        311000,
+        120000,
+        326000
+      ],
+      "map": "regions/bayern-augsburg/map.json",
+      "tiles": [
+        "657.tar",
+        "658.tar"
+      ]
+    },
+    {
+      "id": "bayern-regensburg",
+      "name": "Regensburg",
+      "box": [
+        191000,
+        237000,
+        206000,
+        252000
+      ],
+      "map": "regions/bayern-regensburg/map.json",
+      "tiles": [
+        "659.tar"
+      ]
+    },
+    {
+      "id": "bayern-wuerzburg",
+      "name": "Würzburg",
+      "box": [
+        33000,
+        154000,
+        48000,
+        169000
+      ],
+      "map": "regions/bayern-wuerzburg/map.json",
+      "tiles": [
+        "660.tar"
+      ]
+    },
+    {
+      "id": "bw-tuebingen",
+      "name": "Tübingen",
+      "box": [
+        -32000,
+        296000,
+        -17000,
+        311000
+      ],
+      "map": "regions/bw-tuebingen/map.json",
+      "tiles": [
+        "661.tar"
+      ]
+    },
+    {
+      "id": "nrw-velbert",
+      "name": "Velbert",
+      "box": [
+        -172000,
+        -18000,
+        -157000,
+        -3000
+      ],
+      "map": "regions/nrw-velbert/map.json",
+      "tiles": [
+        "662.tar"
+      ]
+    },
+    {
+      "id": "sh-flensburg",
+      "name": "Flensburg",
+      "box": [
+        -7000,
+        -401000,
+        8000,
+        -386000
+      ],
+      "map": "regions/sh-flensburg/map.json",
+      "tiles": [
+        "663.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wilhelmshaven",
+      "name": "Wilhelmshaven",
+      "box": [
+        -95000,
+        -263000,
+        -82000,
+        -248000
+      ],
+      "map": "regions/niedersachsen-wilhelmshaven/map.json",
+      "tiles": [
+        "664.tar"
+      ]
+    },
+    {
+      "id": "nrw-minden",
+      "name": "Minden",
+      "box": [
+        -41000,
+        -123000,
+        -26000,
+        -108000
+      ],
+      "map": "regions/nrw-minden/map.json",
+      "tiles": [
+        "665.tar"
+      ]
+    },
+    {
+      "id": "sh-norderstedt",
+      "name": "Norderstedt",
+      "box": [
+        30000,
+        -280000,
+        45000,
+        -265000
+      ],
+      "map": "regions/sh-norderstedt/map.json",
+      "tiles": [
+        "666.tar"
+      ]
+    },
+    {
+      "id": "bw-villingen-schwenningen",
+      "name": "Villingen-Schwenningen",
+      "box": [
+        -73000,
+        347000,
+        -58000,
+        362000
+      ],
+      "map": "regions/bw-villingen-schwenningen/map.json",
+      "tiles": [
+        "667.tar"
+      ]
+    },
+    {
+      "id": "bw-konstanz",
+      "name": "Konstanz",
+      "box": [
+        -22000,
+        392000,
+        -7000,
+        401000
+      ],
+      "map": "regions/bw-konstanz/map.json",
+      "tiles": [
+        "668.tar"
+      ]
+    },
+    {
+      "id": "sh-neumuenster",
+      "name": "Neumünster",
+      "box": [
+        29000,
+        -322000,
+        44000,
+        -307000
+      ],
+      "map": "regions/sh-neumuenster/map.json",
+      "tiles": [
+        "669.tar"
+      ]
+    },
+    {
+      "id": "nrw-dorsten",
+      "name": "Dorsten",
+      "box": [
+        -176000,
+        -55000,
+        -161000,
+        -40000
+      ],
+      "map": "regions/nrw-dorsten/map.json",
+      "tiles": [
+        "670.tar"
+      ]
+    },
+    {
+      "id": "nrw-castrop-rauxel",
+      "name": "Castrop-Rauxel",
+      "box": [
+        -153000,
+        -43000,
+        -138000,
+        -28000
+      ],
+      "map": "regions/nrw-castrop-rauxel/map.json",
+      "tiles": [
+        "671.tar",
+        "672.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-koenigs-wusterhausen",
+      "name": "Königs Wusterhausen",
+      "box": [
+        280000,
+        -134000,
+        295000,
+        -119000
+      ],
+      "map": "regions/brandenburg-koenigs-wusterhausen/map.json",
+      "tiles": [
+        "673.tar"
+      ]
+    },
+    {
+      "id": "sachsen-hoyerswerda",
+      "name": "Hoyerswerda",
+      "box": [
+        328000,
+        -41000,
+        343000,
+        -26000
+      ],
+      "map": "regions/sachsen-hoyerswerda/map.json",
+      "tiles": [
+        "674.tar"
+      ]
+    },
+    {
+      "id": "sachsen-riesa",
+      "name": "Riesa",
+      "box": [
+        264000,
+        -22000,
+        279000,
+        -7000
+      ],
+      "map": "regions/sachsen-riesa/map.json",
+      "tiles": [
+        "675.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-senftenberg",
+      "name": "Senftenberg",
+      "box": [
+        311000,
+        -50000,
+        326000,
+        -35000
+      ],
+      "map": "regions/brandenburg-senftenberg/map.json",
+      "tiles": [
+        "676.tar"
+      ]
+    },
+    {
+      "id": "sachsen-meissen",
+      "name": "Meissen",
+      "box": [
+        277000,
+        -7000,
+        292000,
+        8000
+      ],
+      "map": "regions/sachsen-meissen/map.json",
+      "tiles": [
+        "677.tar"
+      ]
+    },
+    {
+      "id": "thueringen-saalfeld",
+      "name": "Saalfeld",
+      "box": [
+        132000,
+        57000,
+        147000,
+        72000
+      ],
+      "map": "regions/thueringen-saalfeld/map.json",
+      "tiles": [
+        "678.tar"
+      ]
+    },
+    {
+      "id": "sachsen-grimma",
+      "name": "Grimma",
+      "box": [
+        224000,
+        -12000,
+        239000,
+        3000
+      ],
+      "map": "regions/sachsen-grimma/map.json",
+      "tiles": [
+        "679.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-rathenow",
+      "name": "Rathenow",
+      "box": [
+        190000,
+        -163000,
+        205000,
+        -148000
+      ],
+      "map": "regions/brandenburg-rathenow/map.json",
+      "tiles": [
+        "680.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-strausberg",
+      "name": "Strausberg",
+      "box": [
+        296000,
+        -166000,
+        311000,
+        -151000
+      ],
+      "map": "regions/brandenburg-strausberg/map.json",
+      "tiles": [
+        "681.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-hennigsdorf",
+      "name": "Hennigsdorf",
+      "box": [
+        249000,
+        -170000,
+        264000,
+        -155000
+      ],
+      "map": "regions/brandenburg-hennigsdorf/map.json",
+      "tiles": [
+        "682.tar"
+      ]
+    },
+    {
+      "id": "thueringen-arnstadt",
+      "name": "Arnstadt",
+      "box": [
+        102000,
+        37000,
+        117000,
+        52000
+      ],
+      "map": "regions/thueringen-arnstadt/map.json",
+      "tiles": [
+        "683.tar"
+      ]
+    },
+    {
+      "id": "thueringen-rudolstadt",
+      "name": "Rudolstadt",
+      "box": [
+        130000,
+        49000,
+        145000,
+        64000
+      ],
+      "map": "regions/thueringen-rudolstadt/map.json",
+      "tiles": [
+        "684.tar"
+      ]
+    },
+    {
+      "id": "thueringen-apolda",
+      "name": "Apolda",
+      "box": [
+        141000,
+        15000,
+        156000,
+        30000
+      ],
+      "map": "regions/thueringen-apolda/map.json",
+      "tiles": [
+        "685.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-ludwigsfelde",
+      "name": "Ludwigsfelde",
+      "box": [
+        254000,
+        -133000,
+        269000,
+        -118000
+      ],
+      "map": "regions/brandenburg-ludwigsfelde/map.json",
+      "tiles": [
+        "686.tar"
       ]
     }
   ]
