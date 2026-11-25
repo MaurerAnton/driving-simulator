@@ -1,5 +1,5 @@
 {
-  "latest": "niedersachsen-eldingen",
+  "latest": "niedersachsen-harz-landkreis-goettingen",
   "regions": [
     {
       "id": "suedwest",
@@ -5619,6 +5619,426 @@
       "map": "regions/niedersachsen-harsum/map.json",
       "tiles": [
         "467.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-harz-landkreis-goettingen",
+      "name": "Harz (Landkreis Göttingen)",
+      "box": [
+        54000,
+        -59000,
+        69000,
+        -44000
+      ],
+      "map": "regions/niedersachsen-harz-landkreis-goettingen/map.json",
+      "tiles": [
+        "468.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-harz-lk-goslar",
+      "name": "Harz (LK Goslar)",
+      "box": [
+        72000,
+        -68000,
+        87000,
+        -53000
+      ],
+      "map": "regions/niedersachsen-harz-lk-goslar/map.json",
+      "tiles": [
+        "469.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-heeslingen",
+      "name": "Heeslingen",
+      "box": [
+        -13000,
+        -239000,
+        2000,
+        -224000
+      ],
+      "map": "regions/niedersachsen-heeslingen/map.json",
+      "tiles": [
+        "470.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hemmingen",
+      "name": "Hemmingen",
+      "box": [
+        15000,
+        -118000,
+        30000,
+        -111000
+      ],
+      "map": "regions/niedersachsen-hemmingen/map.json",
+      "tiles": [
+        "471.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hemsloh",
+      "name": "Hemsloh",
+      "box": [
+        -69000,
+        -158000,
+        -54000,
+        -143000
+      ],
+      "map": "regions/niedersachsen-hemsloh/map.json",
+      "tiles": [
+        "472.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-herzberg-am-harz",
+      "name": "Herzberg am Harz",
+      "box": [
+        57000,
+        -53000,
+        72000,
+        -38000
+      ],
+      "map": "regions/niedersachsen-herzberg-am-harz/map.json",
+      "tiles": [
+        "473.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-herzlake",
+      "name": "Herzlake",
+      "box": [
+        -130000,
+        -168000,
+        -115000,
+        -153000
+      ],
+      "map": "regions/niedersachsen-herzlake/map.json",
+      "tiles": [
+        "474.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hessisch-oldendorf",
+      "name": "Hessisch Oldendorf",
+      "box": [
+        -20000,
+        -104000,
+        -5000,
+        -89000
+      ],
+      "map": "regions/niedersachsen-hessisch-oldendorf/map.json",
+      "tiles": [
+        "475.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-hoexter",
+      "name": "Höxter",
+      "box": [
+        -6000,
+        -68000,
+        8000,
+        -53000
+      ],
+      "map": "regions/niedersachsen-hoexter/map.json",
+      "tiles": [
+        "476.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-holm-seppensen",
+      "name": "Holm-Seppensen",
+      "box": [
+        22000,
+        -234000,
+        37000,
+        -219000
+      ],
+      "map": "regions/niedersachsen-holm-seppensen/map.json",
+      "tiles": [
+        "477.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-holzminden-gemeindefreies-gebiet",
+      "name": "Holzminden (gemeindefreies Gebiet)",
+      "box": [
+        2000,
+        -69000,
+        17000,
+        -54000
+      ],
+      "map": "regions/niedersachsen-holzminden-gemeindefreies-gebiet/map.json",
+      "tiles": [
+        "478.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-husum",
+      "name": "Husum",
+      "box": [
+        -21000,
+        -147000,
+        -6000,
+        -139000
+      ],
+      "map": "regions/niedersachsen-husum/map.json",
+      "tiles": [
+        "479.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-katlenburg-lindau",
+      "name": "Katlenburg-Lindau",
+      "box": [
+        49000,
+        -59000,
+        54000,
+        -44000
+      ],
+      "map": "regions/niedersachsen-katlenburg-lindau/map.json",
+      "tiles": [
+        "480.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-kirchbrak",
+      "name": "Kirchbrak",
+      "box": [
+        2000,
+        -84000,
+        17000,
+        -69000
+      ],
+      "map": "regions/niedersachsen-kirchbrak/map.json",
+      "tiles": [
+        "481.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-kirchlinteln",
+      "name": "Kirchlinteln",
+      "box": [
+        -12000,
+        -200000,
+        3000,
+        -185000
+      ],
+      "map": "regions/niedersachsen-kirchlinteln/map.json",
+      "tiles": [
+        "482.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-langelsheim",
+      "name": "Langelsheim",
+      "box": [
+        54000,
+        -89000,
+        69000,
+        -74000
+      ],
+      "map": "regions/niedersachsen-langelsheim/map.json",
+      "tiles": [
+        "483.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-langlingen",
+      "name": "Langlingen",
+      "box": [
+        50000,
+        -148000,
+        65000,
+        -133000
+      ],
+      "map": "regions/niedersachsen-langlingen/map.json",
+      "tiles": [
+        "484.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-langwedel",
+      "name": "Langwedel",
+      "box": [
+        -26000,
+        -203000,
+        -11000,
+        -188000
+      ],
+      "map": "regions/niedersachsen-langwedel/map.json",
+      "tiles": [
+        "485.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lauenbruck",
+      "name": "Lauenbrück",
+      "box": [
+        2000,
+        -224000,
+        17000,
+        -209000
+      ],
+      "map": "regions/niedersachsen-lauenbruck/map.json",
+      "tiles": [
+        "486.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lauenfoerde",
+      "name": "Lauenförde",
+      "box": [
+        -3000,
+        -53000,
+        8000,
+        -41000
+      ],
+      "map": "regions/niedersachsen-lauenfoerde/map.json",
+      "tiles": [
+        "487.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-leer-ostfriesland",
+      "name": "Leer (Ostfriesland)",
+      "box": [
+        -139000,
+        -229000,
+        -124000,
+        -214000
+      ],
+      "map": "regions/niedersachsen-leer-ostfriesland/map.json",
+      "tiles": [
+        "488.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lehre",
+      "name": "Lehre",
+      "box": [
+        80000,
+        -133000,
+        95000,
+        -118000
+      ],
+      "map": "regions/niedersachsen-lehre/map.json",
+      "tiles": [
+        "489.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lehrte",
+      "name": "Lehrte",
+      "box": [
+        30000,
+        -132000,
+        45000,
+        -117000
+      ],
+      "map": "regions/niedersachsen-lehrte/map.json",
+      "tiles": [
+        "490.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lemforde",
+      "name": "Lemförde",
+      "box": [
+        -78000,
+        -142000,
+        -63000,
+        -127000
+      ],
+      "map": "regions/niedersachsen-lemforde/map.json",
+      "tiles": [
+        "491.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lilienthal",
+      "name": "Lilienthal",
+      "box": [
+        -41000,
+        -218000,
+        -26000,
+        -203000
+      ],
+      "map": "regions/niedersachsen-lilienthal/map.json",
+      "tiles": [
+        "492.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-loccum",
+      "name": "Loccum",
+      "box": [
+        -25000,
+        -138000,
+        -10000,
+        -123000
+      ],
+      "map": "regions/niedersachsen-loccum/map.json",
+      "tiles": [
+        "493.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lohne-oldenburg",
+      "name": "Lohne (Oldenburg)",
+      "box": [
+        -87000,
+        -165000,
+        -72000,
+        -150000
+      ],
+      "map": "regions/niedersachsen-lohne-oldenburg/map.json",
+      "tiles": [
+        "494.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-loxstedt",
+      "name": "Loxstedt",
+      "box": [
+        -63000,
+        -250000,
+        -48000,
+        -235000
+      ],
+      "map": "regions/niedersachsen-loxstedt/map.json",
+      "tiles": [
+        "495.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lueder",
+      "name": "Lüder",
+      "box": [
+        74000,
+        -183000,
+        89000,
+        -168000
+      ],
+      "map": "regions/niedersachsen-lueder/map.json",
+      "tiles": [
+        "496.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-lueneburg",
+      "name": "Lüneburg",
+      "box": [
+        55000,
+        -228000,
+        70000,
+        -213000
+      ],
+      "map": "regions/niedersachsen-lueneburg/map.json",
+      "tiles": [
+        "497.tar"
       ]
     }
   ]
