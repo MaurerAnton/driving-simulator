@@ -1,5 +1,5 @@
 {
-  "latest": "sh-elmshorn",
+  "latest": "nrw-erkrath",
   "regions": [
     {
       "id": "suedwest",
@@ -9945,6 +9945,49 @@
       "map": "regions/mv-wismar/map.json",
       "tiles": [
         "789.tar"
+      ]
+    },
+    {
+      "id": "nrw-erkrath",
+      "name": "Erkrath",
+      "box": [
+        -182000,
+        -6000,
+        -167000,
+        9000
+      ],
+      "map": "regions/nrw-erkrath/map.json",
+      "tiles": [
+        "790.tar",
+        "791.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-melle",
+      "name": "Melle",
+      "box": [
+        -81000,
+        -113000,
+        -66000,
+        -98000
+      ],
+      "map": "regions/niedersachsen-melle/map.json",
+      "tiles": [
+        "792.tar"
+      ]
+    },
+    {
+      "id": "nrw-buende",
+      "name": "Bünde",
+      "box": [
+        -64000,
+        -113000,
+        -49000,
+        -98000
+      ],
+      "map": "regions/nrw-buende/map.json",
+      "tiles": [
+        "793.tar"
       ]
     }
   ]
