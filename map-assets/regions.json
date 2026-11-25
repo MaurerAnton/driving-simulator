@@ -1,5 +1,5 @@
 {
-  "latest": "nrw-luedenscheid",
+  "latest": "nrw-bocholt",
   "regions": [
     {
       "id": "suedwest",
@@ -8921,6 +8921,272 @@
       "map": "regions/thueringen-schmalkalden/map.json",
       "tiles": [
         "714.tar"
+      ]
+    },
+    {
+      "id": "nrw-bocholt",
+      "name": "Bocholt",
+      "box": [
+        -200000,
+        -75000,
+        -185000,
+        -60000
+      ],
+      "map": "regions/nrw-bocholt/map.json",
+      "tiles": [
+        "715.tar"
+      ]
+    },
+    {
+      "id": "bayern-landshut",
+      "name": "Landshut",
+      "box": [
+        198000,
+        291000,
+        213000,
+        306000
+      ],
+      "map": "regions/bayern-landshut/map.json",
+      "tiles": [
+        "716.tar"
+      ]
+    },
+    {
+      "id": "nrw-lippstadt",
+      "name": "Lippstadt",
+      "box": [
+        -81000,
+        -54000,
+        -66000,
+        -39000
+      ],
+      "map": "regions/nrw-lippstadt/map.json",
+      "tiles": [
+        "717.tar"
+      ]
+    },
+    {
+      "id": "berlin-koepenick",
+      "name": "Köpenick",
+      "box": [
+        275000,
+        -150000,
+        290000,
+        -135000
+      ],
+      "map": "regions/berlin-koepenick/map.json",
+      "tiles": [
+        "718.tar"
+      ]
+    },
+    {
+      "id": "nrw-dinslaken",
+      "name": "Dinslaken",
+      "box": [
+        -192000,
+        -44000,
+        -177000,
+        -29000
+      ],
+      "map": "regions/nrw-dinslaken/map.json",
+      "tiles": [
+        "719.tar"
+      ]
+    },
+    {
+      "id": "nrw-herford",
+      "name": "Herford",
+      "box": [
+        -58000,
+        -103000,
+        -43000,
+        -88000
+      ],
+      "map": "regions/nrw-herford/map.json",
+      "tiles": [
+        "720.tar"
+      ]
+    },
+    {
+      "id": "nrw-kerpen",
+      "name": "Kerpen",
+      "box": [
+        -198000,
+        33000,
+        -183000,
+        48000
+      ],
+      "map": "regions/nrw-kerpen/map.json",
+      "tiles": [
+        "721.tar"
+      ]
+    },
+    {
+      "id": "nrw-dormagen",
+      "name": "Dormagen",
+      "box": [
+        -187000,
+        8000,
+        -172000,
+        23000
+      ],
+      "map": "regions/nrw-dormagen/map.json",
+      "tiles": [
+        "722.tar"
+      ]
+    },
+    {
+      "id": "nrw-bergheim",
+      "name": "Bergheim",
+      "box": [
+        -201000,
+        23000,
+        -186000,
+        38000
+      ],
+      "map": "regions/nrw-bergheim/map.json",
+      "tiles": [
+        "723.tar"
+      ]
+    },
+    {
+      "id": "mv-stralsund",
+      "name": "Stralsund",
+      "box": [
+        230000,
+        -355000,
+        245000,
+        -340000
+      ],
+      "map": "regions/mv-stralsund/map.json",
+      "tiles": [
+        "724.tar"
+      ]
+    },
+    {
+      "id": "sachsen-auerbach",
+      "name": "Auerbach",
+      "box": [
+        206000,
+        69000,
+        221000,
+        84000
+      ],
+      "map": "regions/sachsen-auerbach/map.json",
+      "tiles": [
+        "725.tar"
+      ]
+    },
+    {
+      "id": "sachsen-werdau",
+      "name": "Werdau",
+      "box": [
+        203000,
+        45000,
+        211000,
+        60000
+      ],
+      "map": "regions/sachsen-werdau/map.json",
+      "tiles": [
+        "726.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-wandlitz",
+      "name": "Wandlitz",
+      "box": [
+        266000,
+        -182000,
+        280000,
+        -167000
+      ],
+      "map": "regions/brandenburg-wandlitz/map.json",
+      "tiles": [
+        "727.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-lauchhammer",
+      "name": "Lauchhammer",
+      "box": [
+        295000,
+        -44000,
+        310000,
+        -29000
+      ],
+      "map": "regions/brandenburg-lauchhammer/map.json",
+      "tiles": [
+        "728.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-finsterwalde",
+      "name": "Finsterwalde",
+      "box": [
+        290000,
+        -60000,
+        305000,
+        -45000
+      ],
+      "map": "regions/brandenburg-finsterwalde/map.json",
+      "tiles": [
+        "729.tar"
+      ]
+    },
+    {
+      "id": "sachsen-borna",
+      "name": "Borna",
+      "box": [
+        209000,
+        1000,
+        224000,
+        16000
+      ],
+      "map": "regions/sachsen-borna/map.json",
+      "tiles": [
+        "730.tar"
+      ]
+    },
+    {
+      "id": "sachsen-torgau",
+      "name": "Torgau",
+      "box": [
+        241000,
+        -49000,
+        256000,
+        -34000
+      ],
+      "map": "regions/sachsen-torgau/map.json",
+      "tiles": [
+        "731.tar"
+      ]
+    },
+    {
+      "id": "sachsen-radeberg",
+      "name": "Radeberg",
+      "box": [
+        308000,
+        -3000,
+        323000,
+        12000
+      ],
+      "map": "regions/sachsen-radeberg/map.json",
+      "tiles": [
+        "732.tar"
+      ]
+    },
+    {
+      "id": "sachsen-schkeuditz",
+      "name": "Schkeuditz",
+      "box": [
+        190000,
+        -28000,
+        204000,
+        -13000
+      ],
+      "map": "regions/sachsen-schkeuditz/map.json",
+      "tiles": [
+        "733.tar"
       ]
     }
   ]
