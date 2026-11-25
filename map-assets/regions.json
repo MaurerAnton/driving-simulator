@@ -1,5 +1,5 @@
 {
-  "latest": "it-abbadia",
+  "latest": "niedersachsen-achim",
   "regions": [
     {
       "id": "suedwest",
@@ -4345,6 +4345,426 @@
       "map": "regions/it-borgosanlorenzo/map.json",
       "tiles": [
         "376.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-achim",
+      "name": "Achim",
+      "box": [
+        -41000,
+        -203000,
+        -26000,
+        -188000
+      ],
+      "map": "regions/niedersachsen-achim/map.json",
+      "tiles": [
+        "377.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-ahausen",
+      "name": "Ahausen",
+      "box": [
+        -13000,
+        -209000,
+        2000,
+        -194000
+      ],
+      "map": "regions/niedersachsen-ahausen/map.json",
+      "tiles": [
+        "378.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-albringhausen",
+      "name": "Albringhausen",
+      "box": [
+        -50000,
+        -182000,
+        -35000,
+        -167000
+      ],
+      "map": "regions/niedersachsen-albringhausen/map.json",
+      "tiles": [
+        "379.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-alfeld-leine",
+      "name": "Alfeld (Leine)",
+      "box": [
+        22000,
+        -89000,
+        37000,
+        -74000
+      ],
+      "map": "regions/niedersachsen-alfeld-leine/map.json",
+      "tiles": [
+        "380.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-alfhausen",
+      "name": "Alfhausen",
+      "box": [
+        -107000,
+        -147000,
+        -92000,
+        -132000
+      ],
+      "map": "regions/niedersachsen-alfhausen/map.json",
+      "tiles": [
+        "381.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-altenwahlingen",
+      "name": "Altenwahlingen",
+      "box": [
+        -7000,
+        -179000,
+        8000,
+        -164000
+      ],
+      "map": "regions/niedersachsen-altenwahlingen/map.json",
+      "tiles": [
+        "382.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-armstorf",
+      "name": "Armstorf",
+      "box": [
+        -33000,
+        -265000,
+        -18000,
+        -250000
+      ],
+      "map": "regions/niedersachsen-armstorf/map.json",
+      "tiles": [
+        "383.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-auetal",
+      "name": "Auetal",
+      "box": [
+        -20000,
+        -119000,
+        -5000,
+        -104000
+      ],
+      "map": "regions/niedersachsen-auetal/map.json",
+      "tiles": [
+        "384.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-baarsen",
+      "name": "Baarsen",
+      "box": [
+        -13000,
+        -84000,
+        2000,
+        -69000
+      ],
+      "map": "regions/niedersachsen-baarsen/map.json",
+      "tiles": [
+        "385.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-baccum",
+      "name": "Baccum",
+      "box": [
+        -144000,
+        -149000,
+        -129000,
+        -134000
+      ],
+      "map": "regions/niedersachsen-baccum/map.json",
+      "tiles": [
+        "386.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bad-fallingbostel",
+      "name": "Bad Fallingbostel",
+      "box": [
+        12000,
+        -192000,
+        27000,
+        -177000
+      ],
+      "map": "regions/niedersachsen-bad-fallingbostel/map.json",
+      "tiles": [
+        "387.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bad-iburg",
+      "name": "Bad Iburg",
+      "box": [
+        -101000,
+        -108000,
+        -86000,
+        -93000
+      ],
+      "map": "regions/niedersachsen-bad-iburg/map.json",
+      "tiles": [
+        "388.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bad-rehburg",
+      "name": "Bad Rehburg",
+      "box": [
+        -21000,
+        -139000,
+        -6000,
+        -124000
+      ],
+      "map": "regions/niedersachsen-bad-rehburg/map.json",
+      "tiles": [
+        "389.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-badbergen",
+      "name": "Badbergen",
+      "box": [
+        -102000,
+        -165000,
+        -87000,
+        -150000
+      ],
+      "map": "regions/niedersachsen-badbergen/map.json",
+      "tiles": [
+        "390.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bahrenborstel",
+      "name": "Bahrenborstel",
+      "box": [
+        -49000,
+        -152000,
+        -34000,
+        -137000
+      ],
+      "map": "regions/niedersachsen-bahrenborstel/map.json",
+      "tiles": [
+        "391.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bakum",
+      "name": "Bakum",
+      "box": [
+        -88000,
+        -175000,
+        -73000,
+        -160000
+      ],
+      "map": "regions/niedersachsen-bakum/map.json",
+      "tiles": [
+        "392.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-barel",
+      "name": "Barßel",
+      "box": [
+        -119000,
+        -221000,
+        -104000,
+        -206000
+      ],
+      "map": "regions/niedersachsen-barel/map.json",
+      "tiles": [
+        "393.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-barsinghausen",
+      "name": "Barsinghausen",
+      "box": [
+        -6000,
+        -124000,
+        9000,
+        -109000
+      ],
+      "map": "regions/niedersachsen-barsinghausen/map.json",
+      "tiles": [
+        "394.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-basdahl",
+      "name": "Basdahl",
+      "box": [
+        -33000,
+        -250000,
+        -18000,
+        -235000
+      ],
+      "map": "regions/niedersachsen-basdahl/map.json",
+      "tiles": [
+        "395.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bassum",
+      "name": "Bassum",
+      "box": [
+        -49000,
+        -182000,
+        -34000,
+        -167000
+      ],
+      "map": "regions/niedersachsen-bassum/map.json",
+      "tiles": [
+        "396.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-beckdorf",
+      "name": "Beckdorf",
+      "box": [
+        7000,
+        -249000,
+        22000,
+        -234000
+      ],
+      "map": "regions/niedersachsen-beckdorf/map.json",
+      "tiles": [
+        "397.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-beedenbostel",
+      "name": "Beedenbostel",
+      "box": [
+        50000,
+        -163000,
+        65000,
+        -148000
+      ],
+      "map": "regions/niedersachsen-beedenbostel/map.json",
+      "tiles": [
+        "398.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bennemuhlen",
+      "name": "Bennemühlen",
+      "box": [
+        13000,
+        -155000,
+        28000,
+        -140000
+      ],
+      "map": "regions/niedersachsen-bennemuhlen/map.json",
+      "tiles": [
+        "399.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bergen",
+      "name": "Bergen",
+      "box": [
+        27000,
+        -177000,
+        42000,
+        -162000
+      ],
+      "map": "regions/niedersachsen-bergen/map.json",
+      "tiles": [
+        "400.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-berne",
+      "name": "Berne",
+      "box": [
+        -66000,
+        -221000,
+        -51000,
+        -206000
+      ],
+      "map": "regions/niedersachsen-berne/map.json",
+      "tiles": [
+        "401.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-beverstedt",
+      "name": "Beverstedt",
+      "box": [
+        -48000,
+        -250000,
+        -33000,
+        -235000
+      ],
+      "map": "regions/niedersachsen-beverstedt/map.json",
+      "tiles": [
+        "402.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bispingen",
+      "name": "Bispingen",
+      "box": [
+        32000,
+        -215000,
+        47000,
+        -200000
+      ],
+      "map": "regions/niedersachsen-bispingen/map.json",
+      "tiles": [
+        "403.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-bockenem",
+      "name": "Bockenem",
+      "box": [
+        39000,
+        -89000,
+        54000,
+        -74000
+      ],
+      "map": "regions/niedersachsen-bockenem/map.json",
+      "tiles": [
+        "404.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-boehme",
+      "name": "Böhme",
+      "box": [
+        -3000,
+        -177000,
+        12000,
+        -162000
+      ],
+      "map": "regions/niedersachsen-boehme/map.json",
+      "tiles": [
+        "405.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-boffzen-gemeindefreies-gebiet",
+      "name": "Boffzen (gemeindefreies Gebiet)",
+      "box": [
+        -3000,
+        -59000,
+        7000,
+        -44000
+      ],
+      "map": "regions/niedersachsen-boffzen-gemeindefreies-gebiet/map.json",
+      "tiles": [
+        "406.tar"
       ]
     }
   ]
