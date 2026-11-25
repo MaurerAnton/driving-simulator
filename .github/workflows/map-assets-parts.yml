@@ -279,7 +279,9 @@ jobs:
             # – die Region, die das Spiel lädt, wenn man sie in den Einstellungen wählt (world/regionfiles.ts).
             # Die Karte ist noch da: die Dateien kommen, bevor work weg ist.
             if [ -f tools/build-regions.ts ]; then
-              rid=$(echo "$tag" | sed -E 's/^karte-//; s/-[0-9]{4}-[0-9]{2}-[0-9]{2}(-r[0-9]+)?$//')
+              rid=$(echo "$tag" | sed -E 's/^karte-//; s/--[0-9]+[0-9]{4}-[0-9]{2}-[0-9]{2}$//; s/-[0-9]{4}-[0-9]{2}-[0-9]{2}(-r[0-9]+)?$//')
+              # (the Lower Saxony campaign named its releases karte-niedersachsen-<ort>--<n><datum>: the second
+              #  rule takes that off, so the region is niedersachsen-<ort>)
               echo "Region: $rid (aus $tag)"
               # die Teile dieses Laufs (aus dem Fragment) tragen die Kacheln der Region:
               # build-regions bekommt sie, damit regions.json sagt, welcher Teil sie hält
