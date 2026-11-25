@@ -1,5 +1,5 @@
 {
-  "latest": "niedersachsen-toppenstedt",
+  "latest": "hamburg-wandsbek",
   "regions": [
     {
       "id": "suedwest",
@@ -7243,6 +7243,435 @@
       "map": "regions/niedersachsen-wunstorf/map.json",
       "tiles": [
         "583.tar"
+      ]
+    },
+    {
+      "id": "hamburg-wandsbek",
+      "name": "Wandsbek",
+      "box": [
+        36000,
+        -267000,
+        51000,
+        -252000
+      ],
+      "map": "regions/hamburg-wandsbek/map.json",
+      "tiles": [
+        "584.tar"
+      ]
+    },
+    {
+      "id": "nrw-aachen",
+      "name": "Aachen",
+      "box": [
+        -241000,
+        41000,
+        -226000,
+        56000
+      ],
+      "map": "regions/nrw-aachen/map.json",
+      "tiles": [
+        "585.tar"
+      ]
+    },
+    {
+      "id": "nrw-moenchengladbach",
+      "name": "Mönchengladbach",
+      "box": [
+        -214000,
+        -3000,
+        -199000,
+        12000
+      ],
+      "map": "regions/nrw-moenchengladbach/map.json",
+      "tiles": [
+        "586.tar",
+        "587.tar"
+      ]
+    },
+    {
+      "id": "sh-kiel",
+      "name": "Kiel",
+      "box": [
+        38000,
+        -349000,
+        53000,
+        -334000
+      ],
+      "map": "regions/sh-kiel/map.json",
+      "tiles": [
+        "588.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-braunschweig",
+      "name": "Braunschweig",
+      "box": [
+        69000,
+        -121000,
+        84000,
+        -106000
+      ],
+      "map": "regions/niedersachsen-braunschweig/map.json",
+      "tiles": [
+        "589.tar"
+      ]
+    },
+    {
+      "id": "lsa-magdeburg",
+      "name": "Magdeburg",
+      "box": [
+        145000,
+        -108000,
+        160000,
+        -93000
+      ],
+      "map": "regions/lsa-magdeburg/map.json",
+      "tiles": [
+        "590.tar"
+      ]
+    },
+    {
+      "id": "lsa-halle-saale",
+      "name": "Halle (Saale)",
+      "box": [
+        171000,
+        -37000,
+        186000,
+        -22000
+      ],
+      "map": "regions/lsa-halle-saale/map.json",
+      "tiles": [
+        "591.tar"
+      ]
+    },
+    {
+      "id": "sh-luebeck",
+      "name": "Lübeck",
+      "box": [
+        75000,
+        -300000,
+        90000,
+        -285000
+      ],
+      "map": "regions/sh-luebeck/map.json",
+      "tiles": [
+        "592.tar"
+      ]
+    },
+    {
+      "id": "nrw-hagen",
+      "name": "Hagen",
+      "box": [
+        -142000,
+        -21000,
+        -127000,
+        -6000
+      ],
+      "map": "regions/nrw-hagen/map.json",
+      "tiles": [
+        "593.tar"
+      ]
+    },
+    {
+      "id": "mv-rostock",
+      "name": "Rostock",
+      "box": [
+        170000,
+        -327000,
+        185000,
+        -312000
+      ],
+      "map": "regions/mv-rostock/map.json",
+      "tiles": [
+        "594.tar"
+      ]
+    },
+    {
+      "id": "nrw-muelheim",
+      "name": "Mülheim",
+      "box": [
+        -183000,
+        -30000,
+        -168000,
+        -15000
+      ],
+      "map": "regions/nrw-muelheim/map.json",
+      "tiles": [
+        "595.tar",
+        "596.tar"
+      ]
+    },
+    {
+      "id": "nrw-solingen",
+      "name": "Solingen",
+      "box": [
+        -169000,
+        0,
+        -154000,
+        15000
+      ],
+      "map": "regions/nrw-solingen/map.json",
+      "tiles": [
+        "597.tar",
+        "598.tar"
+      ]
+    },
+    {
+      "id": "nrw-leverkusen",
+      "name": "Leverkusen",
+      "box": [
+        -177000,
+        15000,
+        -162000,
+        30000
+      ],
+      "map": "regions/nrw-leverkusen/map.json",
+      "tiles": [
+        "599.tar",
+        "600.tar"
+      ]
+    },
+    {
+      "id": "berlin-charlottenburg",
+      "name": "Charlottenburg",
+      "box": [
+        255000,
+        -157000,
+        270000,
+        -142000
+      ],
+      "map": "regions/berlin-charlottenburg/map.json",
+      "tiles": [
+        "601.tar",
+        "602.tar"
+      ]
+    },
+    {
+      "id": "nrw-bottrop",
+      "name": "Bottrop",
+      "box": [
+        -179000,
+        -40000,
+        -164000,
+        -25000
+      ],
+      "map": "regions/nrw-bottrop/map.json",
+      "tiles": [
+        "603.tar",
+        "604.tar"
+      ]
+    },
+    {
+      "id": "hamburg-bergedorf",
+      "name": "Bergedorf",
+      "box": [
+        46000,
+        -256000,
+        61000,
+        -241000
+      ],
+      "map": "regions/hamburg-bergedorf/map.json",
+      "tiles": [
+        "605.tar"
+      ]
+    },
+    {
+      "id": "bw-pforzheim",
+      "name": "Pforzheim",
+      "box": [
+        -58000,
+        256000,
+        -43000,
+        271000
+      ],
+      "map": "regions/bw-pforzheim/map.json",
+      "tiles": [
+        "606.tar"
+      ]
+    },
+    {
+      "id": "nrw-porz-am-rhein",
+      "name": "Porz am Rhein",
+      "box": [
+        -172000,
+        32000,
+        -157000,
+        47000
+      ],
+      "map": "regions/nrw-porz-am-rhein/map.json",
+      "tiles": [
+        "607.tar",
+        "608.tar"
+      ]
+    },
+    {
+      "id": "rlp-koblenz",
+      "name": "Koblenz",
+      "box": [
+        -137000,
+        92000,
+        -122000,
+        107000
+      ],
+      "map": "regions/rlp-koblenz/map.json",
+      "tiles": [
+        "609.tar"
+      ]
+    },
+    {
+      "id": "nrw-bergisch-gladbach",
+      "name": "Bergisch Gladbach",
+      "box": [
+        -167000,
+        21000,
+        -152000,
+        36000
+      ],
+      "map": "regions/nrw-bergisch-gladbach/map.json",
+      "tiles": [
+        "610.tar"
+      ]
+    },
+    {
+      "id": "nrw-moers",
+      "name": "Moers",
+      "box": [
+        -200000,
+        -32000,
+        -185000,
+        -17000
+      ],
+      "map": "regions/nrw-moers/map.json",
+      "tiles": [
+        "611.tar"
+      ]
+    },
+    {
+      "id": "mv-schwerin",
+      "name": "Schwerin",
+      "box": [
+        124000,
+        -274000,
+        139000,
+        -259000
+      ],
+      "map": "regions/mv-schwerin/map.json",
+      "tiles": [
+        "612.tar"
+      ]
+    },
+    {
+      "id": "nrw-guetersloh",
+      "name": "Gütersloh",
+      "box": [
+        -78000,
+        -80000,
+        -63000,
+        -65000
+      ],
+      "map": "regions/nrw-guetersloh/map.json",
+      "tiles": [
+        "613.tar"
+      ]
+    },
+    {
+      "id": "nrw-dueren",
+      "name": "Düren",
+      "box": [
+        -212000,
+        39000,
+        -197000,
+        54000
+      ],
+      "map": "regions/nrw-dueren/map.json",
+      "tiles": [
+        "614.tar"
+      ]
+    },
+    {
+      "id": "sachsen-dresden",
+      "name": "Dresden",
+      "box": [
+        297000,
+        4000,
+        312000,
+        19000
+      ],
+      "map": "regions/sachsen-dresden/map.json",
+      "tiles": [
+        "615.tar",
+        "616.tar"
+      ]
+    },
+    {
+      "id": "sachsen-leipzig",
+      "name": "Leipzig",
+      "box": [
+        199000,
+        -22000,
+        214000,
+        -7000
+      ],
+      "map": "regions/sachsen-leipzig/map.json",
+      "tiles": [
+        "617.tar",
+        "618.tar"
+      ]
+    },
+    {
+      "id": "sachsen-chemnitz",
+      "name": "Chemnitz",
+      "box": [
+        241000,
+        32000,
+        256000,
+        47000
+      ],
+      "map": "regions/sachsen-chemnitz/map.json",
+      "tiles": [
+        "619.tar"
+      ]
+    },
+    {
+      "id": "thueringen-erfurt",
+      "name": "Erfurt",
+      "box": [
+        107000,
+        21000,
+        122000,
+        36000
+      ],
+      "map": "regions/thueringen-erfurt/map.json",
+      "tiles": [
+        "620.tar"
+      ]
+    },
+    {
+      "id": "brandenburg-potsdam",
+      "name": "Potsdam",
+      "box": [
+        241000,
+        -143000,
+        256000,
+        -128000
+      ],
+      "map": "regions/brandenburg-potsdam/map.json",
+      "tiles": [
+        "621.tar"
+      ]
+    },
+    {
+      "id": "thueringen-jena",
+      "name": "Jena",
+      "box": [
+        146000,
+        25000,
+        161000,
+        40000
+      ],
+      "map": "regions/thueringen-jena/map.json",
+      "tiles": [
+        "622.tar"
       ]
     }
   ]
