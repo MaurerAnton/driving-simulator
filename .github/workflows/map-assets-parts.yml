@@ -30,7 +30,7 @@ on:
   workflow_dispatch:
     inputs:
       releases:
-        description: 'Kartenpakete (Releases), in dieser Reihenfolge durchnumeriert (mit Leerzeichen getrennt)'
+        description: 'Kartenpakete (Releases, oder run:<Lauf-ID>:<Tag> für das Artefakt eines Bau-Laufs), in dieser Reihenfolge durchnumeriert (mit Leerzeichen getrennt)'
         type: string
         default: 'karte-suedwest-2026-11-20-r7 karte-suedost-2026-11-20-r7'
       type:
@@ -61,6 +61,7 @@ on:
 
 permissions:
   contents: write   # das Kartenpaket lesen, und ein Release schreiben, wenn to_release genannt ist
+  actions: read     # das Kartenpaket eines Bau-Laufs als Artefakt holen (run:<id>:<tag>)
 
 jobs:
   parts:
@@ -256,7 +257,19 @@ jobs:
             work="work/$i"
             mkdir -p "$work"
             echo "== $tag =="
-            gh release download "$tag" --pattern 'map.tar.*' -D "$work"
+            # run:<id>:<tag> – the package of a build run, taken from its artifact (karte-*-paket, kept 7 days) when
+            # no release could be made of it (GitHub refused releases to the workflows' token from 2026-11-24 on);
+            # <tag> is the name the release would have had: the region's id comes from it as from a release
+            if [[ "$tag" == run:* ]]; then
+              run_id=$(echo "$tag" | cut -d: -f2)
+              tag=$(echo "$tag" | cut -d: -f3-)
+              gh run download "$run_id" --pattern 'karte-*-paket' -D "$work/artifact"
+              find "$work/artifact" -name 'map.tar.*' -exec mv {} "$work/" \;
+              rm -rf "$work/artifact"
+              echo "   (aus dem Artefakt des Laufs $run_id: $tag)"
+            else
+              gh release download "$tag" --pattern 'map.tar.*' -D "$work"
+            fi
             # die Teile gehören zusammen: zusammengesetzt sind sie wieder ein tar (map/)
             ( cd "$work" && cat map.tar.* > map.tar && rm -f map.tar.* && tar xf map.tar && rm -f map.tar )
             echo "Karte: $(du -sh "$work/map" | cut -f1), $(find "$work/map/tiles" -name '*.fsb' | wc -l) Kacheln"
