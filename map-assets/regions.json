@@ -1,5 +1,5 @@
 {
-  "latest": "niedersachsen-salzgitter",
+  "latest": "niedersachsen-toppenstedt",
   "regions": [
     {
       "id": "suedwest",
@@ -6879,6 +6879,370 @@
       "map": "regions/niedersachsen-tetendorf/map.json",
       "tiles": [
         "557.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-toppenstedt",
+      "name": "Toppenstedt",
+      "box": [
+        37000,
+        -234000,
+        52000,
+        -219000
+      ],
+      "map": "regions/niedersachsen-toppenstedt/map.json",
+      "tiles": [
+        "558.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-tostedt",
+      "name": "Tostedt",
+      "box": [
+        7000,
+        -234000,
+        22000,
+        -219000
+      ],
+      "map": "regions/niedersachsen-tostedt/map.json",
+      "tiles": [
+        "559.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-twistringen",
+      "name": "Twistringen",
+      "box": [
+        -64000,
+        -182000,
+        -49000,
+        -167000
+      ],
+      "map": "regions/niedersachsen-twistringen/map.json",
+      "tiles": [
+        "560.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-undeloh",
+      "name": "Undeloh",
+      "box": [
+        25000,
+        -228000,
+        40000,
+        -213000
+      ],
+      "map": "regions/niedersachsen-undeloh/map.json",
+      "tiles": [
+        "561.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-unterlu",
+      "name": "Unterlüß",
+      "box": [
+        52000,
+        -184000,
+        67000,
+        -169000
+      ],
+      "map": "regions/niedersachsen-unterlu/map.json",
+      "tiles": [
+        "562.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-uslar",
+      "name": "Uslar",
+      "box": [
+        8000,
+        -53000,
+        23000,
+        -38000
+      ],
+      "map": "regions/niedersachsen-uslar/map.json",
+      "tiles": [
+        "563.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-visselhoevede",
+      "name": "Visselhövede",
+      "box": [
+        2000,
+        -200000,
+        17000,
+        -185000
+      ],
+      "map": "regions/niedersachsen-visselhoevede/map.json",
+      "tiles": [
+        "564.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-visselhovede",
+      "name": "Visselhövede",
+      "box": [
+        3000,
+        -200000,
+        18000,
+        -185000
+      ],
+      "map": "regions/niedersachsen-visselhovede/map.json",
+      "tiles": [
+        "565.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-voldagsen",
+      "name": "Voldagsen",
+      "box": [
+        22000,
+        -75000,
+        37000,
+        -60000
+      ],
+      "map": "regions/niedersachsen-voldagsen/map.json",
+      "tiles": [
+        "566.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-vordorf",
+      "name": "Vordorf",
+      "box": [
+        65000,
+        -133000,
+        80000,
+        -118000
+      ],
+      "map": "regions/niedersachsen-vordorf/map.json",
+      "tiles": [
+        "567.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wagenfeld",
+      "name": "Wagenfeld",
+      "box": [
+        -64000,
+        -152000,
+        -49000,
+        -138000
+      ],
+      "map": "regions/niedersachsen-wagenfeld/map.json",
+      "tiles": [
+        "568.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-walsrode",
+      "name": "Walsrode",
+      "box": [
+        3000,
+        -185000,
+        18000,
+        -170000
+      ],
+      "map": "regions/niedersachsen-walsrode/map.json",
+      "tiles": [
+        "569.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wardenburg",
+      "name": "Wardenburg",
+      "box": [
+        -88000,
+        -204000,
+        -73000,
+        -190000
+      ],
+      "map": "regions/niedersachsen-wardenburg/map.json",
+      "tiles": [
+        "570.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wedemark",
+      "name": "Wedemark",
+      "box": [
+        12000,
+        -149000,
+        27000,
+        -134000
+      ],
+      "map": "regions/niedersachsen-wedemark/map.json",
+      "tiles": [
+        "571.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-welle",
+      "name": "Welle",
+      "box": [
+        17000,
+        -230000,
+        32000,
+        -215000
+      ],
+      "map": "regions/niedersachsen-welle/map.json",
+      "tiles": [
+        "572.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-westenholz",
+      "name": "Westenholz",
+      "box": [
+        12000,
+        -177000,
+        27000,
+        -162000
+      ],
+      "map": "regions/niedersachsen-westenholz/map.json",
+      "tiles": [
+        "573.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-westerwalsede",
+      "name": "Westerwalsede",
+      "box": [
+        -11000,
+        -203000,
+        4000,
+        -188000
+      ],
+      "map": "regions/niedersachsen-westerwalsede/map.json",
+      "tiles": [
+        "574.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-westgroefehn",
+      "name": "Westgroßefehn",
+      "box": [
+        -133000,
+        -245000,
+        -118000,
+        -230000
+      ],
+      "map": "regions/niedersachsen-westgroefehn/map.json",
+      "tiles": [
+        "575.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wetschen",
+      "name": "Wetschen",
+      "box": [
+        -72000,
+        -150000,
+        -57000,
+        -135000
+      ],
+      "map": "regions/niedersachsen-wetschen/map.json",
+      "tiles": [
+        "576.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wiesede",
+      "name": "Wiesede",
+      "box": [
+        -117000,
+        -253000,
+        -102000,
+        -238000
+      ],
+      "map": "regions/niedersachsen-wiesede/map.json",
+      "tiles": [
+        "577.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wietzendorf",
+      "name": "Wietzendorf",
+      "box": [
+        27000,
+        -192000,
+        42000,
+        -177000
+      ],
+      "map": "regions/niedersachsen-wietzendorf/map.json",
+      "tiles": [
+        "578.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wildeshausen",
+      "name": "Wildeshausen",
+      "box": [
+        -73000,
+        -190000,
+        -58000,
+        -175000
+      ],
+      "map": "regions/niedersachsen-wildeshausen/map.json",
+      "tiles": [
+        "579.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wilsche",
+      "name": "Wilsche",
+      "box": [
+        65000,
+        -148000,
+        80000,
+        -133000
+      ],
+      "map": "regions/niedersachsen-wilsche/map.json",
+      "tiles": [
+        "580.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-winsen-aller",
+      "name": "Winsen (Aller)",
+      "box": [
+        28000,
+        -170000,
+        43000,
+        -155000
+      ],
+      "map": "regions/niedersachsen-winsen-aller/map.json",
+      "tiles": [
+        "581.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wittingen",
+      "name": "Wittingen",
+      "box": [
+        80000,
+        -163000,
+        95000,
+        -148000
+      ],
+      "map": "regions/niedersachsen-wittingen/map.json",
+      "tiles": [
+        "582.tar"
+      ]
+    },
+    {
+      "id": "niedersachsen-wunstorf",
+      "name": "Wunstorf",
+      "box": [
+        -6000,
+        -139000,
+        9000,
+        -124000
+      ],
+      "map": "regions/niedersachsen-wunstorf/map.json",
+      "tiles": [
+        "583.tar"
       ]
     }
   ]
